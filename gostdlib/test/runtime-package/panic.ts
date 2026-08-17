@@ -1,21 +1,4 @@
 import { GoErrorMethodToken, GoInterfaceValue, GoRuntimeErrorMethodToken } from "./interface-value.js";
-export class GoPanic {
-    private constructor(public readonly value: GoInterfaceValue) {
-    }
-    static createRuntime(message: string): GoPanic {
-        return new GoPanic(new GoRuntimePanicValue(message));
-    }
-    static raise(value: GoInterfaceValue): never {
-        throw new GoPanic(value);
-    }
-    static raiseRuntime(message: string): never {
-        throw new GoPanic(new GoRuntimePanicValue(message));
-    }
-    static rethrow(failure: object): never {
-        throw failure;
-    }
-    declare private readonly then?: never;
-}
 export class GoRuntimePanicValue extends GoInterfaceValue {
     static readonly comparable: boolean = true;
     constructor(public readonly message: string) {
@@ -46,6 +29,23 @@ export class GoRuntimePanicValue extends GoInterfaceValue {
     }
     RuntimeError(): void {
     }
+}
+export class GoPanic {
+    private constructor(public readonly value: GoInterfaceValue) {
+    }
+    static createRuntime(message: string): GoPanic {
+        return new GoPanic(new GoRuntimePanicValue(message));
+    }
+    static raise(value: GoInterfaceValue): never {
+        throw new GoPanic(value);
+    }
+    static raiseRuntime(message: string): never {
+        throw new GoPanic(new GoRuntimePanicValue(message));
+    }
+    static rethrow(failure: object): never {
+        throw failure;
+    }
+    declare private readonly then?: never;
 }
 export class GoRecovery {
     constructor(private pending: GoPanic | undefined) {

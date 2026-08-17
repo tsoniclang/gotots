@@ -183,6 +183,12 @@ func main() {
 		typescriptRunner,
 		goRunner,
 		func(artifacts renderedArtifacts) {
+			if !strings.Contains(
+				artifacts.printed,
+				"ReflectTypeMetadataOperations.$registerOpaqueStruct(",
+			) {
+				t.Fatalf("provider struct reflection lacks its compact opaque registration")
+			}
 			for _, required := range []string{
 				"TimeParseErrorOperations.$copy",
 				"TimeTimerOperations.$copy",

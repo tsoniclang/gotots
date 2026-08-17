@@ -33,6 +33,30 @@ func valueOperationsStatement(
 	sourceType types.Type,
 	descriptorName string,
 ) (tsgo.Statement, []api.RootRequest, bool, error) {
+	if structType, ok := types.Unalias(sourceType).Underlying().(*types.Struct); ok {
+		return structValueOperationsStatement(
+			context,
+			names,
+			operations,
+			reflectionType,
+			targetType,
+			sourceType,
+			descriptorName,
+			structType,
+		)
+	}
+	if pointerType, ok := types.Unalias(sourceType).Underlying().(*types.Pointer); ok {
+		return pointerValueOperationsStatement(
+			context,
+			names,
+			operations,
+			reflectionType,
+			targetType,
+			sourceType,
+			descriptorName,
+			pointerType,
+		)
+	}
 	scalarContext, err := scalarOperationContext(context, sourceType)
 	if err != nil {
 		return nil, nil, false, err

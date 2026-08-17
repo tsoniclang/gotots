@@ -2,6 +2,8 @@ package reflectvalue_test
 
 import (
 	"context"
+	"encoding/binary"
+	"fmt"
 	"go/types"
 	"os"
 	"os/exec"
@@ -14,6 +16,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/toolchain"
@@ -399,4 +402,167 @@ func verifyReflectCanonicalProjectInspect(
 	if len(sourceOutput) == 0 {
 		t.Fatal("native Go reflection fixture produced no evidence")
 	}
+}
+
+type reflectionRegistrationMeasurement struct {
+	count       int
+	bytes       int
+	nodes       int
+	runtimeSize int
+}
+
+func TestReflectionRegistrationsShareBoundedCommonMachinery(t *testing.T) {
+	small := measureReflectionRegistrations(t, 8)
+	large := measureReflectionRegistrations(t, 32)
+	countDelta := large.count - small.count
+	byteDelta := large.bytes - small.bytes
+	nodeDelta := large.nodes - small.nodes
+	if small.runtimeSize != large.runtimeSize {
+		t.Fatalf(
+			"common reflection owner changed with type count: %d -> %d",
+			small.runtimeSize,
+			large.runtimeSize,
+		)
+	}
+	if countDelta != 24 || byteDelta/countDelta > 3_700 ||
+		nodeDelta/countDelta > 550 {
+		t.Fatalf(
+			"reflection registration growth is not bounded: counts=%d/%d bytes=%d/%d nodes=%d/%d",
+			small.count,
+			large.count,
+			small.bytes,
+			large.bytes,
+			small.nodes,
+			large.nodes,
+		)
+	}
+	t.Logf(
+		"reflection registrations counts=%d/%d bytes=%d/%d nodes=%d/%d runtime=%d",
+		small.count,
+		large.count,
+		small.bytes,
+		large.bytes,
+		small.nodes,
+		large.nodes,
+		large.runtimeSize,
+	)
+}
+
+func measureReflectionRegistrations(
+	t *testing.T,
+	count int,
+) reflectionRegistrationMeasurement {
+	t.Helper()
+	project := t.TempDir()
+	var source strings.Builder
+	source.WriteString("package reflectvalue\n\nimport \"reflect\"\n\n")
+	for index := range count {
+		fmt.Fprintf(
+			&source,
+			"type Record%d struct { Count int; Name string; Ready bool }\n",
+			index,
+		)
+	}
+	source.WriteString("\nfunc Audit(index int) int {\n\tvalues := []any{")
+	for index := range count {
+		fmt.Fprintf(&source, "&Record%d{},", index)
+	}
+	source.WriteString(`}
+	total := 0
+	for _, value := range values {
+		reflected := reflect.ValueOf(value).Elem()
+		total += reflected.NumField()
+		if index >= 0 && index < reflected.NumField() && reflected.Field(index).CanSet() {
+			total++
+		}
+	}
+	return total
+}
+`)
+	emission := compileReflectFixture(
+		t,
+		project,
+		source.String(),
+		[]string{"Audit"},
+	)
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+	measurement := reflectionRegistrationMeasurement{count: count}
+	for _, file := range emission.Files() {
+		if file.OutputPath() != output.ReflectionTypeSupportPath {
+			continue
+		}
+		encoded, err := tsgo.EncodeSourceFile(file.SourceFile())
+		if err != nil {
+			t.Fatal(err)
+		}
+		measurement.nodes = encodedReflectionNodes(t, encoded)
+		for _, path := range artifacts.paths {
+			if !strings.HasSuffix(
+				filepath.ToSlash(path),
+				output.ReflectionTypeSupportPath,
+			) {
+				continue
+			}
+			printed, readErr := os.ReadFile(path)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			measurement.bytes = len(printed)
+			text := string(printed)
+			if structs := strings.Count(text, ".$registerStruct("); structs != count {
+				t.Fatalf("struct registrations = %d, want %d", structs, count)
+			}
+			if pointers := strings.Count(text, ".$registerPointer("); pointers < count {
+				t.Fatalf("pointer registrations = %d, want at least %d", pointers, count)
+			}
+			for _, forbidden := range []string{
+				"switch (index)",
+				".$registerValue($goReflectType$Named_reflectvalue$Record",
+				".$registerValue($goReflectType$PointerTo_Named_reflectvalue$Record",
+			} {
+				if strings.Contains(text, forbidden) {
+					t.Fatalf("reflection registrations retain %q", forbidden)
+				}
+			}
+		}
+	}
+	runtimeSource, err := os.ReadFile(filepath.Join(
+		repositoryRoot(),
+		"gostdlib",
+		"src",
+		"internal",
+		"portable",
+		"reflect",
+		"runtime-value.ts",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	measurement.runtimeSize = len(runtimeSource)
+	if measurement.bytes == 0 || measurement.nodes == 0 {
+		t.Fatalf("reflection registration artifact is absent: %#v", measurement)
+	}
+	return measurement
+}
+
+func encodedReflectionNodes(t *testing.T, encoded []byte) int {
+	t.Helper()
+	const (
+		headerSize       = 44
+		nodesOffsetField = 40
+		nodeWidth        = 28
+	)
+	if len(encoded) < headerSize {
+		t.Fatalf("encoded target is %d bytes, want protocol header", len(encoded))
+	}
+	nodesOffset := int(binary.LittleEndian.Uint32(
+		encoded[nodesOffsetField:headerSize],
+	))
+	if nodesOffset < headerSize || nodesOffset > len(encoded) ||
+		(len(encoded)-nodesOffset)%nodeWidth != 0 {
+		t.Fatalf("encoded target has invalid node offset %d", nodesOffset)
+	}
+	return (len(encoded) - nodesOffset) / nodeWidth
 }

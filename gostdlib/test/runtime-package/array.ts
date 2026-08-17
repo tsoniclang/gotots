@@ -1,4 +1,3 @@
-import { GoDenseIndex } from "./dense-index.js";
 import { GoPanic } from "./panic.js";
 export class GoArray<T, N extends number> {
     private constructor(private readonly $values: T[], private readonly $offset: number, public readonly length: N) {
@@ -16,7 +15,7 @@ export class GoArray<T, N extends number> {
         }
         const result = GoArray.zero<T, N>(length, zero);
         for (let entry = 0; entry < indexes.length; entry++) {
-            result.set(GoDenseIndex.get(indexes, entry), GoDenseIndex.get(values, entry));
+            result.set((entry in indexes ? indexes[entry] : GoPanic.raiseRuntime("dense storage index is absent")) as number, (entry in values ? values[entry] : GoPanic.raiseRuntime("dense storage index is absent")) as T);
         }
         return result;
     }
@@ -25,7 +24,7 @@ export class GoArray<T, N extends number> {
     }
     public get(index: number | bigint): T {
         const offset: number = this.$check(index);
-        return GoDenseIndex.get(this.$values, this.$offset + offset);
+        return (this.$offset + offset in this.$values ? this.$values[this.$offset + offset] : GoPanic.raiseRuntime("dense storage index is absent")) as T;
     }
     public set(index: number | bigint, value: T): void {
         const offset: number = this.$check(index);

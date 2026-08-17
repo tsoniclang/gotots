@@ -823,6 +823,20 @@ constructor names, object-key enumeration, property spelling, source-name
 tables, `any`, `unknown`, unchecked casts, and product/package-specific
 descriptor overrides are forbidden.
 
+Invariant reflection mechanics are emitted once at the portable provider
+owner, never repeated inside every descriptor. Generated code supplies only
+exact typed facts and callbacks: the concrete adapter, canonical relation
+descriptors, ordered struct-field accessors, pointer load/store operations,
+copy/zero operations, and explicit unsupported dispositions. For example, a
+struct registration supplies an ordered array of typed field accessors; the
+provider owns the single adapter guard, index bounds check, reflected-location
+construction, and clone guard. A pointer registration supplies its typed
+pointee descriptor and exact location callbacks; the provider owns the single
+nil/foreign-box decision. Moving common mechanics into generated per-type
+closures is a source-size and typecheck regression even when behavior remains
+correct. Erasing callback payloads or recovering their types dynamically is
+equally invalid.
+
 Descriptor definitions are emitted once and use-site references are O(1).
 Metadata growth is linear in reached canonical types plus their actual
 fields/methods; it may not grow by type-pair, call-site, implementer, or package

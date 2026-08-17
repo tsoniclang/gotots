@@ -17,7 +17,13 @@ import {
   type RuntimeTypeRegistration,
 } from "../portable/reflect/runtime-type.js";
 import {
+  registerRuntimeOpaqueStructValueOperations,
+  registerRuntimePointerValueOperations,
+  registerRuntimeStructValueOperations,
   registerRuntimeValueOperations,
+  type RuntimePointerValueOperations,
+  type RuntimeStructFieldOperations,
+  type RuntimeValueAdapter,
   type RuntimeValueOperations,
 } from "../portable/reflect/runtime-value.js";
 
@@ -39,6 +45,35 @@ export class ReflectTypeMetadataOperations {
     operations: () => RuntimeValueOperations,
   ): void {
     registerRuntimeValueOperations(type, operations);
+  }
+
+  static $registerStruct<T>(
+    type: Type,
+    adapter: RuntimeValueAdapter<T>,
+    fields: readonly RuntimeStructFieldOperations<T>[],
+    clone?: (value: T) => T,
+  ): void {
+    registerRuntimeStructValueOperations(type, adapter, fields, clone);
+  }
+
+  static $registerOpaqueStruct<T>(
+    type: Type,
+    adapter: RuntimeValueAdapter<T>,
+    unavailableFields: readonly gostring[],
+  ): void {
+    registerRuntimeOpaqueStructValueOperations(
+      type,
+      adapter,
+      unavailableFields,
+    );
+  }
+
+  static $registerPointer<P>(
+    type: Type,
+    adapter: RuntimeValueAdapter<P | undefined>,
+    descriptor: RuntimePointerValueOperations<P>,
+  ): void {
+    registerRuntimePointerValueOperations(type, adapter, descriptor);
   }
 }
 

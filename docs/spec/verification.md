@@ -558,6 +558,20 @@ unexported, tagged/untagged, embedded, nonzero-offset, and non-comparable
 cases. Product evidence reports descriptor roots, recursive relation types,
 field records, descriptor bytes, and the largest descriptor module separately.
 
+Value-operation shape tests additionally reject a per-type adapter guard,
+field-index switch, reflected-location wrapper, clone guard, or pointer nil
+decision when the portable provider owns that invariant mechanic. A scaling
+fixture grows reflected structs and pointers from 8 to 32 concrete types,
+strict-typechecks both artifacts, and bounds incremental TypeScript bytes and
+TS-Go AST nodes by the type-specific descriptors and callbacks while the
+common provider implementation remains byte-identical. Mutations reorder one
+field descriptor, substitute its adapter, drop a setter/copy callback, route a
+provider-owned field through ordinary storage, or restore the per-type switch;
+the descriptor-shape, strict-typecheck, native-Go differential, or generated-
+size gate must fail before output is sealed. Broad artifact searches prove
+that each migrated semantic family has one typed registration route and no
+superseded direct `$registerValue` registration.
+
 ## Generic Proof
 
 Fixtures cover:

@@ -1,4 +1,5 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
+import { GoPanic } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
@@ -23,12 +24,43 @@ export interface RuntimeValueLocation {
   readonly set: (box: GoInterfaceValue | undefined) => void;
 }
 
-// RuntimeValueOperations are the generated per-type typed value callbacks
-// of one reflection-visible Go type. Every callback receives the canonical
-// interface box, performs its exact generated adapter guard, and projects
-// or mutates through the represented storage. A callback is present
-// exactly when the type's kind admits the operation; absence is kind
-// evidence, never a missing-metadata fallback.
+export interface RuntimeValueAdapter<T> {
+  new (value: T): GoInterfaceValue & { readonly $go$value: T };
+  $is(
+    value: GoInterfaceValue | undefined,
+  ): value is GoInterfaceValue & { readonly $go$value: T };
+}
+
+export interface RuntimeStructFieldOperations<T> {
+  readonly type: () => Type;
+  readonly settable: bool;
+  readonly get: (value: T) => GoInterfaceValue | undefined;
+  readonly set: (
+    value: T,
+    field: GoInterfaceValue | undefined,
+  ) => void;
+}
+
+export interface RuntimePointerElementOperations<P> {
+  readonly type: () => Type;
+  readonly get: (pointer: P) => GoInterfaceValue | undefined;
+  readonly set: (
+    pointer: P,
+    value: GoInterfaceValue | undefined,
+  ) => void;
+}
+
+export interface RuntimePointerValueOperations<P> {
+  readonly zero?: true;
+  readonly element?: RuntimePointerElementOperations<P>;
+  readonly newPointer?: () => P;
+}
+
+// RuntimeValueOperations are the settled value operations of one
+// reflection-visible Go type. Generated callbacks carry exact typed storage
+// facts; common registrations own invariant guards and location mechanics.
+// An operation is present exactly when the type's kind admits it; absence is
+// kind evidence, never a missing-metadata fallback.
 export interface RuntimeValueOperations {
   readonly int?: (box: GoInterfaceValue) => int64;
   readonly uint?: (box: GoInterfaceValue) => uint64;
@@ -149,6 +181,140 @@ export function registerRuntimeValueOperations(
   factory: () => RuntimeValueOperations,
 ): void {
   operationsByType.set(type, { factory });
+}
+
+export function registerRuntimeStructValueOperations<T>(
+  type: Type,
+  adapter: RuntimeValueAdapter<T>,
+  fields: readonly RuntimeStructFieldOperations<T>[],
+  clone?: (value: T) => T,
+): void {
+  registerRuntimeValueOperations(type, () => {
+    const fieldCount = BigInt(fields.length);
+    const field = (
+      box: GoInterfaceValue,
+      index: int64,
+    ): RuntimeValueLocation => {
+      if (!adapter.$is(box)) {
+        return GoPanic.raiseRuntime(
+          "reflect: Value.Field received a foreign interface box",
+        );
+      }
+      if (index < 0n || index >= fieldCount) {
+        return GoPanic.raiseRuntime("reflect: Field index out of range");
+      }
+      const selected = fields[Number(index)];
+      if (selected === undefined) {
+        return GoPanic.raiseRuntime("reflect: Field index out of range");
+      }
+      const value = box.$go$value;
+      return {
+        type: selected.type,
+        settable: selected.settable,
+        get: (): GoInterfaceValue | undefined => selected.get(value),
+        set: (fieldValue: GoInterfaceValue | undefined): void => {
+          selected.set(value, fieldValue);
+        },
+      };
+    };
+    if (clone === undefined) {
+      return { numField: fieldCount, field };
+    }
+    return {
+      numField: fieldCount,
+      field,
+      cloned: (box: GoInterfaceValue): GoInterfaceValue => {
+        if (!adapter.$is(box)) {
+          return GoPanic.raiseRuntime(
+            "reflect: Value.Interface received a foreign interface box",
+          );
+        }
+        return new adapter(clone(box.$go$value));
+      },
+    };
+  });
+}
+
+export function registerRuntimeOpaqueStructValueOperations<T>(
+  type: Type,
+  adapter: RuntimeValueAdapter<T>,
+  unavailableFields: readonly gostring[],
+): void {
+  registerRuntimeValueOperations(type, () => {
+    const fieldCount = BigInt(unavailableFields.length);
+    return {
+      numField: fieldCount,
+      field: (box: GoInterfaceValue, index: int64): RuntimeValueLocation => {
+        if (!adapter.$is(box)) {
+          return GoPanic.raiseRuntime(
+            "reflect: Value.Field received a foreign interface box",
+          );
+        }
+        if (index < 0n || index >= fieldCount) {
+          return GoPanic.raiseRuntime("reflect: Field index out of range");
+        }
+        const message = unavailableFields[Number(index)];
+        return GoPanic.raiseRuntime(
+          message ?? "reflect: Field index out of range",
+        );
+      },
+    };
+  });
+}
+
+export function registerRuntimePointerValueOperations<P>(
+  type: Type,
+  adapter: RuntimeValueAdapter<P | undefined>,
+  descriptor: RuntimePointerValueOperations<P>,
+): void {
+  registerRuntimeValueOperations(type, () => {
+    const element = descriptor.element;
+    const newPointer = descriptor.newPointer;
+    const elementOperation = element === undefined
+      ? {}
+      : {
+        elem: (
+          box: GoInterfaceValue,
+        ): RuntimeValueLocation | undefined => {
+          if (!adapter.$is(box)) {
+            return GoPanic.raiseRuntime(
+              "reflect: Value.Elem received a foreign interface box",
+            );
+          }
+          const pointer = box.$go$value;
+          if (pointer === undefined) {
+            return undefined;
+          }
+          return {
+            type: element.type,
+            settable: true,
+            get: (): GoInterfaceValue | undefined => element.get(pointer),
+            set: (value: GoInterfaceValue | undefined): void => {
+              element.set(pointer, value);
+            },
+          };
+        },
+      };
+    const zeroOperation = descriptor.zero === true
+      ? { zero: (): GoInterfaceValue => new adapter(undefined) }
+      : {};
+    const newPointerOperation = newPointer === undefined
+      ? {}
+      : { newPointer: (): GoInterfaceValue => new adapter(newPointer()) };
+    return {
+      isNil: (box: GoInterfaceValue): bool => {
+        if (!adapter.$is(box)) {
+          return GoPanic.raiseRuntime(
+            "reflect: Value.IsNil received a foreign interface box",
+          );
+        }
+        return box.$go$value === undefined;
+      },
+      ...elementOperation,
+      ...zeroOperation,
+      ...newPointerOperation,
+    };
+  });
 }
 
 // runtimeValueOperations resolves the generated value-operation record of

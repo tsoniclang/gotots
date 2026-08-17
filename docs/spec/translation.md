@@ -783,6 +783,38 @@ descriptor. `TypeOf` returns that descriptor and `ValueOf` creates a typed
 reflective value view whose field/index/element operations delegate to
 generated typed accessors. No host object inspection occurs.
 
+Per-type reflection output contains facts, not a copied reflection
+interpreter. For example, an addressable source struct contributes one compact
+typed registration equivalent to:
+
+```ts
+ReflectTypeMetadataOperations.$registerStruct(
+  $goReflectType_Entry,
+  $goInterfaceAdapter_Entry,
+  [{
+    type: () => $goReflectType_string,
+    settable: true,
+    get: entry => new $goInterfaceAdapter_string(entry.Name),
+    set: (entry, field) => {
+      entry.Name = $goInterfaceAdapter_string.$is(field)
+        ? field.$go$value
+        : GoPanic.raiseRuntime(
+            "reflect: Value.Set received a foreign interface box",
+          );
+    },
+  }],
+  Entry.$copy,
+);
+```
+
+The portable provider owns the one adapter guard, field bounds check,
+location wrapper, and clone wrapper used by every such registration. The
+generated callbacks stay statically typed from their concrete adapter; no
+payload cast, source-name lookup, or host reflection is permitted. Provider-
+represented structs use a distinct typed opaque-field registration whose
+only generated facts are field-order-preserving failure messages; they do not
+retain the ordinary field-access path behind a fallback.
+
 For an open generic body:
 
 ```go

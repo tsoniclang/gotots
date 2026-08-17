@@ -32,11 +32,7 @@ func scaffoldPayload(scaffold *locationScaffold) tsgo.Expression {
 }
 
 // extendedValueProperties derives the location-model callbacks admitted by
-// one type's kind beyond the scalar projections: zero evidence and string
-// boxing for basic scalars, aliasing element navigation for pointers to
-// directly represented structs, and field navigation for structs. A struct
-// participating in the value model with a field kind outside the supported
-// scalar set fails at emission, never silently at runtime.
+// one non-struct, non-pointer kind beyond its scalar projections.
 func extendedValueProperties(
 	context api.Context,
 	names api.ReflectionNames,
@@ -47,37 +43,6 @@ func extendedValueProperties(
 	switch selected := types.Unalias(sourceType).Underlying().(type) {
 	case *types.Basic:
 		return basicValueProperties(context, scaffold, sourceType, selected)
-	case *types.Pointer:
-		switch types.Unalias(selected.Elem()).Underlying().(type) {
-		case *types.Struct:
-			return pointerValueProperties(
-				context,
-				names,
-				reflectionType,
-				sourceType,
-				selected.Elem(),
-				scaffold,
-			)
-		case *types.Slice, *types.Basic, *types.Map:
-			return pointerCellValueProperties(
-				context,
-				names,
-				reflectionType,
-				selected.Elem(),
-				scaffold,
-			)
-		default:
-			return nil, nil
-		}
-	case *types.Struct:
-		return structValueProperties(
-			context,
-			names,
-			reflectionType,
-			sourceType,
-			selected,
-			scaffold,
-		)
 	case *types.Slice:
 		return sliceValueProperties(
 			context,
