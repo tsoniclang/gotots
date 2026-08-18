@@ -531,6 +531,14 @@ ESM for:
 - open generic `TypeFor[T]` through exact private capability or
   concretization, with unchanged source value arity.
 
+Provider-facet tests independently certify the metadata operation target and
+its concrete result target. The checked return type of `$create` must
+exact-join the result export's type symbol, and the manifest must carry the
+result export's sole implementation owner, target fingerprint, and behavior
+sites. Generated-source inspection requires every descriptor declaration and
+descriptor-returning callback to use that certified concrete target before an
+ordinary Go-facing `reflect.Type` assignment widens it.
+
 An independent descriptor extractor walks the selected `go/types` graph and
 exact-joins canonical type identity, kind, relations, fields, tags, methods,
 and architecture sizes against generated descriptor records. Runtime tests
@@ -545,6 +553,13 @@ descriptor join, staticness wall, source-shape gate, strict typecheck, or
 differential test. Scaling holds call sites constant and bounds descriptor
 bytes/AST nodes by canonical types plus fields/methods, with no type-pair or
 call-site cross-product.
+
+Facet-result mutations remove or rename the result export, substitute a
+different checked provider type, alter its implementation owner or
+fingerprint, widen `$create` back to the public interface, or widen one
+generated descriptor callback. Each must fail at seed validation, provider
+certification, manifest validation, generated-AST inspection, or strict
+typechecking; no emitter-local spelling fallback is permitted.
 
 Reachability tests exercise both discovery orders: adapter before reflection
 demand and reflection demand before adapter. They exact-join the descriptors

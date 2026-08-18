@@ -761,13 +761,19 @@ func Describe() (reflect.Kind, string) {
 The call emits a reference to one canonical generated descriptor:
 
 ```ts
+export const $goReflectType_Entry: named_reflect.RuntimeType =
+  named_reflect.ReflectTypeMetadataOperations.$create(/* exact metadata */);
 const typ: reflect.Type = $goReflectType_Entry;
 return [typ.Kind(), typ.Field(0).Tag.Get("json")];
 ```
 
 The descriptor is generated from the selected `go/types.Named` and
 `go/types.Struct`; it is not assembled from target class names or target object
-properties. Its `Entry` field record points lazily to the canonical string
+properties. Its declaration and every generated descriptor callback preserve
+the provider facet's certified concrete result type. Only the authored
+Go-facing assignment above widens it to `reflect.Type`; the compiler does not
+erase the concrete result at its provider boundary. Its `Entry` field record
+points lazily to the canonical string
 descriptor and records the exact tag, package identity, offset, index, and
 embedded/exported facts.
 

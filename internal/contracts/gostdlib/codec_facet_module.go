@@ -232,7 +232,11 @@ func validateFacetModule(
 			}
 			referencedRepresentations[facet.RepresentationExport] = struct{}{}
 		}
-		for _, target := range []string{facet.Export, facet.StorageExport} {
+		for _, target := range []string{
+			facet.Export,
+			facet.ResultExport,
+			facet.StorageExport,
+		} {
 			if target == "" {
 				continue
 			}

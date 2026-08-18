@@ -428,7 +428,11 @@ func buildFacetModules(
 			if err != nil {
 				return nil, err
 			}
-			for _, name := range []string{facet.Export, facet.StorageExport} {
+			for _, name := range []string{
+				facet.Export,
+				facet.ResultExport,
+				facet.StorageExport,
+			} {
 				if name != "" {
 					owned[name] = struct{}{}
 				}
@@ -451,6 +455,33 @@ func buildFacetModules(
 			)
 			if err != nil {
 				return nil, err
+			}
+			if facet.ResultExport != "" {
+				resultTarget, resultOK := byName[facet.ResultExport]
+				if !resultOK {
+					return nil, certifyError(
+						"build facet",
+						facet.ResultExport,
+						"facet result export is absent",
+					)
+				}
+				resultSites, resultErr := facetImplementationSites(
+					config,
+					project,
+					"facet result "+facet.SourceIdentity+"/"+string(facet.Kind),
+					facet.ResultExport,
+					resultTarget.DeclarationNodeHandles(),
+					behaviorEvidence,
+				)
+				if resultErr != nil {
+					return nil, resultErr
+				}
+				facet.ImplementationSites = append(
+					facet.ImplementationSites,
+					resultSites...,
+				)
+				sort.Strings(facet.ImplementationSites)
+				facet.ImplementationSites = slices.Compact(facet.ImplementationSites)
 			}
 			facets = append(facets, facet)
 		}

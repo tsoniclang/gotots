@@ -437,7 +437,7 @@ export function createRuntimeType(
   metadata: () => RuntimeTypeMetadata,
   methodTokens: () => readonly object[],
   registration?: RuntimeTypeRegistration,
-): Type {
+): RuntimeType {
   const result = new RuntimeType(metadata, methodTokens, registration);
   if (registration?.dynamicType !== undefined) {
     runtimeTypesByDynamicType.set(registration.dynamicType, result);

@@ -13,7 +13,7 @@ func structValueOperationsStatement(
 	names api.ReflectionNames,
 	operations api.NameReference,
 	reflectionType *types.TypeName,
-	targetType api.NameReference,
+	descriptorType api.NameReference,
 	sourceType types.Type,
 	descriptorName string,
 	structType *types.Struct,
@@ -62,10 +62,10 @@ func structValueOperationsStatement(
 		return nil, nil, false, err
 	}
 	scaffold := &locationScaffold{
-		factory:    factory,
-		adapter:    adapter,
-		panicRef:   panicReference,
-		targetType: targetType,
+		factory:        factory,
+		adapter:        adapter,
+		panicRef:       panicReference,
+		descriptorType: descriptorType,
 	}
 	fields := make([]tsgo.Expression, 0, structType.NumFields())
 	for index := range structType.NumFields() {
@@ -267,7 +267,7 @@ func structFieldOperations(
 	return factory.ObjectLiteralExpression([]tsgo.ObjectLiteralElementLike{
 		expressionProperty(factory, "type", arrow(
 			factory,
-			scaffold.targetType,
+			scaffold.descriptorType,
 			descriptor.Expression(factory),
 		)),
 		booleanProperty(factory, "settable", settable),

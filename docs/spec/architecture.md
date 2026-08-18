@@ -1441,6 +1441,19 @@ dynamic call or ambiguous symbol fails certification. Canonical placeholder
 identity derives from checked caller/symbol evidence, never a free-form
 string argument.
 
+A provider facet may separately certify the concrete result type produced by
+one of its operations when the public Go contract intentionally widens that
+result. The result export is a distinct facet target with its own exact export
+identity, implementation owner, target fingerprint, and implementation sites.
+Certification exact-joins the selected operation member's checked return type
+to that export's checked type symbol; assignability, display spelling, and a
+shared implementation file are insufficient. For reflection metadata,
+`ReflectTypeMetadataOperations.$create` therefore returns the certified
+`RuntimeType`, while ordinary Go-facing uses may still widen that value to
+`reflect.Type`. Generated declarations and callbacks retain the concrete
+result target until an authored Go contract performs that widening. A missing,
+foreign, or stale result target fails provider certification before emission.
+
 The used-provider closure is computed from the provider-routed settled roots
 through certified implementation dependencies and capabilities under one exact
 build and provider profile. Every join is by canonical identity and reports

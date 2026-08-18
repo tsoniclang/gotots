@@ -265,6 +265,27 @@ func (n *File) ReflectionOperations(
 	return reference, nil
 }
 
+func (n *File) ReflectionDescriptorType(
+	reflectionType *types.TypeName,
+) (api.NameReference, error) {
+	reference, providerOwned, err := n.providerFacetResultReference(
+		reflectionType,
+		gostdlib.FacetReflectionTypeOperations,
+		gostdlib.FacetCapabilityMetadata,
+		api.ImportPhaseType,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	if !providerOwned {
+		return api.NameReference{}, &api.NameError{
+			Name:   reflectionType.Name(),
+			Reason: "reflection type has no certified descriptor result type",
+		}
+	}
+	return reference, nil
+}
+
 func (n *File) ReflectionTypeOf(
 	argumentType types.Type,
 	reflectionType *types.TypeName,

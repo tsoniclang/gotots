@@ -54,6 +54,27 @@ func TestReflectTypeForUsesCanonicalGeneratedMetadata(t *testing.T) {
 			)
 		}
 	}
+	for _, required := range []string{
+		": named_reflect.RuntimeType = named_reflect.ReflectTypeMetadataOperations.$create",
+		"(): named_reflect.RuntimeType => ($goReflectType$",
+	} {
+		if !strings.Contains(reflectionSource, required) {
+			t.Fatalf(
+				"reflection metadata lost its concrete descriptor type %q:\n%s",
+				required,
+				reflectionSource,
+			)
+		}
+	}
+	if strings.Contains(
+		reflectionSource,
+		": reflect.Type = named_reflect.ReflectTypeMetadataOperations.$create",
+	) {
+		t.Fatalf(
+			"reflection metadata widened a provider-created descriptor:\n%s",
+			reflectionSource,
+		)
+	}
 	if strings.Contains(artifacts.printed, ".TypeFor<") {
 		t.Fatalf("TypeFor retained an erased TypeScript generic call:\n%s", artifacts.printed)
 	}

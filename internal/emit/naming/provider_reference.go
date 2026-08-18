@@ -14,6 +14,14 @@ type providerImport struct {
 	local string
 }
 
+type providerFacetTarget uint8
+
+const (
+	providerFacetPrimaryTarget providerFacetTarget = iota + 1
+	providerFacetResultTarget
+	providerFacetStorageTarget
+)
+
 func (n *File) providerImport(
 	module string,
 	phase api.ImportPhase,
@@ -79,7 +87,7 @@ func (n *File) providerFacetReference(
 		kind,
 		capability,
 		phase,
-		false,
+		providerFacetPrimaryTarget,
 	)
 }
 
@@ -94,7 +102,22 @@ func (n *File) providerFacetStorageReference(
 		kind,
 		capability,
 		phase,
-		true,
+		providerFacetStorageTarget,
+	)
+}
+
+func (n *File) providerFacetResultReference(
+	object types.Object,
+	kind gostdlib.FacetKind,
+	capability gostdlib.FacetCapability,
+	phase api.ImportPhase,
+) (api.NameReference, bool, error) {
+	return n.providerFacetTargetReference(
+		object,
+		kind,
+		capability,
+		phase,
+		providerFacetResultTarget,
 	)
 }
 
@@ -103,7 +126,7 @@ func (n *File) providerFacetTargetReference(
 	kind gostdlib.FacetKind,
 	capability gostdlib.FacetCapability,
 	phase api.ImportPhase,
-	storage bool,
+	target providerFacetTarget,
 ) (api.NameReference, bool, error) {
 	contract, providerOwned, err := n.providerFacetOwner(object)
 	if err != nil || !providerOwned {
@@ -129,13 +152,28 @@ func (n *File) providerFacetTargetReference(
 		}
 	}
 	export := selected.Export()
-	if storage {
+	switch target {
+	case providerFacetPrimaryTarget:
+	case providerFacetResultTarget:
+		export = selected.ResultExport()
+		if export == "" {
+			return api.NameReference{}, true, &api.NameError{
+				Name:   contract.Identity(),
+				Reason: "provider facet has no certified result target",
+			}
+		}
+	case providerFacetStorageTarget:
 		export = selected.StorageExport()
 		if export == "" {
 			return api.NameReference{}, true, &api.NameError{
 				Name:   contract.Identity(),
 				Reason: "provider facet has no certified storage target",
 			}
+		}
+	default:
+		return api.NameReference{}, true, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider facet target selection is invalid",
 		}
 	}
 	qualifier, request, err := n.providerImport(

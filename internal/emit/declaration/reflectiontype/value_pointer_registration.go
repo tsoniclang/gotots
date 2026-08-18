@@ -13,7 +13,7 @@ func pointerValueOperationsStatement(
 	names api.ReflectionNames,
 	operations api.NameReference,
 	reflectionType *types.TypeName,
-	targetType api.NameReference,
+	descriptorType api.NameReference,
 	sourceType types.Type,
 	descriptorName string,
 	pointerType *types.Pointer,
@@ -24,9 +24,9 @@ func pointerValueOperationsStatement(
 		return nil, nil, false, err
 	}
 	scaffold := &locationScaffold{
-		factory:    factory,
-		adapter:    adapter,
-		targetType: targetType,
+		factory:        factory,
+		adapter:        adapter,
+		descriptorType: descriptorType,
 	}
 	properties := make([]tsgo.ObjectLiteralElementLike, 0, 3)
 	pointee := pointerType.Elem()
@@ -202,7 +202,7 @@ func pointerStoredElementOperations(
 	return factory.ObjectLiteralExpression([]tsgo.ObjectLiteralElementLike{
 		expressionProperty(factory, "type", arrow(
 			factory,
-			scaffold.targetType,
+			scaffold.descriptorType,
 			descriptor.Expression(factory),
 		)),
 		expressionProperty(factory, "get", factory.ArrowFunction(

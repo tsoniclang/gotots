@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 22,
+  "schemaVersion": 23,
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -1666,6 +1666,7 @@
       "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
       "sourcePath": "src/internal/facets/named-reflect.ts",
       "export": "ReflectTypeMetadataOperations",
+      "resultExport": "RuntimeType",
       "capabilities": [
         "metadata"
       ]

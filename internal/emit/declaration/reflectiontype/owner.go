@@ -34,7 +34,7 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
-	targetType, err := context.Names().TypeReference(reflectionType)
+	descriptorType, err := names.ReflectionDescriptorType(reflectionType)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -44,7 +44,7 @@ func Build(
 		artifact.ArtifactKey(),
 		sourceType,
 		reflectionType,
-		targetType,
+		descriptorType,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -54,7 +54,7 @@ func Build(
 		names,
 		sourceType,
 		reflectionType,
-		targetType,
+		descriptorType,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -89,7 +89,7 @@ func Build(
 					context.Factory().Identifier(artifact.TargetName()),
 					nil,
 					context.Factory().TypeReferenceNode(
-						targetType.EntityName(context.Factory()),
+						descriptorType.EntityName(context.Factory()),
 						nil,
 					),
 					initializer,
@@ -102,7 +102,7 @@ func Build(
 	requests := api.CombineRequests(
 		operations.Requests(),
 		contract.Requests(),
-		targetType.Requests(),
+		descriptorType.Requests(),
 		metadataRequests,
 		registrationRequests,
 	)
@@ -113,7 +113,7 @@ func Build(
 				names,
 				operations,
 				reflectionType,
-				targetType,
+				descriptorType,
 				sourceType,
 				artifact.TargetName(),
 			)
@@ -134,7 +134,7 @@ func metadataExpression(
 	identity string,
 	sourceType types.Type,
 	reflectionType *types.TypeName,
-	targetType api.NameReference,
+	descriptorType api.NameReference,
 ) (tsgo.ObjectLiteralExpression, []api.RootRequest, error) {
 	factory := context.Factory()
 	providerScalar, providerScalarOK := context.ProviderScalarABI()
@@ -246,7 +246,7 @@ func metadataExpression(
 		properties = append(properties, expressionProperty(
 			factory,
 			relation.name,
-			arrow(factory, targetType, reference.Expression(factory)),
+			arrow(factory, descriptorType, reference.Expression(factory)),
 		))
 		requests = append(requests, reference.Requests()...)
 	}
@@ -255,7 +255,7 @@ func metadataExpression(
 		providerScalar,
 		names,
 		reflectionType,
-		targetType,
+		descriptorType,
 		description.structType,
 		description.offsets,
 	)
@@ -397,7 +397,7 @@ func fieldMetadata(
 	providerScalar api.ScalarABI,
 	names api.ReflectionNames,
 	reflectionType *types.TypeName,
-	targetType api.NameReference,
+	descriptorType api.NameReference,
 	structType *types.Struct,
 	offsets []int64,
 ) (tsgo.ArrayLiteralExpression, []api.RootRequest, error) {
@@ -421,7 +421,7 @@ func fieldMetadata(
 			expressionProperty(
 				factory,
 				"type",
-				arrow(factory, targetType, reference.Expression(factory)),
+				arrow(factory, descriptorType, reference.Expression(factory)),
 			),
 		}
 		if pkgPath != "" {

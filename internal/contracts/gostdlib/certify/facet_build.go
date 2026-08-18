@@ -77,6 +77,25 @@ func buildFacet(
 	if err := validateFacetTarget(seed, target); err != nil {
 		return gostdlib.FacetDocument{}, err
 	}
+	var resultTarget tsgo.ProjectExport
+	if seed.ResultExport != "" {
+		resultTarget, ok = targets[seed.ResultExport]
+		if !ok {
+			return gostdlib.FacetDocument{}, certifyError(
+				"build facet",
+				seed.ResultExport,
+				"result target export is absent",
+			)
+		}
+		if err := validateFacetResultTarget(
+			project,
+			seed,
+			target,
+			resultTarget,
+		); err != nil {
+			return gostdlib.FacetDocument{}, err
+		}
+	}
 	effect := seed.Effect
 	var callableParameters []gostdlib.ProviderCallableParameterDocument
 	var err error
@@ -143,6 +162,7 @@ func buildFacet(
 		SourceIdentity:       seed.SourceIdentity,
 		Capabilities:         append([]gostdlib.FacetCapability(nil), seed.Capabilities...),
 		Export:               seed.Export,
+		ResultExport:         seed.ResultExport,
 		StorageExport:        seed.StorageExport,
 		RepresentationExport: seed.RepresentationExport,
 		Effect:               effect,
@@ -150,6 +170,16 @@ func buildFacet(
 		GenericTypeArguments: slices.Clone(seed.GenericTypeArguments),
 		ImplementationOwner:  owner,
 		TargetFingerprint:    target.Fingerprint(),
+	}
+	if seed.ResultExport != "" {
+		document.ResultImplementationOwner, err = singleImplementationOwner(
+			seed.ResultExport,
+			resultTarget.ImplementationOwners(),
+		)
+		if err != nil {
+			return gostdlib.FacetDocument{}, err
+		}
+		document.ResultTargetFingerprint = resultTarget.Fingerprint()
 	}
 	if seed.RepresentationExport != "" {
 		representation, ok := representations[seed.RepresentationExport]
@@ -527,48 +557,6 @@ func verifyRepresentationTargetMembers(
 				"build representation",
 				target.Name(),
 				"representation target has a runtime value member",
-			)
-		}
-	}
-	return nil
-}
-
-func verifySynchronousGenericKernelCallableContract(
-	identity string,
-	binding gostdlib.BindingDocument,
-	effect gostdlib.EffectKind,
-	parameters []gostdlib.ProviderCallableParameterDocument,
-) error {
-	if binding.Kind != gostdlib.BindingFunction {
-		return certifyError(
-			"verify synchronous generic callable kernel",
-			identity,
-			"public binding is not a function",
-		)
-	}
-	if effect != gostdlib.EffectSynchronous || !binding.Effect.MaySuspend() {
-		return certifyError(
-			"verify synchronous generic callable kernel",
-			identity,
-			"kernel does not narrow one cooperative public effect to synchronous",
-		)
-	}
-	if len(parameters) == 0 || len(parameters) != len(binding.CallableParameters) {
-		return certifyError(
-			"verify synchronous generic callable kernel",
-			identity,
-			"kernel callable parameter set does not match the public binding",
-		)
-	}
-	for index, parameter := range parameters {
-		public := binding.CallableParameters[index]
-		if parameter.Parameter != public.Parameter ||
-			parameter.Effect != gostdlib.EffectSynchronous ||
-			!public.Effect.MaySuspend() {
-			return certifyError(
-				"verify synchronous generic callable kernel",
-				identity,
-				"kernel callable parameter does not exactly narrow its public parameter",
 			)
 		}
 	}

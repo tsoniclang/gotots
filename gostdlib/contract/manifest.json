@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 29,
+  "schemaVersion": 30,
   "packageName": "@gotots/gostdlib",
   "packageVersion": "0.0.0",
   "backend": "node",
@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "7ab209a731616d9ecb5b38b5ea1e8dc8f67877d2f7d2f609bebbc9fb590e644a",
+  "providerDigest": "b2d1ebf0ca07a261cc7e8bb715aeaf1f2d4aac9e61fa0e51c255327800e34209",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -20097,7 +20097,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "3685fdc431feb6351351544f64e8c81425418d6f4b6cbb669ea16e29e6efecfb",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectChanDirValueOperations@290"
+            "src/internal/facets/named-reflect.ts#ReflectChanDirValueOperations@298"
           ]
         },
         {
@@ -20111,7 +20111,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "39c7d8263631208234bf7e7632f6f8991041966ca73c39ddc46ccc55bfbfbfbc",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectKindValueOperations@330"
+            "src/internal/facets/named-reflect.ts#ReflectKindValueOperations@338"
           ]
         },
         {
@@ -20125,7 +20125,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "665302f15c37a3e94fc11550f9a0f9099dc69d8bf97e2fa02b9a919585b06ace",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@469"
+            "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@477"
           ]
         },
         {
@@ -20138,7 +20138,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "655f556dcff1bdb1ab6962cb7ec073b61f11513adcaf806a94aa558daee489a8",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectStructFieldOperations@410"
+            "src/internal/facets/named-reflect.ts#ReflectStructFieldOperations@418"
           ]
         },
         {
@@ -20152,7 +20152,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "14402617fb0554922561a161c68467d2d46e4d496847016afd2a9a545ceb1d01",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectStructTagValueOperations@370"
+            "src/internal/facets/named-reflect.ts#ReflectStructTagValueOperations@378"
           ]
         },
         {
@@ -20162,10 +20162,14 @@
             "metadata"
           ],
           "export": "ReflectTypeMetadataOperations",
+          "resultExport": "RuntimeType",
           "implementationOwner": "src/internal/facets/named-reflect.ts",
-          "targetFingerprint": "2d7e992ddc604492b455f0676b51638956d66b76dcafc9ec3dc61170a7e3da68",
+          "resultImplementationOwner": "src/internal/portable/reflect/runtime-type.ts",
+          "targetFingerprint": "5b67489905aac13025b298051970eccd7d6a63ba8bd8412d85421211ca0ac179",
+          "resultTargetFingerprint": "6a18a4b5a6d22834340eb8e1e1e975cf6e42e78d8b8610ddf3ab71550182b0c9",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectTypeMetadataOperations@79"
+            "src/internal/facets/named-reflect.ts#ReflectTypeMetadataOperations@87",
+            "src/internal/portable/reflect/runtime-type.ts#RuntimeType@430"
           ]
         },
         {
@@ -20179,7 +20183,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "6ae4cc3e3fe90bfb3e5ebf47e761961af56706273f0742e49c13e7514029c26f",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectValueOperations@560"
+            "src/internal/facets/named-reflect.ts#ReflectValueOperations@568"
           ]
         }
       ]
@@ -27144,14 +27148,14 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#InvalidValue@544",
+      "identity": "src/internal/facets/named-reflect.ts#InvalidValue@552",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Value@474"
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectChanDirValueOperations@290",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectChanDirValueOperations@298",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#ChanDir@113",
@@ -27159,7 +27163,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectKindValueOperations@330",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectKindValueOperations@338",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Kind@128",
@@ -27167,7 +27171,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@469",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@477",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#$copy@4237",
@@ -27177,7 +27181,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectStructFieldOperations@410",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectStructFieldOperations@418",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Anonymous@4744",
@@ -27191,7 +27195,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectStructTagValueOperations@370",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectStructTagValueOperations@378",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#StructTag@4867",
@@ -27199,7 +27203,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectTypeMetadataOperations@79",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectTypeMetadataOperations@87",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/reflect/runtime-type.ts#createRuntimeType@2695",
@@ -27211,10 +27215,10 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectValueOperations@560",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectValueOperations@568",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/named-reflect.ts#InvalidValue@544"
+        "src/internal/facets/named-reflect.ts#InvalidValue@552"
       ]
     },
     {
@@ -35394,5 +35398,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "c92a6d0794ef8ac1c47885ea8eee37b6ff9155d64fbef07ee480574dcdaa2d50"
+  "manifestDigest": "1d33b178598459a8a3013f84738fc99f0a72891b90d67c7c4d1833e55c554456"
 }

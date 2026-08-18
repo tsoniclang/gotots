@@ -13,9 +13,11 @@ import type { Type } from "../../reflect.js";
 import {
   createRuntimeType,
   runtimeTypeOf,
+  type RuntimeType,
   type RuntimeTypeMetadata,
   type RuntimeTypeRegistration,
 } from "../portable/reflect/runtime-type.js";
+export type { RuntimeType } from "../portable/reflect/runtime-type.js";
 import {
   registerRuntimeOpaqueStructValueOperations,
   registerRuntimePointerValueOperations,
@@ -32,7 +34,7 @@ export class ReflectTypeMetadataOperations {
     metadata: () => RuntimeTypeMetadata,
     methodTokens: () => readonly object[],
     registration?: RuntimeTypeRegistration,
-  ): Type {
+  ): RuntimeType {
     return createRuntimeType(metadata, methodTokens, registration);
   }
 

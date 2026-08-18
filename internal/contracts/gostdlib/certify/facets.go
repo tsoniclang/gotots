@@ -12,7 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 22
+const facetMapSchemaVersion = 23
 
 type facetMapDocument struct {
 	SchemaVersion                 int                               `json:"schemaVersion"`
@@ -47,6 +47,7 @@ type facetSeed struct {
 	Specifier            string                                 `json:"specifier"`
 	SourcePath           string                                 `json:"sourcePath"`
 	Export               string                                 `json:"export"`
+	ResultExport         string                                 `json:"resultExport,omitempty"`
 	StorageExport        string                                 `json:"storageExport,omitempty"`
 	RepresentationExport string                                 `json:"representationExport,omitempty"`
 	Effect               gostdlib.EffectKind                    `json:"effect,omitempty"`
