@@ -727,10 +727,13 @@ That aid must nevertheless be exact: every generated concrete interface adapter
 and provider-interface bridge declares every reached Go-facing TypeScript
 interface surface that is legally referenceable from the generated class
 declaration. Source-owned package-scope named or instantiated interfaces remain
-distinct heritage entries when they remain distinct output types. Function-local
-and anonymous interface surfaces cannot be referenced from a file-level class;
-they retain their ordinary structural contract and are not fabricated, hoisted,
-or replaced by a same-method-set name. A selected target must retain calls whose
+distinct heritage entries when they remain distinct output types. Anonymous and
+predeclared interface demands use their existing canonical generated interface
+contract; that contract is already a file-level declaration and therefore is an
+exact legal heritage target rather than a fabricated same-method-set name.
+Function-local named interface surfaces cannot be referenced from a file-level
+class; they retain their ordinary structural contract and are not hoisted or
+replaced by a same-method-set name. A selected target must retain calls whose
 closed family therefore lacks declaration evidence. A provider-routed interface
 instead uses its canonical generated Go-facing contract because the provider's
 implementation-facing ABI is not the type seen by translated Go callers;
@@ -771,8 +774,9 @@ or erased payload recovery.
 The adapter/bridge `implements` list is a complete projection of the
 declaration-referenceable subset of the canonical interface-demand graph after
 the normal interface-type naming policy selects the actual Go-facing output
-surfaces. Local and anonymous demands still drive adapter methods and runtime
-contracts but contribute no illegal class heritage. The list is emitted as
+surfaces. Function-local named demands still drive adapter methods and runtime
+contracts but contribute no illegal class heritage. Anonymous and predeclared
+demands contribute their canonical generated contracts. The list is emitted as
 ordinary typed TS-Go AST, has no JavaScript runtime representation, and exists
 so a selected target can consume declared heritage without rediscovering Go
 satisfaction.

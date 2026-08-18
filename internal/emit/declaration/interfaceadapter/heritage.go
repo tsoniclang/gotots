@@ -8,6 +8,12 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+type emittedHeritageSurface struct {
+	qualifier string
+	name      string
+	arguments []types.Type
+}
+
 func contractHeritage(
 	context api.Context,
 	children api.ChildEmitter,
@@ -22,6 +28,7 @@ func contractHeritage(
 		len(contracts),
 	)
 	var requests []api.RootRequest
+	var emitted []emittedHeritageSurface
 	for _, contract := range contracts {
 		if !contract.valid() {
 			return nil, nil, &api.GeneratedArtifactShapeError{
@@ -50,6 +57,11 @@ func contractHeritage(
 				return nil, nil, err
 			}
 		}
+		requests = append(requests, reference.Requests()...)
+		requests = append(requests, argumentRequests...)
+		if heritageSurfaceEmitted(emitted, reference, contract.sourceType) {
+			continue
+		}
 		implements = append(
 			implements,
 			context.Factory().ExpressionWithTypeArguments(
@@ -57,8 +69,10 @@ func contractHeritage(
 				arguments,
 			),
 		)
-		requests = append(requests, reference.Requests()...)
-		requests = append(requests, argumentRequests...)
+		emitted = append(
+			emitted,
+			heritageSurface(reference, contract.sourceType),
+		)
 	}
 	if len(implements) == 0 {
 		return nil, nil, nil
@@ -69,12 +83,70 @@ func contractHeritage(
 	), api.CombineRequests(requests), nil
 }
 
-func declarationHeritageSurface(sourceType types.Type) bool {
+func heritageSurfaceEmitted(
+	emitted []emittedHeritageSurface,
+	reference api.NameReference,
+	sourceType types.Type,
+) bool {
+	selected := heritageSurface(reference, sourceType)
+	for _, existing := range emitted {
+		if existing.qualifier != selected.qualifier ||
+			existing.name != selected.name ||
+			len(existing.arguments) != len(selected.arguments) {
+			continue
+		}
+		same := true
+		for index, argument := range existing.arguments {
+			if !types.Identical(argument, selected.arguments[index]) {
+				same = false
+				break
+			}
+		}
+		if same {
+			return true
+		}
+	}
+	return false
+}
+
+func heritageSurface(
+	reference api.NameReference,
+	sourceType types.Type,
+) emittedHeritageSurface {
+	qualifier, _ := reference.Qualifier()
+	selected := emittedHeritageSurface{
+		qualifier: qualifier,
+		name:      reference.Name(),
+	}
 	named, ok := types.Unalias(sourceType).(*types.Named)
+	if !ok {
+		return selected
+	}
+	selected.arguments = make([]types.Type, named.TypeArgs().Len())
+	for index := range named.TypeArgs().Len() {
+		selected.arguments[index] = named.TypeArgs().At(index)
+	}
+	return selected
+}
+
+func declarationHeritageSurface(sourceType types.Type) bool {
+	selected := types.Unalias(sourceType)
+	if _, ok := selected.Underlying().(*types.Interface); !ok {
+		return false
+	}
+	if _, ok := selected.(*types.Interface); ok {
+		return true
+	}
+	named, ok := selected.(*types.Named)
 	if !ok {
 		return false
 	}
 	object := named.Obj()
-	return object != nil && object.Pkg() != nil &&
-		object.Parent() == object.Pkg().Scope()
+	if object == nil {
+		return false
+	}
+	if object.Pkg() == nil {
+		return object.Parent() == types.Universe
+	}
+	return object.Parent() == object.Pkg().Scope()
 }

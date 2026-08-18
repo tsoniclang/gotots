@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestDeclarationHeritageRequiresPackageScope(t *testing.T) {
+func TestDeclarationHeritageRequiresAFileLevelContract(t *testing.T) {
 	owner := types.NewPackage("example.com/heritage", "heritage")
 	methodSet := types.NewInterfaceType(nil, nil).Complete()
 	packageName := types.NewTypeName(token.NoPos, owner, "Package", nil)
@@ -33,7 +33,10 @@ func TestDeclarationHeritageRequiresPackageScope(t *testing.T) {
 	if declarationHeritageSurface(localType) {
 		t.Fatal("function-local interface escaped into declaration heritage")
 	}
-	if declarationHeritageSurface(methodSet) {
-		t.Fatal("anonymous interface escaped into declaration heritage")
+	if !declarationHeritageSurface(methodSet) {
+		t.Fatal("anonymous canonical contract was excluded from declaration heritage")
+	}
+	if !declarationHeritageSurface(types.Universe.Lookup("error").Type()) {
+		t.Fatal("predeclared canonical contract was excluded from declaration heritage")
 	}
 }
