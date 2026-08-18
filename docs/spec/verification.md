@@ -211,13 +211,15 @@ also exact-joined to the declaration-referenceable Go-facing TypeScript
 surfaces selected from its canonical demand graph. For source-owned interfaces,
 the join compares named/instantiated Go type identity, emitted heritage target,
 type arguments, and multiplicity; a structural method-set key is not a
-substitute. A function-local or anonymous interface fixture proves that its
-runtime contract remains represented while no illegal file-level heritage
-reference is emitted. For provider-routed interfaces, the join compares the exact canonical generated contract
-used by translated callers and every reached capability contract carried by
-that bridge, never the provider's implementation-facing ABI. Fixtures include
-two distinct source-owned named interfaces with the same methods, a generic
-instantiation, generated and provider-profile capability bridges,
+substitute. An anonymous or predeclared interface fixture proves that its
+canonical generated contract is present exactly once in file-level heritage. A
+function-local named interface fixture proves that its runtime contract remains
+represented while no illegal file-level heritage reference is emitted. For
+provider-routed interfaces, the join compares the exact canonical generated
+contract used by translated callers and every reached capability contract
+carried by that bridge, never the provider's implementation-facing ABI.
+Fixtures include two distinct source-owned named interfaces with the same
+methods, a generic instantiation, generated and provider-profile capability bridges,
 interface-to-interface demand, and reversed discovery order. Mutations drop a
 heritage entry, add an unrelated entry, collapse distinct source-owned
 surfaces, change one type argument, or omit one reached provider capability;
