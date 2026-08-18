@@ -62,7 +62,6 @@ func channelRuntimeNames() (map[api.RuntimeSymbol]string, error) {
 		api.RuntimeSelectReady,
 		api.RuntimeSelectAttempt,
 		api.RuntimePanic,
-		api.RuntimeDenseIndex,
 	} {
 		contract, err := api.RuntimeContract(symbol)
 		if err != nil {
@@ -97,6 +96,5 @@ func buildChannelSymbol(
 		names[api.RuntimeSelectReady],
 		names[api.RuntimeSelectAttempt],
 		names[api.RuntimePanic],
-		names[api.RuntimeDenseIndex],
 	)
 }

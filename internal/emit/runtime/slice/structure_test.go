@@ -44,7 +44,6 @@ func TestRuntimeSliceBuilderConsumesInjectedContractName(t *testing.T) {
 		tsgo.NewFactory(),
 		changedContractName,
 		runtimePanicClassName(t),
-		runtimeDenseIndexClassName(t),
 	)
 	if class.Name().Text() != changedContractName {
 		t.Fatalf(
@@ -72,7 +71,6 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 		tsgo.NewFactory(),
 		className,
 		runtimePanicClassName(t),
-		runtimeDenseIndexClassName(t),
 	)
 	if class.Name().Text() != className ||
 		len(class.TypeParameters()) != 1 ||
@@ -211,15 +209,6 @@ func runtimeSliceClassName(t *testing.T) string {
 func runtimePanicClassName(t *testing.T) string {
 	t.Helper()
 	contract, err := api.RuntimeContract(api.RuntimePanic)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return contract.ExportedName()
-}
-
-func runtimeDenseIndexClassName(t *testing.T) string {
-	t.Helper()
-	contract, err := api.RuntimeContract(api.RuntimeDenseIndex)
 	if err != nil {
 		t.Fatal(err)
 	}

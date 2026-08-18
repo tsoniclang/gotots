@@ -78,6 +78,10 @@ func Build(
 		return valueContract(factory, contract.ExportedName(), members), nil
 	}
 	className := contract.ExportedName()
+	valueContract, err := api.RuntimeContract(api.RuntimeMapValue)
+	if err != nil {
+		return nil, err
+	}
 	keyType := typeName(factory, keyTypeName)
 	valueType := typeName(factory, valueTypeName)
 
@@ -104,35 +108,17 @@ func Build(
 			keyTypeParameter(factory, keyTypeName),
 			typeParameter(factory, valueTypeName),
 		},
-		nil,
+		[]tsgo.HeritageClause{factory.HeritageClause(
+			tsgo.HeritageClauseTokenKindExtendsKeyword,
+			[]tsgo.ExpressionWithTypeArguments{
+				factory.ExpressionWithTypeArguments(
+					factory.Identifier(valueContract.ExportedName()),
+					[]tsgo.TypeNode{keyType, valueType},
+				),
+			},
+		)},
 		classMembers,
 	), nil
-}
-
-func constructor(
-	factory tsgo.Factory,
-	keyType tsgo.TypeNode,
-	valueType tsgo.TypeNode,
-) tsgo.ConstructorDeclaration {
-	return factory.ConstructorDeclaration(
-		[]tsgo.ModifierLike{factory.PrivateKeyword()},
-		nil,
-		[]tsgo.ParameterDeclaration{
-			parameterProperty(factory, zeroName, valueType),
-			parameterProperty(
-				factory,
-				valuesName,
-				factory.UnionTypeNode([]tsgo.TypeNode{
-					nativeMapType(factory, keyType, valueType),
-					factory.KeywordTypeNode(
-						tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-					),
-				}),
-			),
-		},
-		nil,
-		factory.Block(nil, true),
-	)
 }
 
 func nilMethod(

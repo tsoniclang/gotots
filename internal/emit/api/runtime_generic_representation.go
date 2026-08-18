@@ -18,11 +18,11 @@ const (
 	RuntimeStringMin                  = runtimecontract.RuntimeStringMin
 	RuntimeStringEncodeRune           = runtimecontract.RuntimeStringEncodeRune
 	RuntimeStringDecodeRune           = runtimecontract.RuntimeStringDecodeRune
-	RuntimeDenseIndex                 = runtimecontract.RuntimeDenseIndex
 	RuntimeArray                      = runtimecontract.RuntimeArray
 	RuntimeArrayAllocate              = runtimecontract.RuntimeArrayAllocate
 	RuntimeArrayView                  = runtimecontract.RuntimeArrayView
 	RuntimeArrayLocation              = runtimecontract.RuntimeArrayLocation
+	RuntimeArrayPacked                = runtimecontract.RuntimeArrayPacked
 	RuntimeStorageTypeToken           = runtimecontract.RuntimeStorageTypeToken
 	RuntimeStoredValue                = runtimecontract.RuntimeStoredValue
 	RuntimeStorageType                = runtimecontract.RuntimeStorageType
@@ -88,6 +88,7 @@ const (
 	RuntimeErrorGuard                 = runtimecontract.RuntimeErrorGuard
 	RuntimeInterfaceFormat            = runtimecontract.RuntimeInterfaceFormat
 	RuntimeProviderInterfaceBridge    = runtimecontract.RuntimeProviderInterfaceBridge
+	RuntimeInterfaceAdapterFactory    = runtimecontract.RuntimeInterfaceAdapterFactory
 	RuntimeEmptyStruct                = runtimecontract.RuntimeEmptyStruct
 	RuntimeChannel                    = runtimecontract.RuntimeChannel
 	RuntimeReceiveChannel             = runtimecontract.RuntimeReceiveChannel
@@ -118,7 +119,6 @@ const (
 	RuntimeModuleInterfaceValue   = runtimecontract.RuntimeModuleInterfaceValue
 	RuntimeModulePanicNil         = runtimecontract.RuntimeModulePanicNil
 	RuntimeModuleChannel          = runtimecontract.RuntimeModuleChannel
-	RuntimeModuleDenseIndex       = runtimecontract.RuntimeModuleDenseIndex
 	RuntimeModuleUnsafe           = runtimecontract.RuntimeModuleUnsafe
 	RuntimeModuleStruct           = runtimecontract.RuntimeModuleStruct
 	RuntimeModuleStorage          = runtimecontract.RuntimeModuleStorage

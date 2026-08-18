@@ -103,6 +103,33 @@ func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
 	}
 }
 
+func TestSameModuleRuntimeDependenciesPrecedeConsumers(t *testing.T) {
+	assembled, err := AssemblePackage(
+		tsgo.NewFactory(),
+		testScalarABI(t, api.IntegerRepresentationNumber),
+		api.ConcurrencySemanticsDisabled,
+		map[api.RuntimeSymbol]struct{}{api.RuntimeMap: {}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var classes []string
+	for _, file := range assembled.Files() {
+		if file.OutputPath() != "runtime/map.ts" {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			if class, ok := statement.(tsgo.ClassDeclaration); ok {
+				classes = append(classes, class.Name().Text())
+			}
+		}
+	}
+	if !slices.Equal(classes, []string{"GoMapValue", "GoMap"}) {
+		t.Fatalf("map class order = %v, want nominal base before consumer", classes)
+	}
+}
+
 func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
 	factory := tsgo.NewFactory()
 	without, err := AssemblePackage(
@@ -215,7 +242,6 @@ func TestDependencyClosureIncludesEveryTransitiveOwner(t *testing.T) {
 	}
 	want := map[api.RuntimeSymbol]struct{}{
 		api.RuntimeArray:             {},
-		api.RuntimeDenseIndex:        {},
 		api.RuntimeIntegerDivide:     {},
 		api.RuntimePanic:             {},
 		api.RuntimePanicValue:        {},
@@ -244,8 +270,8 @@ func TestModuleImportsExactDependencyContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(imports) != 2 {
-		t.Fatalf("array runtime imports = %d, want two", len(imports))
+	if len(imports) != 1 {
+		t.Fatalf("array runtime imports = %d, want one", len(imports))
 	}
 	got := make(map[string]string, len(imports))
 	for _, statement := range imports {
@@ -259,8 +285,7 @@ func TestModuleImportsExactDependencyContract(t *testing.T) {
 		got[module.Text()] = bindings[0].Name().Text()
 	}
 	wantImports := map[string]string{
-		"./dense-index.js": "GoDenseIndex",
-		"./panic.js":       "GoPanic",
+		"./panic.js": "GoPanic",
 	}
 	if !maps.Equal(got, wantImports) {
 		t.Fatalf("array runtime imports = %v, want %v", got, wantImports)

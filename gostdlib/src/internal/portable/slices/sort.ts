@@ -1,5 +1,4 @@
 import type { Awaitable, int64 } from "@gotots/gostdlib/internal/scalars.js";
-import { GoDenseIndex } from "@gotots/runtime/dense-index.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { hostInteger } from "../../host-integer.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
@@ -19,6 +18,13 @@ import { callComparison } from "./read.js";
 
 type Comparison<T> = ((left: T, right: T) => Awaitable<int64>) | undefined;
 type SynchronousComparison<T> = ((left: T, right: T) => int64) | undefined;
+
+function denseElement<T>(values: readonly T[], index: number): T {
+  if (!(index in values)) {
+    GoPanic.raiseRuntime("dense storage index is absent");
+  }
+  return values[index] as T;
+}
 
 export function Sort<S, E, EStorage>(
   less: BinaryLess<E>,
@@ -169,8 +175,8 @@ export async function sortValues<E>(
       let right = middle;
       let output = start;
       while (left < middle && right < end) {
-        const leftValue = GoDenseIndex.get(source, left);
-        const rightValue = GoDenseIndex.get(source, right);
+        const leftValue = denseElement(source, left);
+        const rightValue = denseElement(source, right);
         if (await callComparison(compare, leftValue, rightValue) <= 0n) {
           target[output] = leftValue;
           left += 1;
@@ -181,12 +187,12 @@ export async function sortValues<E>(
         output += 1;
       }
       while (left < middle) {
-        target[output] = GoDenseIndex.get(source, left);
+        target[output] = denseElement(source, left);
         left += 1;
         output += 1;
       }
       while (right < end) {
-        target[output] = GoDenseIndex.get(source, right);
+        target[output] = denseElement(source, right);
         right += 1;
         output += 1;
       }
@@ -216,8 +222,8 @@ export function sortValuesSynchronous<E>(
       let right = middle;
       let output = start;
       while (left < middle && right < end) {
-        const leftValue = GoDenseIndex.get(source, left);
-        const rightValue = GoDenseIndex.get(source, right);
+        const leftValue = denseElement(source, left);
+        const rightValue = denseElement(source, right);
         if (compare(leftValue, rightValue) <= 0n) {
           target[output] = leftValue;
           left += 1;
@@ -228,12 +234,12 @@ export function sortValuesSynchronous<E>(
         output += 1;
       }
       while (left < middle) {
-        target[output] = GoDenseIndex.get(source, left);
+        target[output] = denseElement(source, left);
         left += 1;
         output += 1;
       }
       while (right < end) {
-        target[output] = GoDenseIndex.get(source, right);
+        target[output] = denseElement(source, right);
         right += 1;
         output += 1;
       }

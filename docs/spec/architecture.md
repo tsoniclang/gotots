@@ -330,6 +330,15 @@ One declaration assembly owns the complete pre-seal TS-Go AST for one Go
 definition. A later semantic demand may request a revised constructor, member,
 modifier, copy operation, interface adapter, helper import, or callable effect.
 
+Combined root requests are immutable persistent DAGs. The root projects
+placement and dependency leaves for the current artifact while retaining
+declaration subgraphs by exact request-node identity. The liveness scheduler
+reference-counts shared request nodes and separately reference-counts each
+semantic declaration requirement, so a closure used by one thousand
+declarations is stored and prepared once rather than flattened one thousand
+times. Adding or removing the last consumer activates or retires the same exact
+declaration requirements; sharing cannot change liveness.
+
 References subscribe to closed observable facets such as:
 
 - callable signature;
@@ -531,6 +540,15 @@ Defaults prefer readable source and no semantic machinery:
 - copy, pointer, interface, map, channel, and runtime support is demanded only
   when a selected occurrence requires it.
 
+Readability is bounded by a hard target-AST resource envelope. In particular,
+an exact large static scalar array is represented by one demand-generated,
+validated packed payload after 4096 explicit entries instead of two unbounded
+target node lists for indexes and values. The array semantic owner consumes
+the same checked element/index census used by normal literal emission and
+chooses the packed form before child target nodes are constructed. Small literals remain
+source-shaped; a product cannot disable or raise the hard ceiling to make an
+out-of-memory compilation appear successful.
+
 GoToTS-owned scalar aliases preserve every selected Go basic identity. In
 particular, `int`, `uint`, and `uintptr` remain distinct aliases rather than
 being rewritten as `int32`/`int64` or `uint32`/`uint64`. Their carrier width is
@@ -731,6 +749,20 @@ the exact concrete dynamic type. The adapter owns:
 - Go equality/comparability behavior;
 - native constant-size dispatch methods.
 
+The adapter's emitted shape is selected from its exact demanded method set.
+A type with no demanded Go methods uses the one canonical demand-selected
+typed adapter factory; its generated declaration supplies only
+the concrete payload operations and dynamic-type token. It must not repeat a
+class body containing the common constructor, type guard, method-set test,
+equality, hash, and formatting machinery. A type with demanded Go methods
+retains a concrete class only for those named methods and the inheritance
+needed to expose its declaration-referenceable contracts. Both shapes keep
+the same construction and type-guard ABI, so later demand reconstruction
+cannot leave stale call sites. The shared factory is generic and
+statically typed; it performs no erased payload recovery, runtime method
+lookup, source spelling test, or dynamic semantic dispatch. The factory is
+absent unless at least one zero-method adapter requests it.
+
 Interface calls are O(1) and do not emit implementer switches. Adapter methods
 invoke the exact concrete owner, preserving value-copy and pointer semantics.
 Interfaces carry no `any`, `unknown`, reflective lookup, source-name tests,
@@ -790,6 +822,28 @@ setters. The provider never receives or recovers an erased payload. Runtime
 constructor names, object-key enumeration, property spelling, source-name
 tables, `any`, `unknown`, unchecked casts, and product/package-specific
 descriptor overrides are forbidden.
+
+Invariant reflection mechanics are emitted once at the portable provider
+owner, never repeated inside every descriptor. Generated code supplies only
+exact typed facts and callbacks: the concrete adapter, canonical relation
+descriptors, ordered struct-field accessors, pointer load/store operations,
+copy/zero operations, and explicit unsupported dispositions. For example, a
+struct registration supplies an ordered array of typed field accessors; the
+provider owns the single adapter guard, index bounds check, reflected-location
+construction, and clone guard. A pointer registration supplies its typed
+pointee descriptor and exact location callbacks; the provider owns the single
+nil/foreign-box decision. Moving common mechanics into generated per-type
+closures is a source-size and typecheck regression even when behavior remains
+correct. Erasing callback payloads or recovering their types dynamically is
+equally invalid.
+
+Every generated value-operation registration carries its concrete adapter as
+a zero-argument typed resolver. Registration stores that resolver without
+evaluating it; the provider resolves it once when the operation record is first
+materialized. This preserves one canonical adapter while preventing the legal
+`reflection-types` <-> `interface-adapters` ESM cycle from reading a lexical
+class binding during its temporal dead zone. Import reordering, duplicated
+adapters, and eager registration-time resolution are forbidden.
 
 Descriptor definitions are emitted once and use-site references are O(1).
 Metadata growth is linear in reached canonical types plus their actual
@@ -1511,7 +1565,7 @@ Replacement uses two compilation sessions, not a filter over an assembled file
 list and not rollback within one mutable graph. The first session settles the
 ordinary canonical program solely for certification. It captures the complete
 ordinary target set, immutable observable contracts for selected-package source
-artifacts, and each contract artifact's exact outgoing support requirements,
+artifacts, and each contract artifact's exact outgoing support request graph,
 accepted representation requirements, and observable dependency edges. The
 deterministic name and
 generated-support identity registry is transferred as the one identity owner

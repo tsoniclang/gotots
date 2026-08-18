@@ -51,7 +51,7 @@ func (s *programSession) reconstructProviderStatefulArtifact(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (s *programSession) buildProviderStatefulRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
-	requirements := s.requirements.selectedFor(owner)
+	requirements := s.requirements.SelectedFor(owner)
 	if len(requirements) != 1 {
 		return artifactRevision{}, &ScheduleError{
 			Object: artifact.TargetName(),
@@ -212,7 +212,7 @@ func (s *programSession) buildProviderStatefulRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   nextRequirements,
+		requestRoots:   nextRequirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
@@ -282,7 +282,7 @@ func (s *programSession) reconstructGenericConcretizationArtifact(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -336,7 +336,7 @@ func (s *programSession) buildGenericConcretizationRevision(
 	context := builder.context.WithArtifactOwner(owner)
 	deferred, err := exactGenericConcretizationRequirement(
 		artifact,
-		s.requirements.selectedFor(owner),
+		s.requirements.SelectedFor(owner),
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -364,7 +364,7 @@ func (s *programSession) buildGenericConcretizationRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   requirements,
+		requestRoots:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
@@ -477,7 +477,7 @@ func (s *programSession) reconstructDeferredCallableRegistry(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -528,7 +528,7 @@ func (s *programSession) buildDeferredCallableRegistryRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
-	requirements := s.requirements.selectedFor(owner)
+	requirements := s.requirements.SelectedFor(owner)
 	definitions := 0
 	for _, requirement := range requirements {
 		if selected, ok := requirement.DeferredCallableRegistry(); ok {
@@ -581,7 +581,7 @@ func (s *programSession) buildDeferredCallableRegistryRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   nextRequirements,
+		requestRoots:   nextRequirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil

@@ -12,7 +12,6 @@
     "./array.js": "./array.js",
     "./channel.js": "./channel.js",
     "./complex.js": "./complex.js",
-    "./dense-index.js": "./dense-index.js",
     "./interface-value.js": "./interface-value.js",
     "./map.js": "./map.js",
     "./panic.js": "./panic.js",

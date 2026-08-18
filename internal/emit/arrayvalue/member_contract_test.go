@@ -18,6 +18,9 @@ func TestArrayRuntimeContractAndFixtureDemandRemainSeparate(t *testing.T) {
 	emission := compileArrayFixture(t)
 	directory := t.TempDir()
 	target := materializeArrayProgram(t, directory, emission)
+	if strings.Contains(target.printed["runtime/array.ts"], "goArrayPacked") {
+		t.Fatal("ordinary array fixture emitted the packed-array operation")
+	}
 	expected := memberNames(arraymember.All())
 	runtime := runtimeMemberNames(t, emission)
 	if err := exactJoinNames("runtime", expected, runtime); err != nil {

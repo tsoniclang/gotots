@@ -7,53 +7,45 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestDenseIndexUsesCheckedPresenceNarrowing(t *testing.T) {
+func TestElementInlinesPresenceCheckBeforeItsCheckedCast(t *testing.T) {
 	factory := tsgo.NewFactory()
-	class := indexedstorage.Build(
+	value := indexedstorage.Element(
 		factory,
-		"GoDenseIndex",
 		"GoPanic",
+		factory.Identifier("values"),
+		factory.Identifier("index"),
+		factory.TypeReferenceNode(factory.Identifier("T"), nil),
 	)
-	members := class.Members()
-	if len(members) != 2 {
-		t.Fatalf("dense-index members = %d, want get and Promise exclusion", len(members))
+	conditional, ok := value.Expression().(tsgo.ConditionalExpression)
+	if !ok {
+		t.Fatalf("checked element = %T, want ConditionalExpression", value.Expression())
 	}
-	get := members[0].(tsgo.MethodDeclaration)
-	statements := get.Body().(tsgo.Block).Statements()
-	if len(statements) != 3 {
-		t.Fatalf("dense get statements = %d, want value/check/return", len(statements))
+	present, ok := conditional.Condition().(tsgo.BinaryExpression)
+	if !ok || present.OperatorToken().Kind() != tsgo.SyntaxKindInKeyword {
+		t.Fatalf("presence proof = %T, want indexed in check", conditional.Condition())
 	}
-	value := statements[0].(tsgo.VariableStatement).
-		DeclarationList().Declarations()[0].
-		Initializer()
-	if _, ok := value.(tsgo.ElementAccessExpression); !ok {
-		t.Fatalf("dense get value = %T, want ElementAccessExpression", value)
-	}
-	condition := statements[1].(tsgo.IfStatement).
-		Expression().(tsgo.PrefixUnaryExpression).
-		Operand().(tsgo.BinaryExpression)
-	if condition.OperatorToken().Kind() != tsgo.SyntaxKindInKeyword {
-		t.Fatalf("dense get check = %v, want direct in guard", condition.OperatorToken().Kind())
-	}
-	if _, ok := statements[2].(tsgo.ReturnStatement).
-		Expression().(tsgo.AsExpression); !ok {
-		t.Fatal("dense get does not return the presence-checked value")
+	if conditional.WhenTrue().Kind() != tsgo.SyntaxKindElementAccessExpression ||
+		conditional.WhenFalse().Kind() != tsgo.SyntaxKindCallExpression {
+		t.Fatalf(
+			"checked branches = %v/%v, want element/panic",
+			conditional.WhenTrue().Kind(),
+			conditional.WhenFalse().Kind(),
+		)
 	}
 }
 
-func TestDenseIndexReferenceIsOneStaticCall(t *testing.T) {
+func TestElementMutationWithoutPresenceProofIsDetected(t *testing.T) {
 	factory := tsgo.NewFactory()
-	call := indexedstorage.Element(
-		factory,
-		"GoDenseIndex",
-		factory.Identifier("values"),
-		factory.Identifier("index"),
+	unchecked := factory.AsExpression(
+		factory.ElementAccessExpression(
+			factory.Identifier("values"),
+			nil,
+			factory.Identifier("index"),
+			tsgo.NodeFlagsNone,
+		),
+		factory.TypeReferenceNode(factory.Identifier("T"), nil),
 	)
-	property, ok := call.Expression().(tsgo.PropertyAccessExpression)
-	if !ok ||
-		property.Expression().(tsgo.Identifier).Text() != "GoDenseIndex" ||
-		property.Name().(tsgo.Identifier).Text() != "get" ||
-		len(call.Arguments()) != 2 {
-		t.Fatalf("dense index reference = %#v", call)
+	if _, ok := unchecked.Expression().(tsgo.ConditionalExpression); ok {
+		t.Fatal("mutation control unexpectedly retained the presence proof")
 	}
 }

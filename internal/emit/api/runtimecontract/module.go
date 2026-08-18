@@ -22,7 +22,6 @@ const (
 	RuntimeModuleInterfaceValue   RuntimeModule = 12
 	RuntimeModulePanicNil         RuntimeModule = 13
 	RuntimeModuleChannel          RuntimeModule = 14
-	RuntimeModuleDenseIndex       RuntimeModule = 16
 	RuntimeModuleUnsafe           RuntimeModule = 17
 	RuntimeModuleStruct           RuntimeModule = 18
 	RuntimeModuleStorage          RuntimeModule = 19
@@ -80,7 +79,6 @@ func concurrencyRuntimeContract(
 			RuntimeSendChannel,
 			RuntimeSelectCase,
 			RuntimePanic,
-			RuntimeDenseIndex,
 		), nil
 	case RuntimeReceiveChannel:
 		return runtimeContract(
@@ -297,6 +295,14 @@ func interfaceRuntimeContract(
 			"runtime/interface-value.ts",
 			"GoProviderInterfaceBridge",
 			true,
+			RuntimeInterfaceValue,
+		)
+	case RuntimeInterfaceAdapterFactory:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"createGoInterfaceAdapter",
+			false,
 			RuntimeInterfaceValue,
 		)
 	default:

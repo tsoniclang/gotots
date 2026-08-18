@@ -1,6 +1,10 @@
 package reflectvalue_test
 
-import "testing"
+import (
+	"regexp"
+	"strings"
+	"testing"
+)
 
 // TestReflectStructFieldMutationCanonicalizesWithNativeEvidence covers the addressable value
 // location model: pointer Elem, struct NumField/Field, settability, field
@@ -63,12 +67,37 @@ func main() {
 	fmt.Println(fixture.Merge())
 }
 `
-	verifyReflectCanonical(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"Merge",
 		"reflectvalue",
 		typescriptRunner,
 		goRunner,
+		func(artifacts renderedArtifacts) {
+			if !strings.Contains(
+				artifacts.printed,
+				"ReflectTypeMetadataOperations.$registerStruct(",
+			) {
+				t.Fatalf(
+					"struct reflection does not use the typed common owner (%d bytes)",
+					len(artifacts.printed),
+				)
+			}
+			if strings.Contains(
+				artifacts.printed,
+				"switch (index)",
+			) {
+				t.Fatalf(
+					"struct reflection repeats per-type index dispatch (%d bytes)",
+					len(artifacts.printed),
+				)
+			}
+			if !regexp.MustCompile(
+				`(?s)\.\$registerStruct\(\s*[^,]+,\s*\(\)\s*=>`,
+			).MatchString(artifacts.printed) {
+				t.Fatalf("struct reflection resolves its adapter eagerly")
+			}
+		},
 	)
 }

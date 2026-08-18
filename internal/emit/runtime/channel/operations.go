@@ -163,7 +163,7 @@ func (b builder) takeReceiveMethod() tsgo.MethodDeclaration {
 					tsgo.NodeFlagsConst,
 					"value",
 					b.typeT(),
-					b.denseElement(buffer, bufferHead),
+					b.denseElement(buffer, bufferHead, b.typeT()),
 				),
 				b.expression(b.increment(bufferHead)),
 				b.expression(b.methodCall(

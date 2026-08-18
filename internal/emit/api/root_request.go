@@ -1,9 +1,8 @@
 package api
 
 import (
-	"go/ast"
-	"go/token"
 	"go/types"
+	"slices"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -237,91 +236,6 @@ func newDeclarationRequirementRequest(
 	}}
 }
 
-func NewCallableControlRequest(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-	control CallableControlFacet,
-) (RootRequest, error) {
-	requirement, err := NewCallableControlRequirement(
-		owner,
-		enclosing,
-		callable,
-		control,
-	)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
-}
-
-func NewDeferControlRequest(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-	source *ast.DeferStmt,
-) (RootRequest, error) {
-	requirement, err := NewDeferControlRequirement(
-		owner,
-		enclosing,
-		callable,
-		source,
-	)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
-}
-
-func NewGotoControlRequest(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-	label *types.Label,
-	position token.Pos,
-) (RootRequest, error) {
-	requirement, err := NewGotoControlRequirement(
-		owner,
-		enclosing,
-		callable,
-		label,
-		position,
-	)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
-}
-
-func NewIteratorReturnControlRequest(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-	source *ast.RangeStmt,
-) (RootRequest, error) {
-	requirement, err := NewIteratorReturnControlRequirement(
-		owner,
-		enclosing,
-		callable,
-		source,
-	)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
-}
-
-func NewDirectCallableControlRequest(
-	owner *types.Func,
-	control CallableControlFacet,
-) (RootRequest, error) {
-	requirement, err := NewDirectCallableControlRequirement(owner, control)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
-}
-
 func NewConstantProjectionRequest(
 	constant *types.Const,
 	projection types.BasicKind,
@@ -368,80 +282,6 @@ func NewMapSpecializationRequest(
 	demand MapSpecializationDemand,
 ) (RootRequest, error) {
 	requirement, err := NewMapSpecializationRequirement(artifact, demand)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
-}
-
-func NewInterfaceAdapterRequest(
-	artifact *GeneratedArtifact,
-) (RootRequest, error) {
-	requirement, err := NewInterfaceAdapterRequirement(artifact)
-	return generatedDefinitionRequest(requirement, err)
-}
-
-func NewInterfaceAdapterContractRequest(
-	artifact *GeneratedArtifact,
-	contractType types.Type,
-	contract *types.Interface,
-	contractKey string,
-) (RootRequest, error) {
-	requirement, err := NewInterfaceAdapterContractRequirement(
-		artifact,
-		contractType,
-		contract,
-		contractKey,
-	)
-	return generatedDefinitionRequest(requirement, err)
-}
-
-func NewAnonymousInterfaceRequest(
-	artifact *GeneratedArtifact,
-) (RootRequest, error) {
-	requirement, err := NewAnonymousInterfaceRequirement(artifact)
-	return generatedDefinitionRequest(requirement, err)
-}
-
-func NewInterfaceMethodTokenRequest(
-	artifact *GeneratedArtifact,
-) (RootRequest, error) {
-	requirement, err := NewInterfaceMethodTokenRequirement(artifact)
-	return generatedDefinitionRequest(requirement, err)
-}
-
-func NewInterfaceDynamicTypeTokenRequest(
-	artifact *GeneratedArtifact,
-) (RootRequest, error) {
-	requirement, err := NewInterfaceDynamicTypeTokenRequirement(artifact)
-	return generatedDefinitionRequest(requirement, err)
-}
-
-func NewReflectionTypeRequest(
-	artifact *GeneratedArtifact,
-) (RootRequest, error) {
-	requirement, err := NewReflectionTypeRequirement(artifact)
-	return generatedDefinitionRequest(requirement, err)
-}
-
-func NewProviderInterfaceBridgeRequest(
-	artifact *GeneratedArtifact,
-) (RootRequest, error) {
-	requirement, err := NewProviderInterfaceBridgeRequirement(artifact)
-	return generatedDefinitionRequest(requirement, err)
-}
-
-func NewProviderStatefulRepresentationRequest(
-	artifact *GeneratedArtifact,
-) (RootRequest, error) {
-	requirement, err := NewProviderStatefulRepresentationRequirement(artifact)
-	return generatedDefinitionRequest(requirement, err)
-}
-
-func generatedDefinitionRequest(
-	requirement DeclarationRequirement,
-	err error,
-) (RootRequest, error) {
 	if err != nil {
 		return RootRequest{}, err
 	}
@@ -573,25 +413,172 @@ func (r RootRequest) DeclarationRequirement() (
 	DeclarationRequirement,
 	bool,
 ) {
-	if r.payload == nil {
+	if r.payload == nil ||
+		r.payload.owner.kind != RootRequestDeclarationRequirement {
 		return DeclarationRequirement{}, false
 	}
-	requirement := r.payload.owner.declarationRequirement
-	if r.payload.owner.kind != RootRequestDeclarationRequirement ||
-		!requirement.Valid() {
-		return DeclarationRequirement{}, false
-	}
-	return requirement, true
+	return r.payload.owner.declarationRequirement, true
 }
 
 func (r RootRequest) ArtifactDependency() (ArtifactDependency, bool) {
-	if r.payload == nil {
+	if r.payload == nil ||
+		r.payload.owner.kind != RootRequestArtifactDependency {
 		return ArtifactDependency{}, false
 	}
-	dependency := r.payload.owner.artifactDependency
-	if r.payload.owner.kind != RootRequestArtifactDependency ||
-		!dependency.Valid() {
-		return ArtifactDependency{}, false
+	return r.payload.owner.artifactDependency, true
+}
+
+const (
+	invalidRequestKindMask        = uint8(1) << RootRequestInvalid
+	declarationRequestKindMask    = uint8(1) << RootRequestDeclarationRequirement
+	nonDeclarationRequestKindMask = uint8(1)<<RootRequestImport |
+		uint8(1)<<RootRequestArtifactDependency
+)
+
+type rootRequestSelection struct {
+	request  RootRequest
+	selected bool
+}
+
+func (r RootRequest) NestedRequests() ([]RootRequest, bool) {
+	if r.sequence == nil {
+		return nil, false
 	}
-	return dependency, true
+	return slices.Clone(r.sequence.children), true
+}
+
+func SelectDeclarationRequests(
+	requests []RootRequest,
+) ([]RootRequest, error) {
+	return selectRootRequests(requests, declarationRequestKindMask)
+}
+
+func SelectNonDeclarationRequests(
+	requests []RootRequest,
+) ([]RootRequest, error) {
+	return selectRootRequests(requests, nonDeclarationRequestKindMask)
+}
+
+func selectRootRequests(
+	requests []RootRequest,
+	selectedKinds uint8,
+) ([]RootRequest, error) {
+	selected, _, err := selectRootRequestsWithWork(requests, selectedKinds)
+	return selected, err
+}
+
+func selectRootRequestsWithWork(
+	requests []RootRequest,
+	selectedKinds uint8,
+) ([]RootRequest, uint64, error) {
+	memo := make(map[*rootRequestSequence]rootRequestSelection)
+	selected := make([]RootRequest, 0, len(requests))
+	var work uint64
+	for _, request := range requests {
+		selection, err := selectRootRequest(
+			request,
+			selectedKinds,
+			memo,
+			&work,
+		)
+		if err != nil {
+			return nil, work, err
+		}
+		if selection.selected {
+			selected = append(selected, selection.request)
+		}
+	}
+	return slices.Clone(selected), work, nil
+}
+
+func selectRootRequest(
+	request RootRequest,
+	selectedKinds uint8,
+	memo map[*rootRequestSequence]rootRequestSelection,
+	work *uint64,
+) (rootRequestSelection, error) {
+	*work++
+	if request.sequence == nil {
+		if request.Kind() == RootRequestInvalid {
+			return rootRequestSelection{}, &RootRequestError{
+				Reason: "root request is invalid",
+			}
+		}
+		return rootRequestSelection{
+			request:  request,
+			selected: request.rootRequestKinds()&selectedKinds != 0,
+		}, nil
+	}
+	if selection, ok := memo[request.sequence]; ok {
+		return selection, nil
+	}
+	if len(request.sequence.children) == 0 {
+		return rootRequestSelection{}, &RootRequestError{
+			Reason: "root request sequence is empty",
+		}
+	}
+	if request.sequence.kinds&invalidRequestKindMask == 0 &&
+		request.sequence.kinds&^selectedKinds == 0 {
+		selection := rootRequestSelection{request: request, selected: true}
+		memo[request.sequence] = selection
+		return selection, nil
+	}
+	if request.sequence.kinds&selectedKinds == 0 &&
+		request.sequence.kinds&invalidRequestKindMask == 0 {
+		memo[request.sequence] = rootRequestSelection{}
+		return rootRequestSelection{}, nil
+	}
+	children := make([]RootRequest, 0, len(request.sequence.children))
+	unchanged := true
+	for _, child := range request.sequence.children {
+		selection, err := selectRootRequest(
+			child,
+			selectedKinds,
+			memo,
+			work,
+		)
+		if err != nil {
+			return rootRequestSelection{}, err
+		}
+		if !selection.selected {
+			unchanged = false
+			continue
+		}
+		children = append(children, selection.request)
+		if selection.request != child {
+			unchanged = false
+		}
+	}
+	selection := rootRequestSelection{}
+	switch {
+	case len(children) == 0:
+	case unchanged && len(children) == len(request.sequence.children):
+		selection = rootRequestSelection{request: request, selected: true}
+	default:
+		combined := combineRootRequests(children)
+		selection = rootRequestSelection{
+			request:  combined[0],
+			selected: true,
+		}
+	}
+	memo[request.sequence] = selection
+	return selection, nil
+}
+
+func (r RootRequest) rootRequestKinds() uint8 {
+	if r.sequence != nil {
+		return r.sequence.kinds
+	}
+	return uint8(1) << r.Kind()
+}
+
+func NewDeclarationRequirementRequest(
+	requirement DeclarationRequirement,
+) (RootRequest, error) {
+	if !requirement.Valid() {
+		return RootRequest{}, &RootRequestError{
+			Reason: "declaration requirement is invalid",
+		}
+	}
+	return newDeclarationRequirementRequest(requirement), nil
 }

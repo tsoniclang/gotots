@@ -77,6 +77,8 @@ type programSession struct {
 	externalFunctionBindings      map[*types.Func]api.ExternalFunctionTarget
 	sourceImplementationContracts map[api.ArtifactOwner]sourceImplementationContract
 	sourceImplementationTargets   []sourceimplementation.Target
+	preparedDeclarationRequests   map[api.RootRequest]struct{}
+	preparedRequirements          map[api.DeclarationRequirement]struct{}
 	sealed                        bool
 }
 
@@ -310,23 +312,25 @@ func newProgramSessionWithRegistry(
 		artifacts: artifactstate.NewGraph(
 			compareArtifactOwners,
 		),
-		sites:                    sites,
-		emitters:                 make(map[*load.Package]*emitter),
-		builders:                 make(map[string]*targetFileBuilder),
-		packageBuilders:          make(map[*load.Package]*packageTargetBuilder),
-		packageExports:           newPackageExportScheduler(),
-		environmentBuilders:      make(map[*load.Package]*environmentContractBuilder),
-		packageInitializations:   newPackageInitializationScheduler(),
-		genericOperations:        make(map[genericOperationIdentity]*api.GenericOperationContract),
-		genericConcretizations:   make(map[genericConcretizationIdentity]*api.GenericConcretization),
-		classMembers:             make(map[*types.Func]classMemberContribution),
-		callableFields:           callableFields,
-		goRuntime:                goRuntime,
-		compareArtifactOwners:    compareArtifactOwners,
-		standardLibrary:          options.StandardLibrary,
-		sourceImplementations:    options.SourceImplementations,
-		externalFunctions:        make(map[*types.Func]ExternalFunctionObligation),
-		externalFunctionBindings: externalBindings,
+		sites:                       sites,
+		emitters:                    make(map[*load.Package]*emitter),
+		builders:                    make(map[string]*targetFileBuilder),
+		packageBuilders:             make(map[*load.Package]*packageTargetBuilder),
+		packageExports:              newPackageExportScheduler(),
+		environmentBuilders:         make(map[*load.Package]*environmentContractBuilder),
+		packageInitializations:      newPackageInitializationScheduler(),
+		genericOperations:           make(map[genericOperationIdentity]*api.GenericOperationContract),
+		genericConcretizations:      make(map[genericConcretizationIdentity]*api.GenericConcretization),
+		classMembers:                make(map[*types.Func]classMemberContribution),
+		callableFields:              callableFields,
+		goRuntime:                   goRuntime,
+		compareArtifactOwners:       compareArtifactOwners,
+		standardLibrary:             options.StandardLibrary,
+		sourceImplementations:       options.SourceImplementations,
+		externalFunctions:           make(map[*types.Func]ExternalFunctionObligation),
+		externalFunctionBindings:    externalBindings,
+		preparedDeclarationRequests: make(map[api.RootRequest]struct{}),
+		preparedRequirements:        make(map[api.DeclarationRequirement]struct{}),
 	}
 	for _, sourcePackage := range source.Packages() {
 		implementationContract := false
@@ -464,7 +468,7 @@ func (s *programSession) emit(object types.Object) error {
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}

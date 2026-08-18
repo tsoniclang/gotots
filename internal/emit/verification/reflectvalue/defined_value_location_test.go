@@ -58,15 +58,11 @@ func main() {
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
 				"allocatePointer(new DefinedText",
-				"loadPointer(instance)",
+				"loadPointer(pointer)",
 				"allocatePointer(0)",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
-					t.Fatalf(
-						"defined scalar reflection artifact lacks %q:\n%s",
-						required,
-						artifacts.printed,
-					)
+					t.Fatalf("defined scalar reflection artifact lacks %q", required)
 				}
 			}
 			if strings.Contains(

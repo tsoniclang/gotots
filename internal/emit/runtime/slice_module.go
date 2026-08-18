@@ -57,10 +57,6 @@ func buildSlice(
 	if err != nil {
 		return nil, err
 	}
-	denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
-	if err != nil {
-		return nil, err
-	}
 	pointerName := ""
 	addressName := ""
 	pointerProjectName := ""
@@ -91,7 +87,6 @@ func buildSlice(
 			factory,
 			sliceContract.ExportedName(),
 			panicContract.ExportedName(),
-			denseIndexContract.ExportedName(),
 			pointerName,
 			addressName,
 			capabilities,

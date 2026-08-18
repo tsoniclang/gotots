@@ -156,15 +156,17 @@ func element(
 
 func definedElement(
 	factory tsgo.Factory,
-	denseIndexName string,
+	panicName string,
 	value tsgo.Expression,
 	index tsgo.Expression,
-) tsgo.CallExpression {
+	targetType tsgo.TypeNode,
+) tsgo.AsExpression {
 	return indexedstorage.Element(
 		factory,
-		denseIndexName,
+		panicName,
 		value,
 		index,
+		targetType,
 	)
 }
 

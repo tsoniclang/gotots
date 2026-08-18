@@ -82,7 +82,7 @@ func (s *programSession) observeCooperativeCallable(
 		}
 	}
 	cooperative := false
-	for _, requirement := range s.requirements.selectedFor(
+	for _, requirement := range s.requirements.SelectedFor(
 		facet.Owner(),
 	) {
 		selected, selectedCooperative :=
@@ -172,7 +172,7 @@ func (s *programSession) reconstructCallableContractArtifact(
 		return err
 	}
 	owner := api.MustGeneratedArtifactOwner(artifact)
-	selected := s.requirements.selectedFor(owner)
+	selected := s.requirements.SelectedFor(owner)
 	if len(selected) == 0 && s.requirementRemovalOwner == owner {
 		contract, err := s.callableContract(false)
 		if err != nil {
@@ -332,33 +332,21 @@ func (s *programSession) consumeArtifactRequests(
 ) (
 	*targetplacement.Owner,
 	[]api.ArtifactDependency,
-	[]api.DeclarationRequirement,
+	[]api.RootRequest,
 	error,
 ) {
 	placement := targetplacement.New()
 	dependencies := make(map[api.ArtifactDependency]struct{})
-	requirements := make(map[api.DeclarationRequirement]struct{})
-	err := api.WalkUniqueRootRequestPayloads(
-		requests,
+	nonDeclarationRequests, err := api.SelectNonDeclarationRequests(requests)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	err = api.WalkUniqueRootRequestPayloads(
+		nonDeclarationRequests,
 		func(request api.RootRequest) error {
 			switch request.Kind() {
 			case api.RootRequestImport:
 				return placement.Apply([]api.RootRequest{request})
-			case api.RootRequestDeclarationRequirement:
-				requirement, ok := request.DeclarationRequirement()
-				if !ok {
-					return &ScheduleError{
-						Object: consumer.Name(),
-						Reason: "declaration requirement is invalid",
-					}
-				}
-				if _, duplicate := requirements[requirement]; duplicate {
-					return nil
-				}
-				if err := s.prepareDeclarationRequirement(requirement); err != nil {
-					return err
-				}
-				requirements[requirement] = struct{}{}
 			case api.RootRequestArtifactDependency:
 				dependency, ok := request.ArtifactDependency()
 				if !ok {
@@ -405,18 +393,19 @@ func (s *programSession) consumeArtifactRequests(
 		return selectedDependencies[left].Facet() <
 			selectedDependencies[right].Facet()
 	})
-	selectedRequirements := make(
-		[]api.DeclarationRequirement,
-		0,
-		len(requirements),
-	)
-	for requirement := range requirements {
-		selectedRequirements = append(selectedRequirements, requirement)
+	selectedRequests, err := api.SelectDeclarationRequests(requests)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	sortDeclarationRequirements(selectedRequirements)
+	if err := s.prepareDeclarationRequestGraph(
+		consumer,
+		selectedRequests,
+	); err != nil {
+		return nil, nil, nil, err
+	}
 	return placement,
 		selectedDependencies,
-		selectedRequirements,
+		selectedRequests,
 		nil
 }
 
@@ -461,13 +450,12 @@ func (s *programSession) commitArtifactRevision(
 	owner api.ArtifactOwner,
 	contract artifactstate.Contract,
 	dependencies []api.ArtifactDependency,
-	requirements []api.DeclarationRequirement,
+	requestRoots []api.RootRequest,
 ) error {
 	if err := s.commitArtifactContract(owner, contract, dependencies); err != nil {
 		return err
 	}
-	s.requirements.replace(owner, requirements)
-	return nil
+	return s.requirements.Replace(owner, requestRoots)
 }
 
 func (s *programSession) commitArtifactContract(
@@ -526,7 +514,7 @@ func (s *programSession) reconstructArtifact(owner types.Object) error {
 		artifactOwner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}

@@ -1,6 +1,21 @@
 import { GoPanic } from "./panic.js";
-export class GoMap<K extends boolean | number | bigint | string, V> {
+export abstract class GoMapValue<K, V> {
+    abstract lookup(key: K): V;
+    abstract lookupOk(key: K): [
+        V,
+        boolean
+    ];
+    abstract store(key: K, value: V): void;
+    abstract delete(key: K): void;
+    abstract length(): number;
+    abstract isNil(): boolean;
+    abstract clear(): void;
+    abstract keys(): K[];
+    declare private readonly then?: never;
+}
+export class GoMap<K extends boolean | number | bigint | string, V> extends GoMapValue<K, V> {
     private constructor(private readonly zeroValue: V, private readonly values: Map<K, V> | undefined) {
+        super();
     }
     static nil<K extends boolean | number | bigint | string, V>(zeroValue: V): GoMap<K, V> {
         return new GoMap<K, V>(zeroValue, undefined);
@@ -61,7 +76,6 @@ export class GoMap<K extends boolean | number | bigint | string, V> {
     keys(): K[] {
         return this.values !== undefined ? Array.from(this.values.keys()) : [];
     }
-    declare private readonly then?: never;
 }
 export class GoMapHash {
     private static readonly objects: WeakMap<object, number> = new WeakMap<object, number>;
@@ -95,17 +109,4 @@ export class GoMapHash {
         return Math.imul(hash ^ next, 16777619) >>> 0;
     }
     declare private readonly then?: never;
-}
-export interface GoMapValue<K, V> {
-    lookup(key: K): V;
-    lookupOk(key: K): [
-        V,
-        boolean
-    ];
-    store(key: K, value: V): void;
-    delete(key: K): void;
-    length(): number;
-    isNil(): boolean;
-    clear(): void;
-    keys(): K[];
 }

@@ -142,7 +142,7 @@ func (s *programSession) reconstructRepresentationArtifact(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (s *programSession) buildRepresentationArtifactRevision(
 	}
 	defer finish()
 	context := builder.context.WithArtifactOwner(owner)
-	requirements := s.requirements.selectedFor(owner)
+	requirements := s.requirements.SelectedFor(owner)
 	var adapterContracts []interfaceadapterdeclaration.Contract
 	var providerCapabilities []providerinterfacebridge.CapabilityContract
 	var providerProfileCapabilities []providerinterfacebridge.ProfileCapabilityContract
@@ -235,7 +235,7 @@ func (s *programSession) buildRepresentationArtifactRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	placement, dependencies, requirements, err :=
+	placement, dependencies, requestRoots, err :=
 		s.consumeArtifactRequests(
 			owner,
 			requests,
@@ -251,7 +251,7 @@ func (s *programSession) buildRepresentationArtifactRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   requirements,
+		requestRoots:   requestRoots,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil

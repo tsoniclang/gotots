@@ -10,7 +10,6 @@ import (
 	deferredregistryruntime "github.com/tsoniclang/gotots/internal/emit/runtime/deferredregistry"
 	emptystructruntime "github.com/tsoniclang/gotots/internal/emit/runtime/emptystruct"
 	floatruntime "github.com/tsoniclang/gotots/internal/emit/runtime/float"
-	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
 	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
 	storagefacetruntime "github.com/tsoniclang/gotots/internal/emit/runtime/storagefacet"
@@ -151,34 +150,6 @@ func Build(
 		}
 		return []Definition{definition}, nil
 	}
-	if module == api.RuntimeModuleDenseIndex {
-		if len(symbols) != 1 || symbols[0] != api.RuntimeDenseIndex {
-			return nil, &AssemblyError{
-				Module: module,
-				Reason: "dense-index runtime requires exactly RuntimeDenseIndex",
-			}
-		}
-		contract, err := api.RuntimeContract(api.RuntimeDenseIndex)
-		if err != nil {
-			return nil, err
-		}
-		panicContract, err := api.RuntimeContract(api.RuntimePanic)
-		if err != nil {
-			return nil, err
-		}
-		definition, err := NewDefinition(
-			api.RuntimeDenseIndex,
-			indexedstorage.Build(
-				factory,
-				contract.ExportedName(),
-				panicContract.ExportedName(),
-			),
-		)
-		if err != nil {
-			return nil, err
-		}
-		return []Definition{definition}, nil
-	}
 	if module == api.RuntimeModuleArray {
 		if symbols[0] != api.RuntimeArray {
 			return nil, &AssemblyError{
@@ -190,14 +161,9 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
-		denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
-		if err != nil {
-			return nil, err
-		}
 		statement, err := runtimearray.BuildWithCapabilities(
 			factory,
 			panicContract.ExportedName(),
-			denseIndexContract.ExportedName(),
 			runtimearray.Capabilities{
 				Allocate: slices.Contains(
 					symbols,

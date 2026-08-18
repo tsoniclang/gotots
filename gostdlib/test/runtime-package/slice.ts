@@ -1,4 +1,3 @@
-import { GoDenseIndex } from "./dense-index.js";
 import { GoPanic } from "./panic.js";
 export class RuntimeSlice<T> {
     protected constructor(private readonly backing: T[] | null, private readonly offset: number, readonly length: number, readonly capacity: number) {
@@ -25,7 +24,7 @@ export class RuntimeSlice<T> {
         const backing = this.backing;
         if (backing === null || (numericIndex < 0 || numericIndex >= this.length))
             GoPanic.raiseRuntime("runtime error: index out of range [" + String(numericIndex) + "] with length " + String(this.length));
-        return GoDenseIndex.get(backing, this.offset + numericIndex);
+        return (this.offset + numericIndex in backing ? backing[this.offset + numericIndex] : GoPanic.raiseRuntime("dense storage index is absent")) as T;
     }
     set(index: number | bigint, value: T): T {
         const numericIndex = globalThis.Number(index);
@@ -52,7 +51,7 @@ export class RuntimeSlice<T> {
             if (existingBacking === null)
                 GoPanic.raiseRuntime("slice bounds out of range");
             for (let index = 0; index < values.length; index++) {
-                existingBacking[this.offset + this.length + index] = GoDenseIndex.get(values, index);
+                existingBacking[this.offset + this.length + index] = (index in values ? values[index] : GoPanic.raiseRuntime("dense storage index is absent")) as T;
             }
             return new RuntimeSlice<T>(existingBacking, this.offset, newLength, this.capacity);
         }
@@ -63,11 +62,11 @@ export class RuntimeSlice<T> {
         const backing = new Array<T>(nextCapacity).fill(zero);
         if (existingBacking !== null) {
             for (let index = 0; index < this.length; index++) {
-                backing[index] = GoDenseIndex.get(existingBacking, this.offset + index);
+                backing[index] = (this.offset + index in existingBacking ? existingBacking[this.offset + index] : GoPanic.raiseRuntime("dense storage index is absent")) as T;
             }
         }
         for (let index = 0; index < values.length; index++) {
-            backing[this.length + index] = GoDenseIndex.get(values, index);
+            backing[this.length + index] = (index in values ? values[index] : GoPanic.raiseRuntime("dense storage index is absent")) as T;
         }
         return new RuntimeSlice<T>(backing, 0, newLength, nextCapacity);
     }
@@ -82,7 +81,7 @@ export class RuntimeSlice<T> {
                 targetBacking.copyWithin(target.offset, source.offset, source.offset + count);
             else
                 for (let index = 0; index < count; index++) {
-                    targetBacking[target.offset + index] = GoDenseIndex.get(sourceBacking, source.offset + index);
+                    targetBacking[target.offset + index] = (source.offset + index in sourceBacking ? sourceBacking[source.offset + index] : GoPanic.raiseRuntime("dense storage index is absent")) as T;
                 }
             return count;
         }
@@ -91,7 +90,7 @@ export class RuntimeSlice<T> {
             values[index] = source.get(index);
         }
         for (let index = 0; index < count; index++) {
-            target.set(index, GoDenseIndex.get(values, index));
+            target.set(index, (index in values ? values[index] : GoPanic.raiseRuntime("dense storage index is absent")) as T);
         }
         return count;
     }

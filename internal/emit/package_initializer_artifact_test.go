@@ -133,13 +133,13 @@ func Result() int32 { return PackageValue }
 			artifact.reconstructions,
 		)
 	}
-	if requirements := session.requirements.appliedFor(owner); len(requirements) != 3 {
+	if requirements := session.requirements.AppliedFor(owner); len(requirements) != 3 {
 		t.Fatalf(
 			"package initializer anonymous requirements = %d, want definition/copy/equal",
 			len(requirements),
 		)
 	}
-	if session.requirements.hasPending() ||
+	if session.requirements.HasPending() ||
 		session.artifacts.HasPending() {
 		t.Fatal("package initializer did not converge in the existing fixed point")
 	}
@@ -368,7 +368,7 @@ func Run() int32 {
 			result.TypeName(),
 		)
 	}
-	if session.requirements.hasPending() ||
+	if session.requirements.HasPending() ||
 		session.artifacts.HasPending() {
 		t.Fatal("package callable ABI fixed point did not converge")
 	}

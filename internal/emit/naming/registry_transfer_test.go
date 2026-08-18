@@ -30,6 +30,11 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 		interfaceReflectionDemand{}
 	registry.reflectionValueDemands["value"] = struct{}{}
 	registry.reflectionValueContracts["contract"] = interfaceContractSelection{}
+	registry.interfaceDemandRequests[interfaceDemandRequestKey{
+		kind:      interfaceDemandTransition,
+		sourceKey: "source",
+		targetKey: "target",
+	}] = nil
 
 	transferred, err := registry.TransferCanonicalIdentity()
 	if err != nil {
@@ -48,7 +53,8 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 		len(registry.interfaceContractDemands) != 0 ||
 		len(registry.interfaceReflectionDemands) != 0 ||
 		len(registry.reflectionValueDemands) != 0 ||
-		len(registry.reflectionValueContracts) != 0 {
+		len(registry.reflectionValueContracts) != 0 ||
+		len(registry.interfaceDemandRequests) != 0 {
 		t.Fatal("registry transfer retained first-session observations")
 	}
 	if err := registry.ClaimFinalSession(); err != nil {

@@ -15,7 +15,7 @@ import (
 type environmentArtifact struct {
 	placement       *targetplacement.Owner
 	dependencies    []api.ArtifactDependency
-	requirements    []api.DeclarationRequirement
+	requestRoots    []api.RootRequest
 	contract        artifactstate.Contract
 	reconstructions uint64
 }
@@ -118,7 +118,7 @@ func (s *programSession) buildEnvironmentDeclaration(
 		environmentArtifact: environmentArtifact{
 			placement:    placement,
 			dependencies: dependencies,
-			requirements: requestedRequirements,
+			requestRoots: requestedRequirements,
 			contract:     contract,
 		},
 	}, nil
@@ -156,7 +156,7 @@ func (s *programSession) reconstructEnvironmentDeclaration(
 	}
 	requirements, err := s.environmentDeclarationRequirements(
 		object,
-		s.requirements.selectedFor(api.MustSourceArtifactOwner(object)),
+		s.requirements.SelectedFor(api.MustSourceArtifactOwner(object)),
 	)
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func (s *programSession) reconstructEnvironmentDeclaration(
 		owner,
 		target.contract,
 		target.dependencies,
-		target.requirements,
+		target.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func (s *programSession) emitEnvironmentStateField(
 		owner,
 		target.contract,
 		target.dependencies,
-		target.requirements,
+		target.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func (s *programSession) buildEnvironmentStateField(
 		environmentArtifact: environmentArtifact{
 			placement:    placement,
 			dependencies: dependencies,
-			requirements: requirements,
+			requestRoots: requirements,
 			contract:     contract,
 		},
 	}, nil
@@ -269,7 +269,7 @@ func (s *programSession) reconstructEnvironmentStateField(
 		owner,
 		target.contract,
 		target.dependencies,
-		target.requirements,
+		target.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -396,7 +396,7 @@ func (s *programSession) replaceEnvironmentConstantProjections(
 	s.artifacts.DiscardDirty(owner)
 	current.placement = placement
 	current.dependencies = dependencies
-	current.requirements = nestedRequirements
+	current.requestRoots = nestedRequirements
 	current.reconstructions++
 	builder.declarations[selected] = current
 	return nil

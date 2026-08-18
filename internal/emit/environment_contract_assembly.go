@@ -288,7 +288,7 @@ func (s *programSession) emitEnvironmentObject(object types.Object) error {
 			owner,
 			target.contract,
 			target.dependencies,
-			target.requirements,
+			target.requestRoots,
 		); err != nil {
 			return err
 		}
@@ -313,7 +313,7 @@ func (s *programSession) emitEnvironmentObject(object types.Object) error {
 	target, err := s.buildEnvironmentDeclaration(
 		builder,
 		object,
-		s.requirements.selectedFor(api.MustSourceArtifactOwner(object)),
+		s.requirements.SelectedFor(api.MustSourceArtifactOwner(object)),
 	)
 	if err != nil {
 		return err
@@ -322,7 +322,7 @@ func (s *programSession) emitEnvironmentObject(object types.Object) error {
 		api.MustSourceArtifactOwner(object),
 		target.contract,
 		target.dependencies,
-		target.requirements,
+		target.requestRoots,
 	); err != nil {
 		return err
 	}

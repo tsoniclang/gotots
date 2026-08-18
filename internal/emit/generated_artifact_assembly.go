@@ -158,7 +158,7 @@ func (s *programSession) reconstructMapSpecialization(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func (s *programSession) buildMapSpecializationRevision(
 	err = maprepresentation.ValidateRequirements(
 		api.RoleFileDeclaration,
 		artifact,
-		s.requirements.selectedFor(owner),
+		s.requirements.SelectedFor(owner),
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -273,7 +273,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		[]tsgo.ModifierLike{builder.context.Factory().ExportKeyword()},
 		builder.context.Factory().Identifier(artifact.TargetName()),
 		nil,
-		nil,
+		specialization.HeritageClauses(),
 		specialization.Members(),
 	))
 	requests := api.CombineRequests(
@@ -298,7 +298,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		statements:     []tsgo.Statement{statement},
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   requirements,
+		requestRoots:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
@@ -384,7 +384,7 @@ func (s *programSession) reconstructGenericCapabilityArtifact(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -439,7 +439,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 	if err := genericcapability.ValidateRequirements(
 		builder.context.Role(),
 		artifact,
-		s.requirements.selectedFor(owner),
+		s.requirements.SelectedFor(owner),
 	); err != nil {
 		return artifactRevision{}, err
 	}
@@ -481,7 +481,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   requirements,
+		requestRoots:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil

@@ -98,10 +98,13 @@ func TestInterfaceAdaptersContainOnlyDemandedContracts(t *testing.T) {
 		artifacts.paths,
 		"Other__from_interfacecontractdemand",
 	)
+	const otherName = "$goInterfaceAdapter$Named_interfacecontractdemand$Other"
 	for _, forbidden := range []string{
 		"Other_Second",
 		"Other_Shared",
 		"Other_Unused",
+		"export class " + otherName,
+		"const " + otherName + "$methods",
 	} {
 		if strings.Contains(otherAdapter, forbidden) {
 			t.Fatalf(
@@ -110,6 +113,27 @@ func TestInterfaceAdaptersContainOnlyDemandedContracts(t *testing.T) {
 				otherAdapter,
 			)
 		}
+	}
+	if !strings.Contains(otherAdapter, "export const "+otherName+": {") ||
+		!strings.Contains(
+			otherAdapter,
+			"} = createGoInterfaceAdapter<"+
+				"Other__from_interfacecontractdemand>",
+		) {
+		t.Fatalf(
+			"any-only Other adapter did not use the canonical typed factory:\n%s",
+			otherAdapter,
+		)
+	}
+	if count := strings.Count(
+		artifacts.printed,
+		"function createGoInterfaceAdapter<T>(",
+	); count != 1 {
+		t.Fatalf(
+			"interface adapter factory count = %d, want one:\n%s",
+			count,
+			artifacts.printed,
+		)
 	}
 	runner := filepath.Join(workingDirectory, "runner.ts")
 	writeProgramFile(t, runner, `import "./program.js";

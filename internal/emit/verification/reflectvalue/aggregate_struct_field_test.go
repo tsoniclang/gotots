@@ -98,7 +98,7 @@ func main() {
 			for _, required := range []string{
 				"elem:",
 				".$copy(",
-				"storePointer(instance,",
+				"storePointer(pointer,",
 				"settable: false",
 			} {
 				if !strings.Contains(artifacts.printed, required) {

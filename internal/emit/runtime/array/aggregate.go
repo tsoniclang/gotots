@@ -16,6 +16,8 @@ func BuildAggregateOperation(
 		return buildViewOperation(factory)
 	case api.RuntimeArrayLocation:
 		return buildLocationOperation(factory)
+	case api.RuntimeArrayPacked:
+		return buildPackedOperation(factory)
 	default:
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}

@@ -23,18 +23,18 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeStringMin, 4, api.RuntimeModuleString, "runtime/string.ts", "goStringMin", false, nil},
 		{api.RuntimeStringEncodeRune, 5, api.RuntimeModuleString, "runtime/string.ts", "goStringEncodeRune", false, nil},
 		{api.RuntimeStringDecodeRune, 6, api.RuntimeModuleString, "runtime/string.ts", "goStringDecodeRune", false, nil},
-		{api.RuntimeDenseIndex, 90, api.RuntimeModuleDenseIndex, "runtime/dense-index.ts", "GoDenseIndex", false, []api.RuntimeSymbol{api.RuntimePanic}},
-		{api.RuntimeArray, 200, api.RuntimeModuleArray, "runtime/array.ts", "GoArray", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeDenseIndex}},
+		{api.RuntimeArray, 200, api.RuntimeModuleArray, "runtime/array.ts", "GoArray", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeArrayAllocate, 201, api.RuntimeModuleArray, "runtime/array.ts", "goArrayAllocate", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeArrayView, 202, api.RuntimeModuleArray, "runtime/array.ts", "goArrayView", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeArrayLocation, 203, api.RuntimeModuleArray, "runtime/array.ts", "goArrayLocation", false, []api.RuntimeSymbol{api.RuntimeArray}},
+		{api.RuntimeArrayPacked, 204, api.RuntimeModuleArray, "runtime/array.ts", "goArrayPacked", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeStorageTypeToken, 250, api.RuntimeModuleStorage, "runtime/storage.ts", "$goStorageType", true, nil},
 		{api.RuntimeStoredValue, 251, api.RuntimeModuleStorage, "runtime/storage.ts", "GoStoredValue", true, []api.RuntimeSymbol{api.RuntimeStorageTypeToken}},
 		{api.RuntimeStorageType, 252, api.RuntimeModuleStorage, "runtime/storage.ts", "GoStorage", true, []api.RuntimeSymbol{api.RuntimeStoredValue}},
 		{api.RuntimeContainerStorageToken, 253, api.RuntimeModuleStorage, "runtime/storage.ts", "$goContainerStorageType", true, nil},
 		{api.RuntimeContainerStoredValue, 254, api.RuntimeModuleStorage, "runtime/storage.ts", "GoContainerStoredValue", true, []api.RuntimeSymbol{api.RuntimeContainerStorageToken}},
 		{api.RuntimeContainerStorageType, 255, api.RuntimeModuleStorage, "runtime/storage.ts", "GoContainerStorage", true, []api.RuntimeSymbol{api.RuntimeContainerStoredValue}},
-		{api.RuntimeSlice, 300, api.RuntimeModuleSlice, "runtime/slice.ts", "RuntimeSlice", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeDenseIndex}},
+		{api.RuntimeSlice, 300, api.RuntimeModuleSlice, "runtime/slice.ts", "RuntimeSlice", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeSliceAddress, 301, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAddress", false, []api.RuntimeSymbol{api.RuntimeSlice}},
 		{api.RuntimeSliceStorage, 302, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAllocate", false, []api.RuntimeSymbol{api.RuntimeSlice}},
 		{api.RuntimeSliceProjection, 303, api.RuntimeModuleSlice, "runtime/slice.ts", "RuntimeSliceProjection", true, []api.RuntimeSymbol{api.RuntimeSlice}},
@@ -43,7 +43,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeSliceAppendSlice, 307, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAppendSlice", false, []api.RuntimeSymbol{api.RuntimeSlice}},
 		{api.RuntimeSliceClear, 308, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceClear", false, []api.RuntimeSymbol{api.RuntimeSlice}},
 		{api.RuntimeSliceRegion, 309, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceRegion", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimePanic}},
-		{api.RuntimeMap, 400, api.RuntimeModuleMap, "runtime/map.ts", "GoMap", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeMap, 400, api.RuntimeModuleMap, "runtime/map.ts", "GoMap", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeMapValue}},
 		{api.RuntimeMapHash, 401, api.RuntimeModuleMap, "runtime/map.ts", "GoMapHash", false, nil},
 		{api.RuntimeMapClear, 402, api.RuntimeModuleMap, "runtime/map.ts", "goMapClear", false, []api.RuntimeSymbol{api.RuntimeMap}},
 		{api.RuntimeMapKeys, 403, api.RuntimeModuleMap, "runtime/map.ts", "goMapKeys", false, []api.RuntimeSymbol{api.RuntimeMap}},
@@ -85,8 +85,9 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeRuntimeErrorToken, 1004, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "GoRuntimeErrorMethodToken", false, nil},
 		{api.RuntimeInterfaceFormat, 1011, api.RuntimeModuleInterface, "runtime/interface.ts", "GoInterfaceFormat", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeProviderInterfaceBridge, 1012, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "GoProviderInterfaceBridge", true, []api.RuntimeSymbol{api.RuntimeInterfaceValue}},
+		{api.RuntimeInterfaceAdapterFactory, 1013, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "createGoInterfaceAdapter", false, []api.RuntimeSymbol{api.RuntimeInterfaceValue}},
 		{api.RuntimeEmptyStruct, 1050, api.RuntimeModuleStruct, "runtime/struct.ts", "GoEmptyStruct", true, nil},
-		{api.RuntimeChannel, 1100, api.RuntimeModuleChannel, "runtime/channel.ts", "GoChannel", true, []api.RuntimeSymbol{api.RuntimeReceiveChannel, api.RuntimeSendChannel, api.RuntimeSelectCase, api.RuntimePanic, api.RuntimeDenseIndex}},
+		{api.RuntimeChannel, 1100, api.RuntimeModuleChannel, "runtime/channel.ts", "GoChannel", true, []api.RuntimeSymbol{api.RuntimeReceiveChannel, api.RuntimeSendChannel, api.RuntimeSelectCase, api.RuntimePanic}},
 		{api.RuntimeReceiveChannel, 1101, api.RuntimeModuleChannel, "runtime/channel.ts", "GoReceiveChannel", true, []api.RuntimeSymbol{api.RuntimeSelectCase}},
 		{api.RuntimeSendChannel, 1102, api.RuntimeModuleChannel, "runtime/channel.ts", "GoSendChannel", true, []api.RuntimeSymbol{api.RuntimeSelectCase}},
 		{api.RuntimeSelectCase, 1103, api.RuntimeModuleChannel, "runtime/channel.ts", "GoSelectCase", true, nil},
@@ -124,7 +125,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		t.Fatal("invalid runtime symbol unexpectedly has a contract")
 	}
 	for _, retired := range []api.RuntimeSymbol{
-		100, 101, 102, 103, 104, 256, 257, 258, 1199, 1200,
+		90, 100, 101, 102, 103, 104, 256, 257, 258, 1199, 1200,
 		1211, 1212, 1213, 1214,
 	} {
 		if _, err := api.RuntimeContract(retired); err == nil {
@@ -165,9 +166,8 @@ func TestRuntimeContractDoesNotExposeDependencyBacking(t *testing.T) {
 	}
 	dependencies := contract.Dependencies()
 	dependencies[0] = api.RuntimeInvalid
-	if actual := contract.Dependencies(); len(actual) != 2 ||
-		actual[0] != api.RuntimePanic ||
-		actual[1] != api.RuntimeDenseIndex {
+	if actual := contract.Dependencies(); len(actual) != 1 ||
+		actual[0] != api.RuntimePanic {
 		t.Fatalf("runtime dependencies leaked mutable backing: %v", actual)
 	}
 }

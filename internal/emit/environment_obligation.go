@@ -154,7 +154,7 @@ func (s *programSession) environmentObligations() (
 				var err error
 				requirements, err = s.environmentDeclarationRequirements(
 					declaration.object,
-					s.requirements.selectedFor(
+					s.requirements.SelectedFor(
 						api.MustSourceArtifactOwner(declaration.object),
 					),
 				)

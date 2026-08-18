@@ -543,6 +543,32 @@ overlap, nil, and bounds behavior belong to one slice runtime owner. Element
 copy and zero are demanded from the element family only where the operation
 requires them.
 
+An ordinary array literal remains a readable `GoArray.literal` call. A static
+literal with more than 4096 explicit elements must not expand each source
+entry into separate target index and value nodes. When its element is a plain
+8-, 16-, or 32-bit integer represented by `number` and every entry has exact
+checker constant evidence, the array owner emits one demand-generated
+`goArrayPacked` call. Its base-36 payload records exact index/value pairs, so
+keyed sparse literals retain zero-filled holes without constructing an
+expanded target AST:
+
+```go
+var table = [8193]int32{0: -5, 8192: 12 /* plus many constants */}
+```
+
+```ts
+const table = goArrayPacked<int32, 8193>(
+  8193, 0, 4097, "0,-5,...,6bk,c" /* abbreviated one-node payload */,
+);
+```
+
+The fixed readable-node ceiling is a compiler resource-safety invariant, not
+a corpus exception or target optimization switch. Unsupported element
+representations, aggregate values, and nonconstant entries retain their
+existing exact emission path. The decoder validates entry count, safe integer
+syntax, and indexes before publishing the array. It uses no dynamic type
+recovery, filesystem artifact, text patch, or product-specific implementation.
+
 ### Maps
 
 Map representation is selected once from the exact closed key and value
@@ -558,6 +584,30 @@ floating-point, complex, pointer, interface, and aggregate keys retain the
 typed hash/equality bucket representation. Both paths preserve nil behavior,
 zero on miss, comma-ok, deletion, clear, assignment copy, and the iteration
 envelope through the same Go-shaped map contract.
+
+That common contract is one exported nominal abstract class, not a structural
+interface:
+
+```ts
+abstract class GoMapValue<K, V> {
+  declare private readonly then?: never;
+  abstract lookup(key: K): V;
+  abstract store(key: K, value: V): void;
+  // the remaining map operations are abstract members of this same contract
+}
+
+class GoMap<K, V> extends GoMapValue<K, V> { /* direct implementation */ }
+class MapOfPointToItem extends GoMapValue<Point, Item> { /* specialization */ }
+```
+
+The nominal root is emitted before every same-module subclass, each subclass
+calls `super()`, and the erased private member is inherited exactly once. This
+lets a checked consumer prove that a returned map cannot participate in
+JavaScript Promise assimilation without recognizing `GoMapValue` by spelling.
+A public structural `then?: never` is not substituted: a declaration boundary
+could hide a runtime accessor, so it would not establish the same closed
+contract. The abstract root emits one empty JavaScript class; no map instance
+gains a field or per-operation wrapper from this rule.
 
 Native key equality is exact only within the selected primitive carrier. In
 the `number` profile, wide integer keys retain the declared precision tradeoff:
@@ -648,10 +698,27 @@ representation.
 An interface value is nil or a canonical dynamic-type token plus represented
 payload. Concrete boxing copies value payloads and preserves reference
 payloads. One adapter per reached concrete type/contract exposes only demanded
-methods. Each adapter extends the canonical interface-value root and calls its
-zero-argument base constructor, so it inherits the one Promise-assimilation
-exclusion rather than redeclaring an incompatible private member. Calls are
-native constant-size member calls; implementer switches are forbidden.
+methods. An adapter with demanded Go methods extends the canonical
+interface-value root and calls its zero-argument base constructor. An adapter
+with no demanded Go methods is a typed constructor produced by one canonical
+demand-selected runtime factory:
+
+```ts
+export const IntAdapter = createGoInterfaceAdapter<int32>(
+  intDynamicType,
+  (left, right) => left === right,
+  value => hashInt(value),
+  false,
+  (value, verb, flags, precision) => formatInt(value, verb, flags, precision),
+);
+```
+
+The factory returns a statically typed constructor with the same `new
+Adapter(value)` and `Adapter.$is(value)` ABI as a method-bearing adapter. It
+contains the common box behavior once and does not inspect names or recover an
+erased payload. Both shapes inherit the one Promise-assimilation exclusion
+rather than redeclaring an incompatible private member. Calls are native
+constant-size member calls; implementer switches are forbidden.
 
 Every generated root class, including the canonical interface-value contract,
 declares the erased nominal member
@@ -715,6 +782,40 @@ The interface adapter carries the exact typed `Entry` payload and its canonical
 descriptor. `TypeOf` returns that descriptor and `ValueOf` creates a typed
 reflective value view whose field/index/element operations delegate to
 generated typed accessors. No host object inspection occurs.
+
+Per-type reflection output contains facts, not a copied reflection
+interpreter. For example, an addressable source struct contributes one compact
+typed registration equivalent to:
+
+```ts
+ReflectTypeMetadataOperations.$registerStruct(
+  $goReflectType_Entry,
+  () => $goInterfaceAdapter_Entry,
+  [{
+    type: () => $goReflectType_string,
+    settable: true,
+    get: entry => new $goInterfaceAdapter_string(entry.Name),
+    set: (entry, field) => {
+      entry.Name = $goInterfaceAdapter_string.$is(field)
+        ? field.$go$value
+        : GoPanic.raiseRuntime(
+            "reflect: Value.Set received a foreign interface box",
+          );
+    },
+  }],
+  Entry.$copy,
+);
+```
+
+The portable provider owns the one adapter guard, field bounds check,
+location wrapper, and clone wrapper used by every such registration. The
+adapter resolver is retained lazily and evaluated only when reflection first
+materializes the operation record, after ESM module initialization. The
+generated callbacks stay statically typed from their concrete adapter; no
+payload cast, source-name lookup, or host reflection is permitted. Provider-
+represented structs use a distinct typed opaque-field registration whose
+only generated facts are field-order-preserving failure messages; they do not
+retain the ordinary field-access path behind a fallback.
 
 For an open generic body:
 

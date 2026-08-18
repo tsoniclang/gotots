@@ -64,14 +64,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goStringDecodeRune",
 			false,
 		), nil
-	case RuntimeDenseIndex:
-		return runtimeContract(
-			RuntimeModuleDenseIndex,
-			"runtime/dense-index.ts",
-			"GoDenseIndex",
-			false,
-			RuntimePanic,
-		), nil
 	case RuntimeArray:
 		return runtimeContract(
 			RuntimeModuleArray,
@@ -79,7 +71,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoArray",
 			true,
 			RuntimePanic,
-			RuntimeDenseIndex,
 		), nil
 	case RuntimeArrayAllocate:
 		return runtimeContract(
@@ -102,6 +93,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeModuleArray,
 			"runtime/array.ts",
 			"goArrayLocation",
+			false,
+			RuntimeArray,
+		), nil
+	case RuntimeArrayPacked:
+		return runtimeContract(
+			RuntimeModuleArray,
+			"runtime/array.ts",
+			"goArrayPacked",
 			false,
 			RuntimeArray,
 		), nil
@@ -158,7 +157,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"RuntimeSlice",
 			true,
 			RuntimePanic,
-			RuntimeDenseIndex,
 		), nil
 	case RuntimeSliceAddress:
 		return runtimeContract(
@@ -236,6 +234,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoMap",
 			true,
 			RuntimePanic,
+			RuntimeMapValue,
 		), nil
 	case RuntimeMapHash:
 		return runtimeContract(

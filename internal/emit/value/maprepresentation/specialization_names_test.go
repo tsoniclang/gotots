@@ -308,6 +308,8 @@ func (staticSpecializationNames) Runtime(
 	switch symbol {
 	case api.RuntimePanic:
 		return api.NewNameReference("GoPanic")
+	case api.RuntimeMapValue:
+		return api.NewNameReference("GoMapValue")
 	default:
 		panic("unexpected runtime symbol")
 	}

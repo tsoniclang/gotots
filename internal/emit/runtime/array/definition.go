@@ -16,12 +16,10 @@ type Capabilities struct {
 func Build(
 	factory tsgo.Factory,
 	panicName string,
-	denseIndexName string,
 ) (tsgo.ClassDeclaration, error) {
 	return BuildWithCapabilities(
 		factory,
 		panicName,
-		denseIndexName,
 		Capabilities{},
 	)
 }
@@ -29,7 +27,6 @@ func Build(
 func BuildWithCapabilities(
 	factory tsgo.Factory,
 	panicName string,
-	denseIndexName string,
 	capabilities Capabilities,
 ) (tsgo.ClassDeclaration, error) {
 	contract, err := api.RuntimeContract(api.RuntimeArray)
@@ -70,9 +67,9 @@ func BuildWithCapabilities(
 	members = append(
 		members,
 		zeroMethod(factory, exportedName),
-		literalMethod(factory, exportedName, panicName, denseIndexName),
+		literalMethod(factory, exportedName, panicName),
 		copyMethod(factory, exportedName, elementType, lengthType),
-		getMethod(factory, elementType, denseIndexName),
+		getMethod(factory, elementType, panicName),
 		setMethod(factory, elementType),
 		checkMethod(factory, panicName),
 	)
@@ -249,7 +246,6 @@ func literalMethod(
 	factory tsgo.Factory,
 	exportedName string,
 	panicName string,
-	denseIndexName string,
 ) tsgo.MethodDeclaration {
 	elementType := typeReference(factory, "T")
 	lengthType := typeReference(factory, "N")
@@ -316,15 +312,19 @@ func literalMethod(
 					nil,
 					definedElement(
 						factory,
-						denseIndexName,
+						panicName,
 						indexes,
 						entry,
+						factory.KeywordTypeNode(
+							tsgo.KeywordTypeSyntaxKindNumberKeyword,
+						),
 					),
 					definedElement(
 						factory,
-						denseIndexName,
+						panicName,
 						values,
 						entry,
+						elementType,
 					),
 				)),
 			}, true),
@@ -420,7 +420,7 @@ func copyMethod(
 func getMethod(
 	factory tsgo.Factory,
 	elementType tsgo.TypeNode,
-	denseIndexName string,
+	panicName string,
 ) tsgo.MethodDeclaration {
 	index := factory.Identifier("index")
 	return runtimeMethod(
@@ -452,7 +452,7 @@ func getMethod(
 			),
 			factory.ReturnStatement(definedElement(
 				factory,
-				denseIndexName,
+				panicName,
 				property(factory, factory.ThisExpression(), "$values"),
 				binary(
 					factory,
@@ -460,6 +460,7 @@ func getMethod(
 					tsgo.BinaryOperatorPlusToken,
 					factory.Identifier("offset"),
 				),
+				elementType,
 			)),
 		},
 	)

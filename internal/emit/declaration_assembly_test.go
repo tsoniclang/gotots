@@ -42,7 +42,7 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 	}
 	boxDeclaration := declarationForObject(t, session, box)
 	if len(boxDeclaration.statements) != 1 ||
-		len(session.requirements.appliedFor(sourceArtifactOwner(box))) != 0 ||
+		len(session.requirements.AppliedFor(sourceArtifactOwner(box))) != 0 ||
 		boxDeclaration.reconstructions != 0 {
 		t.Fatalf("initial Box assembly = %#v", boxDeclaration)
 	}
@@ -63,11 +63,11 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 		"Item": {declaration: itemDeclaration, reconstructions: 1},
 	} {
 		declaration := expected.declaration
-		if len(session.requirements.appliedFor(declaration.owner)) != 3 {
+		if len(session.requirements.AppliedFor(declaration.owner)) != 3 {
 			t.Fatalf(
 				"%s requirements = %d, want zero/copy/equal",
 				name,
-				len(session.requirements.appliedFor(declaration.owner)),
+				len(session.requirements.AppliedFor(declaration.owner)),
 			)
 		}
 		if declaration.reconstructions != expected.reconstructions {
@@ -263,7 +263,7 @@ func TestDeclarationAssembliesCannotSealWithPendingWork(t *testing.T) {
 	}
 	if session.scheduler.hasPending() ||
 		session.packageInitializations.hasPending() ||
-		!session.requirements.hasPending() {
+		!session.requirements.HasPending() {
 		t.Fatal("pending-seal fixture is not isolated to declaration requirements")
 	}
 	_, err = session.targetFiles()
@@ -356,7 +356,7 @@ func measureDeclarationAssembly(
 		Lookup("Record").(*types.TypeName)
 	declaration := declarationForObject(t, session, record)
 	measurement := declarationAssemblyMeasurement{
-		requirements: len(session.requirements.appliedFor(
+		requirements: len(session.requirements.AppliedFor(
 			sourceArtifactOwner(record),
 		)),
 		reconstructions: declaration.reconstructions,

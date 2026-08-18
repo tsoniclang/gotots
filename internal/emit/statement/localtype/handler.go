@@ -561,7 +561,7 @@ func emitLexicalMapSpecialization(
 			nil,
 			context.Factory().Identifier(artifact.TargetName()),
 			nil,
-			nil,
+			specialization.HeritageClauses(),
 			specialization.Members(),
 		),
 		api.CombineRequests(

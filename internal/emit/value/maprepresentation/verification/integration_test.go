@@ -69,7 +69,8 @@ func TestMapValuesCreateTypedTargetAST(t *testing.T) {
 	}
 	if class.Name().Text() != "GoMap" ||
 		len(class.TypeParameters()) != 2 ||
-		len(class.Members()) != 12 {
+		len(class.Members()) != 11 ||
+		len(class.HeritageClauses()) != 1 {
 		t.Fatalf(
 			"runtime class = %q with %d parameters and %d members",
 			class.Name().Text(),
@@ -100,8 +101,9 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"class GoMap<K extends boolean | number | bigint | string, V>",
-		"interface GoMapValue<K, V>",
+		"class GoMap<K extends boolean | number | bigint | string, V> extends GoMapValue<K, V>",
+		"abstract class GoMapValue<K, V>",
+		"declare private readonly then?: never",
 		"Map<K, V>",
 		"clear(): void",
 		"keys(): K[]",

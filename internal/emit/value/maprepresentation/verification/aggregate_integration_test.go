@@ -19,7 +19,7 @@ func TestScalarMapArtifactsStayAtTheImmutableBaseline(t *testing.T) {
 	)
 	for path, expected := range map[string]string{
 		"source.ts":      "7c92c13c2d2ccdbb9358b215083ec1451c6930a6d7da271398d89f2bcd9cf82d",
-		"runtime/map.ts": "ae5fddf9d3b14590a1bf82cd1852ff22003e79c934c220d589d9de86749e53d4",
+		"runtime/map.ts": "e196f4916d33969430331aae067d59cb30f7341376b9ebb012ef4d87f1993d57",
 	} {
 		content := readFile(t, artifacts.file(t, path))
 		actual := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
@@ -107,7 +107,7 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 		nil,
 		factory.Identifier("AggregateMap"),
 		nil,
-		nil,
+		specialization.HeritageClauses(),
 		specialization.Members(),
 	)
 	source := printAggregateSpecialization(t, factory, class)

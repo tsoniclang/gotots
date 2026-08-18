@@ -190,7 +190,7 @@ func (s *programSession) scheduleDeclarationRequirement(
 	if err := s.prepareDeclarationRequirement(requirement); err != nil {
 		return err
 	}
-	s.requirements.enqueue(requirement)
+	s.requirements.Enqueue(requirement)
 	return nil
 }
 
@@ -205,6 +205,14 @@ func (s *programSession) prepareDeclarationRequirement(
 	}
 	if !requirement.Valid() {
 		return &ScheduleError{Reason: "declaration requirement is invalid"}
+	}
+	if s.preparedRequirements == nil {
+		s.preparedRequirements = make(
+			map[api.DeclarationRequirement]struct{},
+		)
+	}
+	if _, prepared := s.preparedRequirements[requirement]; prepared {
+		return nil
 	}
 	if artifact, generated := requirement.GeneratedArtifact(); generated {
 		if err := s.validateGeneratedArtifact(artifact); err != nil {
@@ -253,6 +261,7 @@ func (s *programSession) prepareDeclarationRequirement(
 			return err
 		}
 	}
+	s.preparedRequirements[requirement] = struct{}{}
 	return nil
 }
 
@@ -309,7 +318,7 @@ func (s *programSession) applyDeclarationRequirements(
 					Reason: "generated-artifact requirement batch has mixed or invalid ownership",
 				}
 			}
-			if !s.requirements.wasApplied(requirement) {
+			if !s.requirements.WasApplied(requirement) {
 				return &ScheduleError{
 					Object: owner.Name(),
 					Reason: "generated-artifact requirement was not accepted by its owner",
@@ -330,7 +339,7 @@ func (s *programSession) applyDeclarationRequirements(
 					Reason: "package initializer requirement batch has mixed or invalid ownership",
 				}
 			}
-			if !s.requirements.wasApplied(requirement) {
+			if !s.requirements.WasApplied(requirement) {
 				return &ScheduleError{
 					Object: owner.Name(),
 					Reason: "package initializer requirement was not accepted by its owner",
@@ -359,7 +368,7 @@ func (s *programSession) applyDeclarationRequirements(
 				Reason: "declaration requirement batch has mixed or invalid ownership",
 			}
 		}
-		if !s.requirements.wasApplied(requirement) {
+		if !s.requirements.WasApplied(requirement) {
 			return &ScheduleError{
 				Object: owner.Name(),
 				Reason: "declaration requirement was not accepted by its owner",
@@ -393,7 +402,7 @@ type artifactRevision struct {
 	statements        []tsgo.Statement
 	placement         *targetplacement.Owner
 	dependencies      []api.ArtifactDependency
-	requirements      []api.DeclarationRequirement
+	requestRoots      []api.RootRequest
 	eagerDependencies []api.ArtifactOwner
 	contract          artifactstate.Contract
 	classContribution *classMemberContribution
@@ -433,7 +442,7 @@ func (s *programSession) buildArtifactRevision(
 	}
 	defer finish()
 
-	requirements := s.requirements.selectedFor(artifactOwner)
+	requirements := s.requirements.SelectedFor(artifactOwner)
 	handlerRequirements, selectedMethods, err :=
 		s.partitionClassMethodRequirements(owner, requirements)
 	if err != nil {
@@ -576,7 +585,7 @@ func (s *programSession) buildArtifactRevision(
 		statements:        statements,
 		placement:         placement,
 		dependencies:      dependencies,
-		requirements:      declarationRequirements,
+		requestRoots:      declarationRequirements,
 		eagerDependencies: eagerDeclarationDependencies(owner, dependencies),
 		contract:          contract,
 		classContribution: contribution,

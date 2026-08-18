@@ -472,6 +472,7 @@ type PlacementError = diagnosticcontract.PlacementError
 
 type rootRequestSequence struct {
 	children []RootRequest
+	kinds    uint8
 }
 
 type rootRequestFrame struct {
@@ -497,11 +498,15 @@ func combineRootRequests(groups ...[]RootRequest) []RootRequest {
 	}
 
 	children := make([]RootRequest, 0, rootCount)
+	var kinds uint8
 	for _, group := range groups {
-		children = append(children, group...)
+		for _, request := range group {
+			children = append(children, request)
+			kinds |= request.rootRequestKinds()
+		}
 	}
 	return []RootRequest{{
-		sequence: &rootRequestSequence{children: children},
+		sequence: &rootRequestSequence{children: children, kinds: kinds},
 	}}
 }
 

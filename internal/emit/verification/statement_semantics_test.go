@@ -185,7 +185,6 @@ func assertWaveFourArtifactShape(t *testing.T, printed string) {
 		"__gotots_switch_selection_",
 		"__gotots_range_keys_",
 		".keys()",
-		"GoDenseIndex.get(__gotots_range_keys_",
 		"outer:",
 		"continue outer;",
 	} {
@@ -193,10 +192,14 @@ func assertWaveFourArtifactShape(t *testing.T, printed string) {
 			t.Fatalf("Wave 4 artifacts lack %q:\n%s", required, printed)
 		}
 	}
-	if direct := regexp.MustCompile(
-		`__gotots_range_keys_[0-9]+\[__gotots_range_index_[0-9]+\]`,
-	); direct.MatchString(printed) {
-		t.Fatalf("map range retained a direct dense-key read:\n%s", printed)
+	direct := regexp.MustCompile(
+		`for \(const __gotots_range_value_[0-9]+ of __gotots_range_keys_[0-9]+\)`,
+	)
+	if !direct.MatchString(printed) {
+		t.Fatalf("map range lacks its direct key iteration:\n%s", printed)
+	}
+	if strings.Contains(printed, "GoDenseIndex.get(__gotots_range_keys_") {
+		t.Fatalf("map range retained its redundant dense-index helper:\n%s", printed)
 	}
 	rangeFunction := targetFunctionText(
 		t,

@@ -524,10 +524,10 @@ var waveSevenTailBounds = map[string]struct {
 	"capability":    {bytes: 2_400, nodes: 400},
 	"generic-alias": {bytes: 500, nodes: 100},
 	// The canonical-pointer fixture selects RuntimeSlice.address and $view.
-	// Its marker-bearing class measures 6,878 bytes/1,403 nodes; the bound
-	// leaves less than two percent byte headroom while retaining the stricter
-	// independent node bound.
-	"generic-class": {bytes: 7_000, nodes: 1_500},
+	// Its marker-bearing class measures 7,367 bytes/1,498 nodes after every
+	// dense read gained an inline presence proof. The bounds retain less than
+	// two percent headroom without restoring the call-based storage helper.
+	"generic-class": {bytes: 7_500, nodes: 1_525},
 	// The bound includes inline storage-facet conversion arrows.
 	// GenericIteratorCopy measures 2,341 bytes/304 nodes; the prior one-facet
 	// ABI could not represent its T-backed struct field.
