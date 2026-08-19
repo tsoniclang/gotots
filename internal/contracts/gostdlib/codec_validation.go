@@ -30,7 +30,9 @@ func validateFacet(facet FacetDocument, field string) error {
 	case FacetNamedStructOperations:
 		if len(facet.Capabilities) == 0 ||
 			facet.Effect != EffectInvalid || len(facet.CallableParameters) != 0 ||
-			len(facet.GenericTypeArguments) != 0 {
+			len(facet.GenericTypeArguments) != 0 ||
+			facet.ResultExport != "" || facet.ResultImplementationOwner != "" ||
+			facet.ResultTargetFingerprint != "" {
 			return manifestError(field, "named-struct facet shape is invalid")
 		}
 		storage := false
@@ -62,6 +64,8 @@ func validateFacet(facet FacetDocument, field string) error {
 			facet.Effect != EffectInvalid ||
 			len(facet.CallableParameters) != 0 ||
 			len(facet.GenericTypeArguments) != 0 ||
+			facet.ResultExport != "" || facet.ResultImplementationOwner != "" ||
+			facet.ResultTargetFingerprint != "" ||
 			facet.StorageExport != "" || facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
 			facet.StorageTargetFingerprint != "" {
@@ -73,6 +77,8 @@ func validateFacet(facet FacetDocument, field string) error {
 			!facet.Effect.Valid() ||
 			len(facet.CallableParameters) != 0 ||
 			len(facet.GenericTypeArguments) != 0 ||
+			facet.ResultExport != "" || facet.ResultImplementationOwner != "" ||
+			facet.ResultTargetFingerprint != "" ||
 			facet.StorageExport != "" ||
 			facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
@@ -85,6 +91,8 @@ func validateFacet(facet FacetDocument, field string) error {
 				facet.Capabilities[0] != FacetCapabilitySynchronousKernel) ||
 			!facet.Effect.Valid() ||
 			len(facet.GenericTypeArguments) == 0 ||
+			facet.ResultExport != "" || facet.ResultImplementationOwner != "" ||
+			facet.ResultTargetFingerprint != "" ||
 			facet.StorageExport != "" || facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
 			facet.StorageTargetFingerprint != "" {
@@ -113,6 +121,9 @@ func validateFacet(facet FacetDocument, field string) error {
 			facet.Effect != EffectInvalid ||
 			len(facet.CallableParameters) != 0 ||
 			len(facet.GenericTypeArguments) != 0 ||
+			facet.ResultExport == "" ||
+			!sourcePath(facet.ResultImplementationOwner) ||
+			!validDigest(facet.ResultTargetFingerprint) ||
 			facet.StorageExport != "" || facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
 			facet.StorageTargetFingerprint != "" {

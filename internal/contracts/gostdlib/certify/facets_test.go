@@ -16,7 +16,7 @@ import (
 func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 22,
+	  "schemaVersion": 24,
   "facets": [],
   "genericOperationSets": [
     {
@@ -42,7 +42,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 		t.Fatalf("generic operations = %#v", selected)
 	}
 
-	payload = `{"schemaVersion":22,"facets":[],"genericOperationSets":[
+	payload = `{"schemaVersion":24,"facets":[],"genericOperationSets":[
   {"sourceIdentity":"x","operations":[
     {"kind":"invented","parameters":[],"results":[{"kind":"type-parameter","typeParameter":0}]}
   ]}
@@ -55,10 +55,57 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	}
 }
 
+func TestFacetMapOwnsInvocationTransportSeeds(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "facets.json")
+	payload := `{
+  "schemaVersion": 24,
+  "facets": [],
+  "genericOperationSets": [],
+  "providerInvocationTransports": [{
+    "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
+    "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+    "sourcePath": "src/internal/facets/named-reflect.ts",
+    "export": "ReflectTypeMetadataOperations",
+    "member": "$create",
+    "inputParameters": [0, 1],
+    "resultOriginParameters": [0],
+    "state": {
+      "kind": "access",
+      "carrierParameter": 0,
+      "writeParameters": [1]
+    }
+  }]
+}`
+	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	seeds, err := readFacetSeeds(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected := &seeds.invocationTransports[0]
+	selected.InputParameters[0] = 9
+	selected.ResultOriginParameters[0] = 9
+	selected.State.WriteParameters[0] = 9
+	*selected.State.CarrierParameter = 9
+
+	next, err := readFacetSeeds(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected = &next.invocationTransports[0]
+	if selected.InputParameters[0] != 0 ||
+		selected.ResultOriginParameters[0] != 0 ||
+		selected.State.WriteParameters[0] != 1 ||
+		*selected.State.CarrierParameter != 0 {
+		t.Fatalf("invocation transport seed exposed mutable storage: %#v", selected)
+	}
+}
+
 func TestFacetMapOwnsClosedGenericCallableKernels(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 22,
+	  "schemaVersion": 24,
 	  "facets": [{
 	    "kind":"generic-callable-kernel",
 	    "sourceIdentity":"slices|kind=4|receiver=|name=Grow",
@@ -100,7 +147,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 ) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 22,
+	  "schemaVersion": 24,
   "facets": [],
   "providerStatefulProfiles": [{
     "sourceIdentity": "example.com/source|kind=2|receiver=|name=State",
@@ -153,7 +200,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 func TestImplementedResultRequiresContractOwner(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 22,
+	  "schemaVersion": 24,
   "facets": [],
   "providerCallableProfiles": [{
     "sourceIdentity": "example.com/source|kind=4|receiver=|name=Build",

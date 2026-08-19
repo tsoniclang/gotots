@@ -12,7 +12,7 @@ func registrationExpression(
 	names api.ReflectionNames,
 	sourceType types.Type,
 	reflectionType *types.TypeName,
-	targetType api.NameReference,
+	descriptorType api.NameReference,
 ) (tsgo.ObjectLiteralExpression, []api.RootRequest, error) {
 	factory := context.Factory()
 	var properties []tsgo.ObjectLiteralElementLike
@@ -37,7 +37,7 @@ func registrationExpression(
 		properties = append(properties, expressionProperty(
 			factory,
 			"pointerElement",
-			arrow(factory, targetType, element.Expression(factory)),
+			arrow(factory, descriptorType, element.Expression(factory)),
 		))
 		requests = append(requests, element.Requests()...)
 	}

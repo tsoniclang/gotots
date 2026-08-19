@@ -11,12 +11,12 @@ import (
 // callback of one walked type needs: the exact adapter guard, the runtime
 // box type, the panic owner, and the descriptor thunk return type.
 type locationScaffold struct {
-	factory    tsgo.Factory
-	adapter    api.NameReference
-	boxType    api.NameReference
-	panicRef   api.NameReference
-	targetType api.NameReference
-	requests   []api.RootRequest
+	factory        tsgo.Factory
+	adapter        api.NameReference
+	boxType        api.NameReference
+	panicRef       api.NameReference
+	descriptorType api.NameReference
+	requests       []api.RootRequest
 	// payload is the raw represented payload of the walked type's box:
 	// the boxed value routed through the defined-type projection when the
 	// registered type carries a branded representation.
@@ -94,7 +94,7 @@ func locationLiteral(
 		[]tsgo.ObjectLiteralElementLike{
 			expressionProperty(factory, "type", arrow(
 				factory,
-				scaffold.targetType,
+				scaffold.descriptorType,
 				callbacks.descriptor.Expression(factory),
 			)),
 			booleanProperty(factory, "settable", callbacks.settable),

@@ -1405,6 +1405,32 @@ provider-internal behavior: a satisfied generated obligation or a linked
 certified binding is never, by itself, proof that the selected provider body
 is implemented.
 
+The provider manifest may additionally certify invocation transport for one
+exact public provider member. This is not a source-call override and does not
+change emitted signatures. Its independently versioned section names the
+provider declaration root, and each record exact-joins one Go or facet identity,
+module specifier, exact `.d.ts` path from that package export's `types` target,
+exported target owner, static member, checked callable type, implementation
+fingerprint, parameter ingress set, result-origin set, and an optional
+closed-state role. For example, `sync.Map.Store(cache, key, value)` records
+`cache` as the state carrier and `value` as a write, while
+`sync.Map.Load(cache, key)` records a read from that same carrier. Reflection
+metadata registration records its callback parameters as certified synchronous
+inputs. The manifest generator derives declaration paths, target types, and
+fingerprints from the inspected provider project; handwritten declaration
+paths, target types, or fingerprints are forbidden.
+
+State transport grants no global permission. A target may consume it only
+after the selected call exact-joins the certified declaration node and exact
+checked references prove one project carrier is closed: every
+creation, alias, read, write, observation, and escape of that carrier must join
+one certified operation. A read receives origins from every certified write in
+that carrier component. An unrecognized use, ambient carrier, stale manifest,
+wrong declaration file, overload ambiguity, duplicate target, invalid parameter
+index, or conflicting semantic owner keeps the complete component conservative.
+Provider names are never inferred from source spelling, and a local same-shaped
+API receives no transport.
+
 Every environment target selection—provider reference or facet, compiler
 intrinsic, generated runtime facet, or explicit boundary—synchronously
 observes its canonical `go/types` object at the root environment owner with
@@ -1440,6 +1466,19 @@ operations terminate at certified capability or host boundaries; an unresolved
 dynamic call or ambiguous symbol fails certification. Canonical placeholder
 identity derives from checked caller/symbol evidence, never a free-form
 string argument.
+
+A provider facet may separately certify the concrete result type produced by
+one of its operations when the public Go contract intentionally widens that
+result. The result export is a distinct facet target with its own exact export
+identity, implementation owner, target fingerprint, and implementation sites.
+Certification exact-joins the selected operation member's checked return type
+to that export's checked type symbol; assignability, display spelling, and a
+shared implementation file are insufficient. For reflection metadata,
+`ReflectTypeMetadataOperations.$create` therefore returns the certified
+`RuntimeType`, while ordinary Go-facing uses may still widen that value to
+`reflect.Type`. Generated declarations and callbacks retain the concrete
+result target until an authored Go contract performs that widening. A missing,
+foreign, or stale result target fails provider certification before emission.
 
 The used-provider closure is computed from the provider-routed settled roots
 through certified implementation dependencies and capabilities under one exact

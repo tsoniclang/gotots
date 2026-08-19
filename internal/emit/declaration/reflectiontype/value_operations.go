@@ -29,7 +29,7 @@ func valueOperationsStatement(
 	names api.ReflectionNames,
 	operations api.NameReference,
 	reflectionType *types.TypeName,
-	targetType api.NameReference,
+	descriptorType api.NameReference,
 	sourceType types.Type,
 	descriptorName string,
 ) (tsgo.Statement, []api.RootRequest, bool, error) {
@@ -39,7 +39,7 @@ func valueOperationsStatement(
 			names,
 			operations,
 			reflectionType,
-			targetType,
+			descriptorType,
 			sourceType,
 			descriptorName,
 			structType,
@@ -51,7 +51,7 @@ func valueOperationsStatement(
 			names,
 			operations,
 			reflectionType,
-			targetType,
+			descriptorType,
 			sourceType,
 			descriptorName,
 			pointerType,
@@ -233,11 +233,11 @@ func valueOperationsStatement(
 		))
 	}
 	scaffold := &locationScaffold{
-		factory:    factory,
-		adapter:    adapter,
-		boxType:    boxType,
-		panicRef:   panicReference,
-		targetType: targetType,
+		factory:        factory,
+		adapter:        adapter,
+		boxType:        boxType,
+		panicRef:       panicReference,
+		descriptorType: descriptorType,
 	}
 	extended, err := extendedValueProperties(
 		context,

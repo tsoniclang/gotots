@@ -531,6 +531,14 @@ ESM for:
 - open generic `TypeFor[T]` through exact private capability or
   concretization, with unchanged source value arity.
 
+Provider-facet tests independently certify the metadata operation target and
+its concrete result target. The checked return type of `$create` must
+exact-join the result export's type symbol, and the manifest must carry the
+result export's sole implementation owner, target fingerprint, and behavior
+sites. Generated-source inspection requires every descriptor declaration and
+descriptor-returning callback to use that certified concrete target before an
+ordinary Go-facing `reflect.Type` assignment widens it.
+
 An independent descriptor extractor walks the selected `go/types` graph and
 exact-joins canonical type identity, kind, relations, fields, tags, methods,
 and architecture sizes against generated descriptor records. Runtime tests
@@ -545,6 +553,13 @@ descriptor join, staticness wall, source-shape gate, strict typecheck, or
 differential test. Scaling holds call sites constant and bounds descriptor
 bytes/AST nodes by canonical types plus fields/methods, with no type-pair or
 call-site cross-product.
+
+Facet-result mutations remove or rename the result export, substitute a
+different checked provider type, alter its implementation owner or
+fingerprint, widen `$create` back to the public interface, or widen one
+generated descriptor callback. Each must fail at seed validation, provider
+certification, manifest validation, generated-AST inspection, or strict
+typechecking; no emitter-local spelling fallback is permitted.
 
 Reachability tests exercise both discovery orders: adapter before reflection
 demand and reflection demand before adapter. They exact-join the descriptors
@@ -904,6 +919,19 @@ independently strict-typechecked against its certified scalar module. Exact
 hash folding, and counters) execute against Go. Node/host boundaries have
 focused range tests; unchecked `bigint`-to-`number` narrowing is forbidden by
 source-shape and mutation gates.
+
+Provider invocation-transport certification exact-joins every configured
+source identity to one provider module/export/member, derives the exact
+declaration path from the package export's `types` target, checks one callable
+signature, derives its target type and fingerprint, and validates every
+parameter index before sealing the provider manifest. Focused checked-source
+fixtures cover direct callback ingress, callback-carrying results, one closed
+state carrier with multiple writes and reads, and a carrier with an unrecognized
+escape. Mutations alter the section schema, declaration path, target type, or
+write index; duplicate a member; remove a provider body; use the same spelling
+from another declaration; or introduce one unaccounted carrier reference. Each
+must fail at certification, exact declaration selection, or closed-carrier
+admission before cooperative effects are removed.
 
 Provider-created dynamic-interface proof additionally exact-joins every
 configured capability view to its base Go interface, target Go interface,

@@ -1,5 +1,156 @@
 {
-  "schemaVersion": 22,
+  "schemaVersion": 24,
+  "providerInvocationTransports": [
+    {
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectTypeMetadataOperations",
+      "member": "$create",
+      "inputParameters": [0, 1, 2],
+      "resultOriginParameters": [0, 1, 2]
+    },
+    {
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectTypeMetadataOperations",
+      "member": "$registerOpaqueStruct",
+      "inputParameters": [0, 1, 2]
+    },
+    {
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectTypeMetadataOperations",
+      "member": "$registerPointer",
+      "inputParameters": [0, 1, 2]
+    },
+    {
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectTypeMetadataOperations",
+      "member": "$registerStruct",
+      "inputParameters": [0, 1, 2, 3]
+    },
+    {
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectTypeMetadataOperations",
+      "member": "$registerValue",
+      "inputParameters": [0, 1]
+    },
+    {
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectTypeMetadataOperations",
+      "member": "$typeOf",
+      "inputParameters": [0],
+      "resultOriginParameters": [0]
+    },
+    {
+      "sourceIdentity": "sync|kind=2|receiver=|name=Map",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncMapOperations",
+      "member": "$copy",
+      "inputParameters": [0],
+      "state": { "kind": "create", "carrierParameter": 0 }
+    },
+    {
+      "sourceIdentity": "sync|kind=2|receiver=|name=Map",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncMapOperations",
+      "member": "$fromStorage",
+      "inputParameters": [0],
+      "resultOriginParameters": [0],
+      "state": { "kind": "alias", "carrierParameter": 0 }
+    },
+    {
+      "sourceIdentity": "sync|kind=2|receiver=|name=Map",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncMapOperations",
+      "member": "$storageOf",
+      "inputParameters": [0],
+      "resultOriginParameters": [0],
+      "state": { "kind": "alias", "carrierParameter": 0 }
+    },
+    {
+      "sourceIdentity": "sync|kind=2|receiver=|name=Map",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncMapOperations",
+      "member": "$zero",
+      "state": { "kind": "create" }
+    },
+    {
+      "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=Clear",
+      "specifier": "@gotots/gostdlib/sync.js",
+      "sourcePath": "src/sync.ts",
+      "export": "Map",
+      "member": "Clear",
+      "inputParameters": [0],
+      "state": { "kind": "access", "carrierParameter": 0 }
+    },
+    {
+      "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=Delete",
+      "specifier": "@gotots/gostdlib/sync.js",
+      "sourcePath": "src/sync.ts",
+      "export": "Map",
+      "member": "Delete",
+      "inputParameters": [0, 1],
+      "state": { "kind": "access", "carrierParameter": 0 }
+    },
+    {
+      "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=Load",
+      "specifier": "@gotots/gostdlib/sync.js",
+      "sourcePath": "src/sync.ts",
+      "export": "Map",
+      "member": "Load",
+      "inputParameters": [0, 1],
+      "state": { "kind": "access", "carrierParameter": 0, "read": true }
+    },
+    {
+      "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=LoadOrStore",
+      "specifier": "@gotots/gostdlib/sync.js",
+      "sourcePath": "src/sync.ts",
+      "export": "Map",
+      "member": "LoadOrStore",
+      "inputParameters": [0, 1, 2],
+      "state": {
+        "kind": "access",
+        "carrierParameter": 0,
+        "read": true,
+        "writeParameters": [2]
+      }
+    },
+    {
+      "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=Range",
+      "specifier": "@gotots/gostdlib/sync.js",
+      "sourcePath": "src/sync.ts",
+      "export": "Map",
+      "member": "Range",
+      "inputParameters": [0, 1]
+    },
+    {
+      "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=Store",
+      "specifier": "@gotots/gostdlib/sync.js",
+      "sourcePath": "src/sync.ts",
+      "export": "Map",
+      "member": "Store",
+      "inputParameters": [0, 1, 2],
+      "state": {
+        "kind": "access",
+        "carrierParameter": 0,
+        "writeParameters": [2]
+      }
+    }
+  ],
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -1666,6 +1817,7 @@
       "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
       "sourcePath": "src/internal/facets/named-reflect.ts",
       "export": "ReflectTypeMetadataOperations",
+      "resultExport": "RuntimeType",
       "capabilities": [
         "metadata"
       ]

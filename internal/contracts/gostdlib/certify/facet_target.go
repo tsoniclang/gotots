@@ -89,6 +89,84 @@ func validateFacetTarget(seed facetSeed, target tsgo.ProjectExport) error {
 	return nil
 }
 
+func validateFacetResultTarget(
+	project *tsgo.ProjectInspection,
+	seed facetSeed,
+	operations tsgo.ProjectExport,
+	result tsgo.ProjectExport,
+) error {
+	if seed.Kind != gostdlib.FacetReflectionTypeOperations ||
+		seed.ResultExport == "" || result.Name() != seed.ResultExport {
+		return certifyError(
+			"build facet",
+			seed.SourceIdentity,
+			"reflection-type result target is invalid",
+		)
+	}
+	create, ok := operations.ValueMember("$create")
+	if !ok {
+		return certifyError(
+			"build facet",
+			seed.Export+".$create",
+			"reflection-type constructor is absent",
+		)
+	}
+	identity, err := project.CallableReturnTypeIdentity(create)
+	if err != nil {
+		return err
+	}
+	if !identity.Matches(result) {
+		return certifyError(
+			"build facet",
+			seed.Export+".$create",
+			"reflection-type constructor does not return the certified result export",
+		)
+	}
+	return nil
+}
+
+func verifySynchronousGenericKernelCallableContract(
+	identity string,
+	binding gostdlib.BindingDocument,
+	effect gostdlib.EffectKind,
+	parameters []gostdlib.ProviderCallableParameterDocument,
+) error {
+	if binding.Kind != gostdlib.BindingFunction {
+		return certifyError(
+			"verify synchronous generic callable kernel",
+			identity,
+			"public binding is not a function",
+		)
+	}
+	if effect != gostdlib.EffectSynchronous || !binding.Effect.MaySuspend() {
+		return certifyError(
+			"verify synchronous generic callable kernel",
+			identity,
+			"kernel does not narrow one cooperative public effect to synchronous",
+		)
+	}
+	if len(parameters) == 0 || len(parameters) != len(binding.CallableParameters) {
+		return certifyError(
+			"verify synchronous generic callable kernel",
+			identity,
+			"kernel callable parameter set does not match the public binding",
+		)
+	}
+	for index, parameter := range parameters {
+		public := binding.CallableParameters[index]
+		if parameter.Parameter != public.Parameter ||
+			parameter.Effect != gostdlib.EffectSynchronous ||
+			!public.Effect.MaySuspend() {
+			return certifyError(
+				"verify synchronous generic callable kernel",
+				identity,
+				"kernel callable parameter does not exactly narrow its public parameter",
+			)
+		}
+	}
+	return nil
+}
+
 func facetCapabilityMembers(
 	capability gostdlib.FacetCapability,
 ) ([]string, error) {

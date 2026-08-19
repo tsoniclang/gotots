@@ -238,6 +238,7 @@ func validateFacetSeeds(
 		if seed.Kind == gostdlib.FacetReflectionTypeOperations &&
 			(len(seed.Capabilities) != 1 ||
 				seed.Capabilities[0] != gostdlib.FacetCapabilityMetadata ||
+				seed.ResultExport == "" ||
 				seed.StorageExport != "" ||
 				seed.RepresentationExport != "" ||
 				seed.Effect != gostdlib.EffectInvalid) {
@@ -251,6 +252,7 @@ func validateFacetSeeds(
 			(len(seed.Capabilities) != 2 ||
 				seed.Capabilities[0] != gostdlib.FacetCapabilityProject ||
 				seed.Capabilities[1] != gostdlib.FacetCapabilityWrap ||
+				seed.ResultExport != "" ||
 				seed.StorageExport != "" ||
 				seed.RepresentationExport != "" ||
 				seed.Effect != gostdlib.EffectInvalid) {
@@ -290,7 +292,19 @@ func validateFacetSeeds(
 			}
 			lookups[lookup] = struct{}{}
 		}
-		for _, export := range []string{seed.Export, seed.StorageExport} {
+		if seed.Kind != gostdlib.FacetReflectionTypeOperations &&
+			seed.ResultExport != "" {
+			return nil, certifyError(
+				"configure facets",
+				key,
+				"result export belongs only to a reflection-type facet",
+			)
+		}
+		for _, export := range []string{
+			seed.Export,
+			seed.ResultExport,
+			seed.StorageExport,
+		} {
 			if export == "" {
 				continue
 			}
@@ -319,7 +333,8 @@ func validateGenericFacetSeedShape(seed facetSeed, key string) error {
 			(seed.Capabilities[0] != gostdlib.FacetCapabilityKernel &&
 				seed.Capabilities[0] != gostdlib.FacetCapabilitySynchronousKernel) ||
 			len(seed.GenericTypeArguments) == 0 ||
-			seed.Effect != gostdlib.EffectInvalid || seed.StorageExport != "" ||
+			seed.Effect != gostdlib.EffectInvalid || seed.ResultExport != "" ||
+			seed.StorageExport != "" ||
 			seed.RepresentationExport != "" {
 			return certifyError(
 				"configure facets",

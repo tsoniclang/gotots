@@ -276,6 +276,26 @@ func (p *ProjectInspection) CallableReturnTypeString(
 	return p.projectTypeString(result.ID, "callable return type")
 }
 
+func (p *ProjectInspection) CallableReturnTypeIdentity(
+	target projectCallable,
+) (ProjectTypeIdentity, error) {
+	if p == nil || target == nil {
+		return ProjectTypeIdentity{}, &ProjectInspectionError{
+			Operation: "callable return type identity",
+			Reason:    "target is absent",
+		}
+	}
+	signature, err := p.singleCallSignature(target, target.callableSubject())
+	if err != nil {
+		return ProjectTypeIdentity{}, err
+	}
+	result, err := p.signatureReturn(signature.ID, target.callableSubject())
+	if err != nil {
+		return ProjectTypeIdentity{}, err
+	}
+	return p.projectTypeIdentity(result.ID)
+}
+
 func (p *ProjectInspection) projectTypeString(
 	typeID uint32,
 	operation string,

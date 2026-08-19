@@ -159,6 +159,7 @@ type ReflectionNames interface {
 	ReflectionMethodIdentity(*types.Func) (string, error)
 	ReflectionType(types.Type, *types.TypeName) (NameReference, error)
 	ReflectionOperations(*types.TypeName) (NameReference, error)
+	ReflectionDescriptorType(*types.TypeName) (NameReference, error)
 	ReflectionTypeOf(types.Type, *types.TypeName) (NameReference, error)
 	// ReflectionValueOf demands the canonical descriptor plus the generated
 	// value-operation facet for one reflected operand type and returns the

@@ -123,14 +123,17 @@ type FacetDocument struct {
 	SourceIdentity             string                              `json:"sourceIdentity"`
 	Capabilities               []FacetCapability                   `json:"capabilities,omitempty"`
 	Export                     string                              `json:"export"`
+	ResultExport               string                              `json:"resultExport,omitempty"`
 	StorageExport              string                              `json:"storageExport,omitempty"`
 	RepresentationExport       string                              `json:"representationExport,omitempty"`
 	Effect                     EffectKind                          `json:"effect,omitempty"`
 	CallableParameters         []ProviderCallableParameterDocument `json:"callableParameters,omitempty"`
 	GenericTypeArguments       []GenericTypeArgumentDocument       `json:"genericTypeArguments,omitempty"`
 	ImplementationOwner        string                              `json:"implementationOwner"`
+	ResultImplementationOwner  string                              `json:"resultImplementationOwner,omitempty"`
 	StorageImplementationOwner string                              `json:"storageImplementationOwner,omitempty"`
 	TargetFingerprint          string                              `json:"targetFingerprint"`
+	ResultTargetFingerprint    string                              `json:"resultTargetFingerprint,omitempty"`
 	StorageTargetFingerprint   string                              `json:"storageTargetFingerprint,omitempty"`
 	ImplementationSites        []string                            `json:"implementationSites,omitempty"`
 }
@@ -256,6 +259,10 @@ func (f Facet) Export() string {
 	return f.facet.Export
 }
 
+func (f Facet) ResultExport() string {
+	return f.facet.ResultExport
+}
+
 func (f Facet) StorageExport() string {
 	return f.facet.StorageExport
 }
@@ -286,18 +293,26 @@ func (f Facet) ImplementationOwner() string {
 	return f.facet.ImplementationOwner
 }
 
+func (f Facet) ResultImplementationOwner() string {
+	return f.facet.ResultImplementationOwner
+}
+
 func (f Facet) StorageImplementationOwner() string {
 	return f.facet.StorageImplementationOwner
 }
 
 // ImplementationSites reference the certified implementation documents of
-// this facet export's checked behavior.
+// every target owned by this facet's checked behavior.
 func (f Facet) ImplementationSites() []string {
 	return append([]string(nil), f.facet.ImplementationSites...)
 }
 
 func (f Facet) TargetFingerprint() string {
 	return f.facet.TargetFingerprint
+}
+
+func (f Facet) ResultTargetFingerprint() string {
+	return f.facet.ResultTargetFingerprint
 }
 
 func (f Facet) StorageTargetFingerprint() string {

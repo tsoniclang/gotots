@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	SchemaVersion  = 29
+	SchemaVersion  = 31
 	PackageName    = "@gotots/gostdlib"
 	PackageVersion = "0.0.0"
 )
@@ -92,23 +92,24 @@ type GenericTypeArgumentDocument struct {
 }
 
 type Document struct {
-	SchemaVersion    int                      `json:"schemaVersion"`
-	PackageName      string                   `json:"packageName"`
-	PackageVersion   string                   `json:"packageVersion"`
-	Backend          string                   `json:"backend"`
-	GoVersion        string                   `json:"goVersion"`
-	MinimumGoVersion string                   `json:"minimumGoVersion"`
-	MaximumGoVersion string                   `json:"maximumGoVersion"`
-	GOOS             string                   `json:"goos"`
-	GOARCH           string                   `json:"goarch"`
-	CGOEnabled       bool                     `json:"cgoEnabled"`
-	BuildTags        []string                 `json:"buildTags"`
-	RuntimeDigest    string                   `json:"runtimeDigest"`
-	ProviderDigest   string                   `json:"providerDigest"`
-	Modules          []ModuleDocument         `json:"modules"`
-	FacetModules     []FacetModuleDocument    `json:"facetModules,omitempty"`
-	Implementations  []ImplementationDocument `json:"implementations,omitempty"`
-	ManifestDigest   string                   `json:"manifestDigest,omitempty"`
+	SchemaVersion       int                                  `json:"schemaVersion"`
+	PackageName         string                               `json:"packageName"`
+	PackageVersion      string                               `json:"packageVersion"`
+	Backend             string                               `json:"backend"`
+	GoVersion           string                               `json:"goVersion"`
+	MinimumGoVersion    string                               `json:"minimumGoVersion"`
+	MaximumGoVersion    string                               `json:"maximumGoVersion"`
+	GOOS                string                               `json:"goos"`
+	GOARCH              string                               `json:"goarch"`
+	CGOEnabled          bool                                 `json:"cgoEnabled"`
+	BuildTags           []string                             `json:"buildTags"`
+	RuntimeDigest       string                               `json:"runtimeDigest"`
+	ProviderDigest      string                               `json:"providerDigest"`
+	Modules             []ModuleDocument                     `json:"modules"`
+	FacetModules        []FacetModuleDocument                `json:"facetModules,omitempty"`
+	InvocationTransport *InvocationTransportContractDocument `json:"invocationTransportContract,omitempty"`
+	Implementations     []ImplementationDocument             `json:"implementations,omitempty"`
+	ManifestDigest      string                               `json:"manifestDigest,omitempty"`
 }
 
 type ModuleDocument struct {
@@ -245,6 +246,13 @@ func (m Manifest) FacetModules() []FacetModule {
 		result[index] = FacetModule{document: cloneFacetModule(module)}
 	}
 	return result
+}
+
+func (m Manifest) InvocationTransports() []InvocationTransportDocument {
+	if m.document.InvocationTransport == nil {
+		return nil
+	}
+	return cloneInvocationTransports(m.document.InvocationTransport.Transports)
 }
 
 func (m Manifest) Facet(
@@ -527,6 +535,9 @@ func cloneDocument(source Document) Document {
 	for index, module := range source.FacetModules {
 		result.FacetModules[index] = cloneFacetModule(module)
 	}
+	result.InvocationTransport = cloneInvocationTransportContract(
+		source.InvocationTransport,
+	)
 	result.Implementations = make(
 		[]ImplementationDocument,
 		len(source.Implementations),

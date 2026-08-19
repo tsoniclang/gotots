@@ -413,6 +413,7 @@ type reflectionRegistrationMeasurement struct {
 }
 
 func TestReflectionRegistrationsShareBoundedCommonMachinery(t *testing.T) {
+	const maxRegistrationBytesPerType = 3_800
 	small := measureReflectionRegistrations(t, 8)
 	large := measureReflectionRegistrations(t, 32)
 	countDelta := large.count - small.count
@@ -425,7 +426,7 @@ func TestReflectionRegistrationsShareBoundedCommonMachinery(t *testing.T) {
 			large.runtimeSize,
 		)
 	}
-	if countDelta != 24 || byteDelta/countDelta > 3_700 ||
+	if countDelta != 24 || byteDelta/countDelta > maxRegistrationBytesPerType ||
 		nodeDelta/countDelta > 550 {
 		t.Fatalf(
 			"reflection registration growth is not bounded: counts=%d/%d bytes=%d/%d nodes=%d/%d",
