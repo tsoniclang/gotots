@@ -12,7 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 23
+const facetMapSchemaVersion = 24
 
 type facetMapDocument struct {
 	SchemaVersion                 int                               `json:"schemaVersion"`
@@ -24,6 +24,7 @@ type facetMapDocument struct {
 	ProviderInterfaces            []providerInterfaceSeed           `json:"providerInterfaces,omitempty"`
 	ProviderInterfaceCapabilities []providerInterfaceCapabilitySeed `json:"providerInterfaceCapabilities,omitempty"`
 	GenericOperationSets          []genericOperationSetSeed         `json:"genericOperationSets"`
+	ProviderInvocationTransports  []providerInvocationTransportSeed `json:"providerInvocationTransports,omitempty"`
 }
 
 type providerRepresentationSeed struct {
@@ -104,6 +105,7 @@ type facetSeedSet struct {
 	genericOperations    map[string][]gostdlib.GenericOperationDocument
 	providerInterfaces   []providerInterfaceSeed
 	providerCapabilities []providerInterfaceCapabilitySeed
+	invocationTransports []providerInvocationTransportSeed
 }
 
 func readFacetSeeds(sourcePath string) (facetSeedSet, error) {
@@ -182,6 +184,9 @@ func readFacetSeeds(sourcePath string) (facetSeedSet, error) {
 		genericOperations:    operations,
 		providerInterfaces:   providerInterfaces,
 		providerCapabilities: providerCapabilities,
+		invocationTransports: cloneProviderInvocationTransportSeeds(
+			document.ProviderInvocationTransports,
+		),
 	}, nil
 }
 

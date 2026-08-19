@@ -64,6 +64,22 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 				TargetFingerprint:   digest('d'),
 			}},
 		}},
+		InvocationTransport: &gostdlib.InvocationTransportContractDocument{
+			SchemaVersion:   gostdlib.InvocationTransportSchemaVersion,
+			DeclarationRoot: "..",
+			Transports: []gostdlib.InvocationTransportDocument{{
+				SourceIdentity:         "strings|kind=4|receiver=|name=Contains",
+				Specifier:              "@gotots/gostdlib/strings.js",
+				SourcePath:             "src/strings.ts",
+				DeclarationPath:        "dist/src/strings.d.ts",
+				Export:                 "Contains",
+				Member:                 "$forward",
+				TargetType:             "(value: () => void) => () => void",
+				TargetFingerprint:      digest('e'),
+				InputParameters:        []int{0},
+				ResultOriginParameters: []int{0},
+			}},
+		},
 	}
 	payload, err := gostdlib.Seal(document)
 	if err != nil {
@@ -126,12 +142,76 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 	if manifest.FacetModules()[0].Specifier() == "" {
 		t.Fatal("manifest exposed mutable facet-module storage")
 	}
+	transports := manifest.InvocationTransports()
+	if len(transports) != 1 || transports[0].Member != "$forward" {
+		t.Fatalf("invocation transports = %#v", transports)
+	}
+	transports[0].InputParameters[0] = 9
+	if manifest.InvocationTransports()[0].InputParameters[0] != 0 {
+		t.Fatal("manifest exposed mutable invocation-transport storage")
+	}
 	reencoded, err := gostdlib.Encode(manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(reencoded) != string(payload) {
 		t.Fatalf("round trip changed canonical bytes\nfirst=%s\nnext=%s", payload, reencoded)
+	}
+}
+
+func TestManifestRejectsInvalidInvocationTransport(t *testing.T) {
+	document := validDocument()
+	document.InvocationTransport = &gostdlib.InvocationTransportContractDocument{
+		SchemaVersion:   gostdlib.InvocationTransportSchemaVersion,
+		DeclarationRoot: "..",
+		Transports: []gostdlib.InvocationTransportDocument{{
+			SourceIdentity:         document.Modules[0].Bindings[0].Identity,
+			Specifier:              document.Modules[0].Specifier,
+			SourcePath:             document.Modules[0].SourcePath,
+			DeclarationPath:        "dist/src/strings.d.ts",
+			Export:                 document.Modules[0].Bindings[0].Export,
+			Member:                 "$forward",
+			TargetType:             "(value: () => void) => () => void",
+			TargetFingerprint:      digest('d'),
+			InputParameters:        []int{0},
+			ResultOriginParameters: []int{0},
+		}},
+	}
+	if _, err := gostdlib.Seal(document); err != nil {
+		t.Fatal(err)
+	}
+
+	document.InvocationTransport.DeclarationRoot = ""
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("empty invocation declaration root passed")
+	}
+	document.InvocationTransport.DeclarationRoot = ".."
+	document.InvocationTransport.Transports[0].DeclarationPath = "../strings.d.ts"
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("escaping invocation declaration path passed")
+	}
+	document.InvocationTransport.Transports[0].DeclarationPath = "dist/src/strings.d.ts"
+	document.InvocationTransport.SchemaVersion++
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("unsupported invocation transport schema passed")
+	}
+	document.InvocationTransport.SchemaVersion = gostdlib.InvocationTransportSchemaVersion
+	document.InvocationTransport.Transports[0].InputParameters = []int{0, 0}
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("duplicate invocation input index passed")
+	}
+	document.InvocationTransport.Transports[0].InputParameters = []int{0}
+	document.InvocationTransport.Transports[0].State = &gostdlib.InvocationTransportStateDocument{
+		Kind: gostdlib.InvocationTransportStateCreate,
+		Read: true,
+	}
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("reading create-state transport passed")
+	}
+	document.InvocationTransport.Transports[0].State = nil
+	document.InvocationTransport.Transports[0].SourceIdentity = "absent"
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("transport without a source owner passed")
 	}
 }
 

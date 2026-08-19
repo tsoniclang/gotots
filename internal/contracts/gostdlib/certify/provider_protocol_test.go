@@ -108,7 +108,7 @@ func TestProviderProtocolConfigurationMutationsFailClosed(t *testing.T) {
 func TestReflectionFacetSeedRequiresOneCertifiedResultExport(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	valid := `{
-  "schemaVersion": 23,
+  "schemaVersion": 24,
   "facets": [{
     "kind": "reflection-type-operations",
     "sourceIdentity": "reflect|kind=2|receiver=|name=Type",

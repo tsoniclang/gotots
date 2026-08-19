@@ -240,6 +240,10 @@ func validateDocument(document Document, sealed bool) error {
 	callableProfileLookups := make(map[string]struct{})
 	statefulProfileLookups := make(map[string]struct{})
 	providerInterfaceLookups := make(map[string]struct{})
+	sourceIdentities := make(map[string]struct{}, len(identities))
+	for identity := range identities {
+		sourceIdentities[identity] = struct{}{}
+	}
 	for index, module := range document.FacetModules {
 		field := fmt.Sprintf("facetModules[%d]", index)
 		if err := validateFacetModule(
@@ -260,6 +264,13 @@ func validateDocument(document Document, sealed bool) error {
 			return manifestError(field+".specifier", "value is duplicated")
 		}
 		specifiers[module.Specifier] = struct{}{}
+		for _, facet := range module.Facets {
+			sourceIdentities[facet.SourceIdentity] = struct{}{}
+		}
 	}
-	return nil
+	return validateInvocationTransportContract(
+		document.InvocationTransport,
+		specifiers,
+		sourceIdentities,
+	)
 }

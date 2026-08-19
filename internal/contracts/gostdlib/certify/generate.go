@@ -173,6 +173,18 @@ func Generate(config Config) ([]byte, error) {
 		client.Close()
 		return nil, err
 	}
+	invocationTransports, err := buildProviderInvocationTransports(
+		resolved,
+		project,
+		providerPackage,
+		seeds.invocationTransports,
+		modules,
+		facetModules,
+	)
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
 	if err := verifyProviderBoundaryCoverage(
 		source,
 		modules,
@@ -198,23 +210,31 @@ func Generate(config Config) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	invocationTransportContract, err := buildInvocationTransportContract(
+		resolved,
+		invocationTransports,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return gostdlib.Seal(gostdlib.Document{
-		SchemaVersion:    gostdlib.SchemaVersion,
-		PackageName:      gostdlib.PackageName,
-		PackageVersion:   providerPackage.Version,
-		Backend:          resolved.backend,
-		GoVersion:        selectedToolchain.version,
-		MinimumGoVersion: resolved.minimumGoVersion,
-		MaximumGoVersion: resolved.maximumGoVersion,
-		GOOS:             selectedToolchain.profile.GOOS(),
-		GOARCH:           selectedToolchain.profile.GOARCH(),
-		CGOEnabled:       selectedToolchain.profile.CgoEnabled(),
-		BuildTags:        selectedToolchain.profile.Tags(),
-		RuntimeDigest:    runtimeDigest,
-		ProviderDigest:   integrity,
-		Modules:          modules,
-		FacetModules:     facetModules,
-		Implementations:  implementations,
+		SchemaVersion:       gostdlib.SchemaVersion,
+		PackageName:         gostdlib.PackageName,
+		PackageVersion:      providerPackage.Version,
+		Backend:             resolved.backend,
+		GoVersion:           selectedToolchain.version,
+		MinimumGoVersion:    resolved.minimumGoVersion,
+		MaximumGoVersion:    resolved.maximumGoVersion,
+		GOOS:                selectedToolchain.profile.GOOS(),
+		GOARCH:              selectedToolchain.profile.GOARCH(),
+		CGOEnabled:          selectedToolchain.profile.CgoEnabled(),
+		BuildTags:           selectedToolchain.profile.Tags(),
+		RuntimeDigest:       runtimeDigest,
+		ProviderDigest:      integrity,
+		Modules:             modules,
+		FacetModules:        facetModules,
+		InvocationTransport: invocationTransportContract,
+		Implementations:     implementations,
 	})
 }
 
