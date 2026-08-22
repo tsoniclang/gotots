@@ -1,29 +1,7 @@
 # Agent Notes (GoToTS)
 
-`AGENTS.md` and `CLAUDE.md` must remain byte-identical. Apply every change to
-both and verify with `cmp`.
-
-## Begin With WCBUBWHB
-
-Every design, implementation, review, test, generated-surface, and performance
-change begins with explicit WCBUBWHB analysis. Read-only discovery may precede
-it only to establish facts.
-
-Answer before editing:
-
-1. What concrete source or artifact problem is observed?
-2. What broader semantic class and sibling paths exist?
-3. Which layer owns the truth?
-4. What is the highest layer that eliminates the whole class?
-5. Which workaround, duplicate state, fallback, or old route must be deleted?
-6. What is the simplest exact result without preserving current code shape?
-7. What are the source-size, staticness, typecheck, runtime, and consumer costs?
-8. What Go input -> decision -> TS-Go AST -> TypeScript examples prove it?
-9. What independent differential and mutation evidence proves it?
-10. What broad searches prove no sibling or superseded path remains?
-
-Do not patch a reproduction and justify it afterward. A repeated workaround
-reopens its shared owner.
+The canonical workspace policy in `../AGENTS.md` applies. This file contains
+only GoToTS-specific ownership, translation, structure, and verification rules.
 
 ## Governing Architecture
 
@@ -36,13 +14,6 @@ Go meaning. Its canonical output contract is strict ESM Tsonic-flavored
 TypeScript: ordinary TypeScript plus public target-neutral marker types and
 calls selected from `@tsonic/core` by exact declaration identity. Those marker
 contracts are shared Tsonic authority, not copied GoToTS declarations.
-
-## Coordinated Repository Scope
-
-This workstream may modify only GoToTS and the TypeScript target. Any change to
-TSTS, Tsonic core, another Tsonic target, or any other repository requires the
-user's explicit approval before editing. Read-only inspection may establish a
-published contract; it does not grant change ownership.
 
 Executable target code is a separate consumer artifact. TSTS checks the exact
 immutable canonical source, retains its TS-Go-contract AST, and finalizes
@@ -124,8 +95,6 @@ representation of the source program.
   mechanics must not appear as translated source parameters. Source generic
   arity is likewise exact; representation facets and callable profiles stay in
   private support artifacts or finite exact concretizations.
-- No semantic recovery through `any`, `unknown`, unchecked casts, reflection,
-  spelling lookup, source scans, or runtime semantic dispatch.
 - Definitions are emitted once. References may repeat. All helper and import
   requests are deduplicated by typed ownership, never rendered text.
 - Every generated binding in a source-bearing lexical or member scope is
@@ -190,15 +159,12 @@ standard-library packages, toolchain packages, and true external boundaries.
   and target boundary, not the root emitter or sibling handlers.
 - Reuse archived code only when it is independently the ideal direct-emitter
   design. Never restore a subsystem merely because it previously passed tests.
-- Keep one production path. Delete replaced helpers, tests, comments, schemas,
-  and facades in the same change.
 - Use validating constructors and closed enums where invalid states otherwise
   become representable. Errors are typed; error strings never select behavior.
 - Do not create `v2`, `legacy`, `compat`, `fallback`, `util`, `utils`,
   `helper`, `helpers`, or `misc` packages/files.
 - Keep maintained non-generated implementation files focused and under 600
   physical lines.
-- Use `apply_patch` for file edits. Never use `git stash`.
 - Keep generated artifacts reproducible from checked-in schema and inputs.
 
 ## Verification
@@ -227,12 +193,8 @@ must be named and must never be reported as exact Go behavior. Strict static
 TypeScript, source-shaped output, bounded generated size, bounded typecheck
 cost, and bounded runtime are simultaneous correctness requirements.
 
-## Repository Safety
+## Repository History
 
-- Never force-push or delete remote branches or tags.
-- Work on feature branches and use pull requests for `main`.
-- Keep meaningful requested checkpoints committed and pushed.
-- Use `.analysis/` and `.temp/` only for ignored local evidence.
 - `archive/*` branches are historical evidence, never production dependencies.
 
 ## Outward Reviews
