@@ -1406,19 +1406,31 @@ certified binding is never, by itself, proof that the selected provider body
 is implemented.
 
 The provider manifest may additionally certify invocation transport for one
-exact public provider member. This is not a source-call override and does not
+exact public provider target. This is not a source-call override and does not
 change emitted signatures. Its independently versioned section names the
 provider declaration root, and each record exact-joins one Go or facet identity,
 module specifier, exact `.d.ts` path from that package export's `types` target,
-exported target owner, static member, checked callable type, implementation
-fingerprint, parameter ingress set, result-origin set, and an optional
-closed-state role. For example, `sync.Map.Store(cache, key, value)` records
-`cache` as the state carrier and `value` as a write, while
+one direct export or exported-owner static method, checked callable type,
+implementation fingerprint, parameter ingress set, result-origin set, and an
+optional closed-state role. For example, `sync.Map.Store(cache, key, value)`
+records `cache` as the state carrier and `value` as a write, while
 `sync.Map.Load(cache, key)` records a read from that same carrier. Reflection
 metadata registration records its callback parameters as certified synchronous
 inputs. The manifest generator derives declaration paths, target types, and
 fingerprints from the inspected provider project; handwritten declaration
 paths, target types, or fingerprints are forbidden.
+
+One direct-export record may additionally certify an exact conditional
+synchronous replacement. It names the complete callable-parameter index set
+whose settled synchronous provenance is required and a second inspected export
+in the same provider module. This record is generated only from the already
+certified canonical/synchronous generic-kernel pair for the same Go identity;
+the callback indexes are derived from the source callback positions plus the
+certified capability prefix. The executable target may select the replacement
+only when every named callback is proved synchronous. Otherwise it retains the
+canonical cooperative export. Runtime Promise inspection, source spelling,
+handwritten replacement records, and a second source-side concretization route
+are forbidden.
 
 State transport grants no global permission. A target may consume it only
 after the selected call exact-joins the certified declaration node and exact

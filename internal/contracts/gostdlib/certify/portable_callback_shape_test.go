@@ -154,6 +154,70 @@ func TestSynchronousCallbackKernelDenominatorIsClosed(t *testing.T) {
 	); ok {
 		t.Fatal("sequence-driven SortedFunc was incorrectly narrowed")
 	}
+	expectedTransports := map[string]struct {
+		current     string
+		replacement string
+		parameter   int
+	}{
+		"maps|kind=4|receiver=|name=EqualFunc": {
+			"MapsEqualFuncKernel", "MapsEqualFuncSynchronousKernel", 6,
+		},
+		"slices|kind=4|receiver=|name=BinarySearchFunc": {
+			"SlicesBinarySearchFuncKernel", "SlicesBinarySearchFuncSynchronousKernel", 5,
+		},
+		"slices|kind=4|receiver=|name=CompactFunc": {
+			"SlicesCompactFuncKernel", "SlicesCompactFuncSynchronousKernel", 7,
+		},
+		"slices|kind=4|receiver=|name=CompareFunc": {
+			"SlicesCompareFuncKernel", "SlicesCompareFuncSynchronousKernel", 8,
+		},
+		"slices|kind=4|receiver=|name=ContainsFunc": {
+			"SlicesContainsFuncKernel", "SlicesContainsFuncSynchronousKernel", 4,
+		},
+		"slices|kind=4|receiver=|name=DeleteFunc": {
+			"SlicesDeleteFuncKernel", "SlicesDeleteFuncSynchronousKernel", 7,
+		},
+		"slices|kind=4|receiver=|name=EqualFunc": {
+			"SlicesEqualFuncKernel", "SlicesEqualFuncSynchronousKernel", 8,
+		},
+		"slices|kind=4|receiver=|name=IndexFunc": {
+			"SlicesIndexFuncKernel", "SlicesIndexFuncSynchronousKernel", 4,
+		},
+		"slices|kind=4|receiver=|name=SortFunc": {
+			"SlicesSortFuncKernel", "SlicesSortFuncSynchronousKernel", 5,
+		},
+		"slices|kind=4|receiver=|name=SortStableFunc": {
+			"SlicesSortStableFuncKernel", "SlicesSortStableFuncSynchronousKernel", 5,
+		},
+	}
+	actualTransports := make(map[string]gostdlib.InvocationTransportDocument)
+	for _, transport := range manifest.InvocationTransports() {
+		if transport.Conditional != nil {
+			actualTransports[transport.SourceIdentity] = transport
+		}
+	}
+	if len(actualTransports) != len(expectedTransports) {
+		t.Fatalf("conditional transport denominator = %d", len(actualTransports))
+	}
+	for identity, expectedTransport := range expectedTransports {
+		transport, ok := actualTransports[identity]
+		if !ok || transport.Conditional == nil {
+			t.Fatalf("conditional transport %q is absent", identity)
+		}
+		if transport.Target.Access != gostdlib.InvocationTransportAccessExport ||
+			transport.Target.Export != expectedTransport.current ||
+			!slices.Equal(transport.InputParameters, []int{expectedTransport.parameter}) ||
+			!slices.Equal(
+				transport.Conditional.CallableParameters,
+				[]int{expectedTransport.parameter},
+			) ||
+			transport.Conditional.Replacement.Access !=
+				gostdlib.InvocationTransportAccessExport ||
+			transport.Conditional.Replacement.Export != expectedTransport.replacement ||
+			transport.Target.Specifier != transport.Conditional.Replacement.Specifier {
+			t.Fatalf("conditional transport %q = %#v", identity, transport)
+		}
+	}
 }
 
 func TestSynchronousCallbackKernelsContainNoCooperativeDispatch(t *testing.T) {

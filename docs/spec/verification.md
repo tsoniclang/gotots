@@ -802,6 +802,16 @@ certification. Iterator/sequence APIs remain canonical because their sequence,
 not only their callback, may suspend; a synchronous callback alone is not
 evidence for a synchronous outer kernel.
 
+The generated invocation-transport denominator contains exactly those ten
+canonical/synchronous kernel pairs and no handwritten conditional row. Each
+row exact-checks the Go identity, direct-export access, provider module,
+canonical export, synchronous replacement export, derived target callback
+index, inspected target types, and both target fingerprints. Mutations remove
+one pair, duplicate a capability, move one half to another module, change a
+callback index or capability-prefix arity, replace either export or
+fingerprint, use a static member, or make the replacement equal the canonical
+target; generation or manifest admission must fail at the owning gate.
+
 The certifier independently derives a total directional obligation multiset
 over every provider callable. It recursively records inward interface-method and
 callable-value effects by source parameter root, including nested callbacks,

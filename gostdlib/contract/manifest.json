@@ -26663,18 +26663,311 @@
     }
   ],
   "invocationTransportContract": {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "declarationRoot": "..",
     "transports": [
       {
+        "sourceIdentity": "maps|kind=4|receiver=|name=EqualFunc",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/generic-maps-kernel.js",
+          "sourcePath": "src/internal/facets/generic-maps-kernel.ts",
+          "declarationPath": "dist/src/internal/facets/generic-maps-kernel.d.ts",
+          "access": "export",
+          "export": "MapsEqualFuncKernel",
+          "targetType": "\u003cM1, M2, K, L, R\u003e(leftMap: Convert\u003cM1, GoMapValue\u003cK, L\u003e\u003e, rightMap: Convert\u003cM2, GoMapValue\u003cK, R\u003e\u003e, copyLeft: CopyValue\u003cL\u003e, copyRight: CopyValue\u003c...\u003e, left: M1, right: M2, equal: Equality\u003c...\u003e) =\u003e Promise\u003c...\u003e",
+          "targetFingerprint": "e5738c3b7dcd46a450d7953a768d01885e2af5ff15bcd8f74574e6745709435d"
+        },
+        "inputParameters": [
+          6
+        ],
+        "conditional": {
+          "callableParameters": [
+            6
+          ],
+          "replacement": {
+            "specifier": "@gotots/gostdlib/internal/facets/generic-maps-kernel.js",
+            "sourcePath": "src/internal/facets/generic-maps-kernel.ts",
+            "declarationPath": "dist/src/internal/facets/generic-maps-kernel.d.ts",
+            "access": "export",
+            "export": "MapsEqualFuncSynchronousKernel",
+            "targetType": "\u003cM1, M2, K, L, R\u003e(leftMap: Convert\u003cM1, GoMapValue\u003cK, L\u003e\u003e, rightMap: Convert\u003cM2, GoMapValue\u003cK, R\u003e\u003e, copyLeft: CopyValue\u003cL\u003e, copyRight: CopyValue\u003c...\u003e, left: M1, right: M2, equal: SynchronousEquality\u003c...\u003e) =\u003e boolean",
+            "targetFingerprint": "b5566cc58c400b6062b4ae63e705f07dffb2705cd4f7b032c7ed9eb39f5d2dd0"
+          }
+        }
+      },
+      {
+        "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearchFunc",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+          "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+          "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+          "access": "export",
+          "export": "SlicesBinarySearchFuncKernel",
+          "targetType": "\u003cS, E, EStorage, Target\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, copyElement: CopyValue\u003cE\u003e, fromStorage: FromContainerStorage\u003cE, EStorage\u003e, source: S, target: Target, compare: Comparison\u003c...\u003e) =\u003e Promise\u003c...\u003e",
+          "targetFingerprint": "e29bdee449a1215dff23f33b0e118eb0256fd01178ea324e0251343a69cca3c5"
+        },
+        "inputParameters": [
+          5
+        ],
+        "conditional": {
+          "callableParameters": [
+            5
+          ],
+          "replacement": {
+            "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+            "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+            "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+            "access": "export",
+            "export": "SlicesBinarySearchFuncSynchronousKernel",
+            "targetType": "\u003cS, E, EStorage, Target\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, copyElement: CopyValue\u003cE\u003e, fromStorage: FromContainerStorage\u003cE, EStorage\u003e, source: S, target: Target, compare: SynchronousComparison\u003c...\u003e) =\u003e [...]",
+            "targetFingerprint": "8cf6f864bd68c5ff7545fc1aaab686fc5ed1873aaff745d63f2752f3bc9443e3"
+          }
+        }
+      },
+      {
+        "sourceIdentity": "slices|kind=4|receiver=|name=CompactFunc",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+          "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+          "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+          "access": "export",
+          "export": "SlicesCompactFuncKernel",
+          "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, fromSlice: Convert\u003cRuntimeSlice\u003cEStorage\u003e, S\u003e, copyElement: CopyValue\u003c...\u003e, fromStorage: FromContainerStorage\u003c...\u003e, toStorage: ToContainerStorage\u003c...\u003e, zeroElement: Zero\u003c...\u003e, source: S, equal: Equality\u003c...\u003e) =\u003e Promise\u003c...\u003e",
+          "targetFingerprint": "ffde4ce0a62d3e5eaa6a34cd24799168a49a6ae2b7337d6381e2c525025c8a01"
+        },
+        "inputParameters": [
+          7
+        ],
+        "conditional": {
+          "callableParameters": [
+            7
+          ],
+          "replacement": {
+            "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+            "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+            "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+            "access": "export",
+            "export": "SlicesCompactFuncSynchronousKernel",
+            "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, fromSlice: Convert\u003cRuntimeSlice\u003cEStorage\u003e, S\u003e, copyElement: CopyValue\u003c...\u003e, fromStorage: FromContainerStorage\u003c...\u003e, toStorage: ToContainerStorage\u003c...\u003e, zeroElement: Zero\u003c...\u003e, source: S, equal: SynchronousEquality\u003c...\u003e) =\u003e S",
+            "targetFingerprint": "a942d62403fcba47cdad92df2f09b4057511f436eb11b2ef3e85ec28b817f0c2"
+          }
+        }
+      },
+      {
+        "sourceIdentity": "slices|kind=4|receiver=|name=CompareFunc",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+          "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+          "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+          "access": "export",
+          "export": "SlicesCompareFuncKernel",
+          "targetType": "\u003cS1, S2, E1, E1Storage, E2, E2Storage\u003e(leftSlice: Convert\u003cS1, RuntimeSlice\u003cE1Storage\u003e\u003e, rightSlice: Convert\u003cS2, RuntimeSlice\u003cE2Storage\u003e\u003e, copyLeft: CopyValue\u003c...\u003e, copyRight: CopyValue\u003c...\u003e, fromLeftStorage: FromContainerStorage\u003c...\u003e, fromRightStorage: FromContainerStorage\u003c...\u003e, left: S1, right: S2, compare: Compari...",
+          "targetFingerprint": "834825312352b96bbf85e7a7f7840db9b1f889d696306076f3b365311d4561d3"
+        },
+        "inputParameters": [
+          8
+        ],
+        "conditional": {
+          "callableParameters": [
+            8
+          ],
+          "replacement": {
+            "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+            "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+            "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+            "access": "export",
+            "export": "SlicesCompareFuncSynchronousKernel",
+            "targetType": "\u003cS1, S2, E1, E1Storage, E2, E2Storage\u003e(leftSlice: Convert\u003cS1, RuntimeSlice\u003cE1Storage\u003e\u003e, rightSlice: Convert\u003cS2, RuntimeSlice\u003cE2Storage\u003e\u003e, copyLeft: CopyValue\u003c...\u003e, copyRight: CopyValue\u003c...\u003e, fromLeftStorage: FromContainerStorage\u003c...\u003e, fromRightStorage: FromContainerStorage\u003c...\u003e, left: S1, right: S2, compare: Synchro...",
+            "targetFingerprint": "27bbdae6f7a378e503dbb239f960e3357f19ecd7f311357353dbb3e99aa4ea7a"
+          }
+        }
+      },
+      {
+        "sourceIdentity": "slices|kind=4|receiver=|name=ContainsFunc",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+          "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+          "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+          "access": "export",
+          "export": "SlicesContainsFuncKernel",
+          "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, copyElement: CopyValue\u003cE\u003e, fromStorage: FromContainerStorage\u003cE, EStorage\u003e, source: S, predicate: Predicate\u003c...\u003e) =\u003e Promise\u003c...\u003e",
+          "targetFingerprint": "370102fc8a16488d9d39fe399edbc4eda2d71e9d7d20324a15986ca83fad71d3"
+        },
+        "inputParameters": [
+          4
+        ],
+        "conditional": {
+          "callableParameters": [
+            4
+          ],
+          "replacement": {
+            "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+            "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+            "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+            "access": "export",
+            "export": "SlicesContainsFuncSynchronousKernel",
+            "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, copyElement: CopyValue\u003cE\u003e, fromStorage: FromContainerStorage\u003cE, EStorage\u003e, source: S, predicate: SynchronousPredicate\u003c...\u003e) =\u003e boolean",
+            "targetFingerprint": "df717306bd67f234c07b66a8d85337ea88266f2ded12c81452d25c0553970a3a"
+          }
+        }
+      },
+      {
+        "sourceIdentity": "slices|kind=4|receiver=|name=DeleteFunc",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+          "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+          "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+          "access": "export",
+          "export": "SlicesDeleteFuncKernel",
+          "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, fromSlice: Convert\u003cRuntimeSlice\u003cEStorage\u003e, S\u003e, copyElement: CopyValue\u003c...\u003e, fromStorage: FromContainerStorage\u003c...\u003e, toStorage: ToContainerStorage\u003c...\u003e, zeroElement: Zero\u003c...\u003e, source: S, predicate: Predicate\u003c...\u003e) =\u003e Promise\u003c...\u003e",
+          "targetFingerprint": "54a2f13ec1399a5de61f712c0c5be5b32611ebf798d86ee8a0e642a8fae57497"
+        },
+        "inputParameters": [
+          7
+        ],
+        "conditional": {
+          "callableParameters": [
+            7
+          ],
+          "replacement": {
+            "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+            "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+            "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+            "access": "export",
+            "export": "SlicesDeleteFuncSynchronousKernel",
+            "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, fromSlice: Convert\u003cRuntimeSlice\u003cEStorage\u003e, S\u003e, copyElement: CopyValue\u003c...\u003e, fromStorage: FromContainerStorage\u003c...\u003e, toStorage: ToContainerStorage\u003c...\u003e, zeroElement: Zero\u003c...\u003e, source: S, predicate: SynchronousPredicate\u003c...\u003e) =\u003e S",
+            "targetFingerprint": "0433787094a130bc39be1e7601614bd2f8d64c177958a551fa3a1088d36eba14"
+          }
+        }
+      },
+      {
+        "sourceIdentity": "slices|kind=4|receiver=|name=EqualFunc",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+          "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+          "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+          "access": "export",
+          "export": "SlicesEqualFuncKernel",
+          "targetType": "\u003cS1, S2, E1, E1Storage, E2, E2Storage\u003e(leftSlice: Convert\u003cS1, RuntimeSlice\u003cE1Storage\u003e\u003e, rightSlice: Convert\u003cS2, RuntimeSlice\u003cE2Storage\u003e\u003e, copyLeft: CopyValue\u003c...\u003e, copyRight: CopyValue\u003c...\u003e, fromLeftStorage: FromContainerStorage\u003c...\u003e, fromRightStorage: FromContainerStorage\u003c...\u003e, left: S1, right: S2, equal: Equality\u003c...",
+          "targetFingerprint": "ba444113e490f2e3f387b9b7dc7785950e1bc773ba3e257f37bd6de7c111f6bb"
+        },
+        "inputParameters": [
+          8
+        ],
+        "conditional": {
+          "callableParameters": [
+            8
+          ],
+          "replacement": {
+            "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+            "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+            "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+            "access": "export",
+            "export": "SlicesEqualFuncSynchronousKernel",
+            "targetType": "\u003cS1, S2, E1, E1Storage, E2, E2Storage\u003e(leftSlice: Convert\u003cS1, RuntimeSlice\u003cE1Storage\u003e\u003e, rightSlice: Convert\u003cS2, RuntimeSlice\u003cE2Storage\u003e\u003e, copyLeft: CopyValue\u003c...\u003e, copyRight: CopyValue\u003c...\u003e, fromLeftStorage: FromContainerStorage\u003c...\u003e, fromRightStorage: FromContainerStorage\u003c...\u003e, left: S1, right: S2, equal: Synchrono...",
+            "targetFingerprint": "31d707db049894c0b08af83a3f411453a492ed2322ab587ccbcf27c519630b95"
+          }
+        }
+      },
+      {
+        "sourceIdentity": "slices|kind=4|receiver=|name=IndexFunc",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+          "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+          "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+          "access": "export",
+          "export": "SlicesIndexFuncKernel",
+          "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, copyElement: CopyValue\u003cE\u003e, fromStorage: FromContainerStorage\u003cE, EStorage\u003e, source: S, predicate: Predicate\u003c...\u003e) =\u003e Promise\u003c...\u003e",
+          "targetFingerprint": "c42e66baad8acde8631c91297d5bc9b2a898ad1ed1989cfe4604d7e265d82ef5"
+        },
+        "inputParameters": [
+          4
+        ],
+        "conditional": {
+          "callableParameters": [
+            4
+          ],
+          "replacement": {
+            "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+            "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+            "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+            "access": "export",
+            "export": "SlicesIndexFuncSynchronousKernel",
+            "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, copyElement: CopyValue\u003cE\u003e, fromStorage: FromContainerStorage\u003cE, EStorage\u003e, source: S, predicate: SynchronousPredicate\u003c...\u003e) =\u003e bigint",
+            "targetFingerprint": "56c132013e3fc83a824a8da0be769115f667608b9aea1c44b5792dbd3be8fc6d"
+          }
+        }
+      },
+      {
+        "sourceIdentity": "slices|kind=4|receiver=|name=SortFunc",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+          "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+          "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+          "access": "export",
+          "export": "SlicesSortFuncKernel",
+          "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, copyElement: CopyValue\u003cE\u003e, fromStorage: FromContainerStorage\u003cE, EStorage\u003e, toStorage: ToContainerStorage\u003c...\u003e, source: S, compare: Comparison\u003c...\u003e) =\u003e Promise\u003c...\u003e",
+          "targetFingerprint": "a4344b441d83dd334ca2ab15fe4f94fd26fc595a995c9ca9d8c3a2f365c040ef"
+        },
+        "inputParameters": [
+          5
+        ],
+        "conditional": {
+          "callableParameters": [
+            5
+          ],
+          "replacement": {
+            "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+            "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+            "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+            "access": "export",
+            "export": "SlicesSortFuncSynchronousKernel",
+            "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, copyElement: CopyValue\u003cE\u003e, fromStorage: FromContainerStorage\u003cE, EStorage\u003e, toStorage: ToContainerStorage\u003c...\u003e, source: S, compare: SynchronousComparison\u003c...\u003e) =\u003e void",
+            "targetFingerprint": "9641b118ff8ad238b6aa1d3ca38c2a9e7ae0f6707695c32ab0daa02c4a487249"
+          }
+        }
+      },
+      {
+        "sourceIdentity": "slices|kind=4|receiver=|name=SortStableFunc",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+          "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+          "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+          "access": "export",
+          "export": "SlicesSortStableFuncKernel",
+          "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, copyElement: CopyValue\u003cE\u003e, fromStorage: FromContainerStorage\u003cE, EStorage\u003e, toStorage: ToContainerStorage\u003c...\u003e, source: S, compare: Comparison\u003c...\u003e) =\u003e Promise\u003c...\u003e",
+          "targetFingerprint": "233de7468f9aa4e4b3285bbac0fce4695abb8974e9e6571d07d66211ecef39dc"
+        },
+        "inputParameters": [
+          5
+        ],
+        "conditional": {
+          "callableParameters": [
+            5
+          ],
+          "replacement": {
+            "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+            "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+            "declarationPath": "dist/src/internal/facets/generic-slices-kernel.d.ts",
+            "access": "export",
+            "export": "SlicesSortStableFuncSynchronousKernel",
+            "targetType": "\u003cS, E, EStorage\u003e(toSlice: Convert\u003cS, RuntimeSlice\u003cEStorage\u003e\u003e, copyElement: CopyValue\u003cE\u003e, fromStorage: FromContainerStorage\u003cE, EStorage\u003e, toStorage: ToContainerStorage\u003c...\u003e, source: S, compare: SynchronousComparison\u003c...\u003e) =\u003e void",
+            "targetFingerprint": "da7473d63ef6d20018a03680cafbaa81167c93c6aeaf439a61bc264e3f2f06df"
+          }
+        }
+      },
+      {
         "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
-        "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
-        "sourcePath": "src/internal/facets/named-reflect.ts",
-        "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
-        "export": "ReflectTypeMetadataOperations",
-        "member": "$create",
-        "targetType": "(metadata: () =\u003e RuntimeTypeMetadata, methodTokens: () =\u003e readonly object[], registration?: RuntimeTypeRegistration | undefined) =\u003e RuntimeType",
-        "targetFingerprint": "b02ffd3fc0581eb13c25ff737e4df5520ef97547fbeadec3778fb271e2efcd26",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+          "sourcePath": "src/internal/facets/named-reflect.ts",
+          "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
+          "access": "static-method",
+          "export": "ReflectTypeMetadataOperations",
+          "member": "$create",
+          "targetType": "(metadata: () =\u003e RuntimeTypeMetadata, methodTokens: () =\u003e readonly object[], registration?: RuntimeTypeRegistration | undefined) =\u003e RuntimeType",
+          "targetFingerprint": "b02ffd3fc0581eb13c25ff737e4df5520ef97547fbeadec3778fb271e2efcd26"
+        },
         "inputParameters": [
           0,
           1,
@@ -26688,13 +26981,16 @@
       },
       {
         "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
-        "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
-        "sourcePath": "src/internal/facets/named-reflect.ts",
-        "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
-        "export": "ReflectTypeMetadataOperations",
-        "member": "$registerOpaqueStruct",
-        "targetType": "\u003cT\u003e(type: Type, resolveAdapter: RuntimeValueAdapterResolver\u003cT\u003e, unavailableFields: readonly string[]) =\u003e void",
-        "targetFingerprint": "eaf411fe699ed3a693fa46ffde136a73619d8db534d4135dca96f0777b27607f",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+          "sourcePath": "src/internal/facets/named-reflect.ts",
+          "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
+          "access": "static-method",
+          "export": "ReflectTypeMetadataOperations",
+          "member": "$registerOpaqueStruct",
+          "targetType": "\u003cT\u003e(type: Type, resolveAdapter: RuntimeValueAdapterResolver\u003cT\u003e, unavailableFields: readonly string[]) =\u003e void",
+          "targetFingerprint": "eaf411fe699ed3a693fa46ffde136a73619d8db534d4135dca96f0777b27607f"
+        },
         "inputParameters": [
           0,
           1,
@@ -26703,13 +26999,16 @@
       },
       {
         "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
-        "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
-        "sourcePath": "src/internal/facets/named-reflect.ts",
-        "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
-        "export": "ReflectTypeMetadataOperations",
-        "member": "$registerPointer",
-        "targetType": "\u003cP\u003e(type: Type, resolveAdapter: RuntimeValueAdapterResolver\u003cP | undefined\u003e, descriptor: RuntimePointerValueOperations\u003cP\u003e) =\u003e void",
-        "targetFingerprint": "bb81e927ab2cf5d92afc73967932b59d61daf5f0e570a1082febbab1a916ff65",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+          "sourcePath": "src/internal/facets/named-reflect.ts",
+          "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
+          "access": "static-method",
+          "export": "ReflectTypeMetadataOperations",
+          "member": "$registerPointer",
+          "targetType": "\u003cP\u003e(type: Type, resolveAdapter: RuntimeValueAdapterResolver\u003cP | undefined\u003e, descriptor: RuntimePointerValueOperations\u003cP\u003e) =\u003e void",
+          "targetFingerprint": "bb81e927ab2cf5d92afc73967932b59d61daf5f0e570a1082febbab1a916ff65"
+        },
         "inputParameters": [
           0,
           1,
@@ -26718,13 +27017,16 @@
       },
       {
         "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
-        "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
-        "sourcePath": "src/internal/facets/named-reflect.ts",
-        "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
-        "export": "ReflectTypeMetadataOperations",
-        "member": "$registerStruct",
-        "targetType": "\u003cT\u003e(type: Type, resolveAdapter: RuntimeValueAdapterResolver\u003cT\u003e, fields: readonly RuntimeStructFieldOperations\u003cT\u003e[], clone?: ((value: T) =\u003e T) | undefined) =\u003e void",
-        "targetFingerprint": "4140bfadd724f7947dbe5fb8de732b6d8a79ed49babbcbd2bfab7a7c26e725c5",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+          "sourcePath": "src/internal/facets/named-reflect.ts",
+          "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
+          "access": "static-method",
+          "export": "ReflectTypeMetadataOperations",
+          "member": "$registerStruct",
+          "targetType": "\u003cT\u003e(type: Type, resolveAdapter: RuntimeValueAdapterResolver\u003cT\u003e, fields: readonly RuntimeStructFieldOperations\u003cT\u003e[], clone?: ((value: T) =\u003e T) | undefined) =\u003e void",
+          "targetFingerprint": "4140bfadd724f7947dbe5fb8de732b6d8a79ed49babbcbd2bfab7a7c26e725c5"
+        },
         "inputParameters": [
           0,
           1,
@@ -26734,13 +27036,16 @@
       },
       {
         "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
-        "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
-        "sourcePath": "src/internal/facets/named-reflect.ts",
-        "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
-        "export": "ReflectTypeMetadataOperations",
-        "member": "$registerValue",
-        "targetType": "(type: Type, operations: () =\u003e RuntimeValueOperations) =\u003e void",
-        "targetFingerprint": "6ab1e94c76139f6f88ff31c4c9e0ab334d48cb1a0ccb3272f0a6c4e6c3fc69c9",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+          "sourcePath": "src/internal/facets/named-reflect.ts",
+          "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
+          "access": "static-method",
+          "export": "ReflectTypeMetadataOperations",
+          "member": "$registerValue",
+          "targetType": "(type: Type, operations: () =\u003e RuntimeValueOperations) =\u003e void",
+          "targetFingerprint": "6ab1e94c76139f6f88ff31c4c9e0ab334d48cb1a0ccb3272f0a6c4e6c3fc69c9"
+        },
         "inputParameters": [
           0,
           1
@@ -26748,13 +27053,16 @@
       },
       {
         "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
-        "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
-        "sourcePath": "src/internal/facets/named-reflect.ts",
-        "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
-        "export": "ReflectTypeMetadataOperations",
-        "member": "$typeOf",
-        "targetType": "(value: GoInterfaceValue | undefined) =\u003e Type | undefined",
-        "targetFingerprint": "2fd4fb7fba9088112dc83fe98144994d334373f7582c1e9be27f2b9f4fe39812",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+          "sourcePath": "src/internal/facets/named-reflect.ts",
+          "declarationPath": "dist/src/internal/facets/named-reflect.d.ts",
+          "access": "static-method",
+          "export": "ReflectTypeMetadataOperations",
+          "member": "$typeOf",
+          "targetType": "(value: GoInterfaceValue | undefined) =\u003e Type | undefined",
+          "targetFingerprint": "2fd4fb7fba9088112dc83fe98144994d334373f7582c1e9be27f2b9f4fe39812"
+        },
         "inputParameters": [
           0
         ],
@@ -26764,13 +27072,16 @@
       },
       {
         "sourceIdentity": "sync|kind=2|receiver=|name=Map",
-        "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
-        "sourcePath": "src/internal/facets/named-sync.ts",
-        "declarationPath": "dist/src/internal/facets/named-sync.d.ts",
-        "export": "SyncMapOperations",
-        "member": "$copy",
-        "targetType": "(_source: Map) =\u003e Map",
-        "targetFingerprint": "4fdee34478e5145fef15e2f859b9cd62145db5a4695a21fd0026d758466358be",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+          "sourcePath": "src/internal/facets/named-sync.ts",
+          "declarationPath": "dist/src/internal/facets/named-sync.d.ts",
+          "access": "static-method",
+          "export": "SyncMapOperations",
+          "member": "$copy",
+          "targetType": "(_source: Map) =\u003e Map",
+          "targetFingerprint": "4fdee34478e5145fef15e2f859b9cd62145db5a4695a21fd0026d758466358be"
+        },
         "inputParameters": [
           0
         ],
@@ -26781,13 +27092,16 @@
       },
       {
         "sourceIdentity": "sync|kind=2|receiver=|name=Map",
-        "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
-        "sourcePath": "src/internal/facets/named-sync.ts",
-        "declarationPath": "dist/src/internal/facets/named-sync.d.ts",
-        "export": "SyncMapOperations",
-        "member": "$fromStorage",
-        "targetType": "(source: Map) =\u003e Map",
-        "targetFingerprint": "d3c04f610068bb54c65a8bcc8e656c335b17936ff795c87838aadbd909275c8e",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+          "sourcePath": "src/internal/facets/named-sync.ts",
+          "declarationPath": "dist/src/internal/facets/named-sync.d.ts",
+          "access": "static-method",
+          "export": "SyncMapOperations",
+          "member": "$fromStorage",
+          "targetType": "(source: Map) =\u003e Map",
+          "targetFingerprint": "d3c04f610068bb54c65a8bcc8e656c335b17936ff795c87838aadbd909275c8e"
+        },
         "inputParameters": [
           0
         ],
@@ -26801,13 +27115,16 @@
       },
       {
         "sourceIdentity": "sync|kind=2|receiver=|name=Map",
-        "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
-        "sourcePath": "src/internal/facets/named-sync.ts",
-        "declarationPath": "dist/src/internal/facets/named-sync.d.ts",
-        "export": "SyncMapOperations",
-        "member": "$storageOf",
-        "targetType": "(source: Map) =\u003e Map",
-        "targetFingerprint": "4f6251e501ad0ea8b0b0b0e99eafe8abae847689815c59398e74fd1857465e4d",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+          "sourcePath": "src/internal/facets/named-sync.ts",
+          "declarationPath": "dist/src/internal/facets/named-sync.d.ts",
+          "access": "static-method",
+          "export": "SyncMapOperations",
+          "member": "$storageOf",
+          "targetType": "(source: Map) =\u003e Map",
+          "targetFingerprint": "4f6251e501ad0ea8b0b0b0e99eafe8abae847689815c59398e74fd1857465e4d"
+        },
         "inputParameters": [
           0
         ],
@@ -26821,26 +27138,32 @@
       },
       {
         "sourceIdentity": "sync|kind=2|receiver=|name=Map",
-        "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
-        "sourcePath": "src/internal/facets/named-sync.ts",
-        "declarationPath": "dist/src/internal/facets/named-sync.d.ts",
-        "export": "SyncMapOperations",
-        "member": "$zero",
-        "targetType": "() =\u003e Map",
-        "targetFingerprint": "b1ada9807b675759dec7ebef09fcf9cb4a2ad119c99bb19d355f6e6da449aea8",
+        "target": {
+          "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+          "sourcePath": "src/internal/facets/named-sync.ts",
+          "declarationPath": "dist/src/internal/facets/named-sync.d.ts",
+          "access": "static-method",
+          "export": "SyncMapOperations",
+          "member": "$zero",
+          "targetType": "() =\u003e Map",
+          "targetFingerprint": "b1ada9807b675759dec7ebef09fcf9cb4a2ad119c99bb19d355f6e6da449aea8"
+        },
         "state": {
           "kind": "create"
         }
       },
       {
         "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=Clear",
-        "specifier": "@gotots/gostdlib/sync.js",
-        "sourcePath": "src/sync.ts",
-        "declarationPath": "dist/src/sync.d.ts",
-        "export": "Map",
-        "member": "Clear",
-        "targetType": "(receiver: Map | undefined) =\u003e void",
-        "targetFingerprint": "a9bcd9bc81a89a10d7275c2916c1097c97b20bcf318d415ca844fa15ca17d361",
+        "target": {
+          "specifier": "@gotots/gostdlib/sync.js",
+          "sourcePath": "src/sync.ts",
+          "declarationPath": "dist/src/sync.d.ts",
+          "access": "static-method",
+          "export": "Map",
+          "member": "Clear",
+          "targetType": "(receiver: Map | undefined) =\u003e void",
+          "targetFingerprint": "a9bcd9bc81a89a10d7275c2916c1097c97b20bcf318d415ca844fa15ca17d361"
+        },
         "inputParameters": [
           0
         ],
@@ -26851,13 +27174,16 @@
       },
       {
         "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=Delete",
-        "specifier": "@gotots/gostdlib/sync.js",
-        "sourcePath": "src/sync.ts",
-        "declarationPath": "dist/src/sync.d.ts",
-        "export": "Map",
-        "member": "Delete",
-        "targetType": "(receiver: Map | undefined, key: GoInterfaceValue | undefined) =\u003e void",
-        "targetFingerprint": "db8459b03a0f5b5fceecf0ab97458092d47edd63358043d91c11eb60a2cb374f",
+        "target": {
+          "specifier": "@gotots/gostdlib/sync.js",
+          "sourcePath": "src/sync.ts",
+          "declarationPath": "dist/src/sync.d.ts",
+          "access": "static-method",
+          "export": "Map",
+          "member": "Delete",
+          "targetType": "(receiver: Map | undefined, key: GoInterfaceValue | undefined) =\u003e void",
+          "targetFingerprint": "db8459b03a0f5b5fceecf0ab97458092d47edd63358043d91c11eb60a2cb374f"
+        },
         "inputParameters": [
           0,
           1
@@ -26869,13 +27195,16 @@
       },
       {
         "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=Load",
-        "specifier": "@gotots/gostdlib/sync.js",
-        "sourcePath": "src/sync.ts",
-        "declarationPath": "dist/src/sync.d.ts",
-        "export": "Map",
-        "member": "Load",
-        "targetType": "(receiver: Map | undefined, key: GoInterfaceValue | undefined) =\u003e [GoInterfaceValue | undefined, boolean]",
-        "targetFingerprint": "d448225c4795b5a967f80bd00c9826abcb56e63569f2bb90ee368116ed31f2dc",
+        "target": {
+          "specifier": "@gotots/gostdlib/sync.js",
+          "sourcePath": "src/sync.ts",
+          "declarationPath": "dist/src/sync.d.ts",
+          "access": "static-method",
+          "export": "Map",
+          "member": "Load",
+          "targetType": "(receiver: Map | undefined, key: GoInterfaceValue | undefined) =\u003e [GoInterfaceValue | undefined, boolean]",
+          "targetFingerprint": "d448225c4795b5a967f80bd00c9826abcb56e63569f2bb90ee368116ed31f2dc"
+        },
         "inputParameters": [
           0,
           1
@@ -26888,13 +27217,16 @@
       },
       {
         "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=LoadOrStore",
-        "specifier": "@gotots/gostdlib/sync.js",
-        "sourcePath": "src/sync.ts",
-        "declarationPath": "dist/src/sync.d.ts",
-        "export": "Map",
-        "member": "LoadOrStore",
-        "targetType": "(receiver: Map | undefined, key: GoInterfaceValue | undefined, value: GoInterfaceValue | undefined) =\u003e [GoInterfaceValue | undefined, boolean]",
-        "targetFingerprint": "afd91d25f19e0941393b79dc2703796e7a26d2c79cad99e1c70caaf9cd5644d3",
+        "target": {
+          "specifier": "@gotots/gostdlib/sync.js",
+          "sourcePath": "src/sync.ts",
+          "declarationPath": "dist/src/sync.d.ts",
+          "access": "static-method",
+          "export": "Map",
+          "member": "LoadOrStore",
+          "targetType": "(receiver: Map | undefined, key: GoInterfaceValue | undefined, value: GoInterfaceValue | undefined) =\u003e [GoInterfaceValue | undefined, boolean]",
+          "targetFingerprint": "afd91d25f19e0941393b79dc2703796e7a26d2c79cad99e1c70caaf9cd5644d3"
+        },
         "inputParameters": [
           0,
           1,
@@ -26911,13 +27243,16 @@
       },
       {
         "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=Range",
-        "specifier": "@gotots/gostdlib/sync.js",
-        "sourcePath": "src/sync.ts",
-        "declarationPath": "dist/src/sync.d.ts",
-        "export": "Map",
-        "member": "Range",
-        "targetType": "(receiver: Map | undefined, f: ((key: GoInterfaceValue | undefined, value: GoInterfaceValue | undefined) =\u003e Awaitable\u003cboolean\u003e) | undefined) =\u003e Promise\u003c...\u003e",
-        "targetFingerprint": "0eceff800111f1f7bd99ed35fcb5324d596d7a40f8dafc9ea353bfae522784a6",
+        "target": {
+          "specifier": "@gotots/gostdlib/sync.js",
+          "sourcePath": "src/sync.ts",
+          "declarationPath": "dist/src/sync.d.ts",
+          "access": "static-method",
+          "export": "Map",
+          "member": "Range",
+          "targetType": "(receiver: Map | undefined, f: ((key: GoInterfaceValue | undefined, value: GoInterfaceValue | undefined) =\u003e Awaitable\u003cboolean\u003e) | undefined) =\u003e Promise\u003c...\u003e",
+          "targetFingerprint": "0eceff800111f1f7bd99ed35fcb5324d596d7a40f8dafc9ea353bfae522784a6"
+        },
         "inputParameters": [
           0,
           1
@@ -26925,13 +27260,16 @@
       },
       {
         "sourceIdentity": "sync|kind=4|receiver=*sync.Map|name=Store",
-        "specifier": "@gotots/gostdlib/sync.js",
-        "sourcePath": "src/sync.ts",
-        "declarationPath": "dist/src/sync.d.ts",
-        "export": "Map",
-        "member": "Store",
-        "targetType": "(receiver: Map | undefined, key: GoInterfaceValue | undefined, value: GoInterfaceValue | undefined) =\u003e void",
-        "targetFingerprint": "51b855edf1cf603a3948c0e2bbd402358272c3d4358a1565350ea81e70970983",
+        "target": {
+          "specifier": "@gotots/gostdlib/sync.js",
+          "sourcePath": "src/sync.ts",
+          "declarationPath": "dist/src/sync.d.ts",
+          "access": "static-method",
+          "export": "Map",
+          "member": "Store",
+          "targetType": "(receiver: Map | undefined, key: GoInterfaceValue | undefined, value: GoInterfaceValue | undefined) =\u003e void",
+          "targetFingerprint": "51b855edf1cf603a3948c0e2bbd402358272c3d4358a1565350ea81e70970983"
+        },
         "inputParameters": [
           0,
           1,
@@ -35683,5 +36021,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "4a1fe744d0b32b8024198d1d0335181e934c26a45aa4957e1bffa4da6c4f7eb0"
+  "manifestDigest": "c74ebd66efe9d2c853ab513d0a9c211f34ddcac6a4d2479fcc8a9cd5ec6f2ccb"
 }
