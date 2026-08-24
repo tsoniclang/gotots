@@ -1123,6 +1123,21 @@ cooperative products consume the provider declarations through certified
 cooperative facades rather than changing the provider's direct implementation
 ABI. Both runtime profiles are generated from the same runtime contract owner.
 
+The build manifest carries one independently versioned source-invocation
+contract for compiler-owned runtime source. One file table owns each normalized
+emitted source path, exact printed digest, and complete-file inspectability.
+A separate invocation table names the runtime symbol identity, its file owner,
+exported declaration, selected-implementation exactness, and any exact
+argument-ingress or result-origin parameter indexes. File facts are never
+repeated per invocation; every invocation exact-joins one file owner, and an
+exact file cannot contain an inexact selected invocation. Both tables are
+strictly ordered and sealed by one canonical digest. This contract is
+generic evidence for a downstream checked-source optimizer: it never names a
+product, recognizes a call by spelling, grants semantics to a declaration
+file, or authorizes rereading different source bytes. The consumer must exact-
+join the row to its checker-selected declaration and immutable source snapshot
+before using it.
+
 Generated source never calls a provider kernel with extra source arguments.
 When canonical generated values require conversion, guards, runtime tokens,
 copy/zero operations, or a specialized generic implementation, the compiler

@@ -87,6 +87,42 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 	}
 }
 
+func TestRuntimeInvocationContractsCertifyOneExactSourceSnapshot(t *testing.T) {
+	assembled, err := AssemblePackage(
+		tsgo.NewFactory(),
+		testScalarABI(t, api.IntegerRepresentationNumber),
+		api.ConcurrencySemanticsDisabled,
+		map[api.RuntimeSymbol]struct{}{
+			api.RuntimeDeferPop:        {},
+			api.RuntimeInterfaceNonNil: {},
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contracts := assembled.InvocationContracts()
+	if len(contracts) == 0 {
+		t.Fatal("runtime package has no source invocation contracts")
+	}
+	files := make(map[string]struct{})
+	for _, file := range assembled.Files() {
+		files[file.OutputPath()] = struct{}{}
+	}
+	for _, contract := range contracts {
+		if !contract.ExactImplementation() {
+			t.Fatalf(
+				"source invocation %q/%q implementation is inexact",
+				contract.SourcePath(),
+				contract.ExportedName(),
+			)
+		}
+		if _, ok := files[contract.SourcePath()]; !ok {
+			t.Fatalf("source invocation file %q was not emitted", contract.SourcePath())
+		}
+	}
+}
+
 func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
 	_, err := AssemblePackage(
 		tsgo.NewFactory(),

@@ -45,17 +45,81 @@ func runtimeContract(
 	}
 }
 
+func runtimeFunctionContract(
+	module RuntimeModule,
+	outputPath string,
+	exportedName string,
+	dependencies ...RuntimeSymbol,
+) RuntimeSymbolContract {
+	return withInvocationContract(
+		runtimeContract(
+			module,
+			outputPath,
+			exportedName,
+			false,
+			dependencies...,
+		),
+		true,
+		nil,
+		nil,
+	)
+}
+
+func runtimeClassContract(
+	module RuntimeModule,
+	outputPath string,
+	exportedName string,
+	dependencies ...RuntimeSymbol,
+) RuntimeSymbolContract {
+	return runtimeContract(
+		module,
+		outputPath,
+		exportedName,
+		true,
+		dependencies...,
+	)
+}
+
+func runtimeCallableOwnerContract(
+	module RuntimeModule,
+	outputPath string,
+	exportedName string,
+	typeUsable bool,
+	dependencies ...RuntimeSymbol,
+) RuntimeSymbolContract {
+	return runtimeContract(
+		module,
+		outputPath,
+		exportedName,
+		typeUsable,
+		dependencies...,
+	)
+}
+
+func withInvocationContract(
+	contract RuntimeSymbolContract,
+	exactImplementation bool,
+	inputParameters []uint32,
+	resultOriginParameters []uint32,
+) RuntimeSymbolContract {
+	contract.invocation = RuntimeInvocationContract{
+		exactImplementation:    exactImplementation,
+		inputParameters:        slices.Clone(inputParameters),
+		resultOriginParameters: slices.Clone(resultOriginParameters),
+	}
+	return contract
+}
+
 func unsafeRuntimeContract(
 	symbol RuntimeSymbol,
 ) (RuntimeSymbolContract, bool) {
 	var contract RuntimeSymbolContract
 	switch symbol {
 	case RuntimeUnsafeString:
-		contract = runtimeContract(
+		contract = runtimeFunctionContract(
 			RuntimeModuleUnsafe,
 			"runtime/unsafe.ts",
 			"goUnsafeString",
-			false,
 			RuntimeSlice,
 			RuntimePanic,
 		)
@@ -70,11 +134,10 @@ func concurrencyRuntimeContract(
 ) (RuntimeSymbolContract, error) {
 	switch symbol {
 	case RuntimeChannel:
-		return runtimeContract(
+		return runtimeClassContract(
 			RuntimeModuleChannel,
 			"runtime/channel.ts",
 			"GoChannel",
-			true,
 			RuntimeReceiveChannel,
 			RuntimeSendChannel,
 			RuntimeSelectCase,
@@ -104,36 +167,32 @@ func concurrencyRuntimeContract(
 			true,
 		), nil
 	case RuntimeSelect:
-		return runtimeContract(
+		return runtimeFunctionContract(
 			RuntimeModuleChannel,
 			"runtime/channel.ts",
 			"goSelect",
-			false,
 			RuntimeSelectReady,
 			RuntimeSelectAttempt,
 		), nil
 	case RuntimeScheduler:
-		return runtimeContract(
+		return runtimeClassContract(
 			RuntimeModuleChannel,
 			"runtime/channel.ts",
 			"GoScheduler",
-			true,
 			RuntimePanic,
 		), nil
 	case RuntimeSelectReady:
-		return runtimeContract(
+		return runtimeFunctionContract(
 			RuntimeModuleChannel,
 			"runtime/channel.ts",
 			"goSelectReady",
-			false,
 			RuntimeSelectAttempt,
 		), nil
 	case RuntimeSelectAttempt:
-		return runtimeContract(
+		return runtimeFunctionContract(
 			RuntimeModuleChannel,
 			"runtime/channel.ts",
 			"goSelectAttempt",
-			false,
 			RuntimeSelectCase,
 		), nil
 	default:
@@ -145,11 +204,10 @@ func complexOperationContract(
 	exportedName string,
 	dependencies ...RuntimeSymbol,
 ) (RuntimeSymbolContract, error) {
-	return runtimeContract(
+	return runtimeFunctionContract(
 		RuntimeModuleComplex,
 		"runtime/complex.ts",
 		exportedName,
-		false,
 		dependencies...,
 	), nil
 }
@@ -195,20 +253,19 @@ func interfaceRuntimeContract(
 			true,
 		)
 	case RuntimeInterfaceNonNil:
-		contract = runtimeContract(
+		contract = withInvocationContract(runtimeContract(
 			RuntimeModuleInterface,
 			"runtime/interface.ts",
 			"goInterfaceNonNil",
 			false,
 			RuntimeInterfaceValue,
 			RuntimePanic,
-		)
+		), true, nil, []uint32{0})
 	case RuntimeInterfaceEqual:
-		contract = runtimeContract(
+		contract = runtimeFunctionContract(
 			RuntimeModuleInterface,
 			"runtime/interface.ts",
 			"goInterfaceEqual",
-			false,
 			RuntimeInterfaceValue,
 		)
 	case RuntimeErrorMethodToken:
@@ -244,11 +301,10 @@ func interfaceRuntimeContract(
 			RuntimeErrorMethodToken,
 		)
 	case RuntimeBuiltinErrorGuard:
-		contract = runtimeContract(
+		contract = runtimeFunctionContract(
 			RuntimeModuleInterfaceValue,
 			"runtime/interface-value.ts",
 			"GoError$is",
-			false,
 			RuntimeBuiltinErrorType,
 			RuntimeBuiltinErrorContract,
 		)
@@ -273,16 +329,15 @@ func interfaceRuntimeContract(
 			RuntimeRuntimeErrorToken,
 		)
 	case RuntimeErrorGuard:
-		contract = runtimeContract(
+		contract = runtimeFunctionContract(
 			RuntimeModuleInterfaceValue,
 			"runtime/interface-value.ts",
 			"GoRuntimeError$is",
-			false,
 			RuntimeErrorType,
 			RuntimeErrorContract,
 		)
 	case RuntimeInterfaceFormat:
-		contract = runtimeContract(
+		contract = runtimeCallableOwnerContract(
 			RuntimeModuleInterface,
 			"runtime/interface.ts",
 			"GoInterfaceFormat",
@@ -298,11 +353,10 @@ func interfaceRuntimeContract(
 			RuntimeInterfaceValue,
 		)
 	case RuntimeInterfaceAdapterFactory:
-		contract = runtimeContract(
+		contract = runtimeFunctionContract(
 			RuntimeModuleInterfaceValue,
 			"runtime/interface-value.ts",
 			"createGoInterfaceAdapter",
-			false,
 			RuntimeInterfaceValue,
 		)
 	default:

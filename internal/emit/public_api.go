@@ -15,6 +15,7 @@ import (
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
+	sourceinvocation "github.com/tsoniclang/gotots/internal/emit/sourceinvocation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -547,6 +548,13 @@ func (e ProgramEmission) ExternalFunctionObligations() []ExternalFunctionObligat
 
 func (e ProgramEmission) RuntimePackage() (RuntimePackage, bool) {
 	return e.runtimePackage, e.runtimePackage.assembled.Valid()
+}
+
+func (e ProgramEmission) SourceInvocationContract() (
+	sourceinvocation.Contract,
+	error,
+) {
+	return sourceinvocation.FromRuntime(e.runtimePackage.assembled)
 }
 
 func (e ProgramEmission) PackageDependencies() []PackageDependency {

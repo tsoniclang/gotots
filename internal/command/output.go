@@ -12,6 +12,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/config"
 	"github.com/tsoniclang/gotots/internal/emit"
+	sourceinvocation "github.com/tsoniclang/gotots/internal/emit/sourceinvocation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -79,6 +80,7 @@ func writeEmissionTo(
 	}
 	files := emission.Files()
 	paths := make([]string, 0, len(files)+3)
+	printedDigests := make(map[string]string, len(files))
 	for _, file := range files {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
 		if err != nil {
@@ -89,6 +91,8 @@ func writeEmissionTo(
 			_ = client.Close()
 			return 0, err
 		}
+		sum := sha256.Sum256([]byte(printed))
+		printedDigests[file.OutputPath()] = hex.EncodeToString(sum[:])
 		paths = append(paths, file.OutputPath())
 	}
 	if err := client.Close(); err != nil {
@@ -115,7 +119,16 @@ func writeEmissionTo(
 	paths = append(paths, projectPackageName)
 	paths = append(paths, buildManifestName)
 	sort.Strings(paths)
-	manifest, err := encodeBuildManifest(semanticDigest, paths)
+	sourceInvocations, err := emission.SourceInvocationContract()
+	if err != nil {
+		return 0, err
+	}
+	manifest, err := encodeBuildManifest(
+		semanticDigest,
+		paths,
+		sourceInvocations,
+		printedDigests,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -167,19 +180,33 @@ func writeTargetFile(root string, relative string, payload []byte) error {
 	return nil
 }
 
-func encodeBuildManifest(semanticDigest string, files []string) ([]byte, error) {
+func encodeBuildManifest(
+	semanticDigest string,
+	files []string,
+	sourceInvocations sourceinvocation.Contract,
+	printedDigests map[string]string,
+) ([]byte, error) {
 	selected := slices.Clone(files)
 	if !slices.IsSorted(selected) {
 		return nil, commandError("encode build manifest", "files are not sorted")
 	}
+	invocationContract, err := encodeSourceInvocationContract(
+		sourceInvocations,
+		printedDigests,
+	)
+	if err != nil {
+		return nil, err
+	}
 	document := struct {
-		SchemaVersion  int      `json:"schemaVersion"`
-		SemanticDigest string   `json:"semanticDigest"`
-		Files          []string `json:"files"`
+		SchemaVersion            int                               `json:"schemaVersion"`
+		SemanticDigest           string                            `json:"semanticDigest"`
+		Files                    []string                          `json:"files"`
+		SourceInvocationContract *sourceInvocationContractDocument `json:"sourceInvocationContract,omitempty"`
 	}{
-		SchemaVersion:  config.SchemaVersion,
-		SemanticDigest: semanticDigest,
-		Files:          selected,
+		SchemaVersion:            config.SchemaVersion,
+		SemanticDigest:           semanticDigest,
+		Files:                    selected,
+		SourceInvocationContract: invocationContract,
 	}
 	payload, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {

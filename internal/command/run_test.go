@@ -3,7 +3,9 @@ package command
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -133,6 +135,83 @@ func Increment(value int32) int32 {
 		t.Fatalf("canonical marker dependencies = %s", packageDocument)
 	}
 	assertManifestMatchesOutput(t, generated)
+}
+
+func TestRunSealsExactRuntimeSourceInvocations(t *testing.T) {
+	root := t.TempDir()
+	writeCommandFixture(t, filepath.Join(root, "go.mod"), "module example.test/runtimecontract\n\ngo 1.26.4\n")
+	writeCommandFixture(t, filepath.Join(root, "source.go"), `package runtimecontract
+
+func FirstAndClone(value string, values []int) (byte, []int) {
+	clone := make([]int, len(values))
+	copy(clone, values)
+	return value[0], clone
+}
+`)
+	writeCommandFixture(t, filepath.Join(root, "gotots.json"), `{
+  "schemaVersion": 1,
+  "distribution": {"root": "`+filepath.ToSlash(repositoryRoot(t))+`"},
+  "source": {"root": ".", "package": ".", "mode": "exported"},
+  "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
+  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "providers": {"standardLibrary": false, "externals": false},
+  "implementations": {"bundles": []},
+  "output": {"directory": "generated"}
+}
+`)
+	var output bytes.Buffer
+	if err := Run(context.Background(), root, []string{"build"}, &output, &output); err != nil {
+		t.Fatal(err)
+	}
+	generated := filepath.Join(root, "generated")
+	payload, err := os.ReadFile(filepath.Join(generated, buildManifestName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		SourceInvocationContract *sourceInvocationContractDocument `json:"sourceInvocationContract"`
+	}
+	if err := json.Unmarshal(payload, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	contract := manifest.SourceInvocationContract
+	if contract == nil || len(contract.Files) == 0 || len(contract.Invocations) == 0 {
+		t.Fatalf("source invocation contract is incomplete: %s", payload)
+	}
+	if len(contract.Files) < 2 {
+		t.Fatalf("source invocation contract did not exercise multiple files: %#v", contract.Files)
+	}
+	if contract.ContractDigest != sourceInvocationDigest(
+		contract.Files,
+		contract.Invocations,
+	) {
+		t.Fatal("source invocation contract digest does not match its rows")
+	}
+	for _, file := range contract.Files {
+		source, err := os.ReadFile(filepath.Join(generated, filepath.FromSlash(file.SourcePath)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual := fmt.Sprintf("%x", sha256.Sum256(source))
+		if actual != file.SourceDigest {
+			t.Fatalf("source digest for %q = %q, want %q", file.SourcePath, actual, file.SourceDigest)
+		}
+	}
+	selected := false
+	for _, invocation := range contract.Invocations {
+		if invocation.SourcePath == "runtime/string.ts" &&
+			invocation.ExportedName == "goStringIndex" {
+			selected = true
+			if invocation.InputParameters == nil ||
+				invocation.ResultOriginParameters == nil ||
+				!invocation.ExactImplementation {
+				t.Fatalf("goStringIndex invocation contract = %#v", invocation)
+			}
+		}
+	}
+	if !selected {
+		t.Fatalf("goStringIndex invocation is absent: %#v", contract.Invocations)
+	}
 }
 
 func TestProjectPackageIsRequiredForTopLevelAwait(t *testing.T) {

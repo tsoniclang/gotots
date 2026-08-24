@@ -17,84 +17,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type PackageFile struct {
-	outputPath string
-	sourceFile tsgo.SourceFile
-}
-
-func (f PackageFile) OutputPath() string {
-	return f.outputPath
-}
-
-func (f PackageFile) SourceFile() tsgo.SourceFile {
-	return f.sourceFile
-}
-
-type Package struct {
-	files       []PackageFile
-	manifest    []byte
-	fingerprint string
-	scalar      api.ScalarABI
-	concurrency api.ConcurrencySemantics
-	valid       bool
-}
-
-func (p Package) Valid() bool {
-	return p.valid
-}
-
-func (p Package) Name() string {
-	if !p.valid {
-		return ""
-	}
-	return targetoutput.RuntimePackageName
-}
-
-func (p Package) Version() string {
-	if !p.valid {
-		return ""
-	}
-	return targetoutput.RuntimePackageVersion
-}
-
-func (p Package) RootPath() string {
-	if !p.valid {
-		return ""
-	}
-	return targetoutput.RuntimePackageRootPath
-}
-
-func (p Package) ManifestPath() string {
-	if !p.valid {
-		return ""
-	}
-	return targetoutput.RuntimePackageManifestPath
-}
-
-func (p Package) Profile() api.IntegerRepresentation {
-	return p.scalar.IntegerRepresentation()
-}
-
-func (p Package) NativeIntegerWidth() api.NativeIntegerWidth {
-	return p.scalar.NativeIntegerWidth()
-}
-
-func (p Package) Concurrency() api.ConcurrencySemantics {
-	return p.concurrency
-}
-
-func (p Package) Files() []PackageFile {
-	return slices.Clone(p.files)
-}
-
-func (p Package) Manifest() []byte {
-	return slices.Clone(p.manifest)
-}
-
-func (p Package) Fingerprint() string {
-	return p.fingerprint
-}
-
 func AssemblePackage(
 	factory tsgo.Factory,
 	scalar api.ScalarABI,
@@ -131,6 +53,7 @@ func AssemblePackage(
 	if len(closed) == 0 && len(aliases) == 0 {
 		return Package{}, nil
 	}
+	invocationContracts := make([]InvocationContract, 0)
 	byModule := make(map[api.RuntimeModule][]api.RuntimeSymbol)
 	paths := make(map[api.RuntimeModule]string)
 	for symbol := range closed {
@@ -149,7 +72,23 @@ func AssemblePackage(
 		}
 		paths[module] = contract.OutputPath()
 		byModule[module] = append(byModule[module], symbol)
+		if invocation, ok := contract.Invocation(); ok {
+			invocationContracts = append(invocationContracts, InvocationContract{
+				sourceIdentity:         fmt.Sprintf("gotots-runtime:%d", symbol),
+				sourcePath:             contract.OutputPath(),
+				exportedName:           contract.ExportedName(),
+				exactImplementation:    invocation.ExactImplementation(),
+				inputParameters:        invocation.InputParameters(),
+				resultOriginParameters: invocation.ResultOriginParameters(),
+			})
+		}
 	}
+	sort.Slice(invocationContracts, func(left, right int) bool {
+		if invocationContracts[left].sourcePath != invocationContracts[right].sourcePath {
+			return invocationContracts[left].sourcePath < invocationContracts[right].sourcePath
+		}
+		return invocationContracts[left].exportedName < invocationContracts[right].exportedName
+	})
 	modules := make([]api.RuntimeModule, 0, len(byModule))
 	for module := range byModule {
 		modules = append(modules, module)
@@ -255,12 +194,13 @@ func AssemblePackage(
 		return Package{}, err
 	}
 	return Package{
-		files:       files,
-		manifest:    manifest,
-		fingerprint: fingerprint,
-		scalar:      scalar,
-		concurrency: concurrency,
-		valid:       true,
+		files:               files,
+		invocationContracts: invocationContracts,
+		manifest:            manifest,
+		fingerprint:         fingerprint,
+		scalar:              scalar,
+		concurrency:         concurrency,
+		valid:               true,
 	}, nil
 }
 

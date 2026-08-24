@@ -922,6 +922,17 @@ normalization, or restore a product-scalar import in provider source; each
 fails at the runtime contract, strict typecheck, artifact gate, or execution
 differential.
 
+Source-invocation manifest fixtures independently inspect every emitted
+runtime file owner and invocation row, then exact-join identity, normalized
+path, export, printed-source digest, implementation/file exactness, and
+parameter indexes to the runtime contract. Mutations reorder or duplicate a
+file or invocation, orphan an invocation, alter printed bytes, change one
+digest or parameter index, or mark an exact file's invocation implementation
+inexact; each must
+fail before the manifest is sealed. A round-trip consumer fixture resolves the
+same immutable source snapshot and proves a same-spelled local export receives
+no fact.
+
 Provider-certificate generation invokes the pinned TS-Go compiler and rejects
 every diagnostic before sealing provider evidence. The provider is therefore
 independently strict-typechecked against its certified scalar module. Exact
