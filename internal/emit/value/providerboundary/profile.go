@@ -112,21 +112,30 @@ func ResolveCallableProfile(
 			continue
 		}
 		expectedParameters := slices.Clone(canonicalParameters)
+		expectedResults := slices.Clone(canonicalResults)
 		if candidate.Profile().Required() {
 			semanticParameters, parameterErr := requiredProfileParameters(
 				candidate.Profile(),
+				base.parameterInterfaces,
 			)
 			if parameterErr != nil {
 				return CallableProfileSelection{}, false, parameterErr
 			}
 			expectedParameters = mergeIndexes(expectedParameters, semanticParameters)
+			expectedResults = mergeIndexes(
+				expectedResults,
+				requiredProfileResults(
+					candidate.Profile(),
+					base.resultInterfaces,
+				),
+			)
 		}
 		selected, matchesCurrent, mismatch, matchErr := matchCallableProfileCandidate(
 			context,
 			signature,
 			candidate,
 			expectedParameters,
-			canonicalResults,
+			expectedResults,
 		)
 		if matchErr != nil {
 			return CallableProfileSelection{}, false, matchErr
@@ -191,24 +200,6 @@ func ResolveCallableProfile(
 			selected.requests,
 		),
 	}, true, nil
-}
-
-func requiredProfileParameters(
-	profile gostdlib.ProviderCallableProfile,
-) ([]int, error) {
-	var result []int
-	for _, selected := range profile.Interfaces() {
-		protocol, ok := selected.Protocol()
-		if !ok {
-			continue
-		}
-		parameters, err := gostdlib.ProviderProtocolCallableParameters(protocol)
-		if err != nil {
-			return nil, err
-		}
-		result = mergeIndexes(result, parameters)
-	}
-	return result, nil
 }
 
 func mergeIndexes(left []int, right []int) []int {
@@ -385,6 +376,17 @@ func matchCallableProfileCandidate(
 	expectedBoundaryIdentities := cloneIdentitySet(selected.affected)
 	for identity := range implemented {
 		expectedBoundaryIdentities[identity] = struct{}{}
+	}
+	if profile.Required() {
+		for identity := range boundaryIdentities {
+			if identityOccursInRoots(
+				identity,
+				selected.parameterInterfaces,
+				selected.resultInterfaces,
+			) {
+				expectedBoundaryIdentities[identity] = struct{}{}
+			}
+		}
 	}
 	if !sameIdentitySet(boundaryIdentities, expectedBoundaryIdentities) {
 		return matchedProfile{}, false, "affected interface set differs", nil

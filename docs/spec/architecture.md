@@ -1450,6 +1450,13 @@ In disabled mode the synchronous kernel is the only admissible selected
 concretization. Every generated callback has the synchronous indirect ABI, and
 an absent or suspending kernel fails before source output is sealed.
 
+A provider profile marked required by certified semantic-protocol evidence is
+selected even when the disabled generated interface ABI is already structurally
+direct. Its parameter and result roots are independently rejoined to interfaces
+present in the selected Go signature, and its synchronous method/effect
+contract must match exactly. Structural ABI equality never bypasses a required
+provider implementation route.
+
 Compile-only mode emits exact typed throwing placeholders and canonical
 obligations. Linked mode uses certified provider facades. These are explicit
 profiles, never fallback paths in one compilation. Publication requires every

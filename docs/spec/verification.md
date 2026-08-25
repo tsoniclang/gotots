@@ -771,6 +771,13 @@ source emission. Mutations that silently accept the direct binding, widen its
 callback or interface methods, or defer the mismatch to target typechecking
 fail the owning profile-selection gate.
 
+A disabled-profile fixture reaches a required semantic-protocol facade whose
+source interface ABI is otherwise structurally direct (`errors.Unwrap`). The
+consumer independently rejoins its certified parameter/result roots and must
+select the synchronous facade with no `Promise`, `async`, or `await`. Mutations
+that bypass the required facade, select its cooperative sibling, or omit a
+required result root fail profile selection or generated-shape proof.
+
 Portable cooperative sorting is exercised with both synchronous and genuinely
 asynchronous comparators, stable equal-key ordering, empty input with a nil
 comparator, and a comparison-count bound proportional to `n log n`. The
