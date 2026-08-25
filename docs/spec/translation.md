@@ -1105,6 +1105,14 @@ stateful profiles are selected by exact certified identity and must report a
 synchronous effect. A suspending provider path fails before publication; no
 consumer repairs a Promise-bearing declaration or call afterward.
 
+When a stateful provider type retains interface-typed state, each execution
+profile has its own certified target class and constructor profile. For
+example, disabled `bufio.NewWriter(w)` selects a class whose `Write` and
+`Flush` methods and retained `io.Writer`/`error` contracts are synchronous;
+cooperative compilation selects the awaitable class. Both may share private
+state algorithms, but neither exposes a union effect and neither is selected
+by target spelling.
+
 Under `cooperative`, channel send/receive and blocking select lower to typed
 Promise operations. Direct call effects propagate through revisable callable
 facets. Function values and interface methods use canonical

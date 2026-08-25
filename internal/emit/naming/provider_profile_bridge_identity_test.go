@@ -31,8 +31,23 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 	stateful := manifest.ProviderStatefulProfiles(
 		"compress/gzip|kind=2|receiver=|name=Reader",
 	)
-	if len(callable) != 1 || len(stateful) != 1 {
+	if len(callable) != 2 || len(stateful) != 2 {
 		t.Fatalf("gzip profiles = callable %d, stateful %d", len(callable), len(stateful))
+	}
+	var callableCanonical gostdlib.ProviderCallableProfile
+	for _, profile := range callable {
+		if profile.Export() == "GzipNewReaderCanonical" {
+			callableCanonical = profile
+		}
+	}
+	var statefulCanonical gostdlib.ProviderStatefulProfile
+	for _, profile := range stateful {
+		if profile.Export() == "CanonicalGzipReader" {
+			statefulCanonical = profile
+		}
+	}
+	if !callableCanonical.Valid() || !statefulCanonical.Valid() {
+		t.Fatal("canonical gzip profile pair is absent")
 	}
 	errorName, ok := types.Universe.Lookup("error").(*types.TypeName)
 	if !ok {
@@ -48,7 +63,7 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 		"go:universe|error",
 		errorType,
 		"$goProviderProfileBridge$Named_error",
-		callable[0].Interfaces(),
+		callableCanonical.Interfaces(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +72,7 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 		"go:universe|error",
 		errorType,
 		"$goProviderProfileBridge$Named_error",
-		stateful[0].Interfaces(),
+		statefulCanonical.Interfaces(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -89,8 +104,17 @@ func TestProviderProfileBridgeIdentityIncludesReachableInterfaceABI(
 	profiles := manifest.ProviderCallableProfiles(
 		"compress/gzip|kind=4|receiver=|name=NewReader",
 	)
-	if len(profiles) != 1 {
+	if len(profiles) != 2 {
 		t.Fatalf("gzip NewReader profiles = %d", len(profiles))
+	}
+	var canonical gostdlib.ProviderCallableProfile
+	for _, profile := range profiles {
+		if profile.Export() == "GzipNewReaderCanonical" {
+			canonical = profile
+		}
+	}
+	if !canonical.Valid() {
+		t.Fatal("canonical gzip NewReader profile is absent")
 	}
 	ioPackage, err := importer.Default().Import("io")
 	if err != nil {
@@ -106,7 +130,7 @@ func TestProviderProfileBridgeIdentityIncludesReachableInterfaceABI(
 	}
 	closure, err := providerProfileBridgeClosure(
 		reader,
-		profiles[0].Interfaces(),
+		canonical.Interfaces(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -209,18 +233,33 @@ func TestProviderProfileBridgeIdentityDistinguishesMethodEffects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	awaitableProfiles := manifest.ProviderCallableProfiles(
+	readerProfiles := manifest.ProviderCallableProfiles(
 		"bufio|kind=4|receiver=|name=NewReader",
 	)
 	synchronousProfiles := manifest.ProviderCallableProfiles(
 		"errors|kind=4|receiver=|name=Unwrap",
 	)
-	if len(awaitableProfiles) != 1 || len(synchronousProfiles) != 2 {
+	if len(readerProfiles) != 2 || len(synchronousProfiles) != 2 {
 		t.Fatalf(
-			"profiles = awaitable %d, errors %d",
-			len(awaitableProfiles),
+			"profiles = reader %d, errors %d",
+			len(readerProfiles),
 			len(synchronousProfiles),
 		)
+	}
+	var awaitableProfile gostdlib.ProviderCallableProfile
+	for _, profile := range readerProfiles {
+		selected, ok := profile.Interface(gostdlib.LanguageErrorInterfaceIdentity)
+		if !ok {
+			continue
+		}
+		methods := selected.ProviderInterface().Methods()
+		if len(methods) == 1 && methods[0].Effect() == gostdlib.EffectAwaitable {
+			awaitableProfile = profile
+			break
+		}
+	}
+	if !awaitableProfile.Valid() {
+		t.Fatal("awaitable reader profile is absent")
 	}
 	var synchronous gostdlib.ProviderCallableProfile
 	for _, profile := range synchronousProfiles {
@@ -251,7 +290,7 @@ func TestProviderProfileBridgeIdentityDistinguishesMethodEffects(t *testing.T) {
 		"go:universe|error",
 		errorType,
 		"$goProviderProfileBridge$Named_error",
-		awaitableProfiles[0].Interfaces(),
+		awaitableProfile.Interfaces(),
 	)
 	if err != nil {
 		t.Fatal(err)

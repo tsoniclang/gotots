@@ -23,63 +23,27 @@ func verifyProviderProfileInterfaceClosure(
 	var differences []string
 	for _, module := range facetModules {
 		for _, profile := range module.CallableProfiles {
-			selected := make(map[string]gostdlib.ProviderInterfaceDocument)
-			queue := make([]string, 0, len(profile.Interfaces))
-			for _, candidate := range profile.Interfaces {
-				selected[candidate.SourceIdentity] = candidate.ProviderInterface
-				if candidate.Protocol == nil {
-					queue = append(queue, candidate.SourceIdentity)
-				}
+			if err := verifyOneProviderProfileInterfaceClosure(
+				profile.SourceIdentity,
+				profile.Interfaces,
+				providers,
+				interfaces,
+				identities,
+				&differences,
+			); err != nil {
+				return err
 			}
-			visited := make(map[string]struct{})
-			for len(queue) != 0 {
-				identity := queue[0]
-				queue = queue[1:]
-				if _, seen := visited[identity]; seen {
-					continue
-				}
-				visited[identity] = struct{}{}
-				contract := interfaces[identity]
-				if contract == nil {
-					continue
-				}
-				children := make(map[string]struct{})
-				for index := range contract.NumMethods() {
-					collectBoundProviderInterfaces(
-						contract.Method(index).Type(),
-						identities,
-						providers,
-						make(map[types.Type]struct{}),
-						children,
-					)
-				}
-				ordered := sortedIdentityKeys(children)
-				for _, child := range ordered {
-					if child == identity {
-						continue
-					}
-					queue = append(queue, child)
-					ordinary := providers[child]
-					required, requiredErr := providerInterfaceNeedsCooperative(
-						child,
-						ordinary,
-					)
-					if requiredErr != nil {
-						return requiredErr
-					}
-					cooperative, ok := selected[child]
-					if required && (!ok || !providerInterfaceIsCooperative(
-						ordinary,
-						cooperative,
-					)) {
-						differences = append(differences, fmt.Sprintf(
-							"%s interface %s transitively requires cooperative %s",
-							profile.SourceIdentity,
-							identity,
-							child,
-						))
-					}
-				}
+		}
+		for _, profile := range module.StatefulProfiles {
+			if err := verifyOneProviderProfileInterfaceClosure(
+				profile.SourceIdentity,
+				profile.Interfaces,
+				providers,
+				interfaces,
+				identities,
+				&differences,
+			); err != nil {
+				return err
 			}
 		}
 	}
@@ -92,6 +56,104 @@ func verifyProviderProfileInterfaceClosure(
 		"provider surface",
 		strings.Join(differences, "; "),
 	)
+}
+
+type providerProfileInterfaceVisit struct {
+	identity    string
+	cooperative bool
+}
+
+func verifyOneProviderProfileInterfaceClosure(
+	owner string,
+	profileInterfaces []gostdlib.ProviderCallableProfileInterfaceDocument,
+	providers map[string]gostdlib.ProviderInterfaceDocument,
+	interfaces map[string]*types.Interface,
+	identities map[types.Object]string,
+	differences *[]string,
+) error {
+	selected := make(map[string]gostdlib.ProviderInterfaceDocument)
+	queue := make([]providerProfileInterfaceVisit, 0, len(profileInterfaces))
+	for _, candidate := range profileInterfaces {
+		selected[candidate.SourceIdentity] = candidate.ProviderInterface
+		if candidate.Protocol != nil {
+			continue
+		}
+		queue = append(queue, providerProfileInterfaceVisit{
+			identity:    candidate.SourceIdentity,
+			cooperative: providerInterfaceMaySuspend(candidate.ProviderInterface),
+		})
+	}
+	visited := make(map[providerProfileInterfaceVisit]struct{})
+	for len(queue) != 0 {
+		visit := queue[0]
+		queue = queue[1:]
+		if _, seen := visited[visit]; seen {
+			continue
+		}
+		visited[visit] = struct{}{}
+		contract := interfaces[visit.identity]
+		if contract == nil {
+			continue
+		}
+		children := make(map[string]struct{})
+		for index := range contract.NumMethods() {
+			collectBoundProviderInterfaces(
+				contract.Method(index).Type(),
+				identities,
+				providers,
+				make(map[types.Type]struct{}),
+				children,
+			)
+		}
+		for _, child := range sortedIdentityKeys(children) {
+			if child == visit.identity {
+				continue
+			}
+			ordinary := providers[child]
+			required, err := providerInterfaceNeedsCooperative(child, ordinary)
+			if err != nil {
+				return err
+			}
+			candidate, ok := selected[child]
+			matches := !required && !ok
+			if ok {
+				if visit.cooperative {
+					matches = providerInterfaceIsCooperative(ordinary, candidate)
+				} else {
+					matches = providerInterfaceIsDirect(ordinary, candidate)
+				}
+			}
+			if !matches {
+				mode := "direct"
+				if visit.cooperative {
+					mode = "cooperative"
+				}
+				*differences = append(*differences, fmt.Sprintf(
+					"%s interface %s transitively requires %s %s",
+					owner,
+					visit.identity,
+					mode,
+					child,
+				))
+			}
+			queue = append(queue, providerProfileInterfaceVisit{
+				identity:    child,
+				cooperative: visit.cooperative,
+			})
+		}
+	}
+	return nil
+}
+
+func providerInterfaceMaySuspend(
+	provider gostdlib.ProviderInterfaceDocument,
+) bool {
+	for _, method := range provider.Methods {
+		if method.Effect.MaySuspend() {
+			return true
+		}
+	}
+	return false
 }
 
 func sourceProviderInterfaceTypes(
@@ -299,6 +361,34 @@ func providerInterfaceIsCooperative(
 		}
 		if method.Kind == gostdlib.ProviderInterfaceMethodCallable &&
 			selected.Effect != gostdlib.EffectAwaitable {
+			return false
+		}
+	}
+	return true
+}
+
+func providerInterfaceIsDirect(
+	ordinary gostdlib.ProviderInterfaceDocument,
+	direct gostdlib.ProviderInterfaceDocument,
+) bool {
+	if ordinary.Mode != gostdlib.ProviderInterfaceModeBridge ||
+		direct.Mode != gostdlib.ProviderInterfaceModeBridge ||
+		len(ordinary.Methods) != len(direct.Methods) {
+		return false
+	}
+	directMethods := make(
+		map[string]gostdlib.ProviderInterfaceMethodDocument,
+		len(direct.Methods),
+	)
+	for _, method := range direct.Methods {
+		directMethods[method.SourceIdentity] = method
+	}
+	for _, method := range ordinary.Methods {
+		selected, ok := directMethods[method.SourceIdentity]
+		if !ok || selected.Kind != method.Kind ||
+			selected.SourceSignature != method.SourceSignature ||
+			selected.ContractSignature != method.ContractSignature ||
+			selected.Effect != method.Effect {
 			return false
 		}
 	}

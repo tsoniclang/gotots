@@ -179,3 +179,99 @@ func TestStatefulProfileOperationsExactJoin(t *testing.T) {
 		t.Fatalf("dropped storage-operation error = %v", err)
 	}
 }
+
+func TestStatefulExecutionProfilesRequireExactSynchronousSibling(t *testing.T) {
+	cooperative := statefulExecutionProfileFixture(
+		gostdlib.EffectAwaitable,
+		gostdlib.EffectAsynchronous,
+	)
+	direct := statefulExecutionProfileFixture(
+		gostdlib.EffectSynchronous,
+		gostdlib.EffectSynchronous,
+	)
+	modules := []gostdlib.FacetModuleDocument{{
+		StatefulProfiles: []gostdlib.ProviderStatefulProfileDocument{
+			cooperative,
+			direct,
+		},
+	}}
+	if err := verifyStatefulExecutionProfilePairs(modules); err != nil {
+		t.Fatal(err)
+	}
+
+	mutations := []struct {
+		name     string
+		profiles []gostdlib.ProviderStatefulProfileDocument
+	}{
+		{name: "missing", profiles: []gostdlib.ProviderStatefulProfileDocument{
+			cooperative,
+		}},
+		{name: "interface-shape", profiles: func() []gostdlib.ProviderStatefulProfileDocument {
+			mutated := statefulExecutionProfileFixture(
+				gostdlib.EffectSynchronous,
+				gostdlib.EffectSynchronous,
+			)
+			mutated.Interfaces[0].ProviderInterface.Methods[0].SourceSignature =
+				"func(int) string"
+			return []gostdlib.ProviderStatefulProfileDocument{cooperative, mutated}
+		}()},
+		{name: "method-shape", profiles: func() []gostdlib.ProviderStatefulProfileDocument {
+			mutated := statefulExecutionProfileFixture(
+				gostdlib.EffectSynchronous,
+				gostdlib.EffectSynchronous,
+			)
+			mutated.Methods[0].SourceSignature = "func(int) string"
+			return []gostdlib.ProviderStatefulProfileDocument{cooperative, mutated}
+		}()},
+	}
+	for _, mutation := range mutations {
+		t.Run(mutation.name, func(t *testing.T) {
+			err := verifyStatefulExecutionProfilePairs(
+				[]gostdlib.FacetModuleDocument{{StatefulProfiles: mutation.profiles}},
+			)
+			if err == nil || !strings.Contains(
+				err.Error(),
+				"suspending profile has no exact synchronous sibling",
+			) {
+				t.Fatalf("mutation error = %v", err)
+			}
+		})
+	}
+}
+
+func statefulExecutionProfileFixture(
+	interfaceEffect gostdlib.EffectKind,
+	methodEffect gostdlib.EffectKind,
+) gostdlib.ProviderStatefulProfileDocument {
+	return gostdlib.ProviderStatefulProfileDocument{
+		SourceIdentity: "example.com/provider|kind=2|receiver=|name=State",
+		Interfaces: []gostdlib.ProviderCallableProfileInterfaceDocument{{
+			SourceIdentity: "example.com/provider|kind=2|receiver=|name=Protocol",
+			ProviderInterface: gostdlib.ProviderInterfaceDocument{
+				Mode: gostdlib.ProviderInterfaceModeBridge,
+				Methods: []gostdlib.ProviderInterfaceMethodDocument{{
+					SourceIdentity:    "example.com/provider|kind=4|receiver=Protocol|name=Read",
+					Kind:              gostdlib.ProviderInterfaceMethodCallable,
+					Effect:            interfaceEffect,
+					SourceSignature:   "func() string",
+					ContractSignature: "func() string",
+				}},
+			},
+		}},
+		TypeArguments: []string{
+			"example.com/provider|kind=2|receiver=|name=Protocol",
+		},
+		Operations: []gostdlib.FacetCapability{gostdlib.FacetCapabilityCopy},
+		Fields: []gostdlib.ProviderStructFieldDocument{{
+			Member:          "Value",
+			Ordinal:         0,
+			SourceSignature: "string",
+		}},
+		Methods: []gostdlib.ProviderStatefulProfileMethodDocument{{
+			SourceIdentity:  "example.com/provider|kind=4|receiver=*State|name=Read",
+			Member:          "Read",
+			Effect:          methodEffect,
+			SourceSignature: "func() string",
+		}},
+	}
+}

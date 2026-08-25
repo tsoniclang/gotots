@@ -523,8 +523,8 @@ func TestStatefulNamedStructProfileRejectsAbsentCapabilityMember(t *testing.T) {
 			mutations++
 		}
 	}
-	if mutations != 2 {
-		t.Fatalf("named-struct capability mutation count = %d, want 2", mutations)
+	if mutations != 3 {
+		t.Fatalf("named-struct capability mutation count = %d, want 3", mutations)
 	}
 	mutated, err := json.Marshal(document)
 	if err != nil {

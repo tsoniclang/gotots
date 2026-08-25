@@ -1457,6 +1457,22 @@ present in the selected Go signature, and its synchronous method/effect
 contract must match exactly. Structural ABI equality never bypasses a required
 provider implementation route.
 
+A non-required provider callable profile is still selected in disabled mode
+when an exact parameter, result, callable, or scalar ABI differs from the
+ordinary provider binding. The all-direct case bypasses the profile only when
+every boundary root already exact-matches. This keeps constructor results and
+their stateful representation on one profile key.
+
+Stateful provider representations obey the same profile separation. If a
+retained interface differs for any reason, including the selected scalar ABI,
+the provider contract supplies distinct, fully certified synchronous and
+cooperative representations rather than one union-returning implementation.
+Disabled mode may select only the all-synchronous representation; cooperative
+mode selects the awaitable representation. Matching remains an exact join over
+the complete retained-interface method/effect set, stateful method effects, and
+profile key. The compiler never coerces an awaitable stateful profile into a
+synchronous one or ignores an effect mismatch.
+
 Compile-only mode emits exact typed throwing placeholders and canonical
 obligations. Linked mode uses certified provider facades. These are explicit
 profiles, never fallback paths in one compilation. Publication requires every

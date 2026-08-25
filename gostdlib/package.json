@@ -208,6 +208,10 @@
       "types": "./dist/src/internal/facets/provider-compress-gzip.d.ts",
       "default": "./dist/src/internal/facets/provider-compress-gzip.js"
     },
+    "./internal/facets/provider-compress-gzip-direct.js": {
+      "types": "./dist/src/internal/facets/provider-compress-gzip-direct.d.ts",
+      "default": "./dist/src/internal/facets/provider-compress-gzip-direct.js"
+    },
     "./internal/facets/provider-context.js": {
       "types": "./dist/src/internal/facets/provider-context.d.ts",
       "default": "./dist/src/internal/facets/provider-context.js"

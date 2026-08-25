@@ -9,12 +9,18 @@ import {
 } from "../host-integer.js";
 
 import { byteSlice } from "../runtime/slice.js";
-import type { CanonicalWriter } from "./provider-io-contract.js";
+import type {
+  CanonicalWriter,
+  ProviderWriterInterface,
+} from "./provider-io-contract.js";
+import type { ProviderErrorInterface } from "./provider-error.js";
 
 export type {
   CanonicalError,
   CanonicalWriter,
+  ProviderWriterInterface,
 } from "./provider-io-contract.js";
+export type { ProviderErrorInterface } from "./provider-error.js";
 
 const defaultBufferSize = 4096;
 
@@ -240,6 +246,134 @@ export class CanonicalBufioWriter<
   }
 }
 
+export class DirectBufioWriter<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
+> {
+  #state: WriterBuffer<Failure>;
+  #target: Target | undefined;
+
+  constructor(target: Target | undefined, shortWrite: Failure) {
+    this.#target = target;
+    this.#state = new WriterBuffer(shortWrite);
+  }
+
+  static $copy<
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
+  >(
+    source: DirectBufioWriter<Failure, Target>,
+  ): DirectBufioWriter<Failure, Target> {
+    const target = new DirectBufioWriter(
+      source.#target,
+      source.#state.shortWrite,
+    );
+    target.#state = source.#state.copy();
+    return target;
+  }
+
+  static $assign<
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
+  >(
+    target: DirectBufioWriter<Failure, Target>,
+    source: DirectBufioWriter<Failure, Target>,
+  ): void {
+    target.#state = source.#state.copy();
+    target.#target = source.#target;
+  }
+
+  static Flush<
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
+  >(
+    receiver: DirectBufioWriter<Failure, Target> | undefined,
+    recovery?: GoRecovery,
+  ): Failure | undefined {
+    return requireDirectWriter(receiver).Flush(recovery);
+  }
+
+  static Write<
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
+  >(
+    receiver: DirectBufioWriter<Failure, Target> | undefined,
+    source: RuntimeSlice<uint8>,
+    recovery?: GoRecovery,
+  ): [int, Failure | undefined] {
+    return requireDirectWriter(receiver).Write(source, recovery);
+  }
+
+  static WriteByte<
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
+  >(
+    receiver: DirectBufioWriter<Failure, Target> | undefined,
+    value: uint8,
+    recovery?: GoRecovery,
+  ): Failure | undefined {
+    return requireDirectWriter(receiver).WriteByte(value, recovery);
+  }
+
+  Flush(recovery?: GoRecovery): Failure | undefined {
+    if (this.#state.failure !== undefined || this.#state.length === 0) {
+      return this.#state.failure;
+    }
+    const [count, failure] = requireTarget(this.#target).Write(
+      this.#state.source(),
+      recovery,
+    );
+    return this.#state.finishFlush(count, failure);
+  }
+
+  Write(
+    source: RuntimeSlice<uint8>,
+    recovery?: GoRecovery,
+  ): [int, Failure | undefined] {
+    if (this.#state.failure !== undefined) {
+      return [0n, this.#state.failure];
+    }
+    let accepted = 0;
+    while (source.length - accepted > this.#state.available &&
+      this.#state.failure === undefined) {
+      let count: number;
+      if (this.#state.length === 0) {
+        const result = requireTarget(this.#target).Write(
+          source.slice(accepted, source.length, null),
+          recovery,
+        );
+        count = hostInteger(result[0]);
+        this.#state.acceptFailure(result[1]);
+      } else {
+        count = Math.min(this.#state.available, source.length - accepted);
+        this.#state.append(source, accepted, count);
+        this.Flush(recovery);
+      }
+      accepted += count;
+    }
+    if (this.#state.failure !== undefined) {
+      return [integerFromHost(accepted), this.#state.failure];
+    }
+    const count = source.length - accepted;
+    this.#state.append(source, accepted, count);
+    return [integerFromHost(accepted + count), undefined];
+  }
+
+  WriteByte(value: uint8, recovery?: GoRecovery): Failure | undefined {
+    if (this.#state.failure !== undefined) {
+      return this.#state.failure;
+    }
+    if (this.#state.available === 0) {
+      const failure = this.Flush(recovery);
+      if (failure !== undefined) {
+        return failure;
+      }
+    }
+    this.#state.appendByte(value);
+    return undefined;
+  }
+}
+
 export class BufioWriterOperations {
   static $copy<
     Failure extends GoInterfaceValue,
@@ -271,6 +405,16 @@ export function NewWriterCanonical<
   return new CanonicalBufioWriter(target, requireShortWrite(shortWrite));
 }
 
+export function NewWriterDirect<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
+>(
+  target: Target | undefined,
+  shortWrite: Failure | undefined,
+): DirectBufioWriter<Failure, Target> {
+  return new DirectBufioWriter(target, requireShortWrite(shortWrite));
+}
+
 function requireTarget<Target>(target: Target | undefined): Target {
   if (target === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
@@ -291,6 +435,18 @@ function requireWriter<
 >(
   receiver: CanonicalBufioWriter<Failure, Target> | undefined,
 ): CanonicalBufioWriter<Failure, Target> {
+  if (receiver === undefined) {
+    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
+  }
+  return receiver;
+}
+
+function requireDirectWriter<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
+>(
+  receiver: DirectBufioWriter<Failure, Target> | undefined,
+): DirectBufioWriter<Failure, Target> {
   if (receiver === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }

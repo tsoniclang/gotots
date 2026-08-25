@@ -316,7 +316,7 @@ func buildFacetModules(
 				seed,
 				byName,
 				bindingDocuments,
-				selected,
+				seeds,
 				project,
 				effectMarker,
 				scalarAliases,
@@ -537,6 +537,9 @@ func buildFacetModules(
 			StatefulProfiles:              statefulProfileDocuments,
 			Facets:                        facets,
 		})
+	}
+	if err := verifyStatefulExecutionProfilePairs(result); err != nil {
+		return nil, err
 	}
 	if err := verifySynchronousGenericKernelPairs(result); err != nil {
 		return nil, err

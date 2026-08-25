@@ -443,6 +443,28 @@ func (a *profileBoundaryAnalyzer) affectedInterfaces() map[string]struct{} {
 	return affected
 }
 
+func includeProfileInterfaceDescendants(
+	nodes map[string]*profileBoundaryInterface,
+	identities map[string]struct{},
+) {
+	queue := sortedIdentitySet(identities)
+	for len(queue) != 0 {
+		identity := queue[0]
+		queue = queue[1:]
+		node := nodes[identity]
+		if node == nil {
+			continue
+		}
+		for _, child := range sortedIdentitySet(node.children) {
+			if _, found := identities[child]; found {
+				continue
+			}
+			identities[child] = struct{}{}
+			queue = append(queue, child)
+		}
+	}
+}
+
 func affectedRoots(
 	roots []map[string]struct{},
 	affected map[string]struct{},

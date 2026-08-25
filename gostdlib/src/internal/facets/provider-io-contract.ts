@@ -49,10 +49,26 @@ export interface CanonicalReader<Failure extends GoInterfaceValue>
   ): Awaitable<[int, Failure | undefined]>;
 }
 
+export interface ProviderReaderInterface<Failure extends GoInterfaceValue>
+  extends GoInterfaceValue {
+  Read(
+    destination: RuntimeSlice<uint8>,
+    recovery?: GoRecovery,
+  ): [int, Failure | undefined];
+}
+
 export interface CanonicalWriter<Failure extends GoInterfaceValue>
   extends GoInterfaceValue {
   Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
   ): Awaitable<[int, Failure | undefined]>;
+}
+
+export interface ProviderWriterInterface<Failure extends GoInterfaceValue>
+  extends GoInterfaceValue {
+  Write(
+    source: RuntimeSlice<uint8>,
+    recovery?: GoRecovery,
+  ): [int, Failure | undefined];
 }

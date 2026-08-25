@@ -745,6 +745,38 @@
       "sourceIdentity": "bufio|kind=4|receiver=|name=NewReader",
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
       "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "NewReaderDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
+          "targetParameter": "noProgress"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "ProviderReaderInterface"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewReader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
       "export": "NewReaderCanonical",
       "canonicalParameters": [
         0
@@ -770,6 +802,50 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Reader",
           "export": "CanonicalReader"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "NewScannerDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "bufio|kind=3|receiver=|name=ErrBadReadCount",
+          "targetParameter": "badReadCount"
+        },
+        {
+          "sourceIdentity": "bufio|kind=3|receiver=|name=ErrTooLong",
+          "targetParameter": "tooLong"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
+          "targetParameter": "noProgress"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "ProviderReaderInterface"
         }
       ]
     },
@@ -821,6 +897,38 @@
       "sourceIdentity": "bufio|kind=4|receiver=|name=NewWriter",
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
       "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "NewWriterDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrShortWrite",
+          "targetParameter": "shortWrite"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "ProviderWriterInterface"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewWriter",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
       "export": "NewWriterCanonical",
       "canonicalParameters": [
         0
@@ -846,6 +954,59 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Writer",
           "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "compress/gzip|kind=4|receiver=|name=NewReader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip-direct.js",
+      "sourcePath": "src/internal/facets/provider-compress-gzip-direct.ts",
+      "export": "GzipNewReaderDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0,
+        1
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrUnexpectedEOF",
+          "targetParameter": "unexpectedEOF"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
+          "targetParameter": "noProgress"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "compress/flate|kind=2|receiver=|name=Reader",
+        "go:universe|error",
+        "io|kind=2|receiver=|name=ReadCloser"
+      ],
+      "contractInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "compress/flate|kind=2|receiver=|name=Reader",
+          "export": "ProviderFlateReader"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=ReadCloser",
+          "export": "ProviderReadCloser"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "ProviderReaderInterface"
         }
       ]
     },
@@ -1568,6 +1729,30 @@
       "sourceIdentity": "bufio|kind=2|receiver=|name=Reader",
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
       "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "DirectBufioReader",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "ProviderReaderInterface"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "operations": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
       "export": "CanonicalBufioReader",
       "interfaces": [
         {
@@ -1577,6 +1762,30 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Reader",
           "export": "CanonicalReader"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "operations": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "DirectBufioScanner",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "ProviderReaderInterface"
         }
       ],
       "typeArguments": [
@@ -1616,6 +1825,30 @@
       "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
       "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "DirectBufioWriter",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "ProviderWriterInterface"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "operations": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
       "export": "CanonicalBufioWriter",
       "interfaces": [
         {
@@ -1630,6 +1863,35 @@
       "typeArguments": [
         "go:universe|error",
         "io|kind=2|receiver=|name=Writer"
+      ],
+      "operations": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "sourceIdentity": "compress/gzip|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip-direct.js",
+      "sourcePath": "src/internal/facets/provider-compress-gzip-direct.ts",
+      "export": "DirectGzipReader",
+      "interfaces": [
+        {
+          "sourceIdentity": "compress/flate|kind=2|receiver=|name=Reader",
+          "export": "ProviderFlateReader"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=ReadCloser",
+          "export": "ProviderReadCloser"
+        }
+      ],
+      "typeArguments": [
+        "compress/flate|kind=2|receiver=|name=Reader",
+        "go:universe|error",
+        "io|kind=2|receiver=|name=ReadCloser"
       ],
       "operations": [
         "assign",
@@ -1663,6 +1925,29 @@
       "operations": [
         "assign",
         "copy"
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=2|receiver=|name=PathError",
+      "specifier": "@gotots/gostdlib/internal/facets/named-io-fs.js",
+      "sourcePath": "src/internal/facets/named-io-fs.ts",
+      "export": "DirectPathError",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error"
+      ],
+      "operations": [
+        "assign",
+        "copy",
+        "equal",
+        "hash",
+        "make",
+        "storage"
       ]
     },
     {

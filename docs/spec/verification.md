@@ -734,6 +734,13 @@ method, facade, generic kernel, or callback adapter as suspending must fail
 before publication rather than producing a Promise or selecting a cooperative
 fallback.
 
+The stateful-profile matrix exercises every configured stateful source identity
+under both disabled and cooperative execution. For a scalar-ABI mismatch it
+must select exactly one profile with the expected complete interface and method
+effect set. Mutations that delete the synchronous sibling, substitute one
+awaitable interface member, reuse the cooperative profile key, or select both
+siblings fail at certification or the exact profile join.
+
 The selected race-free cooperative profile exits only with:
 
 - unbuffered/buffered/nil/closed channel cases;

@@ -94,12 +94,6 @@ func ResolveCallableProfile(
 	for _, candidate := range candidates {
 		required = required || candidate.Profile().Required()
 	}
-	if context.ConcurrencySemantics() == api.ConcurrencySemanticsDisabled &&
-		!required {
-		return CallableProfileSelection{
-			requests: api.CombineRequests(base.analyzer.requests),
-		}, false, nil
-	}
 	if len(canonicalParameters) == 0 && !required {
 		return CallableProfileSelection{
 			requests: api.CombineRequests(base.analyzer.requests),
@@ -388,6 +382,10 @@ func matchCallableProfileCandidate(
 			}
 		}
 	}
+	includeProfileInterfaceDescendants(
+		selected.analyzer.nodes,
+		expectedBoundaryIdentities,
+	)
 	if !sameIdentitySet(boundaryIdentities, expectedBoundaryIdentities) {
 		return matchedProfile{}, false, "affected interface set differs", nil
 	}
