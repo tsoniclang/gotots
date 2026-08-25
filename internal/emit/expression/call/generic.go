@@ -50,19 +50,14 @@ func emitGeneric(
 	}
 	openConcretization := requiresConcretization &&
 		instance.TypeArgs.ContainsGenericTypeParameter()
-	effectSelection := genericConcretizationEffectSelection{
-		effect: api.GenericConcretizationEffectCanonical,
-	}
-	if requiresConcretization && !openConcretization {
-		effectSelection, err = selectGenericConcretizationEffect(
-			context,
-			source,
-			owner,
-			detached,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
+	effectSelection, err := selectGenericConcretizationEffect(
+		context,
+		source,
+		owner,
+		detached,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
 	arguments, before, argumentRequests, err :=
 		emitArgumentsWithSynchronousParameters(
@@ -123,16 +118,22 @@ func emitGeneric(
 				Reason: "generic kernel names are unavailable",
 			}
 		}
-		reference, err = kernelNames.GenericKernel(owner)
+		if effectSelection.effect.Synchronous() {
+			reference, err = kernelNames.SynchronousGenericKernel(owner)
+		} else {
+			reference, err = kernelNames.GenericKernel(owner)
+		}
 		callableFacet = facet
-		typeArguments, typeRequests, err =
-			genericinstance.EmitFunctionTypeArguments(
-				context,
-				children,
-				source,
-				owner,
-				instance.TypeArgs,
-			)
+		if err == nil {
+			typeArguments, typeRequests, err =
+				genericinstance.EmitFunctionTypeArguments(
+					context,
+					children,
+					source,
+					owner,
+					instance.TypeArgs,
+				)
+		}
 		if err == nil {
 			capabilities, capabilityRequests, capabilityErr :=
 				genericinstance.EmitCapabilities(
@@ -162,21 +163,36 @@ func emitGeneric(
 				Reason: "generic mechanics reached a source-facing callable",
 			}
 		}
-		selected, facet, selectionErr :=
-			cooperativecall.SelectGenericCallable(context, owner)
-		if selectionErr != nil {
-			return api.ExpressionEmission{}, true, selectionErr
+		if effectSelection.effect.Synchronous() {
+			kernelNames, available := context.Names().(api.GenericKernelNames)
+			if !available {
+				return api.ExpressionEmission{}, true, &api.ContextError{
+					Reason: "generic kernel names are unavailable",
+				}
+			}
+			reference, err = kernelNames.SynchronousGenericKernel(owner)
+			if err == nil {
+				callableFacet, err = api.NewSourceCallableFacet(owner)
+			}
+		} else {
+			selected, facet, selectionErr :=
+				cooperativecall.SelectGenericCallable(context, owner)
+			if selectionErr != nil {
+				return api.ExpressionEmission{}, true, selectionErr
+			}
+			reference = selected
+			callableFacet = facet
 		}
-		reference = selected
-		callableFacet = facet
-		typeArguments, typeRequests, err =
-			genericinstance.EmitFunctionTypeArguments(
-				context,
-				children,
-				source,
-				owner,
-				instance.TypeArgs,
-			)
+		if err == nil {
+			typeArguments, typeRequests, err =
+				genericinstance.EmitFunctionTypeArguments(
+					context,
+					children,
+					source,
+					owner,
+					instance.TypeArgs,
+				)
+		}
 	}
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -242,6 +258,15 @@ func emitGeneric(
 		return api.ExpressionEmission{}, true, err
 	}
 	if effectSelection.effect.Synchronous() {
+		if reference.ProviderBoundary() && !detached && !discarded {
+			result, err = providerboundary.FromProviderGenericResults(
+				context,
+				children,
+				contract.Results(),
+				signature.Results(),
+				result,
+			)
+		}
 		return result, true, nil
 	}
 	if detached {

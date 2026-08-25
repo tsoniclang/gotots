@@ -88,35 +88,4 @@ func TestCallableParameterEvidenceAndProfileCoverageAreExact(t *testing.T) {
 		t.Fatalf("nested callable mismatches = %v", nestedMismatches)
 	}
 
-	identity := "example|kind=4|receiver=|name=Search"
-	source := goSurface{objects: map[string]goObject{
-		identity: {object: types.NewFunc(token.NoPos, nil, "Search", signature)},
-	}}
-	modules := []gostdlib.ModuleDocument{{Bindings: []gostdlib.BindingDocument{{
-		Identity:           identity,
-		Kind:               gostdlib.BindingFunction,
-		CallableParameters: direct,
-	}}}}
-	if err := verifyCallableParameterProfileCoverage(source, modules, nil); err == nil ||
-		!strings.Contains(err.Error(), "expected 1 profile") {
-		t.Fatalf("missing cooperative profile error = %v", err)
-	}
-	profile := gostdlib.ProviderCallableProfileDocument{
-		SourceIdentity: identity,
-		CallableParameters: []gostdlib.ProviderCallableParameterDocument{{
-			Parameter: 1,
-			Effect:    gostdlib.EffectAwaitable,
-		}},
-	}
-	facets := []gostdlib.FacetModuleDocument{{CallableProfiles: []gostdlib.ProviderCallableProfileDocument{
-		profile,
-	}}}
-	if err := verifyCallableParameterProfileCoverage(source, modules, facets); err != nil {
-		t.Fatal(err)
-	}
-	facets[0].CallableProfiles = append(facets[0].CallableProfiles, profile)
-	if err := verifyCallableParameterProfileCoverage(source, modules, facets); err == nil ||
-		!strings.Contains(err.Error(), "certified 2 profile") {
-		t.Fatalf("duplicate cooperative profile error = %v", err)
-	}
 }

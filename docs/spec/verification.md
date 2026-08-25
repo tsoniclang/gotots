@@ -716,7 +716,7 @@ strict typechecking and nil-call behavior. A pinned-checker fixture proves the
 nullish expression narrows the callable without a helper call. Broad artifact
 search rejects the former conditional and assertion paths.
 
-## Cooperative-Concurrency Proof
+## Execution-Profile Proof
 
 The disabled profile separately proves inline goroutine evaluation, ready
 buffered channel send/receive, ready and default select, close/len/cap, and a
@@ -724,6 +724,15 @@ loud runtime boundary for every operation that would suspend. Its generated
 artifacts must contain no `Promise`, `async`, `await`, scheduler request, or
 cooperative channel waiter. Mutations that restore scheduler dispatch, admit a
 silent unready operation, or leak a Promise fail shape and differential gates.
+
+The zero-suspension shape proof covers every generated source function, method,
+literal, callable value, interface method, callable ABI, package initializer,
+provider facade, stateful provider profile, and generic concretization. Exact
+provider certificate joins prove that each selected binding and nested callback
+contract is synchronous. Mutations that mark a selected binding, profile
+method, facade, generic kernel, or callback adapter as suspending must fail
+before publication rather than producing a Promise or selecting a cooperative
+fallback.
 
 The selected race-free cooperative profile exits only with:
 
@@ -754,6 +763,13 @@ is uniform: all transported methods are synchronous for direct mode or all are
 `Awaitable` for cooperative mode. A Go identity admits at most one certificate
 per mode. Mutations adding a second certificate in either mode or mixing the
 two effects inside one certificate fail before emission.
+
+A direct callback or interface-transporting binding is not required to carry an
+unused cooperative twin. A cooperative fixture that reaches a direct-only
+binding must nevertheless fail at exact callable-profile selection before
+source emission. Mutations that silently accept the direct binding, widen its
+callback or interface methods, or defer the mismatch to target typechecking
+fail the owning profile-selection gate.
 
 Portable cooperative sorting is exercised with both synchronous and genuinely
 asynchronous comparators, stable equal-key ordering, empty input with a nil
@@ -801,13 +817,23 @@ is compared with both the canonical kernel and the selected Go toolchain for
 result values, callback order and short-circuiting, nil-call panic behavior,
 and observable mutation. `CompactFunc` additionally proves Go's current-before-
 previous callback order, in-place backing-store mutation, returned reslice,
-and zeroed tail. Direct synchronous callbacks must select each synchronous
-kernel; an open callback must retain its canonical kernel. Removing one pair
+and zeroed tail. In cooperative mode, direct synchronous callbacks must select
+each synchronous kernel and an open callback must retain its canonical kernel.
+In disabled mode, the synchronous kernel and synchronous callback ABI are
+mandatory; an absent or suspending selection fails closed. Removing one pair
 is caught by the generated-artifact join, while changing projection, callback
 index, effect, source identity, or capability is caught by contract
-certification. Iterator/sequence APIs remain canonical because their sequence,
-not only their callback, may suspend; a synchronous callback alone is not
-evidence for a synchronous outer kernel.
+certification. In cooperative mode, language-owned iterator/sequence APIs
+remain canonical because their sequence, not only their callback, may suspend;
+a synchronous callback alone is not evidence for a synchronous outer kernel.
+A provider-defined sequence carrier records the independently inspected effect
+of its projected callable. A direct-only carrier therefore fails exact effect
+selection in a cooperative product before source emission instead of running a
+suspending sequence through a synchronous kernel. A separately certified
+cooperative callable profile is tested against its own carrier effect and is
+not rejected by the direct-carrier gate. In disabled mode, sequence production
+and consumption contracts are direct and a suspending iterator provider is
+rejected before sealing.
 
 The certifier independently derives a total directional obligation multiset
 over every provider callable. It recursively records inward interface-method and
@@ -1027,12 +1053,18 @@ emission, or silently fall back to ambient mode.
 independently. Generated product linkage proves the same physical runtime
 module is used by provider and generated code.
 
-Provider-source strict typechecking uses the generated direct-profile runtime
-harness. Runtime generation tests separately inspect direct and cooperative
-contracts, and the linked cooperative product must strict-typecheck provider
-declarations against its own generated cooperative runtime. Mutating either
-profile selection, or substituting the direct harness into the cooperative
-product, must fail at the exact interface method effect.
+Provider-source strict typechecking uses the generated provider-certification
+harness: scalar and channel modules are cooperative, while the interface
+callable ABI and every other module are disabled. This checks direct bindings
+and optional cooperative facets together without selecting product semantics.
+Runtime generation tests inspect this exact mixed contract and the independent
+direct and cooperative product contracts. A linked cooperative product must
+strict-typecheck provider declarations against its own generated cooperative runtime. Mutating either
+profile selection, or substituting a disabled runtime into the provider harness
+or cooperative product, must fail at the exact interface method effect. A
+disabled generated product must not demand `Awaitable<T>` or any executable
+scheduler/waiter symbol; restoring such a demand fails the runtime-assembly and
+generated-artifact shape gates.
 
 Provider packaging begins from an empty emitted-output tree. A package
 artifact contains exactly current source-owned outputs; deleting a source

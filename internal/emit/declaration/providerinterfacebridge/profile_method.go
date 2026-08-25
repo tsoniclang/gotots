@@ -22,6 +22,13 @@ func profileContractMethod(
 		certificate.Member() == "" || !certificate.Effect().Valid() {
 		return nil, nil, shapeError("", "profile contract method is invalid")
 	}
+	if err := providerboundary.RequireSynchronousEffect(
+		context,
+		method.FullName(),
+		certificate.Effect(),
+	); err != nil {
+		return nil, nil, err
+	}
 	target, err := callable.EmitABIAdapter(context, children, nil, signature)
 	if err != nil {
 		return nil, nil, err
@@ -56,6 +63,13 @@ func profileForwardMethod(
 	signature, ok := receiverFreeSignature(method)
 	if !ok {
 		return nil, nil, shapeError(bridgeName, "profile forward method is invalid")
+	}
+	if err := providerboundary.RequireSynchronousEffect(
+		context,
+		method.FullName(),
+		certificate.Effect(),
+	); err != nil {
+		return nil, nil, err
 	}
 	target, err := callable.EmitABIAdapter(context, children, nil, signature)
 	if err != nil {
@@ -194,6 +208,13 @@ func prepareProfileReverseMethod(
 	signature, ok := receiverFreeSignature(method)
 	if !ok {
 		return methodEmission{}, shapeError(bridgeName, "profile reverse method is invalid")
+	}
+	if err := providerboundary.RequireSynchronousEffect(
+		context,
+		method.FullName(),
+		certificate.Effect(),
+	); err != nil {
+		return methodEmission{}, err
 	}
 	target, err := callable.EmitABIAdapter(
 		providerContext,

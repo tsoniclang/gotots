@@ -39,7 +39,7 @@ export function StartCPUProfile(w: Writer | undefined): GoError | undefined {
   if (w === undefined) {
     return new ProviderError("pprof: nil writer");
   }
-  if (!beginCpuProfile(async (content): Promise<void> => {
+  if (!beginCpuProfile((content): void => {
     write(w, content);
   })) {
     return new ProviderError("cpu profiling already in use");
@@ -47,8 +47,8 @@ export function StartCPUProfile(w: Writer | undefined): GoError | undefined {
   return undefined;
 }
 
-export async function StopCPUProfile(): Promise<void> {
-  await finishCpuProfile();
+export function StopCPUProfile(): void {
+  finishCpuProfile();
 }
 
 function write(writer: Writer, content: Uint8Array): GoError | undefined {

@@ -20,6 +20,9 @@ func FromProviderSourceCallable(
 	function *types.Func,
 	target api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if err := RequireSynchronousCallable(context, function); err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	if context.SynchronousCallableBoundary() {
 		signature, supported, model := callableType(function.Type())
 		if !supported {
@@ -126,6 +129,11 @@ func fromProviderCallableSelectedWithEffect(
 	source api.ExpressionEmission,
 	synchronous bool,
 ) (api.ExpressionEmission, bool, error) {
+	if len(profile) == 0 {
+		if err := RequireProviderDefinedCallableOutput(context, model); err != nil {
+			return api.ExpressionEmission{}, false, err
+		}
+	}
 	target, err := callable.EmitABIAdapter(context, children, nil, signature)
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
@@ -288,6 +296,15 @@ func toProviderCallableSelected(
 	model definedtype.Model,
 	source api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	if len(profile) == 0 {
+		if err := RequireProviderDefinedCallableInput(
+			context,
+			model,
+			context.SynchronousCallableBoundary(),
+		); err != nil {
+			return api.ExpressionEmission{}, false, err
+		}
+	}
 	parameters := make([]tsgo.ParameterDeclaration, 0, signature.Params().Len())
 	arguments := make([]tsgo.Expression, 0, signature.Params().Len())
 	var argumentBefore []tsgo.Statement

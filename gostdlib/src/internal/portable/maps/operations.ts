@@ -133,12 +133,12 @@ export function Keys<M, K, V>(
   source: M,
 ): Seq<K> {
   const sourceValue = sourceMap(source);
-  return new Seq<K>(async (yieldValue): Promise<void> => {
+  return new Seq<K>((yieldValue): void => {
     if (yieldValue === undefined) {
       GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
     }
     for (const key of sourceValue.keys()) {
-      if (!await yieldValue(copyKey(key))) {
+      if (!yieldValue(copyKey(key))) {
         return;
       }
     }
@@ -151,12 +151,12 @@ export function Values<M, K, V>(
   source: M,
 ): Seq<V> {
   const sourceValue = sourceMap(source);
-  return new Seq<V>(async (yieldValue): Promise<void> => {
+  return new Seq<V>((yieldValue): void => {
     if (yieldValue === undefined) {
       GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
     }
     for (const key of sourceValue.keys()) {
-      if (!await yieldValue(copyValue(sourceValue.lookup(key)))) {
+      if (!yieldValue(copyValue(sourceValue.lookup(key)))) {
         return;
       }
     }

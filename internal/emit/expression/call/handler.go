@@ -497,6 +497,14 @@ func emitCallee(
 		if err != nil {
 			return api.ExpressionEmission{}, false, false, err
 		}
+		if reference.ProviderBoundary() {
+			if err := providerboundary.RequireSynchronousCallable(
+				context,
+				object,
+			); err != nil {
+				return api.ExpressionEmission{}, false, false, err
+			}
+		}
 		return api.DirectExpression(
 			reference.Expression(context.Factory()),
 			reference.Requests()...,

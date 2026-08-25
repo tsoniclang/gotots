@@ -4,10 +4,10 @@ import type { Awaitable, bool, int } from "@gotots/gostdlib/internal/scalars.js"
 
 import type { Seq } from "./internal/portable/iter/sequence.js";
 
-export async function AppendSeq<Slice, Element>(
+export function AppendSeq<Slice, Element>(
   source: Slice,
   sequence: Seq<Element>,
-): Promise<Slice> {
+): Slice {
   return specializationRequired("slices.AppendSeq");
 }
 
@@ -34,9 +34,9 @@ export function Clone<Slice, Element>(source: Slice): Slice {
   return specializationRequired("slices.Clone");
 }
 
-export async function Collect<Element>(
+export function Collect<Element>(
   sequence: Seq<Element>,
-): Promise<RuntimeSlice<Element>> {
+): RuntimeSlice<Element> {
   return specializationRequired("slices.Collect");
 }
 
@@ -169,16 +169,16 @@ export async function SortStableFunc<Slice, Element>(
   return specializationRequired("slices.SortStableFunc");
 }
 
-export async function Sorted<Element>(
+export function Sorted<Element>(
   sequence: Seq<Element>,
-): Promise<RuntimeSlice<Element>> {
+): RuntimeSlice<Element> {
   return specializationRequired("slices.Sorted");
 }
 
-export async function SortedFunc<Element>(
+export function SortedFunc<Element>(
   sequence: Seq<Element>,
-  compare: ((left: Element, right: Element) => Awaitable<int>) | undefined,
-): Promise<RuntimeSlice<Element>> {
+  compare: ((left: Element, right: Element) => int) | undefined,
+): RuntimeSlice<Element> {
   return specializationRequired("slices.SortedFunc");
 }
 

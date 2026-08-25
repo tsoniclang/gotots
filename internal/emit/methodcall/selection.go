@@ -194,7 +194,16 @@ func resolveStatefulBoundary(
 		boundary.Requests(),
 	)
 	if err != nil || !selected {
-		return selection, err
+		if err != nil {
+			return selection, err
+		}
+		if err := providerboundary.RequireSynchronousCallable(
+			context,
+			selection.owner,
+		); err != nil {
+			return Selection{}, err
+		}
+		return selection, nil
 	}
 	selection.statefulProfile = true
 	selection.profile = boundary.Interfaces()

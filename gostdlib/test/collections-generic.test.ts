@@ -440,18 +440,6 @@ test("maps functions use the semantic GoMapValue contract", async (): Promise<vo
 });
 
 test("cooperative collection facets have one typed internal owner", async (): Promise<void> => {
-  const sequence = new Seq<number>(async (yieldValue): Promise<void> => {
-    if (yieldValue !== undefined) {
-      await yieldValue(3);
-      await yieldValue(1);
-      await yieldValue(2);
-    }
-  });
-  assert.deepEqual(values(await Collect(
-    copyValue,
-    copyValue,
-    sequence,
-  )), [3, 1, 2]);
   assert.equal(
     await ContainsFunc(
       sliceValue,
@@ -486,11 +474,11 @@ test("cooperative collection facets have one typed internal owner", async (): Pr
 
   const source = GoMap.make<string, number>(0, 0, [["a", 1], ["b", 2]]);
   const keys: string[] = [];
-  await Keys(
+  Keys(
     (value): GoMapValue<string, number> => value,
     (key): string => key,
     source,
-  ).value?.(async (key): Promise<boolean> => {
+  ).value?.((key): boolean => {
     keys.push(key);
     return true;
   });

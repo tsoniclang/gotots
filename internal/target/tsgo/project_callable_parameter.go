@@ -296,6 +296,30 @@ func (p *ProjectInspection) CallableReturnTypeIdentity(
 	return p.projectTypeIdentity(result.ID)
 }
 
+func (p *ProjectInspection) CallableReturnEffect(
+	target projectCallable,
+	asyncMarker ProjectExport,
+) (CallableEffect, error) {
+	if p == nil || target == nil {
+		return CallableEffectInvalid, &ProjectInspectionError{
+			Operation: "callable return effect",
+			Reason:    "target is absent",
+		}
+	}
+	signature, err := p.singleCallSignature(target, target.callableSubject())
+	if err != nil {
+		return CallableEffectInvalid, err
+	}
+	result, err := p.signatureReturn(signature.ID, target.callableSubject())
+	if err != nil {
+		return CallableEffectInvalid, err
+	}
+	return p.CallableEffect(projectCallableType{
+		typeID:  result.ID,
+		subject: target.callableSubject() + " return value",
+	}, asyncMarker)
+}
+
 func (p *ProjectInspection) projectTypeString(
 	typeID uint32,
 	operation string,

@@ -99,26 +99,31 @@ function startNotificationWithDone<Value>(
   done: GoReceiveChannel<GoEmptyStruct> | undefined,
 ): [Value, NonNullable<CancelFunc>] {
   let stopped = false;
+  let unsubscribeDone = (): void => undefined;
 
-  const stop = async (): Promise<void> => {
+  const stop = (): void => {
     if (stopped) {
       return;
     }
     stopped = true;
+    unsubscribeDone();
     for (const signal of selected) {
       process.removeListener(signal, onSignal);
     }
-    await cancel();
+    cancel();
   };
-  const onSignal = (): void => {
-    void stop();
-  };
+  const onSignal = (): void => stop();
 
   for (const signal of selected) {
     process.once(signal, onSignal);
   }
   if (done !== undefined) {
-    void done.receive().then(stop);
+    const receive = done.$selectReceive(stop);
+    if (receive.ready()) {
+      receive.commit();
+    } else {
+      unsubscribeDone = receive.subscribe((): boolean => !stopped);
+    }
   }
   return [context, stop];
 }

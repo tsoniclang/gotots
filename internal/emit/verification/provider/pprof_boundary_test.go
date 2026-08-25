@@ -75,7 +75,7 @@ func Result() (bool, bool, bool, bool) {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsDisabled
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -108,10 +108,10 @@ func Result() (bool, bool, bool, bool) {
 `,
 	)
 	for _, required := range []string{
-		"PprofStartCPUProfileCanonical",
-		"PprofProfileWriteToCanonical",
+		"pprof__from_gostdlib.StartCPUProfile(",
+		"pprof__from_gostdlib.Profile.WriteTo(",
 		"bindPointer<",
-		"await pprof__from_gostdlib.StopCPUProfile()",
+		"pprof__from_gostdlib.StopCPUProfile()",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("runtime/pprof output lacks %q:\n%s", required, artifacts.printed)

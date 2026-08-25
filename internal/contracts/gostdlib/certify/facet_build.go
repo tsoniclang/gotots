@@ -99,6 +99,17 @@ func buildFacet(
 	effect := seed.Effect
 	var callableParameters []gostdlib.ProviderCallableParameterDocument
 	var err error
+	if seed.Kind == gostdlib.FacetDefinedValueOperations {
+		effect, err = definedValueOperationEffect(
+			project,
+			evidence,
+			target,
+			effectMarker,
+		)
+		if err != nil {
+			return gostdlib.FacetDocument{}, err
+		}
+	}
 	if seed.Kind == gostdlib.FacetGenericCallableKernel {
 		operations := genericOperations[seed.SourceIdentity]
 		if err := verifyGenericKernelProjection(

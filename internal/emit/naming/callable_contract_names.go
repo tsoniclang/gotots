@@ -5,11 +5,116 @@ import (
 	"encoding/hex"
 	"go/types"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/output"
 )
+
+func (r *Registry) ProviderCallableEffect(
+	owner *types.Func,
+) (gostdlib.EffectKind, bool, error) {
+	if r == nil || owner == nil {
+		return gostdlib.EffectInvalid, false, &api.NameError{
+			Reason: "provider callable identity is invalid",
+		}
+	}
+	owner = owner.Origin()
+	binding, ok := r.byObject[owner]
+	if !ok || binding.kind == targetBindingMissingProvider ||
+		binding.kind != targetBindingProvider {
+		return gostdlib.EffectInvalid, false, nil
+	}
+	if !binding.providerEffect.Valid() {
+		return gostdlib.EffectInvalid, true, &api.NameError{
+			Name:   owner.Name(),
+			Reason: "certified provider callable effect is absent",
+		}
+	}
+	return binding.providerEffect, true, nil
+}
+
+func (r *Registry) ProviderDefinedCallableEffect(
+	owner *types.TypeName,
+) (gostdlib.EffectKind, bool, error) {
+	if r == nil || owner == nil || owner.IsAlias() {
+		return gostdlib.EffectInvalid, false, &api.NameError{
+			Reason: "provider defined-callable identity is invalid",
+		}
+	}
+	if _, callable := owner.Type().Underlying().(*types.Signature); !callable {
+		return gostdlib.EffectInvalid, false, nil
+	}
+	binding, ok := r.byObject[owner]
+	if !ok || binding.kind == targetBindingMissingProvider ||
+		binding.kind != targetBindingProvider {
+		return gostdlib.EffectInvalid, false, nil
+	}
+	switch binding.providerDefinedValue {
+	case gostdlib.DefinedValueRepresentationCanonical:
+		if !binding.providerEffect.Valid() {
+			return gostdlib.EffectInvalid, true, &api.NameError{
+				Name:   owner.Name(),
+				Reason: "certified provider canonical-callable effect is absent",
+			}
+		}
+		return binding.providerEffect, true, nil
+	case gostdlib.DefinedValueRepresentationOperations:
+		if r.provider == nil || !r.provider.Valid() {
+			return gostdlib.EffectInvalid, true, &api.NameError{
+				Name:   owner.Name(),
+				Reason: "standard-library provider certificate is invalid",
+			}
+		}
+		contract, err := environmentcontract.Describe(owner)
+		if err != nil {
+			return gostdlib.EffectInvalid, true, err
+		}
+		facet, ok := r.provider.Facet(
+			contract.Identity(),
+			gostdlib.FacetDefinedValueOperations,
+			gostdlib.FacetCapabilityProject,
+		)
+		if !ok || facet.SourceIdentity() != contract.Identity() ||
+			facet.Kind() != gostdlib.FacetDefinedValueOperations ||
+			!facet.Effect().Valid() {
+			return gostdlib.EffectInvalid, true, &api.NameError{
+				Name:   owner.Name(),
+				Reason: "certified provider operation-callable effect is absent",
+			}
+		}
+		return facet.Effect(), true, nil
+	default:
+		return gostdlib.EffectInvalid, true, &api.NameError{
+			Name:   owner.Name(),
+			Reason: "provider defined-callable representation is uncertified",
+		}
+	}
+}
+
+func (n *File) ProviderCallableEffect(
+	owner *types.Func,
+) (gostdlib.EffectKind, bool, error) {
+	if n == nil || n.owner == nil || n.owner.registry == nil {
+		return gostdlib.EffectInvalid, false, &api.NameError{
+			Reason: "provider callable-effect registry is unavailable",
+		}
+	}
+	return n.owner.registry.ProviderCallableEffect(owner)
+}
+
+func (n *File) ProviderDefinedCallableEffect(
+	owner *types.TypeName,
+) (gostdlib.EffectKind, bool, error) {
+	if n == nil || n.owner == nil || n.owner.registry == nil {
+		return gostdlib.EffectInvalid, false, &api.NameError{
+			Reason: "provider defined-callable registry is unavailable",
+		}
+	}
+	return n.owner.registry.ProviderDefinedCallableEffect(owner)
+}
 
 func (n *File) GenericCapability(
 	selection api.GenericOperationSelection,

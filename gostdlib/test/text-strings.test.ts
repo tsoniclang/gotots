@@ -198,12 +198,12 @@ test("Replacer value operations preserve shallow Go assignment", () => {
   assert.equal(Replacer.Replace(originalTarget, "a"), "target");
 });
 
-test("strings Lines yields newline-preserving single-use values", async () => {
+test("strings Lines yields newline-preserving single-use values", () => {
   const sequence = Lines("first\nsecond");
   const lines: string[] = [];
   const implementation = sequence.value;
   assert.notEqual(implementation, undefined);
-  await implementation?.(async (line) => {
+  implementation?.((line) => {
     lines.push(line);
     return true;
   });

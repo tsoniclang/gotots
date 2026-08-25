@@ -2,7 +2,6 @@ import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
-  Awaitable,
   bool,
   gostring,
   int64,
@@ -19,7 +18,7 @@ export interface ErrorHandlingValue {
 }
 
 export interface FlagSetValue {
-  Usage: (() => Awaitable<void>) | undefined;
+  Usage: (() => void) | undefined;
 }
 
 interface BooleanBinding {
@@ -119,7 +118,7 @@ export function parseFlags(
     const binding = state.bindings.get(name);
     if (binding === undefined) {
       if (name === "h" || name === "help") {
-        void receiver?.Usage?.();
+        receiver?.Usage?.();
         return failure(state, "flag: help requested");
       }
       return failure(state, `flag provided but not defined: -${name}`);

@@ -119,6 +119,18 @@ type DeclarationOwnershipNames interface {
 	EnvironmentOwnedDeclaration(types.Object) (bool, error)
 }
 
+type ProviderCallableEffectNames interface {
+	ProviderCallableEffect(*types.Func) (gostdlib.EffectKind, bool, error)
+}
+
+type ProviderDefinedCallableEffectNames interface {
+	ProviderDefinedCallableEffect(*types.TypeName) (
+		gostdlib.EffectKind,
+		bool,
+		error,
+	)
+}
+
 type Names interface {
 	DeclarationOwnershipNames
 	Declare(types.Object) (string, error)

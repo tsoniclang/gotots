@@ -24,6 +24,13 @@ func (s Selection) ResolveRecovery(
 		return RecoveryInvocation{}, err
 	}
 	if profiled {
+		if err := providerboundary.RequireSynchronousEffect(
+			context,
+			s.owner.FullName()+" recovery",
+			profileEffect,
+		); err != nil {
+			return RecoveryInvocation{}, err
+		}
 		return RecoveryInvocation{
 			selection: s,
 			requests:  profileRequests,
@@ -35,6 +42,15 @@ func (s Selection) ResolveRecovery(
 	reference, provider, err := context.Names().RecoveryCallable(s.owner)
 	if err != nil {
 		return RecoveryInvocation{}, err
+	}
+	if provider {
+		if err := providerboundary.RequireSynchronousSuspension(
+			context,
+			s.owner.FullName()+" recovery",
+			reference.Cooperative(),
+		); err != nil {
+			return RecoveryInvocation{}, err
+		}
 	}
 	return RecoveryInvocation{
 		selection: s,

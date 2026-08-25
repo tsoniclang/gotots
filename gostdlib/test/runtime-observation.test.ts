@@ -93,7 +93,7 @@ test("runtime profiles write concrete provider observations", async () => {
   const duplicate = StartCPUProfile(writer);
   assert.notEqual(duplicate, undefined);
   assert.match(duplicate?.Error() ?? "", /already in use/u);
-  await StopCPUProfile();
+  StopCPUProfile();
   assert.ok(writer.bytes.length > 0);
   assert.deepEqual(writer.bytes.slice(0, 2), [0x1f, 0x8b]);
   assert.ok(gunzipSync(Uint8Array.from(writer.bytes)).length > 0);

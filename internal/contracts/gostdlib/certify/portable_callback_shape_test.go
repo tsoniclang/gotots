@@ -156,6 +156,57 @@ func TestSynchronousCallbackKernelDenominatorIsClosed(t *testing.T) {
 	}
 }
 
+func TestProviderDefinedCallableEffectDenominatorIsClosed(t *testing.T) {
+	repository, err := filepath.Abs("../../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := os.ReadFile(filepath.Join(
+		repository,
+		"gostdlib",
+		"contract",
+		"manifest.json",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := gostdlib.Parse(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, identity := range []string{
+		"context|kind=2|receiver=|name=CancelCauseFunc",
+		"context|kind=2|receiver=|name=CancelFunc",
+		"io/fs|kind=2|receiver=|name=WalkDirFunc",
+	} {
+		binding, ok := manifest.Binding(identity)
+		if !ok || binding.DefinedValueRepresentation() !=
+			gostdlib.DefinedValueRepresentationCanonical ||
+			binding.Effect() != gostdlib.EffectSynchronous {
+			t.Fatalf("canonical callable %s = %#v, %t", identity, binding, ok)
+		}
+	}
+	for _, identity := range []string{
+		"iter|kind=2|receiver=|name=Seq",
+		"iter|kind=2|receiver=|name=Seq2",
+	} {
+		binding, ok := manifest.Binding(identity)
+		if !ok || binding.DefinedValueRepresentation() !=
+			gostdlib.DefinedValueRepresentationOperations ||
+			binding.Effect() != gostdlib.EffectInvalid {
+			t.Fatalf("operation callable %s = %#v, %t", identity, binding, ok)
+		}
+		facet, ok := manifest.Facet(
+			identity,
+			gostdlib.FacetDefinedValueOperations,
+			gostdlib.FacetCapabilityProject,
+		)
+		if !ok || facet.Effect() != gostdlib.EffectSynchronous {
+			t.Fatalf("operation callable facet %s = %#v, %t", identity, facet, ok)
+		}
+	}
+}
+
 func TestSynchronousCallbackKernelsContainNoCooperativeDispatch(t *testing.T) {
 	repository, err := filepath.Abs("../../../..")
 	if err != nil {

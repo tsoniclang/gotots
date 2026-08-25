@@ -30,6 +30,11 @@ func main() {
 		"disabled",
 		"concurrency semantics",
 	)
+	assembly := flag.String(
+		"assembly",
+		"product",
+		"runtime assembly purpose (product or provider-certification)",
+	)
 	check := flag.Bool("check", false, "verify output without changing it")
 	flag.Parse()
 	if *contractPath == "" || *outputDirectory == "" {
@@ -67,13 +72,30 @@ func main() {
 	if err != nil {
 		fail(err.Error())
 	}
-	assembled, err := runtimeemission.AssemblePackage(
-		tsgo.NewFactory(),
-		scalar,
-		concurrency,
-		requirements.RuntimeSymbols(),
-		requirements.PrimitiveAliases(),
-	)
+	var assembled runtimeemission.Package
+	switch *assembly {
+	case "product":
+		productSymbols, selectionErr := requirements.RuntimeSymbolsFor(concurrency)
+		if selectionErr != nil {
+			fail(selectionErr.Error())
+		}
+		assembled, err = runtimeemission.AssemblePackage(
+			tsgo.NewFactory(),
+			scalar,
+			concurrency,
+			productSymbols,
+			requirements.PrimitiveAliases(),
+		)
+	case "provider-certification":
+		assembled, err = runtimeemission.AssembleProviderCertificationPackage(
+			tsgo.NewFactory(),
+			scalar,
+			requirements.RuntimeSymbols(),
+			requirements.PrimitiveAliases(),
+		)
+	default:
+		fail("runtime assembly purpose is invalid: " + *assembly)
+	}
 	if err != nil {
 		fail(err.Error())
 	}

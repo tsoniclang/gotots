@@ -2,9 +2,14 @@ package emit
 
 import (
 	"go/types"
+	"sort"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	provideroperation "github.com/tsoniclang/gotots/internal/emit/provideroperation"
 	"github.com/tsoniclang/gotots/internal/emit/requirements"
 )
@@ -243,4 +248,124 @@ func (s *programSession) semanticNamedTypeToken(
 		return "", err
 	}
 	return qualifier + "$" + semanticname.Identifier(object.Name()), nil
+}
+
+func (s *programSession) consumeArtifactRequests(
+	consumer api.ArtifactOwner,
+	requests []api.RootRequest,
+) (
+	*targetplacement.Owner,
+	[]api.ArtifactDependency,
+	[]api.RootRequest,
+	error,
+) {
+	placement := targetplacement.New()
+	dependencies := make(map[api.ArtifactDependency]struct{})
+	nonDeclarationRequests, err := api.SelectNonDeclarationRequests(requests)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	err = api.WalkUniqueRootRequestPayloads(
+		nonDeclarationRequests,
+		func(request api.RootRequest) error {
+			switch request.Kind() {
+			case api.RootRequestImport:
+				return placement.Apply([]api.RootRequest{request})
+			case api.RootRequestArtifactDependency:
+				dependency, ok := request.ArtifactDependency()
+				if !ok {
+					return &ScheduleError{
+						Object: consumer.Name(),
+						Reason: "artifact dependency is invalid",
+					}
+				}
+				if _, duplicate := dependencies[dependency]; duplicate {
+					return nil
+				}
+				if err := s.prepareArtifactDependency(dependency); err != nil {
+					return err
+				}
+				dependencies[dependency] = struct{}{}
+			default:
+				return &ScheduleError{
+					Object: consumer.Name(),
+					Reason: "root request kind is invalid",
+				}
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	selectedDependencies := make(
+		[]api.ArtifactDependency,
+		0,
+		len(dependencies),
+	)
+	for dependency := range dependencies {
+		selectedDependencies = append(selectedDependencies, dependency)
+	}
+	sort.Slice(selectedDependencies, func(left, right int) bool {
+		order := emitordering.CompareArtifactOwners(
+			selectedDependencies[left].Provider(),
+			selectedDependencies[right].Provider(),
+		)
+		if order != 0 {
+			return order < 0
+		}
+		return selectedDependencies[left].Facet() <
+			selectedDependencies[right].Facet()
+	})
+	selectedRequests, err := api.SelectDeclarationRequests(requests)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if err := s.prepareDeclarationRequestGraph(
+		consumer,
+		selectedRequests,
+	); err != nil {
+		return nil, nil, nil, err
+	}
+	return placement,
+		selectedDependencies,
+		selectedRequests,
+		nil
+}
+
+func (s *programSession) prepareArtifactDependency(
+	dependency api.ArtifactDependency,
+) error {
+	sourceObject, sourceProvider := dependency.Provider().Source()
+	if sourceProvider {
+		_, sourceProvider = s.sites[sourceObject]
+		sourceProvider = sourceProvider ||
+			s.environmentArtifactSource(sourceObject)
+	}
+	generated, generatedProvider := dependency.Provider().Generated()
+	if generatedProvider {
+		generatedProvider =
+			s.validateGeneratedArtifact(generated) == nil &&
+				(generated.Placement() ==
+					api.GeneratedArtifactPlacementCompilation ||
+					generated.Placement() ==
+						api.GeneratedArtifactPlacementContract)
+	}
+	if !sourceProvider && !generatedProvider {
+		return &ScheduleError{
+			Object: dependency.Provider().Name(),
+			Reason: "artifact dependency provider has no reconstructible declaration",
+		}
+	}
+	if !sourceProvider {
+		return nil
+	}
+	return s.RequireUse(
+		sourceObject,
+		environmentcontract.ArtifactFacetUseDemand(
+			dependency.Facet(),
+			sourceObject,
+		),
+		gostdlib.NoUseSelection(),
+	)
 }

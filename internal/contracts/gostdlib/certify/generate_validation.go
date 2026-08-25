@@ -83,18 +83,7 @@ func verifyProviderBoundaryCoverage(
 	if err := verifyCallableParameterBindings(source, modules); err != nil {
 		return err
 	}
-	if err := verifyCallableParameterProfileCoverage(
-		source,
-		modules,
-		facets,
-	); err != nil {
-		return err
-	}
-	if err := verifyInterfaceParameterProfileCoverage(
-		source,
-		modules,
-		facets,
-	); err != nil {
+	if err := verifyDefinedCallableEffects(source, modules, facets); err != nil {
 		return err
 	}
 	return verifyProviderProfileInterfaceClosure(source, modules, facets)

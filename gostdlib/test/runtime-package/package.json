@@ -6,7 +6,7 @@
   "gotots": {
     "integerRepresentation": "number",
     "nativeIntegerBits": 64,
-    "concurrencySemantics": "disabled"
+    "concurrencySemantics": "provider-certification"
   },
   "exports": {
     "./array.js": "./array.js",

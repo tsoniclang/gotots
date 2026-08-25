@@ -5,14 +5,13 @@ import type {
 } from "@gotots/runtime/interface-value.js";
 import { GoInterfaceValue as InterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { GoRecovery } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool } from "@gotots/gostdlib/internal/scalars.js";
 import { GoEmptyStruct } from "@gotots/runtime/struct.js";
 import { ProviderError } from "../../runtime/error.js";
 import { goInterfaceEqual } from "../../runtime/interface.js";
 import { ProviderChannel } from "../concurrency/channel.js";
 import { propagateCancel } from "./propagation.js";
-import { After } from "../time/timer.js";
+import { AfterFunc as scheduleAfter } from "../time/timer.js";
 import { Duration } from "../time/duration.js";
 import { Now, Time } from "../time/time.js";
 
@@ -212,10 +211,10 @@ class ValueContext extends ContextValue {
 const background = new EmptyContext("context.Background");
 const todo = new EmptyContext("context.TODO");
 
-export type CancelFunc = (() => Awaitable<void>) | undefined;
+export type CancelFunc = (() => void) | undefined;
 export type CancelCauseFunc = ((
   cause: GoError | undefined,
-) => Awaitable<void>) | undefined;
+) => void) | undefined;
 
 export function Background(): Context {
   return background;
@@ -229,7 +228,7 @@ export function WithCancel(
   parent: Context | undefined,
 ): [Context, NonNullable<CancelFunc>] {
   const child = new CancelContext(requireParent(parent), undefined);
-  return [child, async (): Promise<void> => child.cancel(canceled, canceled)];
+  return [child, (): void => child.cancel(canceled, canceled)];
 }
 
 export function WithCancelCause(
@@ -238,7 +237,7 @@ export function WithCancelCause(
   const child = new CancelContext(requireParent(parent), undefined);
   return [
     child,
-    async (cause: GoError | undefined): Promise<void> =>
+    (cause: GoError | undefined): void =>
       child.cancel(canceled, cause ?? canceled),
   ];
 }
@@ -254,9 +253,11 @@ export function WithTimeout(
     ? parentDeadline
     : requestedDeadline;
   const child = new CancelContext(actualParent, deadline);
-  void After(deadline.Sub(Now())).receive().then(() =>
-    child.cancel(deadlineExceeded, deadlineExceeded));
-  return [child, async (): Promise<void> => child.cancel(canceled, canceled)];
+  scheduleAfter(
+    deadline.Sub(Now()),
+    (): void => child.cancel(deadlineExceeded, deadlineExceeded),
+  );
+  return [child, (): void => child.cancel(canceled, canceled)];
 }
 
 export function Cause(ctx: Context | undefined): GoError | undefined {
@@ -276,27 +277,39 @@ export function WithValue(
 
 export function AfterFunc(
   ctx: Context | undefined,
-  f: (() => Awaitable<void>) | undefined,
+  f: (() => void) | undefined,
 ): () => bool {
   const done = requireParent(ctx).Done();
   let stopped = false;
   let started = false;
+  let unsubscribe = (): void => undefined;
   if (done !== undefined) {
-    void done.receive().then(async () => {
-      if (!stopped) {
-        started = true;
-        if (f === undefined) {
-          GoPanic.raiseRuntime("context.AfterFunc called with nil function");
-        }
-        await f();
+    const run = (): void => {
+      if (f === undefined) {
+        GoPanic.raiseRuntime("context.AfterFunc called with nil function");
       }
-    });
+      f();
+    };
+    const selected = done.$selectReceive(run);
+    if (selected.ready()) {
+      started = true;
+      selected.commit();
+    } else {
+      unsubscribe = selected.subscribe((): boolean => {
+        if (stopped || started) {
+          return false;
+        }
+        started = true;
+        return true;
+      });
+    }
   }
   return (): bool => {
     if (started || stopped) {
       return false;
     }
     stopped = true;
+    unsubscribe();
     return true;
   };
 }

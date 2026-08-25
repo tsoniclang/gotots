@@ -1,6 +1,6 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool } from "@gotots/gostdlib/internal/scalars.js";
 
 import { goInterfaceEqual } from "../../runtime/interface.js";
 
@@ -50,18 +50,18 @@ export class Map {
     return [value, false];
   }
 
-  static async Range(
+  static Range(
     receiver: Map | undefined,
     f: ((
       key: GoInterfaceValue | undefined,
       value: GoInterfaceValue | undefined,
-    ) => Awaitable<bool>) | undefined,
-  ): Promise<void> {
+    ) => bool) | undefined,
+  ): void {
     if (f === undefined) {
       GoPanic.raiseRuntime("sync.Map.Range called with nil function");
     }
     for (const entry of [...Map.#require(receiver).#entries]) {
-      if (!await f(entry.key, entry.value)) {
+      if (!f(entry.key, entry.value)) {
         return;
       }
     }

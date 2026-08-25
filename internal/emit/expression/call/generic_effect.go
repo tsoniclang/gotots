@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
+	genericeffect "github.com/tsoniclang/gotots/internal/emit/generic/effect"
 )
 
 type genericConcretizationEffectSelection struct {
@@ -22,6 +23,16 @@ func selectGenericConcretizationEffect(
 ) (genericConcretizationEffectSelection, error) {
 	canonical := genericConcretizationEffectSelection{
 		effect: api.GenericConcretizationEffectCanonical,
+	}
+	profile, err := genericeffect.ForExecutionProfile(context, owner)
+	if err != nil {
+		return genericConcretizationEffectSelection{}, err
+	}
+	if profile.Effect().Synchronous() {
+		return genericConcretizationEffectSelection{
+			effect:                profile.Effect(),
+			synchronousParameters: profile.SynchronousParameters(),
+		}, nil
 	}
 	if detached || source == nil {
 		return canonical, nil
@@ -49,13 +60,13 @@ func selectGenericConcretizationEffect(
 		}
 		requests = append(requests, selectedRequests...)
 		if !synchronous {
-			canonical.requests = api.CombineRequests(requests)
+			canonical.requests = api.CombineRequests(canonical.requests, requests)
 			return canonical, nil
 		}
 	}
 	return genericConcretizationEffectSelection{
 		effect:                api.GenericConcretizationEffectSynchronous,
 		synchronousParameters: indexes,
-		requests:              api.CombineRequests(requests),
+		requests:              api.CombineRequests(canonical.requests, requests),
 	}, nil
 }

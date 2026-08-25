@@ -4,6 +4,8 @@ import "fmt"
 
 func validateBinding(binding BindingDocument, field string) error {
 	requiresEffect := binding.Kind == BindingFunction
+	allowsDefinedCallableEffect := binding.Kind == BindingType &&
+		binding.DefinedValue == DefinedValueRepresentationCanonical
 	switch {
 	case binding.Identity == "":
 		return manifestError(field+".identity", "value is empty")
@@ -36,8 +38,12 @@ func validateBinding(binding BindingDocument, field string) error {
 		)
 	case requiresEffect && !binding.Effect.Valid():
 		return manifestError(field+".effect", "callable effect is invalid")
-	case !requiresEffect && binding.Effect != EffectInvalid:
+	case !requiresEffect && !allowsDefinedCallableEffect &&
+		binding.Effect != EffectInvalid:
 		return manifestError(field+".effect", "non-callable has an effect")
+	case allowsDefinedCallableEffect && binding.Effect != EffectInvalid &&
+		!binding.Effect.Valid():
+		return manifestError(field+".effect", "defined-callable effect is invalid")
 	case binding.ProviderInterface != nil &&
 		(binding.Kind != BindingType || binding.Access != AccessExport ||
 			binding.Representation != RepresentationDirect):

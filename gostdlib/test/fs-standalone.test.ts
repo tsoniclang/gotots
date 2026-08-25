@@ -205,7 +205,7 @@ test("filesystem functions read, stat, sort, and walk", async () => {
   );
 
   const visited: string[] = [];
-  const walkFailure = await WalkDir(fileSystem, ".", async (path) => {
+  const walkFailure = WalkDir(fileSystem, ".", (path) => {
     visited.push(path);
     return undefined;
   });

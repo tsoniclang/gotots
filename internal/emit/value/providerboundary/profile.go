@@ -94,6 +94,12 @@ func ResolveCallableProfile(
 	for _, candidate := range candidates {
 		required = required || candidate.Profile().Required()
 	}
+	if context.ConcurrencySemantics() == api.ConcurrencySemanticsDisabled &&
+		!required {
+		return CallableProfileSelection{
+			requests: api.CombineRequests(base.analyzer.requests),
+		}, false, nil
+	}
 	if len(canonicalParameters) == 0 && !required {
 		return CallableProfileSelection{
 			requests: api.CombineRequests(base.analyzer.requests),
@@ -170,6 +176,13 @@ func ResolveCallableProfile(
 			context,
 			"provider callable-profile reference diverged from its selected candidate",
 		)
+	}
+	if err := RequireSynchronousEffect(
+		context,
+		selected.profile.ProfileKey(),
+		selected.profile.Effect(),
+	); err != nil {
+		return CallableProfileSelection{}, false, err
 	}
 	return CallableProfileSelection{
 		reference: reference,

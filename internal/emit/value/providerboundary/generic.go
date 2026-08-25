@@ -450,6 +450,9 @@ func fromProviderGenericCallable(
 	model definedtype.Model,
 	source api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	if err := RequireProviderDefinedCallableOutput(context, model); err != nil {
+		return api.ExpressionEmission{}, false, err
+	}
 	target, err := callable.EmitABIAdapter(context, children, nil, concrete)
 	if err != nil {
 		return api.ExpressionEmission{}, false, err

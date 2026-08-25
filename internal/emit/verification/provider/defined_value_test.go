@@ -233,6 +233,63 @@ func RewindMapIterator(value reflect.Value) bool {
 	}
 }
 
+func TestProviderSequenceRequiresExactCallableEffect(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/providersequence\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package providersequence
+
+import "slices"
+
+func Values(yield func(int) bool) {
+	yield(1)
+}
+
+func Collect() []int {
+	return slices.Collect(Values)
+}
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := emit.DefaultOptions()
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
+	options.StandardLibrary = linkedProviderCertificate(t)
+	_, err = emit.CompileWithOptions(
+		program,
+		[]emit.Root{mustProviderRoot(
+			t,
+			program.Roots()[0].Types().Scope().Lookup("Collect"),
+		)},
+		options,
+	)
+	if err == nil || !strings.Contains(
+		err.Error(),
+		"provider defined-callable input effect is sync, want awaitable for Seq",
+	) {
+		t.Fatalf("cooperative direct-sequence error = %v", err)
+	}
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsDisabled
+	if _, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{mustProviderRoot(
+			t,
+			program.Roots()[0].Types().Scope().Lookup("Collect"),
+		)},
+		options,
+	); err != nil {
+		t.Fatalf("disabled direct-sequence compile: %v", err)
+	}
+}
+
 func TestAtomicComparableFacetsMatchGo(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
@@ -408,7 +465,7 @@ func Facts() string {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsDisabled
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,

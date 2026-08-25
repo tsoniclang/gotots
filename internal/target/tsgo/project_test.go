@@ -66,6 +66,14 @@ export type GenericAsyncCallable<
     (() => Promise<void>) | undefined,
 > = Value;
 
+export function SyncCallableFactory(): () => number {
+  return () => 1;
+}
+
+export function AwaitableCallableFactory(): () => number | Promise<number> {
+  return () => 1;
+}
+
 export function Invoke(
   direct: (value: number) => boolean,
   cooperative: (value: number) => boolean | Promise<boolean>,
@@ -115,6 +123,7 @@ void Hidden;
 	writeProjectFile(t, entryPath, `export {
   AsyncCallable,
   AwaitableCallable,
+  AwaitableCallableFactory,
   AwaitableUnionCallable,
   Box,
   Effects,
@@ -132,6 +141,7 @@ void Hidden;
   RequiredCapabilityView,
   ConsumeSupport,
   SyncCallable,
+  SyncCallableFactory,
   Value,
 } from "./implementation.js";
 export const count: number = 1;
@@ -235,7 +245,7 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			) {
 				t.Fatalf("Shape members = %#v", selected)
 			}
-		case "AsyncCallable", "AwaitableCallable", "AwaitableUnionCallable", "CapabilitySource", "CapabilityTarget", "CapabilityView", "ConsumeSupport", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "Invoke", "NumericAlias", "RequiredCapabilityView", "SupportContract", "SyncCallable":
+		case "AsyncCallable", "AwaitableCallable", "AwaitableCallableFactory", "AwaitableUnionCallable", "CapabilitySource", "CapabilityTarget", "CapabilityView", "ConsumeSupport", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "Invoke", "NumericAlias", "RequiredCapabilityView", "SupportContract", "SyncCallable", "SyncCallableFactory":
 			continue
 		}
 		if !slices.Equal(
@@ -262,6 +272,7 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 		[]string{
 			"AsyncCallable",
 			"AwaitableCallable",
+			"AwaitableCallableFactory",
 			"AwaitableUnionCallable",
 			"Box",
 			"CapabilitySource",
@@ -279,6 +290,7 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			"Shape",
 			"SupportContract",
 			"SyncCallable",
+			"SyncCallableFactory",
 			"Value",
 			"count",
 			"state",
@@ -393,6 +405,24 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 	syncEffect, err := project.CallableEffect(sync, marker)
 	if err != nil || syncEffect != CallableEffectSynchronous {
 		t.Fatalf("sync effect = %v, %v", syncEffect, err)
+	}
+	syncFactory := projectExportByName(t, exports, "SyncCallableFactory")
+	syncEffect, err = project.CallableReturnEffect(syncFactory, marker)
+	if err != nil || syncEffect != CallableEffectSynchronous {
+		t.Fatalf("sync factory return effect = %v, %v", syncEffect, err)
+	}
+	awaitableFactory := projectExportByName(
+		t,
+		exports,
+		"AwaitableCallableFactory",
+	)
+	awaitableEffect, err = project.CallableReturnEffect(awaitableFactory, marker)
+	if err != nil || awaitableEffect != CallableEffectAwaitable {
+		t.Fatalf(
+			"awaitable factory return effect = %v, %v",
+			awaitableEffect,
+			err,
+		)
 	}
 	effects := projectExportByName(t, exports, "Effects")
 	asyncMember, ok := effects.ValueMember("Async")

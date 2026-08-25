@@ -97,6 +97,103 @@ func TestDefinedValueRepresentationsAreTotalAndExclusive(t *testing.T) {
 	}
 }
 
+func TestDefinedCallableEffectsExactJoinRepresentations(t *testing.T) {
+	canonicalIdentity := "example|kind=2|receiver=|name=CanonicalAction"
+	operationCallableIdentity := "example|kind=2|receiver=|name=OperationAction"
+	operationValueIdentity := "example|kind=2|receiver=|name=OperationCount"
+	source := goSurface{objects: map[string]goObject{
+		canonicalIdentity: {
+			object: testDefinedType("CanonicalAction", testSignature()),
+		},
+		operationCallableIdentity: {
+			object: testDefinedType("OperationAction", testSignature()),
+		},
+		operationValueIdentity: {
+			object: testDefinedType("OperationCount", types.Typ[types.Int]),
+		},
+	}}
+	modules := []gostdlib.ModuleDocument{{
+		Bindings: []gostdlib.BindingDocument{
+			{
+				Identity:     canonicalIdentity,
+				Kind:         gostdlib.BindingType,
+				Access:       gostdlib.AccessExport,
+				DefinedValue: gostdlib.DefinedValueRepresentationCanonical,
+				Effect:       gostdlib.EffectSynchronous,
+			},
+			{
+				Identity:     operationCallableIdentity,
+				Kind:         gostdlib.BindingType,
+				Access:       gostdlib.AccessExport,
+				DefinedValue: gostdlib.DefinedValueRepresentationOperations,
+			},
+			{
+				Identity:     operationValueIdentity,
+				Kind:         gostdlib.BindingType,
+				Access:       gostdlib.AccessExport,
+				DefinedValue: gostdlib.DefinedValueRepresentationOperations,
+			},
+		},
+	}}
+	facets := []gostdlib.FacetModuleDocument{{
+		Facets: []gostdlib.FacetDocument{
+			{
+				Kind:           gostdlib.FacetDefinedValueOperations,
+				SourceIdentity: operationCallableIdentity,
+				Effect:         gostdlib.EffectSynchronous,
+			},
+			{
+				Kind:           gostdlib.FacetDefinedValueOperations,
+				SourceIdentity: operationValueIdentity,
+			},
+		},
+	}}
+	if err := verifyDefinedCallableEffects(source, modules, facets); err != nil {
+		t.Fatal(err)
+	}
+
+	missingCanonical := append([]gostdlib.ModuleDocument(nil), modules...)
+	missingCanonical[0].Bindings = append(
+		[]gostdlib.BindingDocument(nil),
+		modules[0].Bindings...,
+	)
+	missingCanonical[0].Bindings[0].Effect = gostdlib.EffectInvalid
+	if err := verifyDefinedCallableEffects(
+		source,
+		missingCanonical,
+		facets,
+	); err == nil || !strings.Contains(err.Error(), "canonical callable effect") {
+		t.Fatalf("missing canonical effect error = %v", err)
+	}
+
+	extraOperation := append([]gostdlib.FacetModuleDocument(nil), facets...)
+	extraOperation[0].Facets = append(
+		[]gostdlib.FacetDocument(nil),
+		facets[0].Facets...,
+	)
+	extraOperation[0].Facets[1].Effect = gostdlib.EffectSynchronous
+	if err := verifyDefinedCallableEffects(
+		source,
+		modules,
+		extraOperation,
+	); err == nil || !strings.Contains(err.Error(), "operation callable effect") {
+		t.Fatalf("extra operation effect error = %v", err)
+	}
+
+	missingOperation := append([]gostdlib.FacetModuleDocument(nil), facets...)
+	missingOperation[0].Facets = append(
+		[]gostdlib.FacetDocument(nil),
+		facets[0].Facets[1:]...,
+	)
+	if err := verifyDefinedCallableEffects(
+		source,
+		modules,
+		missingOperation,
+	); err == nil || !strings.Contains(err.Error(), "operation callable effect") {
+		t.Fatalf("missing operation effect error = %v", err)
+	}
+}
+
 func testDefinedType(name string, underlying types.Type) *types.TypeName {
 	object := types.NewTypeName(
 		token.NoPos,

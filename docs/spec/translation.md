@@ -1092,7 +1092,18 @@ execution is serial. A goroutine call is emitted as a direct call; ready
 buffered send/receive and ready/default select complete synchronously. A nil,
 unbuffered, full, empty, or otherwise unready operation that would suspend
 raises the exact synchronous-blocking boundary instead of fabricating progress.
-No `Promise`, `async`, `await`, scheduler, or host task is emitted.
+That language-concurrency path emits no `Promise`, `async`, `await`, scheduler,
+or host task. Explicit event-based provider APIs such as timers retain their
+separately certified host behavior without changing the source call's direct
+signature.
+
+The same profile decision owns the complete callable surface. Source functions,
+methods, literals, callable values, interface methods, generated callable
+contracts, package initializers, provider facades, and selected generic kernels
+all have direct synchronous signatures at construction. Provider bindings and
+stateful profiles are selected by exact certified identity and must report a
+synchronous effect. A suspending provider path fails before publication; no
+consumer repairs a Promise-bearing declaration or call afterward.
 
 Under `cooperative`, channel send/receive and blocking select lower to typed
 Promise operations. Direct call effects propagate through revisable callable
@@ -1152,11 +1163,22 @@ failure := fs.WalkDir(fileSystem, ".", visit)
 emits a call with the same three Go arguments:
 
 ```ts
-const failure = await io_fs.WalkDir(fileSystem, ".", visit);
+const failure = io_fs.WalkDir(fileSystem, ".", visit);
 ```
 
 The generated `io_fs.WalkDir` facade may statically import provider bridges
-or a private provider kernel, but no call site supplies a policy object.
+or a private provider kernel, but no call site supplies a policy object. A
+cooperative product has a separately certified Promise-bearing provider
+contract and emits the corresponding `await`; it is not a fallback for the
+disabled profile.
+
+A provider-defined callable type is joined by identity to the certified effect
+of its target carrier. For example, a direct `iter.Seq[int]` carrier accepts a
+direct generated sequence under the disabled profile. A cooperative generated
+sequence cannot be passed to that carrier: compilation stops before constructing
+the call AST unless the provider exposes a separately certified `Awaitable`
+carrier. The compiler never inserts a cast, tests for `Promise`, or infers this
+contract from `Seq` spelling.
 
 Every standard-library or toolchain reference selects exactly one
 implementation route—provider binding, compiler intrinsic, generated runtime

@@ -180,6 +180,97 @@ func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
 	}
 }
 
+func TestProviderCertificationRuntimeHasOneExactHybridContract(t *testing.T) {
+	assembled, err := AssembleProviderCertificationPackage(
+		tsgo.NewFactory(),
+		testScalarABI(t, api.IntegerRepresentationNumber),
+		map[api.RuntimeSymbol]struct{}{
+			api.RuntimeAwaitable:        {},
+			api.RuntimeBuiltinErrorType: {},
+			api.RuntimeReceiveChannel:   {},
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		GoToTS struct {
+			ConcurrencySemantics string `json:"concurrencySemantics"`
+		} `json:"gotots"`
+	}
+	if err := json.Unmarshal(assembled.Manifest(), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.GoToTS.ConcurrencySemantics != "provider-certification" {
+		t.Fatalf(
+			"provider certification semantics = %q",
+			manifest.GoToTS.ConcurrencySemantics,
+		)
+	}
+
+	var errorResult tsgo.TypeNode
+	var receiveResult tsgo.TypeNode
+	var awaitable bool
+	for _, file := range assembled.Files() {
+		for _, statement := range file.SourceFile().Statements() {
+			switch declaration := statement.(type) {
+			case tsgo.TypeAliasDeclaration:
+				awaitable = awaitable || declaration.Name().Text() == "Awaitable"
+			case tsgo.InterfaceDeclaration:
+				for _, member := range declaration.Members() {
+					method, ok := member.(tsgo.MethodSignatureDeclaration)
+					if !ok {
+						continue
+					}
+					name, ok := method.Name().(tsgo.Identifier)
+					if !ok {
+						continue
+					}
+					switch {
+					case declaration.Name().Text() == "GoError" && name.Text() == "Error":
+						errorResult = method.Type()
+					case declaration.Name().Text() == "GoReceiveChannel" && name.Text() == "receive":
+						receiveResult = method.Type()
+					}
+				}
+			}
+		}
+	}
+	if !awaitable {
+		t.Fatal("provider certification runtime lacks cooperative Awaitable support")
+	}
+	if errorResult == nil ||
+		errorResult.Kind() != tsgo.SyntaxKindStringKeyword {
+		t.Fatalf("provider GoError result = %T", errorResult)
+	}
+	reference, ok := receiveResult.(tsgo.TypeReferenceNode)
+	if !ok || reference.TypeName().(tsgo.Identifier).Text() != "Promise" {
+		t.Fatalf("provider receive result = %T", receiveResult)
+	}
+}
+
+func TestDisabledErrorRuntimeDoesNotDemandAwaitable(t *testing.T) {
+	assembled, err := AssemblePackage(
+		tsgo.NewFactory(),
+		testScalarABI(t, api.IntegerRepresentationNumber),
+		api.ConcurrencySemanticsDisabled,
+		map[api.RuntimeSymbol]struct{}{api.RuntimeBuiltinErrorType: {}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range assembled.Files() {
+		for _, statement := range file.SourceFile().Statements() {
+			alias, ok := statement.(tsgo.TypeAliasDeclaration)
+			if ok && alias.Name().Text() == "Awaitable" {
+				t.Fatal("disabled error runtime retained Awaitable")
+			}
+		}
+	}
+}
+
 func testScalarABI(
 	t *testing.T,
 	profile api.IntegerRepresentation,
@@ -245,6 +336,8 @@ func TestDependencyClosureIncludesEveryTransitiveOwner(t *testing.T) {
 	closure, err := dependencyClosure(map[api.RuntimeSymbol]struct{}{
 		api.RuntimeArray:         {},
 		api.RuntimeIntegerDivide: {},
+	}, func(api.RuntimeModule) api.ConcurrencySemantics {
+		return api.ConcurrencySemanticsDisabled
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -275,6 +368,7 @@ func TestModuleImportsExactDependencyContract(t *testing.T) {
 		"runtime/array.ts",
 		api.RuntimeModuleArray,
 		[]api.RuntimeSymbol{api.RuntimeArray},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)

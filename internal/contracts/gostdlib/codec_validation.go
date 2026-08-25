@@ -61,7 +61,7 @@ func validateFacet(facet FacetDocument, field string) error {
 		if len(facet.Capabilities) != 2 ||
 			facet.Capabilities[0] != FacetCapabilityProject ||
 			facet.Capabilities[1] != FacetCapabilityWrap ||
-			facet.Effect != EffectInvalid ||
+			(facet.Effect != EffectInvalid && !facet.Effect.Valid()) ||
 			len(facet.CallableParameters) != 0 ||
 			len(facet.GenericTypeArguments) != 0 ||
 			facet.ResultExport != "" || facet.ResultImplementationOwner != "" ||

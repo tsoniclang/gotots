@@ -262,15 +262,9 @@ func assertProviderReceiverProjection(
 			t.Fatalf("stored provider receiver lacks %q:\n%s", stored, printed)
 		}
 	}
-	for _, projected := range []string{
-		"await sync__from_gostdlib.Mutex.Lock(",
-	} {
-		if !strings.Contains(printed, projected) {
-			t.Fatalf("stored provider receiver lacks %q:\n%s", projected, printed)
-		}
-	}
 	for _, bypass := range []string{
 		"GoPointer.",
+		"await sync__from_gostdlib.Mutex.Lock(",
 		"await strings__from_gostdlib.Builder.Len(",
 		"SyncMutexOperations.$fromStorage(__gotots_receiver_",
 		"StringsBuilderOperations.$fromStorage(__gotots_receiver_",

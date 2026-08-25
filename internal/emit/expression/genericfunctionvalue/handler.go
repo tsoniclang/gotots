@@ -9,6 +9,7 @@ import (
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
+	genericeffect "github.com/tsoniclang/gotots/internal/emit/generic/effect"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -48,6 +49,11 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	effectSelection, err := genericeffect.ForExecutionProfile(context, owner)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	synchronousParameters := effectSelection.SynchronousParameters()
 	var (
 		reference              api.NameReference
 		deferredReference      api.NameReference
@@ -73,7 +79,7 @@ func Emit(
 			owner,
 			instance.TypeArgs,
 			signature,
-			api.GenericConcretizationEffectCanonical,
+			effectSelection.Effect(),
 		)
 		if concreteErr != nil {
 			return api.ExpressionEmission{}, true, concreteErr
@@ -82,7 +88,7 @@ func Emit(
 			concrete.Name(),
 			concrete.Requests()...,
 		)
-		if err == nil {
+		if err == nil && !effectSelection.Effect().Synchronous() {
 			concretizationNames, available :=
 				context.Names().(api.GenericConcretizationNames)
 			if !available {
@@ -110,8 +116,12 @@ func Emit(
 				Reason: "generic kernel names are unavailable",
 			}
 		}
-		reference, err = kernelNames.GenericKernel(owner)
-		if err == nil {
+		if effectSelection.Effect().Synchronous() {
+			reference, err = kernelNames.SynchronousGenericKernel(owner)
+		} else {
+			reference, err = kernelNames.GenericKernel(owner)
+		}
+		if err == nil && !effectSelection.Effect().Synchronous() {
 			deferredTarget, err =
 				kernelNames.DeferredGenericKernel(owner)
 			if err == nil {
@@ -157,20 +167,33 @@ func Emit(
 				Reason: "generic mechanics reached a source-facing function value",
 			}
 		}
-		reference, callableFacet, err =
-			cooperativecall.SelectGenericCallable(context, owner)
-		if err == nil {
+		if effectSelection.Effect().Synchronous() {
 			kernelNames, available := context.Names().(api.GenericKernelNames)
 			if !available {
 				return api.ExpressionEmission{}, true, &api.ContextError{
-					Reason: "generic callable variant names are unavailable",
+					Reason: "generic kernel names are unavailable",
 				}
 			}
-			deferredTarget, err =
-				kernelNames.DeferredGenericCallable(owner)
+			reference, err = kernelNames.SynchronousGenericKernel(owner)
 			if err == nil {
-				deferredReference = deferredTarget.Reference()
-				deferredTargetSelected = true
+				callableFacet, err = api.NewSourceCallableFacet(owner)
+			}
+		} else {
+			reference, callableFacet, err =
+				cooperativecall.SelectGenericCallable(context, owner)
+			if err == nil {
+				kernelNames, available := context.Names().(api.GenericKernelNames)
+				if !available {
+					return api.ExpressionEmission{}, true, &api.ContextError{
+						Reason: "generic callable variant names are unavailable",
+					}
+				}
+				deferredTarget, err =
+					kernelNames.DeferredGenericCallable(owner)
+				if err == nil {
+					deferredReference = deferredTarget.Reference()
+					deferredTargetSelected = true
+				}
 			}
 		}
 		if err == nil {
@@ -201,7 +224,9 @@ func Emit(
 	}
 	providerCooperative := false
 	var contractRequests []api.RootRequest
-	if synchronousBoundary {
+	if effectSelection.Effect().Synchronous() {
+		providerCooperative = false
+	} else if synchronousBoundary {
 		sourceFacet, facetErr := api.NewSourceCallableFacet(owner)
 		if facetErr != nil {
 			return api.ExpressionEmission{}, true, facetErr
@@ -229,12 +254,23 @@ func Emit(
 			return api.ExpressionEmission{}, true, err
 		}
 	}
-	target, err := callable.EmitABIAdapter(
-		context,
-		children,
-		source,
-		signature,
-	)
+	var target callable.SignatureEmission
+	if effectSelection.Effect().Synchronous() {
+		target, err = callable.EmitAdapterWithSynchronousParameters(
+			context,
+			children,
+			source,
+			signature,
+			synchronousParameters,
+		)
+	} else {
+		target, err = callable.EmitABIAdapter(
+			context,
+			children,
+			source,
+			signature,
+		)
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
@@ -266,6 +302,7 @@ func Emit(
 		sourceArguments,
 		contract,
 		signature,
+		synchronousParameters,
 		providerCooperative,
 		nil,
 		api.DeferredGenericRecoveryInvalid,
@@ -294,6 +331,12 @@ func Emit(
 			)...,
 		), true, nil
 	}
+	if effectSelection.Effect().Synchronous() {
+		return api.ExpressionEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "synchronous provider generic function value requires recovery transport",
+		}
+	}
 	recovery, recoveryRequests, err :=
 		callable.RecoveryAuthorityParameter(context)
 	if err != nil {
@@ -319,6 +362,7 @@ func Emit(
 		sourceArguments,
 		contract,
 		signature,
+		nil,
 		providerCooperative,
 		recoveryValue,
 		recoveryPlacement,
@@ -379,6 +423,7 @@ func kernelValueInvocation(
 	sourceArguments []tsgo.Expression,
 	contract *types.Signature,
 	signature *types.Signature,
+	synchronousParameters []int,
 	cooperative bool,
 	recovery tsgo.Expression,
 	recoveryPlacement api.DeferredGenericRecoveryPlacement,
@@ -388,14 +433,26 @@ func kernelValueInvocation(
 	var requests []api.RootRequest
 	var err error
 	if reference.ProviderBoundary() {
-		arguments, before, requests, err =
-			providerboundary.ToProviderGenericArguments(
-				context,
-				children,
-				contract.Params(),
-				signature.Params(),
-				sourceArguments,
-			)
+		if len(synchronousParameters) != 0 {
+			arguments, before, requests, err =
+				providerboundary.ToProviderGenericArgumentsWithSynchronousParameters(
+					context,
+					children,
+					contract.Params(),
+					signature.Params(),
+					sourceArguments,
+					synchronousParameters,
+				)
+		} else {
+			arguments, before, requests, err =
+				providerboundary.ToProviderGenericArguments(
+					context,
+					children,
+					contract.Params(),
+					signature.Params(),
+					sourceArguments,
+				)
+		}
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}

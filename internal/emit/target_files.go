@@ -476,7 +476,11 @@ func (r *targetRequirements) addProviderRuntime(s *programSession) error {
 	for _, alias := range requirements.PrimitiveAliases() {
 		r.primitiveAliases[alias] = struct{}{}
 	}
-	for symbol := range requirements.RuntimeSymbols() {
+	selectedSymbols, err := requirements.RuntimeSymbolsFor(s.concurrency)
+	if err != nil {
+		return err
+	}
+	for symbol := range selectedSymbols {
 		r.runtimeSymbols[symbol] = struct{}{}
 	}
 	return nil

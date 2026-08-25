@@ -62,18 +62,16 @@ func Build(
 	if !concurrency.Valid() {
 		return nil, &AssemblyError{Reason: "runtime concurrency profile is invalid"}
 	}
+	for _, symbol := range symbols {
+		if err := requireRuntimeSymbolAvailable(symbol, concurrency); err != nil {
+			return nil, err
+		}
+	}
 	if module == api.RuntimeModuleScalar {
 		if len(symbols) != 1 || symbols[0] != api.RuntimeAwaitable {
 			return nil, &AssemblyError{
 				Module: module,
 				Reason: "scalar runtime requires its one exact symbol",
-			}
-		}
-		if concurrency != api.ConcurrencySemanticsCooperative {
-			return nil, &AssemblyError{
-				Module: module,
-				Symbol: api.RuntimeAwaitable,
-				Reason: "Awaitable is unavailable under disabled concurrency",
 			}
 		}
 		definition, err := NewDefinition(
@@ -369,14 +367,6 @@ func Build(
 		return []Definition{definition}, nil
 	}
 	if module == api.RuntimeModuleChannel {
-		if concurrency == api.ConcurrencySemanticsDisabled &&
-			slices.Contains(symbols, api.RuntimeScheduler) {
-			return nil, &AssemblyError{
-				Module: module,
-				Symbol: api.RuntimeScheduler,
-				Reason: "scheduler is unavailable under disabled concurrency",
-			}
-		}
 		return buildChannel(factory, symbols, concurrency)
 	}
 	if module == api.RuntimeModuleUnsafe {

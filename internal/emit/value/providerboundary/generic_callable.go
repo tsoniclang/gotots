@@ -25,6 +25,13 @@ func toProviderGenericCallable(
 	source api.ExpressionEmission,
 	boundary genericCallableBoundary,
 ) (api.ExpressionEmission, bool, error) {
+	if err := RequireProviderDefinedCallableInput(
+		context,
+		model,
+		boundary == genericCallableBoundarySynchronous,
+	); err != nil {
+		return api.ExpressionEmission{}, false, err
+	}
 	parameters := make([]tsgo.ParameterDeclaration, 0, concrete.Params().Len())
 	parameterValues := make([]tsgo.Expression, 0, concrete.Params().Len())
 	for index := range concrete.Params().Len() {

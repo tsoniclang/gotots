@@ -41,16 +41,16 @@ interface CanonicalEntry {
   Name(): string | Promise<string>;
 }
 
-test("provider named callables keep source arity", async () => {
-  const cancel: NonNullable<CancelCauseFunc> = async () => {};
-  const walk: NonNullable<WalkDirFunc> = async (
+test("provider named callables keep source arity", () => {
+  const cancel: NonNullable<CancelCauseFunc> = () => {};
+  const walk: NonNullable<WalkDirFunc> = (
     _path,
     _entry,
     failure,
   ) => failure;
 
-  await cancel(undefined);
-  assert.equal(await walk(".", undefined, undefined), undefined);
+  cancel(undefined);
+  assert.equal(walk(".", undefined, undefined), undefined);
 });
 
 class CooperativeSortable extends ProviderInterfaceValue implements SortInterfaceCanonical {

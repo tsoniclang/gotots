@@ -77,6 +77,15 @@ func EmitDeferred(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		if providerRecoverySelected {
+			if err := providerboundary.RequireSynchronousSuspension(
+				context,
+				directOwner.FullName()+" recovery",
+				providerRecovery.Cooperative(),
+			); err != nil {
+				return api.ExpressionEmission{}, err
+			}
+		}
 		if !providerRecoverySelected {
 			facet, facetErr := api.NewSourceCallableFacet(directOwner)
 			if facetErr != nil {
