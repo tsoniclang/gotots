@@ -169,6 +169,15 @@ func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
 			t.Fatalf("scalar support statement %d = %#v, want %s", index, statement, wantNames[index])
 		}
 	}
+	if _, err := AssemblePackage(
+		factory,
+		testScalarABI(t, api.IntegerRepresentationNumber),
+		api.ConcurrencySemanticsDisabled,
+		map[api.RuntimeSymbol]struct{}{api.RuntimeAwaitable: {}},
+		nil,
+	); err == nil {
+		t.Fatal("disabled concurrency accepted Awaitable runtime support")
+	}
 }
 
 func testScalarABI(

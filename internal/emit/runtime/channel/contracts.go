@@ -20,6 +20,7 @@ const (
 func Build(
 	factory tsgo.Factory,
 	symbol api.RuntimeSymbol,
+	concurrency api.ConcurrencySemantics,
 	channelName string,
 	receiveName string,
 	sendName string,
@@ -31,6 +32,7 @@ func Build(
 ) (tsgo.Statement, error) {
 	target := builder{
 		factory:           factory,
+		concurrency:       concurrency,
 		channelName:       channelName,
 		receiveName:       receiveName,
 		sendName:          sendName,
@@ -135,7 +137,7 @@ func (b builder) receiveContract() tsgo.InterfaceDeclaration {
 				nil,
 				nil,
 				nil,
-				b.promiseType(result),
+				b.blockingResultType(result),
 			),
 			b.factory.MethodSignatureDeclaration(
 				nil,
@@ -182,7 +184,7 @@ func (b builder) sendContract() tsgo.InterfaceDeclaration {
 				[]tsgo.ParameterDeclaration{
 					b.parameter("value", b.typeT()),
 				},
-				b.promiseType(b.voidType()),
+				b.blockingResultType(b.voidType()),
 			),
 			b.factory.MethodSignatureDeclaration(
 				nil,

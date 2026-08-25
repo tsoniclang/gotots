@@ -25,14 +25,21 @@ func Emit(
 	); err != nil {
 		return api.StatementEmission{}, err
 	}
-	call, err := children.DiscardedCall(
-		context.
-			WithRole(api.RoleGoroutineCall).
-			WithDetachedInvocation(),
-		source.Call,
-	)
+	callContext := context.WithRole(api.RoleGoroutineCall)
+	if context.ConcurrencySemantics() == api.ConcurrencySemanticsCooperative {
+		callContext = callContext.WithDetachedInvocation()
+	}
+	call, err := children.DiscardedCall(callContext, source.Call)
 	if err != nil {
 		return api.StatementEmission{}, err
+	}
+	if context.ConcurrencySemantics() == api.ConcurrencySemanticsDisabled {
+		statements := call.Before()
+		statements = append(
+			statements,
+			context.Factory().ExpressionStatement(call.Value()),
+		)
+		return api.NewStatementEmission(statements, call.Requests())
 	}
 	scheduler, err := context.Names().Runtime(
 		api.RuntimeScheduler,

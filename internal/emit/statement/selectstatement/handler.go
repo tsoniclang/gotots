@@ -59,7 +59,8 @@ func Emit(
 		),
 		selectReference.Requests()...,
 	)
-	if !target.hasDefault {
+	if !target.hasDefault &&
+		context.ConcurrencySemantics() == api.ConcurrencySemanticsCooperative {
 		selected, err = cooperative.Operation(
 			context.WithRole(api.RoleSelectClause),
 			source,

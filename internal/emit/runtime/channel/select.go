@@ -202,6 +202,9 @@ func (b builder) selectAttemptBody() tsgo.Block {
 }
 
 func (b builder) selectFunction() tsgo.FunctionDeclaration {
+	if !b.cooperative() {
+		return b.synchronousSelectFunction()
+	}
 	return b.factory.FunctionDeclaration(
 		[]tsgo.ModifierLike{b.factory.ExportKeyword()},
 		nil,
@@ -234,6 +237,38 @@ func (b builder) selectFunction() tsgo.FunctionDeclaration {
 				b.numberType(),
 				b.selectExecutor(),
 			)),
+		}, true),
+	)
+}
+
+func (b builder) synchronousSelectFunction() tsgo.FunctionDeclaration {
+	return b.factory.FunctionDeclaration(
+		[]tsgo.ModifierLike{b.factory.ExportKeyword()},
+		nil,
+		b.id(b.selectName),
+		nil,
+		[]tsgo.ParameterDeclaration{
+			b.parameter(
+				"cases",
+				b.arrayType(b.typeReference(b.caseName)),
+			),
+		},
+		b.numberType(),
+		b.factory.Block([]tsgo.Statement{
+			b.variable(
+				tsgo.NodeFlagsConst,
+				"immediate",
+				b.unionType(b.numberType(), b.undefinedType()),
+				b.call(b.id(b.selectReadyName), b.id("cases")),
+			),
+			b.factory.IfStatement(
+				b.strictUndefined(b.id("immediate")),
+				b.factory.Block([]tsgo.Statement{
+					b.expression(b.panic("synchronous select would block")),
+				}, true),
+				nil,
+			),
+			b.returnStatement(b.id("immediate")),
 		}, true),
 	)
 }

@@ -1087,6 +1087,13 @@ entry, while absence uses the ordinary provider callable.
 
 ### Channels, Goroutines, And Select
 
+Under `disabled`, channel types retain the same typed runtime identity, but
+execution is serial. A goroutine call is emitted as a direct call; ready
+buffered send/receive and ready/default select complete synchronously. A nil,
+unbuffered, full, empty, or otherwise unready operation that would suspend
+raises the exact synchronous-blocking boundary instead of fabricating progress.
+No `Promise`, `async`, `await`, scheduler, or host task is emitted.
+
 Under `cooperative`, channel send/receive and blocking select lower to typed
 Promise operations. Direct call effects propagate through revisable callable
 facets. Function values and interface methods use canonical

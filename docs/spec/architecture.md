@@ -440,8 +440,10 @@ The same rule applies recursively to callable parameters/results and to
 interface methods. An indirect call unconditionally `await`s the result.
 This is statically typed and performs no thenable inspection. A synchronous
 implementation is directly assignable; an asynchronous implementation is also
-assignable. Under the disabled-concurrency profile the ABI is synchronous and
-blocking constructs fail at their owner.
+assignable. Under the disabled-concurrency profile the ABI is synchronous:
+goroutine calls execute inline, immediately-ready channel and select operations
+complete directly, and an operation that would require suspension fails loudly
+at its runtime owner.
 
 Named function types retain exactly their source type parameters. They do not
 gain a hidden payload/effect type parameter. Method values and method
@@ -1052,6 +1054,14 @@ already-created TS-Go statements. No CFG or control IR is retained.
 Concurrency is disabled by default. Selecting `cooperative` explicitly
 accepts race-free cooperative semantics: execution may switch at modeled
 synchronization operations but does not emulate asynchronous Go preemption.
+
+The disabled profile is a separate, closed serial semantics. A `go` statement
+evaluates and invokes its call inline. Channel send, receive, and select use the
+same typed channel state but may complete only when immediately ready; otherwise
+the channel runtime raises a typed synchronous-blocking panic. It never creates
+a Promise, scheduler task, hidden callback, or deferred host job. This profile
+is appropriate only when the selected product proves its observable paths are
+serializable; it is not reported as Go concurrency parity.
 
 One `GoChannel<T>` runtime identity owns capacity, FIFO buffering, close
 state, and insertion-ordered live send/receive offers. Direct operations and

@@ -408,6 +408,7 @@ func TestSchedulerRoutesOnlyThroughItsSemanticOwner(t *testing.T) {
 	if _, err := channelruntime.Build(
 		factory,
 		api.RuntimeScheduler,
+		api.ConcurrencySemanticsDisabled,
 		"GoChannel",
 		"GoReceiveChannel",
 		"GoSendChannel",
@@ -419,11 +420,19 @@ func TestSchedulerRoutesOnlyThroughItsSemanticOwner(t *testing.T) {
 	); err == nil {
 		t.Fatal("channel owner accepted RuntimeScheduler")
 	}
-	definitions, err := Build(
+	if _, err := Build(
 		factory,
 		api.RuntimeModuleChannel,
 		[]api.RuntimeSymbol{api.RuntimeScheduler},
 		api.ConcurrencySemanticsDisabled,
+	); err == nil {
+		t.Fatal("disabled concurrency accepted the cooperative scheduler")
+	}
+	definitions, err := Build(
+		factory,
+		api.RuntimeModuleChannel,
+		[]api.RuntimeSymbol{api.RuntimeScheduler},
+		api.ConcurrencySemanticsCooperative,
 	)
 	if err != nil {
 		t.Fatal(err)

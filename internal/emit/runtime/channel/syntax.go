@@ -9,6 +9,7 @@ import (
 
 type builder struct {
 	factory           tsgo.Factory
+	concurrency       api.ConcurrencySemantics
 	channelName       string
 	receiveName       string
 	sendName          string
@@ -17,6 +18,17 @@ type builder struct {
 	selectReadyName   string
 	selectAttemptName string
 	panicName         string
+}
+
+func (b builder) cooperative() bool {
+	return b.concurrency == api.ConcurrencySemanticsCooperative
+}
+
+func (b builder) blockingResultType(result tsgo.TypeNode) tsgo.TypeNode {
+	if b.cooperative() {
+		return b.promiseType(result)
+	}
+	return result
 }
 
 func (b builder) id(name string) tsgo.Identifier {

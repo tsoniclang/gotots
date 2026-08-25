@@ -718,6 +718,13 @@ search rejects the former conditional and assertion paths.
 
 ## Cooperative-Concurrency Proof
 
+The disabled profile separately proves inline goroutine evaluation, ready
+buffered channel send/receive, ready and default select, close/len/cap, and a
+loud runtime boundary for every operation that would suspend. Its generated
+artifacts must contain no `Promise`, `async`, `await`, scheduler request, or
+cooperative channel waiter. Mutations that restore scheduler dispatch, admit a
+silent unready operation, or leak a Promise fail shape and differential gates.
+
 The selected race-free cooperative profile exits only with:
 
 - unbuffered/buffered/nil/closed channel cases;

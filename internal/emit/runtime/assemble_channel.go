@@ -10,6 +10,7 @@ import (
 func buildChannel(
 	factory tsgo.Factory,
 	symbols []api.RuntimeSymbol,
+	concurrency api.ConcurrencySemantics,
 ) ([]Definition, error) {
 	names, err := channelRuntimeNames()
 	if err != nil {
@@ -37,7 +38,12 @@ func buildChannel(
 			}
 		}
 		seen[symbol] = struct{}{}
-		statement, err := buildChannelSymbol(factory, symbol, names)
+		statement, err := buildChannelSymbol(
+			factory,
+			symbol,
+			names,
+			concurrency,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -76,6 +82,7 @@ func buildChannelSymbol(
 	factory tsgo.Factory,
 	symbol api.RuntimeSymbol,
 	names map[api.RuntimeSymbol]string,
+	concurrency api.ConcurrencySemantics,
 ) (tsgo.Statement, error) {
 	if symbol == api.RuntimeScheduler {
 		return schedulerruntime.Build(
@@ -88,6 +95,7 @@ func buildChannelSymbol(
 	return channelruntime.Build(
 		factory,
 		symbol,
+		concurrency,
 		names[api.RuntimeChannel],
 		names[api.RuntimeReceiveChannel],
 		names[api.RuntimeSendChannel],

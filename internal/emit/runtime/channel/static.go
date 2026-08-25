@@ -4,6 +4,34 @@ import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 func (b builder) staticSendMethod() tsgo.MethodDeclaration {
 	typeT := b.typeT()
+	if !b.cooperative() {
+		return b.staticGenericMethod(
+			MemberSend,
+			[]tsgo.ParameterDeclaration{
+				b.parameter(
+					"channel",
+					b.unionType(
+						b.typeReference(b.sendName, typeT),
+						b.undefinedType(),
+					),
+				),
+				b.parameter("value", typeT),
+			},
+			b.voidType(),
+			b.factory.IfStatement(
+				b.strictUndefined(b.id("channel")),
+				b.factory.Block([]tsgo.Statement{
+					b.expression(b.panic("synchronous channel send would block")),
+				}, true),
+				nil,
+			),
+			b.expression(b.methodCall(
+				b.id("channel"),
+				MemberSend,
+				b.id("value"),
+			)),
+		)
+	}
 	return b.staticGenericMethod(
 		MemberSend,
 		[]tsgo.ParameterDeclaration{
@@ -35,6 +63,30 @@ func (b builder) staticSendMethod() tsgo.MethodDeclaration {
 func (b builder) staticReceiveMethod() tsgo.MethodDeclaration {
 	typeT := b.typeT()
 	result := b.receiveResultType()
+	if !b.cooperative() {
+		return b.staticGenericMethod(
+			MemberReceive,
+			[]tsgo.ParameterDeclaration{b.parameter(
+				"channel",
+				b.unionType(
+					b.typeReference(b.receiveName, typeT),
+					b.undefinedType(),
+				),
+			)},
+			result,
+			b.factory.IfStatement(
+				b.strictUndefined(b.id("channel")),
+				b.factory.Block([]tsgo.Statement{
+					b.expression(b.panic("synchronous channel receive would block")),
+				}, true),
+				nil,
+			),
+			b.returnStatement(b.methodCall(
+				b.id("channel"),
+				MemberReceive,
+			)),
+		)
+	}
 	return b.staticGenericMethod(
 		MemberReceive,
 		[]tsgo.ParameterDeclaration{b.parameter(

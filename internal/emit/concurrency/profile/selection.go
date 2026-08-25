@@ -11,8 +11,7 @@ func Admit(
 	category api.Category,
 	source ast.Node,
 ) error {
-	if context.ConcurrencySemantics() !=
-		api.ConcurrencySemanticsCooperative {
+	if !context.ConcurrencySemantics().Valid() {
 		return api.Unsupported(context, category, source)
 	}
 	return nil

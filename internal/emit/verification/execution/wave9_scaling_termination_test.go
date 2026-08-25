@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -241,54 +240,6 @@ func waveNineOutcome(output string, runError error) string {
 		return "return"
 	}
 	return "unclassified"
-}
-
-func TestWaveNineRequiresExplicitCooperativeProfile(t *testing.T) {
-	directory := t.TempDir()
-	writeProgramFile(
-		t,
-		filepath.Join(directory, "go.mod"),
-		"module example.com/concurrencyprofile\n\ngo 1.26.4\n",
-	)
-	writeProgramFile(t, filepath.Join(directory, "source.go"), `package concurrencyprofile
-
-func Run() int32 {
-	values := make(chan int32, 1)
-	values <- 1
-	return <-values
-}
-`)
-	program, err := load.Load(context.Background(), load.Request{
-		Directory: directory,
-		Pattern:   ".",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	root, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("Run"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = emit.Compile(program, []emit.Root{root})
-	var unsupported *api.UnsupportedError
-	if !errors.As(err, &unsupported) ||
-		unsupported.Category != api.CategoryExpression ||
-		unsupported.Construct != "*ast.CallExpr" ||
-		unsupported.Role != api.RoleLocalValue {
-		t.Fatalf(
-			"default concurrency error = %#v, want make-expression UnsupportedError",
-			err,
-		)
-	}
-	if _, err := emit.CompileWithOptions(
-		program,
-		[]emit.Root{root},
-		waveNineOptions(),
-	); err != nil {
-		t.Fatalf("explicit cooperative profile: %v", err)
-	}
 }
 
 func waveNineOptions() emit.Options {

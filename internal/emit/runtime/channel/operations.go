@@ -234,6 +234,9 @@ func (b builder) takeReceiveMethod() tsgo.MethodDeclaration {
 }
 
 func (b builder) sendMethod() tsgo.MethodDeclaration {
+	if !b.cooperative() {
+		return b.synchronousSendMethod()
+	}
 	return b.method(
 		nil,
 		MemberSend,
@@ -262,6 +265,34 @@ func (b builder) sendMethod() tsgo.MethodDeclaration {
 			b.voidType(),
 			b.sendExecutor(),
 		)),
+	)
+}
+
+func (b builder) synchronousSendMethod() tsgo.MethodDeclaration {
+	return b.method(
+		nil,
+		MemberSend,
+		[]tsgo.ParameterDeclaration{
+			b.parameter("value", b.typeT()),
+		},
+		b.voidType(),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"prepared",
+			b.typeT(),
+			b.copyCall(b.id("value")),
+		),
+		b.factory.IfStatement(
+			b.logicalNot(b.methodCall(
+				b.factory.ThisExpression(),
+				"commitPreparedSend",
+				b.id("prepared"),
+			)),
+			b.factory.Block([]tsgo.Statement{
+				b.expression(b.panic("synchronous channel send would block")),
+			}, true),
+			nil,
+		),
 	)
 }
 
@@ -348,6 +379,9 @@ func (b builder) sendExecutor() tsgo.ArrowFunction {
 }
 
 func (b builder) receiveMethod() tsgo.MethodDeclaration {
+	if !b.cooperative() {
+		return b.synchronousReceiveMethod()
+	}
 	receive := b.arrow(
 		[]tsgo.ParameterDeclaration{
 			b.parameter("result", b.receiveResultType()),
@@ -411,6 +445,35 @@ func (b builder) receiveMethod() tsgo.MethodDeclaration {
 				}, true),
 			),
 		)),
+	)
+}
+
+func (b builder) synchronousReceiveMethod() tsgo.MethodDeclaration {
+	return b.method(
+		nil,
+		MemberReceive,
+		nil,
+		b.receiveResultType(),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"immediate",
+			b.unionType(
+				b.receiveResultType(),
+				b.undefinedType(),
+			),
+			b.methodCall(
+				b.factory.ThisExpression(),
+				"takeReceive",
+			),
+		),
+		b.factory.IfStatement(
+			b.strictUndefined(b.id("immediate")),
+			b.factory.Block([]tsgo.Statement{
+				b.expression(b.panic("synchronous channel receive would block")),
+			}, true),
+			nil,
+		),
+		b.returnStatement(b.id("immediate")),
 	)
 }
 

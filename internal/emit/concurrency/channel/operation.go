@@ -72,5 +72,8 @@ func BlockingCall(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if context.ConcurrencySemantics() == api.ConcurrencySemanticsDisabled {
+		return target, nil
+	}
 	return cooperative.Operation(context, source, target)
 }
