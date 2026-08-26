@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "68b6571d0cf430fafd8f5520c3f1c0acaa94eddbad8baef4b02fca7a9d9fea9c",
+  "providerDigest": "e0a84c29d8f50c76d8545cde5f88ea31f26e63e12a4942b01cefb27cb017c8a0",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -27271,6 +27271,66 @@
       "callableProfiles": [
         {
           "sourceIdentity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
+          "profileKey": "6f99d07e8e379bff414c0849e3dfb9a915f634b21850774460e52afccb171ed3",
+          "export": "PprofProfileWriteToDirect",
+          "receiver": true,
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "implementationSites": [
+            "src/internal/facets/provider-runtime-pprof.ts#PprofProfileWriteToDirect@146"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+              "export": "ProviderWriterInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Writer|name=Write",
+                    "kind": "callable",
+                    "member": "Write",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "contractSignature": "func(p []byte) (n int, err error)",
+                    "sourceLocation": "io/io.go:100:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "b82c95dbb864d6c64bb25a0a048c21db1f1a5c098939281fc17a9a850a4fc065"
+                  }
+                ]
+              },
+              "targetFingerprint": "488d64c278ba4dcab615ce6c95b7ce02a7da47e62d416a60fd14f554a817206b"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-runtime-pprof.ts",
+          "targetFingerprint": "94699ced0f4e6e3a6571c6002f19ebb4d7ce2b25a6e78f1a90e3fee8fe45b480"
+        },
+        {
+          "sourceIdentity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
           "profileKey": "98282c66143e376e47ad4becf33a0972ec58fd13f66d5a6fd4085e362e4a4726",
           "export": "PprofProfileWriteToCanonical",
           "receiver": true,
@@ -27284,7 +27344,7 @@
             "go:universe|error"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-runtime-pprof.ts#PprofProfileWriteToCanonical@134"
+            "src/internal/facets/provider-runtime-pprof.ts#PprofProfileWriteToCanonical@335"
           ],
           "interfaces": [
             {
@@ -27336,6 +27396,65 @@
         },
         {
           "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
+          "profileKey": "6f99d07e8e379bff414c0849e3dfb9a915f634b21850774460e52afccb171ed3",
+          "export": "PprofStartCPUProfileDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "implementationSites": [
+            "src/internal/facets/provider-runtime-pprof.ts#PprofStartCPUProfileDirect@80"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+              "export": "ProviderWriterInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Writer|name=Write",
+                    "kind": "callable",
+                    "member": "Write",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "contractSignature": "func(p []byte) (n int, err error)",
+                    "sourceLocation": "io/io.go:100:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "b82c95dbb864d6c64bb25a0a048c21db1f1a5c098939281fc17a9a850a4fc065"
+                  }
+                ]
+              },
+              "targetFingerprint": "488d64c278ba4dcab615ce6c95b7ce02a7da47e62d416a60fd14f554a817206b"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-runtime-pprof.ts",
+          "targetFingerprint": "184cd48e7cfc19a818da2cc2ff18de7f81bd437490701ab6cfdc635bc34c50e4"
+        },
+        {
+          "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
           "profileKey": "98282c66143e376e47ad4becf33a0972ec58fd13f66d5a6fd4085e362e4a4726",
           "export": "PprofStartCPUProfileCanonical",
           "canonicalParameters": [
@@ -27348,7 +27467,7 @@
             "go:universe|error"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-runtime-pprof.ts#PprofStartCPUProfileCanonical@56"
+            "src/internal/facets/provider-runtime-pprof.ts#PprofStartCPUProfileCanonical@257"
           ],
           "interfaces": [
             {
@@ -30966,18 +31085,28 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-runtime-pprof.ts#PprofProfileWriteToCanonical@134",
+      "identity": "src/internal/facets/provider-runtime-pprof.ts#PprofProfileWriteToCanonical@335",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/facets/provider-io-contract.ts#CanonicalBoundaryError@82",
-        "src/internal/facets/provider-runtime-pprof.ts#writeResult@236",
+        "src/internal/facets/provider-runtime-pprof.ts#writeResult@437",
         "src/internal/node/runtime/profile.ts#ProfileNameKey@47",
         "src/internal/node/runtime/profile.ts#profileSnapshot@243",
         "src/internal/runtime/slice.ts#byteSlice@108"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-runtime-pprof.ts#PprofStartCPUProfileCanonical@56",
+      "identity": "src/internal/facets/provider-runtime-pprof.ts#PprofProfileWriteToDirect@146",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/node/runtime/profile.ts#ProfileNameKey@47",
+        "src/internal/node/runtime/profile.ts#profileSnapshot@243",
+        "src/internal/runtime/error.ts#ProviderError@16",
+        "src/internal/runtime/slice.ts#byteSlice@108"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-runtime-pprof.ts#PprofStartCPUProfileCanonical@257",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/facets/provider-io-contract.ts#CanonicalBoundaryError@82",
@@ -30986,7 +31115,16 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-runtime-pprof.ts#writeResult@236",
+      "identity": "src/internal/facets/provider-runtime-pprof.ts#PprofStartCPUProfileDirect@80",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/node/runtime/profile.ts#beginCpuProfile@169",
+        "src/internal/runtime/error.ts#ProviderError@16",
+        "src/internal/runtime/slice.ts#byteSlice@108"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-runtime-pprof.ts#writeResult@437",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/facets/provider-io-contract.ts#CanonicalBoundaryError@82"
@@ -37823,5 +37961,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "c757b9ceb7c9852aa1211b1afff58d853d24c603d567e993e4e2cf63fe7b47b4"
+  "manifestDigest": "f6a9ea507a4b529c9dbb27fae0f708add0ac6b780ce43c392b2641e3f307d229"
 }

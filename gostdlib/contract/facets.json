@@ -742,6 +742,25 @@
       "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
       "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
       "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofStartCPUProfileDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "ProviderWriterInterface"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
       "export": "PprofStartCPUProfileCanonical",
       "canonicalParameters": [
         0
@@ -760,6 +779,26 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Writer",
           "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofProfileWriteToDirect",
+      "receiver": true,
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "ProviderWriterInterface"
         }
       ]
     },
