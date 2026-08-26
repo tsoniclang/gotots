@@ -433,7 +433,7 @@ func emitInterfaceAssertion(
 			)) {
 		return api.ExpressionEmission{}, shapeError(context, operation)
 	}
-	return assertionoperation.Apply(
+	return assertionoperation.ApplyGenericCapability(
 		context,
 		children,
 		nil,

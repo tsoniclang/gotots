@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "324aa2a0c67806e04fc19d0f706737751fb485cdbfef302aee86efb5a762446f",
+  "providerDigest": "3e505ad26eab73aa1f6863abdb922331de521dd14b9bf0859dad078dee75e3b5",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -3252,7 +3252,7 @@
           "targetFingerprint": "f97d73a00f89bf5f499d7e31750b3a149c16ed34c718bbaa1c687df508349162",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#DirEntry@371"
+            "src/io/fs.ts#DirEntry@385"
           ]
         },
         {
@@ -3283,7 +3283,7 @@
           "targetFingerprint": "c499bfcd7956c9735b8a0dddf797191988279e83e0118f9b71dc22a3cf150698",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#FS@411"
+            "src/io/fs.ts#FS@425"
           ]
         },
         {
@@ -3336,7 +3336,7 @@
           "targetFingerprint": "fba85e89107a086ba2bf881bb7dd1b5da6dcff6c3054bd8d491b708991800a53",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#File@440"
+            "src/io/fs.ts#File@454"
           ]
         },
         {
@@ -3422,7 +3422,7 @@
           "targetFingerprint": "293ded0d70f65e4cffeb3265c0916adf784e4ce30170f883a562e96e53116dfe",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#FileInfo@492"
+            "src/io/fs.ts#FileInfo@506"
           ]
         },
         {
@@ -3438,7 +3438,7 @@
           "targetFingerprint": "0b1b75687a03fd7897b39da49df7b11a59efbde9b481808305e8f1e456b92a0a",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#FileMode@116"
+            "src/io/fs.ts#FileMode@130"
           ]
         },
         {
@@ -3479,14 +3479,14 @@
           "sourceSignature": "defined=io/fs.PathError|underlying=struct{Op string; Path string; Err error}",
           "sourceLocation": "io/fs/fs.go:261:6",
           "implementationOwner": "src/io/fs.ts",
-          "targetFingerprint": "f1bb2928df1ac6243841433576eefd15409679507fe1cf69bc3c7f1289360118",
+          "targetFingerprint": "918716a4b61990b1968b0857db04d6fc700bcaf22f9692a60a0b4c8e5261c216",
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/errors/tree.ts#WrappedProviderError@26",
-            "src/io/fs.ts#pathErrorType@538"
+            "src/io/fs.ts#pathErrorType@552"
           ],
           "implementationSites": [
-            "src/io/fs.ts#PathError@550"
+            "src/io/fs.ts#PathError@564"
           ]
         },
         {
@@ -3503,7 +3503,7 @@
           "targetFingerprint": "8f01354de5ba64f7da0dfca9cacfb5b81808cafff05f49202a8628d41cba4490",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#WalkDirFunc@756"
+            "src/io/fs.ts#WalkDirFunc@1025"
           ]
         },
         {
@@ -3518,7 +3518,7 @@
           "targetFingerprint": "734c7039c45aa1e036a62ad70c0936124f2a49bb42f699dcb29208d4e889ce78",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#ErrClosed@798"
+            "src/io/fs.ts#ErrClosed@1067"
           ]
         },
         {
@@ -3533,7 +3533,7 @@
           "targetFingerprint": "2cc0a83c9905af4c20858b8d23ec38fa6414382d5f7cc3598b2584af0e31b253",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#ErrExist@802"
+            "src/io/fs.ts#ErrExist@1071"
           ]
         },
         {
@@ -3548,7 +3548,7 @@
           "targetFingerprint": "5cb5a3e686c50e7a1568e26aa8736649af15a0e8d3931a8d2173cc9a608c7d13",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#ErrInvalid@806"
+            "src/io/fs.ts#ErrInvalid@1075"
           ]
         },
         {
@@ -3563,7 +3563,7 @@
           "targetFingerprint": "24d8131f203adf8826fdc54353fb8033a72d95056fc85fa8c6b5e614fd0b528f",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#ErrNotExist@810"
+            "src/io/fs.ts#ErrNotExist@1079"
           ]
         },
         {
@@ -3578,7 +3578,7 @@
           "targetFingerprint": "d67d1fcc4aa423f8b77b0fe79477c8e6b105fcb4aafe8fda9dc481710e2e2b4e",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#ErrPermission@814"
+            "src/io/fs.ts#ErrPermission@1083"
           ]
         },
         {
@@ -3593,7 +3593,7 @@
           "targetFingerprint": "3b89a3a5c5ecbac85ddee1341437480f7036a452bf40c19ac7c4962d6136ede4",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#SkipAll@818"
+            "src/io/fs.ts#SkipAll@1087"
           ]
         },
         {
@@ -3608,7 +3608,7 @@
           "targetFingerprint": "8351fff4d98647b2acc84317ea5dbed67bf1a086523a1356f49eaf1610ce53a4",
           "disposition": "implemented",
           "implementationSites": [
-            "src/io/fs.ts#SkipDir@822"
+            "src/io/fs.ts#SkipDir@1091"
           ]
         },
         {
@@ -3624,10 +3624,10 @@
           "targetFingerprint": "23db42d82ad9e2dcb9d157f3f77d2f30c0a4ac70e2b39183da1798bcd6549124",
           "disposition": "implemented",
           "dependencies": [
-            "src/io/fs.ts#Error@621"
+            "src/io/fs.ts#Error@890"
           ],
           "implementationSites": [
-            "src/io/fs.ts#Error@590"
+            "src/io/fs.ts#Error@859"
           ]
         },
         {
@@ -3643,10 +3643,10 @@
           "targetFingerprint": "d25d886f0ef093577599afd08bb91c8b17f6d1126879e64e30a159ac7590abe3",
           "disposition": "implemented",
           "dependencies": [
-            "src/io/fs.ts#Unwrap@703"
+            "src/io/fs.ts#Unwrap@972"
           ],
           "implementationSites": [
-            "src/io/fs.ts#Unwrap@717"
+            "src/io/fs.ts#Unwrap@986"
           ]
         },
         {
@@ -3662,11 +3662,11 @@
           "targetFingerprint": "0794d33b18aecb8038e5798a61e5a96d547113a3d35ed1a8df96dfff35b5bf9b",
           "disposition": "implemented",
           "dependencies": [
-            "src/io/fs.ts#ModeDir@343",
-            "src/io/fs.ts#value@123"
+            "src/io/fs.ts#ModeDir@357",
+            "src/io/fs.ts#value@137"
           ],
           "implementationSites": [
-            "src/io/fs.ts#IsDir@131"
+            "src/io/fs.ts#IsDir@145"
           ]
         },
         {
@@ -3682,11 +3682,11 @@
           "targetFingerprint": "a1d3288fb08a932f544df0a575573af7aad3009439632b2917a9bb9c8e9c2f32",
           "disposition": "implemented",
           "dependencies": [
-            "src/io/fs.ts#modeTypeMask@113",
-            "src/io/fs.ts#value@123"
+            "src/io/fs.ts#modeTypeMask@127",
+            "src/io/fs.ts#value@137"
           ],
           "implementationSites": [
-            "src/io/fs.ts#IsRegular@151"
+            "src/io/fs.ts#IsRegular@165"
           ]
         },
         {
@@ -3702,10 +3702,10 @@
           "targetFingerprint": "527c815905170006beb82c7815c6c4e86a08060fcb470d5c8d6d8bd57fe25118",
           "disposition": "implemented",
           "dependencies": [
-            "src/io/fs.ts#value@123"
+            "src/io/fs.ts#value@137"
           ],
           "implementationSites": [
-            "src/io/fs.ts#String@169"
+            "src/io/fs.ts#String@183"
           ]
         },
         {
@@ -3721,12 +3721,12 @@
           "targetFingerprint": "cefa4d98abbfcff0929801e33351d1a3b9e7edf6864b8f3f3249c240b131348e",
           "disposition": "implemented",
           "dependencies": [
-            "src/io/fs.ts#FileMode@116",
-            "src/io/fs.ts#modeTypeMask@113",
-            "src/io/fs.ts#value@123"
+            "src/io/fs.ts#FileMode@130",
+            "src/io/fs.ts#modeTypeMask@127",
+            "src/io/fs.ts#value@137"
           ],
           "implementationSites": [
-            "src/io/fs.ts#Type@317"
+            "src/io/fs.ts#Type@331"
           ]
         },
         {
@@ -3741,10 +3741,10 @@
           "targetFingerprint": "0ef6d9d11eae98f931336c7c032cb6aa68dc60257d08aeb1379d576c129af0b6",
           "disposition": "implemented",
           "dependencies": [
-            "src/io/fs.ts#InfoDirEntry@870"
+            "src/io/fs.ts#InfoDirEntry@1139"
           ],
           "implementationSites": [
-            "src/io/fs.ts#FileInfoToDirEntry@964"
+            "src/io/fs.ts#FileInfoToDirEntry@1233"
           ]
         },
         {
@@ -3763,12 +3763,12 @@
             "src/internal/portable/io/filesystem.ts#DirectoryFile@59",
             "src/internal/portable/io/filesystem.ts#ReadDir@143",
             "src/internal/runtime/slice.ts#sliceValues@19",
-            "src/io/fs.ts#PathError@550",
-            "src/io/fs.ts#open@1881",
-            "src/io/fs.ts#state@794"
+            "src/io/fs.ts#PathError@564",
+            "src/io/fs.ts#open@2150",
+            "src/io/fs.ts#state@1063"
           ],
           "implementationSites": [
-            "src/io/fs.ts#ReadDir@996"
+            "src/io/fs.ts#ReadDir@1265"
           ]
         },
         {
@@ -3785,11 +3785,11 @@
           "dependencies": [
             "src/errors.ts#New@76",
             "src/internal/runtime/slice.ts#byteSlice@108",
-            "src/io/fs.ts#ioState@99",
-            "src/io/fs.ts#open@1881"
+            "src/io/fs.ts#ioState@113",
+            "src/io/fs.ts#open@2150"
           ],
           "implementationSites": [
-            "src/io/fs.ts#ReadFile@1221"
+            "src/io/fs.ts#ReadFile@1490"
           ]
         },
         {
@@ -3804,10 +3804,10 @@
           "targetFingerprint": "bd3d57a7cfea73516fc06bbe1dcde3f801c2a3b3a6a6ef45ed92cbfbb75a5d42",
           "disposition": "implemented",
           "dependencies": [
-            "src/io/fs.ts#open@1881"
+            "src/io/fs.ts#open@2150"
           ],
           "implementationSites": [
-            "src/io/fs.ts#Stat@1438"
+            "src/io/fs.ts#Stat@1707"
           ]
         },
         {
@@ -3822,14 +3822,14 @@
           "targetFingerprint": "7ab8f9689da09bf9f6c47b691ec718137a22c0d7ccb26c38beac69f864c00e62",
           "disposition": "implemented",
           "dependencies": [
-            "src/io/fs.ts#FileInfoToDirEntry@964",
-            "src/io/fs.ts#Stat@1438",
-            "src/io/fs.ts#invokeWalkDir@1828",
-            "src/io/fs.ts#state@794",
-            "src/io/fs.ts#walk@1649"
+            "src/io/fs.ts#FileInfoToDirEntry@1233",
+            "src/io/fs.ts#Stat@1707",
+            "src/io/fs.ts#invokeWalkDir@2097",
+            "src/io/fs.ts#state@1063",
+            "src/io/fs.ts#walk@1918"
           ],
           "implementationSites": [
-            "src/io/fs.ts#WalkDir@1534"
+            "src/io/fs.ts#WalkDir@1803"
           ]
         }
       ]
@@ -5852,14 +5852,14 @@
           "sourceSignature": "defined=os.PathError|underlying=struct{Op string; Path string; Err error}",
           "sourceLocation": "os/error.go:46:6",
           "implementationOwner": "src/io/fs.ts",
-          "targetFingerprint": "abf0c848782df963ec3f5f46d75975f82fd9b3caaa0a487ef547b8a539c53eb9",
+          "targetFingerprint": "84613624c7698e2c9298b15d2c6b2630b579a060390f9b3e6d0cade222fdb3fc",
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/errors/tree.ts#WrappedProviderError@26",
-            "src/io/fs.ts#pathErrorType@538"
+            "src/io/fs.ts#pathErrorType@552"
           ],
           "implementationSites": [
-            "src/io/fs.ts#PathError@550"
+            "src/io/fs.ts#PathError@564"
           ]
         },
         {
@@ -6363,7 +6363,7 @@
           "targetFingerprint": "5b7317968611016cf18d94e453f7fcd4f2bf3a55aa9c024d4f57a6361b4eb1b0",
           "disposition": "implemented",
           "dependencies": [
-            "src/io/fs.ts#FileMode@116",
+            "src/io/fs.ts#FileMode@130",
             "src/os.ts#OpenFile@735"
           ],
           "implementationSites": [
@@ -17816,9 +17816,9 @@
             }
           ],
           "implementationOwner": "src/internal/facets/generic-errors-kernel.ts",
-          "targetFingerprint": "bb20e4a496553e40fc4b8eaed504832287caaa509a16a5bd9298d0b4bcb14aba",
+          "targetFingerprint": "8e2f052aef7d80c28bec08e894f7060654e27e7882568a1449aec415fc444027",
           "implementationSites": [
-            "src/internal/facets/generic-errors-kernel.ts#ErrorsAsTypeKernel@73"
+            "src/internal/facets/generic-errors-kernel.ts#ErrorsAsTypeKernel@53"
           ]
         }
       ]
@@ -19864,7 +19864,7 @@
           "implementationOwner": "src/internal/facets/named-io-fs.ts",
           "targetFingerprint": "95373f0b6b4d30f8322653697889c6a2d5e888c8262a7cca96f87828516e62f5",
           "implementationSites": [
-            "src/internal/facets/named-io-fs.ts#DirectPathError@963"
+            "src/internal/facets/named-io-fs.ts#DirectPathError@702"
           ]
         },
         {
@@ -19959,7 +19959,7 @@
           "implementationOwner": "src/internal/facets/named-io-fs.ts",
           "targetFingerprint": "c05ca2d07f4b069db340dcd6579367152b61c79ddd83ddc14bbed5acdd993ecb",
           "implementationSites": [
-            "src/internal/facets/named-io-fs.ts#CanonicalPathError@393"
+            "src/internal/facets/named-io-fs.ts#CanonicalPathError@132"
           ]
         }
       ],
@@ -19975,7 +19975,7 @@
           "implementationOwner": "src/internal/facets/named-io-fs.ts",
           "targetFingerprint": "22002561d8245f0b66d2b81ef18ba60a91ce501cce3370e6f1bd86c87394508d",
           "implementationSites": [
-            "src/internal/facets/named-io-fs.ts#IoFsFileModeValueOperations@87"
+            "src/internal/facets/named-io-fs.ts#IoFsFileModeValueOperations@80"
           ]
         },
         {
@@ -19991,12 +19991,12 @@
           ],
           "export": "IoFsPathErrorOperations",
           "storageExport": "IoFsPathErrorStorage",
-          "implementationOwner": "src/internal/facets/named-io-fs.ts",
+          "implementationOwner": "src/io/fs.ts",
           "storageImplementationOwner": "src/io/fs.ts",
-          "targetFingerprint": "386b87dff1a6eb871cf01b1b1d472a4bad0fb04bdeb2e94bf0292ea4715ecaab",
+          "targetFingerprint": "89e8292a350a02a4592a63a7378fc043a949a5692e4810a19e02db74f676fe55",
           "storageTargetFingerprint": "28bcba05ba29f55325530fa3d3c4be6eb43f32bcfefaec9fde48f4c086f031af",
           "implementationSites": [
-            "src/internal/facets/named-io-fs.ts#IoFsPathErrorOperations@133"
+            "src/io/fs.ts#IoFsPathErrorOperations@564"
           ]
         }
       ]
@@ -31027,14 +31027,14 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/generic-errors-kernel.ts#ErrorsAsTypeKernel@73",
+      "identity": "src/internal/facets/generic-errors-kernel.ts#ErrorsAsTypeKernel@53",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/generic-errors-kernel.ts#asType@119"
+        "src/internal/facets/generic-errors-kernel.ts#asType@99"
       ]
     },
     {
-      "identity": "src/internal/facets/generic-errors-kernel.ts#asType@119",
+      "identity": "src/internal/facets/generic-errors-kernel.ts#asType@99",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/errors/tree.ts#MessageWrappedErrors@231",
@@ -31113,36 +31113,25 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-io-fs.ts#CanonicalPathError@393",
+      "identity": "src/internal/facets/named-io-fs.ts#CanonicalPathError@132",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/interface.ts#goInterfaceEqual@10"
       ]
     },
     {
-      "identity": "src/internal/facets/named-io-fs.ts#DirectPathError@963",
+      "identity": "src/internal/facets/named-io-fs.ts#DirectPathError@702",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/interface.ts#goInterfaceEqual@10"
       ]
     },
     {
-      "identity": "src/internal/facets/named-io-fs.ts#IoFsFileModeValueOperations@87",
+      "identity": "src/internal/facets/named-io-fs.ts#IoFsFileModeValueOperations@80",
       "disposition": "implemented",
       "dependencies": [
-        "src/io/fs.ts#FileMode@116",
-        "src/io/fs.ts#value@123"
-      ]
-    },
-    {
-      "identity": "src/internal/facets/named-io-fs.ts#IoFsPathErrorOperations@133",
-      "disposition": "implemented",
-      "dependencies": [
-        "src/internal/runtime/interface.ts#goInterfaceEqual@10",
-        "src/io/fs.ts#Err@574",
-        "src/io/fs.ts#Op@562",
-        "src/io/fs.ts#Path@568",
-        "src/io/fs.ts#PathError@550"
+        "src/io/fs.ts#FileMode@130",
+        "src/io/fs.ts#value@137"
       ]
     },
     {
@@ -32924,7 +32913,7 @@
       "dependencies": [
         "src/internal/facets/provider-io-fs-direct.ts#directInfoDirEntryType@546",
         "src/internal/portable/io/value.ts#ProviderInterfaceValue@17",
-        "src/io/fs.ts#Type@317"
+        "src/io/fs.ts#Type@331"
       ]
     },
     {
@@ -32943,7 +32932,7 @@
         "src/internal/facets/provider-io-fs-direct.ts#sortDirectoryEntries@1792",
         "src/internal/portable/io/filesystem.ts#DirectoryFile@59",
         "src/internal/runtime/slice.ts#sliceValues@19",
-        "src/io/fs.ts#PathError@550"
+        "src/io/fs.ts#PathError@564"
       ]
     },
     {
@@ -33015,7 +33004,7 @@
       "dependencies": [
         "src/internal/facets/provider-io-fs.ts#canonicalInfoDirEntryType@232",
         "src/internal/portable/io/value.ts#ProviderInterfaceValue@17",
-        "src/io/fs.ts#Type@317"
+        "src/io/fs.ts#Type@331"
       ]
     },
     {
@@ -33034,7 +33023,7 @@
         "src/internal/facets/provider-io-fs.ts#sortDirectoryEntries@2021",
         "src/internal/portable/io/filesystem.ts#DirectoryFile@59",
         "src/internal/runtime/slice.ts#sliceValues@19",
-        "src/io/fs.ts#PathError@550"
+        "src/io/fs.ts#PathError@564"
       ]
     },
     {
@@ -33355,8 +33344,8 @@
       "identity": "src/internal/facets/recovery-io.ts#IoFsPathErrorError@332",
       "disposition": "implemented",
       "dependencies": [
-        "src/io/fs.ts#Error@590",
-        "src/io/fs.ts#PathError@550"
+        "src/io/fs.ts#Error@859",
+        "src/io/fs.ts#PathError@564"
       ]
     },
     {
@@ -33730,7 +33719,7 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/node/os/error.ts#fsState@21",
-        "src/io/fs.ts#state@794"
+        "src/io/fs.ts#state@1063"
       ]
     },
     {
@@ -33950,7 +33939,7 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/node/os/file.ts#fsState@69",
-        "src/io/fs.ts#state@794"
+        "src/io/fs.ts#state@1063"
       ]
     },
     {
@@ -34027,7 +34016,7 @@
         "src/internal/node/os/filesystem.ts#open@264",
         "src/internal/node/os/filesystem.ts#resolveFileSystemPath@1903",
         "src/internal/portable/io/value.ts#ProviderInterfaceValue@17",
-        "src/io/fs.ts#FileMode@116"
+        "src/io/fs.ts#FileMode@130"
       ]
     },
     {
@@ -34040,7 +34029,7 @@
         "src/internal/node/os/filesystem.ts#modeDirectory@162",
         "src/internal/node/os/filesystem.ts#modeSymlink@186",
         "src/internal/portable/io/value.ts#ProviderInterfaceValue@17",
-        "src/io/fs.ts#FileMode@116",
+        "src/io/fs.ts#FileMode@130",
         "src/time.ts#UnixMilli@38"
       ]
     },
@@ -34081,7 +34070,7 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/node/os/filesystem.ts#open@264",
-        "src/io/fs.ts#FileMode@116"
+        "src/io/fs.ts#FileMode@130"
       ]
     },
     {
@@ -34095,7 +34084,7 @@
         "src/internal/node/os/filesystem.ts#modeNamedPipe@174",
         "src/internal/node/os/filesystem.ts#modeSocket@180",
         "src/internal/node/os/filesystem.ts#modeSymlink@186",
-        "src/io/fs.ts#FileMode@116"
+        "src/io/fs.ts#FileMode@130"
       ]
     },
     {
@@ -34149,7 +34138,7 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/node/os/error.ts#nodeError@232",
-        "src/io/fs.ts#value@123"
+        "src/io/fs.ts#value@137"
       ]
     },
     {
@@ -34186,7 +34175,7 @@
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
         "src/internal/node/os/error.ts#nodeError@232",
-        "src/io/fs.ts#value@123"
+        "src/io/fs.ts#value@137"
       ]
     },
     {
@@ -39096,83 +39085,92 @@
       ]
     },
     {
-      "identity": "src/io/fs.ts#Err@574",
+      "identity": "src/io/fs.ts#Err@588",
       "disposition": "implemented"
     },
     {
-      "identity": "src/io/fs.ts#Error@621",
+      "identity": "src/io/fs.ts#Error@890",
       "disposition": "implemented",
       "dependencies": [
-        "src/io/fs.ts#Err@574",
-        "src/io/fs.ts#Op@562",
-        "src/io/fs.ts#Path@568"
+        "src/io/fs.ts#Err@588",
+        "src/io/fs.ts#Op@576",
+        "src/io/fs.ts#Path@582"
       ]
     },
     {
-      "identity": "src/io/fs.ts#InfoDirEntry@870",
+      "identity": "src/io/fs.ts#InfoDirEntry@1139",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/io/value.ts#ProviderInterfaceValue@17",
-        "src/io/fs.ts#Type@317",
-        "src/io/fs.ts#dirEntryType@858"
+        "src/io/fs.ts#Type@331",
+        "src/io/fs.ts#dirEntryType@1127"
       ]
     },
     {
-      "identity": "src/io/fs.ts#ModeDir@343",
+      "identity": "src/io/fs.ts#IoFsPathErrorOperations@564",
       "disposition": "implemented",
       "dependencies": [
-        "src/io/fs.ts#FileMode@116"
+        "src/internal/portable/errors/tree.ts#WrappedProviderError@26",
+        "src/internal/runtime/interface.ts#goInterfaceEqual@10",
+        "src/io/fs.ts#pathErrorType@552"
       ]
     },
     {
-      "identity": "src/io/fs.ts#Op@562",
-      "disposition": "implemented"
-    },
-    {
-      "identity": "src/io/fs.ts#Path@568",
-      "disposition": "implemented"
-    },
-    {
-      "identity": "src/io/fs.ts#Unwrap@703",
+      "identity": "src/io/fs.ts#ModeDir@357",
       "disposition": "implemented",
       "dependencies": [
-        "src/io/fs.ts#Err@574"
+        "src/io/fs.ts#FileMode@130"
       ]
     },
     {
-      "identity": "src/io/fs.ts#dirEntryType@858",
+      "identity": "src/io/fs.ts#Op@576",
       "disposition": "implemented"
     },
     {
-      "identity": "src/io/fs.ts#invokeWalkDir@1828",
+      "identity": "src/io/fs.ts#Path@582",
       "disposition": "implemented"
     },
     {
-      "identity": "src/io/fs.ts#ioState@99",
+      "identity": "src/io/fs.ts#Unwrap@972",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/io/fs.ts#Err@588"
+      ]
+    },
+    {
+      "identity": "src/io/fs.ts#dirEntryType@1127",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/io/fs.ts#invokeWalkDir@2097",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/io/fs.ts#ioState@113",
       "disposition": "implemented",
       "dependencies": [
         "src/io.ts#state@262",
-        "src/io/fs.ts#ioState@99"
+        "src/io/fs.ts#ioState@113"
       ]
     },
     {
-      "identity": "src/io/fs.ts#modeTypeMask@113",
+      "identity": "src/io/fs.ts#modeTypeMask@127",
       "disposition": "implemented"
     },
     {
-      "identity": "src/io/fs.ts#open@1881",
+      "identity": "src/io/fs.ts#open@2150",
       "disposition": "implemented",
       "dependencies": [
-        "src/io/fs.ts#PathError@550",
-        "src/io/fs.ts#state@794"
+        "src/io/fs.ts#PathError@564",
+        "src/io/fs.ts#state@1063"
       ]
     },
     {
-      "identity": "src/io/fs.ts#pathErrorType@538",
+      "identity": "src/io/fs.ts#pathErrorType@552",
       "disposition": "implemented"
     },
     {
-      "identity": "src/io/fs.ts#state@794",
+      "identity": "src/io/fs.ts#state@1063",
       "disposition": "implemented",
       "dependencies": [
         "src/errors.ts#New@76",
@@ -39184,17 +39182,17 @@
       ]
     },
     {
-      "identity": "src/io/fs.ts#value@123",
+      "identity": "src/io/fs.ts#value@137",
       "disposition": "implemented"
     },
     {
-      "identity": "src/io/fs.ts#walk@1649",
+      "identity": "src/io/fs.ts#walk@1918",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/slice.ts#sliceValues@19",
-        "src/io/fs.ts#ReadDir@996",
-        "src/io/fs.ts#invokeWalkDir@1828",
-        "src/io/fs.ts#state@794"
+        "src/io/fs.ts#ReadDir@1265",
+        "src/io/fs.ts#invokeWalkDir@2097",
+        "src/io/fs.ts#state@1063"
       ]
     },
     {
@@ -40052,5 +40050,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "5b5acc50b7e2de7158fd60bb89841a37fc641ffe8dba55189a88113eb806992c"
+  "manifestDigest": "b10e19e0d00b77b2946cb5d7efb3f90e70d078516c54ff559b52cde01f794332"
 }

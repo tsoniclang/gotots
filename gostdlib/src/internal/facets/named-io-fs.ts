@@ -1,6 +1,5 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { GoMapHash } from "@gotots/runtime/map.js";
-import type { GoError } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 import type { uint32 } from "@gotots/gostdlib/internal/scalars.js";
@@ -23,50 +22,8 @@ export class IoFsFileModeValueOperations {
   }
 }
 
+export { PathError as IoFsPathErrorOperations };
 export type IoFsPathErrorStorage = PathError;
-
-export class IoFsPathErrorOperations {
-  static $make(
-    operation: gostring,
-    path: gostring,
-    failure: GoError | undefined,
-  ): PathError {
-    return new PathError(operation, path, failure);
-  }
-
-  static $copy(source: PathError): PathError {
-    return new PathError(source.Op, source.Path, source.Err);
-  }
-
-  static $assign(target: PathError, source: PathError): void {
-    const operation = source.Op;
-    const path = source.Path;
-    const failure = source.Err;
-    target.Op = operation;
-    target.Path = path;
-    target.Err = failure;
-  }
-
-  static $equal(left: PathError, right: PathError): boolean {
-    return left.Op === right.Op &&
-      left.Path === right.Path &&
-      goInterfaceEqual(left.Err, right.Err);
-  }
-
-  static $hash(source: PathError): number {
-    let hash = GoMapHash.string(source.Op);
-    hash = GoMapHash.mix(hash, GoMapHash.string(source.Path));
-    return GoMapHash.mix(hash, source.Err?.$go$hash() ?? 0);
-  }
-
-  static $storageOf(source: PathError): IoFsPathErrorStorage {
-    return source;
-  }
-
-  static $fromStorage(source: IoFsPathErrorStorage): PathError {
-    return source;
-  }
-}
 
 export class CanonicalPathError<Failure extends CanonicalError> {
   constructor(

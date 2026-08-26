@@ -38,6 +38,62 @@ func EmitAdapter(
 	)
 }
 
+func EmitAdapterWithRootInterfaceParameter(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+) (SignatureEmission, error) {
+	if signature == nil || signature.Params().Len() != 1 {
+		return SignatureEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "root-interface adapter requires exactly one parameter",
+		}
+	}
+	if _, ok := signature.Params().At(0).Type().Underlying().(*types.Interface); !ok {
+		return SignatureEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "root-interface adapter parameter is not an interface",
+		}
+	}
+	return emitRepresentedWithParameterType(
+		context,
+		children,
+		source,
+		signature,
+		api.RoleCallableParameter,
+		api.RoleCallableResult,
+		func(_ *types.Var, index int) (string, error) {
+			return "$argument" + strconv.Itoa(index), nil
+		},
+		false,
+		func(_ *types.Var, index int) (api.TypeEmission, bool, error) {
+			if index != 0 {
+				return api.TypeEmission{}, false, nil
+			}
+			runtimeValue, err := context.Names().Runtime(
+				api.RuntimeInterfaceValue,
+				api.ImportPhaseType,
+			)
+			if err != nil {
+				return api.TypeEmission{}, false, err
+			}
+			return api.DirectType(
+				context.Factory().UnionTypeNode([]tsgo.TypeNode{
+					context.Factory().TypeReferenceNode(
+						runtimeValue.EntityName(context.Factory()),
+						nil,
+					),
+					context.Factory().KeywordTypeNode(
+						tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+					),
+				}),
+				runtimeValue.Requests()...,
+			), true, nil
+		},
+	)
+}
+
 func EmitAdapterWithSynchronousParameters(
 	context api.Context,
 	children api.ChildEmitter,

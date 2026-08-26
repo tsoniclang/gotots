@@ -276,7 +276,7 @@ func TimeAddress() time.Time {
 		"SlicesCloneKernel<GoContainerStorage<T>>($argument0)",
 		"CmpCompareKernel<gostring>(",
 		"SlicesValuesKernel<RuntimeSlice<gostring>, gostring, gostring>(",
-		"ErrorsAsTypeKernel<code__from_providerprojection>(($argument0:",
+		"ErrorsAsTypeKernel<code__from_providerprojection>(($argument0: GoInterfaceValue | undefined)",
 		"GenericAddress$kernel<T>",
 		"SlicesSortFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
 		"SlicesSortStableFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
