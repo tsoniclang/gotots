@@ -74,6 +74,14 @@ func prepareBuild(
 	project config.Project,
 	outputDirectory string,
 ) (printPlan, string, error) {
+	standardLibrary, externalProvider, err := certifyProviders(project)
+	if err != nil {
+		return printPlan{}, "", err
+	}
+	preparedImplementations, err := prepareSourceImplementations(project)
+	if err != nil {
+		return printPlan{}, "", err
+	}
 	program, err := load.Load(ctx, load.Request{
 		Directory:    project.SourceRoot(),
 		Pattern:      project.PackagePattern(),
@@ -91,13 +99,12 @@ func prepareBuild(
 	options.IntegerRepresentation = project.IntegerRepresentation()
 	options.EvaluationOrder = project.EvaluationOrder()
 
-	standardLibrary, externalProvider, err := certifyProviders(project)
-	if err != nil {
-		return printPlan{}, "", err
-	}
 	options.StandardLibrary = standardLibrary
 	options.ExternalProvider = externalProvider
-	sourceImplementations, err := certifySourceImplementations(project, program)
+	sourceImplementations, err := joinSourceImplementations(
+		preparedImplementations,
+		program,
+	)
 	if err != nil {
 		return printPlan{}, "", err
 	}
@@ -132,18 +139,17 @@ func prepareBuild(
 	return plan, semanticDigest, nil
 }
 
-func certifySourceImplementations(
+func prepareSourceImplementations(
 	project config.Project,
-	program *load.Program,
-) (*sourceimplementation.Certificate, error) {
+) (*sourceimplementation.Prepared, error) {
 	bundles := project.ImplementationBundles()
 	if len(bundles) == 0 {
 		return nil, nil
 	}
-	return sourceimplementation.VerifyAll(sourceimplementation.Config{
+	return sourceimplementation.PrepareAll(sourceimplementation.Config{
 		RepositoryRoot: project.DistributionRoot(),
-		Program:        program,
 		ContractPaths:  bundles,
+		BuildProfile:   project.BuildProfile(),
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers:        project.IntegerRepresentation().String(),
 			EvaluationOrder: project.EvaluationOrder().String(),
@@ -155,6 +161,16 @@ func certifySourceImplementations(
 		),
 		TSGoTool: project.TSGoTool(),
 	})
+}
+
+func joinSourceImplementations(
+	prepared *sourceimplementation.Prepared,
+	program *load.Program,
+) (*sourceimplementation.Certificate, error) {
+	if prepared == nil {
+		return nil, nil
+	}
+	return prepared.Join(program)
 }
 
 func certifyProviders(

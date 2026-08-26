@@ -60,14 +60,18 @@ func Value() int { return beta.Twice(alpha.Add(20, 1)) }
 	compilation := sourceimplementation.CompilationDocument{
 		Integers: "number", EvaluationOrder: "direct",
 	}
-	certificate, err := sourceimplementation.VerifyAll(sourceimplementation.Config{
+	prepared, err := sourceimplementation.PrepareAll(sourceimplementation.Config{
 		RepositoryRoot: repository,
-		Program:        program,
 		ContractPaths:  []string{alphaContract, betaContract},
 		ScratchRoot:    filepath.Join(root, ".scratch"),
+		BuildProfile:   program.BuildProfile(),
 		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation:    compilation,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := prepared.Join(program)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -90,24 +91,39 @@ export type DigestView = { value: Digest };
 	}
 	contractPath := filepath.Join(implementation, "contract.json")
 	writeFixture(t, contractPath, string(payload)+"\n")
-	program, err := load.Load(context.Background(), load.Request{
-		Directory: root,
-		Pattern:   ".",
-		GoTool:    selectedGo,
-	})
+	buildProfile, err := load.NewBuildProfileForToolchain(
+		selectedGo.Version(),
+		selectedGo.DefaultGOOS(),
+		selectedGo.DefaultGOARCH(),
+		false,
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	certificate, err := VerifyAll(Config{
+	prepared, err := PrepareAll(Config{
 		RepositoryRoot: repository,
-		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".scratch"),
+		BuildProfile:   buildProfile,
 		Compilation: CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct",
 		},
 		TSGoTool: selectedTSGo,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory:    root,
+		Pattern:      ".",
+		BuildProfile: buildProfile,
+		GoTool:       selectedGo,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := prepared.Join(program)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,6 +143,40 @@ export type DigestView = { value: Digest };
 		t.Fatalf("private modules = %#v", privateModules)
 	}
 
+	wrongPackage := clonePrepared(prepared)
+	wrongPackageRecord := wrongPackage.certificate.byPath["example.test/app/fast"]
+	wrongPackageRecord.modulePath = "example.test/other"
+	wrongPackage.certificate.byPath[wrongPackageRecord.packagePath] = wrongPackageRecord
+	if _, err := wrongPackage.Join(program); err == nil ||
+		!strings.Contains(err.Error(), "selected source package identity differs") {
+		t.Fatalf("package-identity join error = %v", err)
+	}
+
+	wrongBuild := clonePrepared(prepared)
+	wrongBuild.buildProfile, err = load.NewBuildProfileForToolchain(
+		selectedGo.Version(),
+		selectedGo.DefaultGOOS(),
+		selectedGo.DefaultGOARCH(),
+		false,
+		[]string{"joindrift"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wrongBuild.Join(program); err == nil ||
+		!strings.Contains(err.Error(), "join build profile") {
+		t.Fatalf("build-profile join error = %v", err)
+	}
+
+	missingPrivateFile := clonePrepared(prepared)
+	missingFileRecord := missingPrivateFile.certificate.byPath["example.test/app/fast"]
+	missingFileRecord.privateModules[0].goFile = "missing.go"
+	missingPrivateFile.certificate.byPath[missingFileRecord.packagePath] = missingFileRecord
+	if _, err := missingPrivateFile.Join(program); err == nil ||
+		!strings.Contains(err.Error(), "selected Go source file is absent") {
+		t.Fatalf("private-file join error = %v", err)
+	}
+
 	writeFixture(t, filepath.Join(implementation, "private.ts"), `export type DigestView = { value: string };
 export const Marker = 1;
 `)
@@ -136,11 +186,11 @@ export const Marker = 1;
 		t.Fatal(err)
 	}
 	writeFixture(t, contractPath, string(payload)+"\n")
-	if _, err := VerifyAll(Config{
+	if _, err := PrepareAll(Config{
 		RepositoryRoot: repository,
-		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".mutation-scratch"),
+		BuildProfile:   buildProfile,
 		Compilation: CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct",
 		},
@@ -181,4 +231,18 @@ func writeFixture(t *testing.T, path string, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func clonePrepared(source *Prepared) *Prepared {
+	cloned := *source
+	cloned.certificate = source.certificate
+	cloned.certificate.byPath = make(
+		map[string]Implementation,
+		len(source.certificate.byPath),
+	)
+	for path, implementation := range source.certificate.byPath {
+		implementation.privateModules = slices.Clone(implementation.privateModules)
+		cloned.certificate.byPath[path] = implementation
+	}
+	return &cloned
 }

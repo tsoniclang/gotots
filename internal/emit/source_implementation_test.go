@@ -143,16 +143,20 @@ export function Sum(value: string): number { return value.length; }
 	if err != nil {
 		t.Fatal(err)
 	}
-	certificate, err := sourceimplementation.VerifyAll(sourceimplementation.Config{
+	prepared, err := sourceimplementation.PrepareAll(sourceimplementation.Config{
 		RepositoryRoot: repository,
-		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".scratch"),
+		BuildProfile:   program.BuildProfile(),
 		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct",
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := prepared.Join(program)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,16 +429,20 @@ export function Sum(value: string): number { return value.length; }
 		t.Fatal(err)
 	}
 	writeSourceImplementationFixture(t, contractPath, string(payload)+"\n")
-	mutated, err := sourceimplementation.VerifyAll(sourceimplementation.Config{
+	preparedMutation, err := sourceimplementation.PrepareAll(sourceimplementation.Config{
 		RepositoryRoot: repository,
-		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".mutated-scratch"),
+		BuildProfile:   program.BuildProfile(),
 		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct",
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutated, err := preparedMutation.Join(program)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -538,16 +546,20 @@ export function Sum(value: string): number { return value.length; }
 	if err != nil {
 		t.Fatal(err)
 	}
-	certificate, err := sourceimplementation.VerifyAll(sourceimplementation.Config{
+	prepared, err := sourceimplementation.PrepareAll(sourceimplementation.Config{
 		RepositoryRoot: repository,
-		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".scratch"),
+		BuildProfile:   program.BuildProfile(),
 		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct",
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := prepared.Join(program)
 	if err != nil {
 		t.Fatal(err)
 	}

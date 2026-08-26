@@ -130,6 +130,11 @@ type Certificate struct {
 	tsgoTool    tsgo.Tool
 }
 
+type Prepared struct {
+	buildProfile load.BuildProfile
+	certificate  Certificate
+}
+
 func (c *Certificate) Valid() bool {
 	return c != nil && c.compilation.valid() && c.digest != "" &&
 		len(c.byPath) != 0 && c.tsgoTool.Valid()

@@ -1646,6 +1646,19 @@ state, initializer, compatibility wrapper, or fallback for the selected
 package may survive. References keep the ordinary package assembly path and
 source-facing contract.
 
+Certification has two resource-disjoint lifecycle types. Preparation validates
+the configured build/compilation profile, strict-typechecks and inspects every
+authored TypeScript project, and seals package/file claims before the product
+Go graph is loaded. The prepared value contains no loader package, Go syntax,
+or checker graph. After loading, one join validates those sealed claims against
+the exact selected module/package/version, build profile, and private Go-file
+membership and produces the only certificate accepted by emission. Provider
+certification follows the same prerequisite-first ordering. A TS-Go
+certification subprocess may never overlap the resident whole-product Go
+syntax/type graph merely because its result will later be joined to that graph;
+moving independent preparation after loading is a lifecycle violation, not a
+permitted memory tradeoff.
+
 Replacement uses two compilation sessions, not a filter over an assembled file
 list and not rollback within one mutable graph. The first session settles the
 ordinary canonical program solely for certification. It captures the complete

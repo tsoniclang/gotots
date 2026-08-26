@@ -19,18 +19,18 @@ import (
 
 type Config struct {
 	RepositoryRoot string
-	Program        *load.Program
 	ContractPaths  []string
 	ScratchRoot    string
+	BuildProfile   load.BuildProfile
 	Compilation    CompilationDocument
 	TSGoTool       tsgo.Tool
 }
 
-func VerifyAll(config Config) (
-	certificate *Certificate,
+func PrepareAll(config Config) (
+	prepared *Prepared,
 	resultErr error,
 ) {
-	if config.RepositoryRoot == "" || config.Program == nil ||
+	if config.RepositoryRoot == "" || !config.BuildProfile.Valid() ||
 		len(config.ContractPaths) == 0 || config.ScratchRoot == "" ||
 		!config.Compilation.valid() || !config.TSGoTool.Valid() {
 		return nil, &Error{Operation: "configure", Reason: "required input is absent"}
@@ -44,19 +44,22 @@ func VerifyAll(config Config) (
 	}
 	defer func() {
 		if err := client.Close(); resultErr == nil && err != nil {
-			certificate = nil
+			prepared = nil
 			resultErr = implementationError("close TS-Go client", "", err)
 		}
 	}()
 	paths := slices.Clone(config.ContractPaths)
 	slices.Sort(paths)
-	certificate = &Certificate{
-		byPath:     make(map[string]Implementation),
-		repository: config.RepositoryRoot,
-		scratch:    config.ScratchRoot,
-		tsgoTool:   config.TSGoTool,
+	prepared = &Prepared{
+		buildProfile: config.BuildProfile,
+		certificate: Certificate{
+			byPath:     make(map[string]Implementation),
+			repository: config.RepositoryRoot,
+			scratch:    config.ScratchRoot,
+			tsgoTool:   config.TSGoTool,
+		},
 	}
-	if err := certificate.bindCompilation(config.Compilation); err != nil {
+	if err := prepared.certificate.bindCompilation(config.Compilation); err != nil {
 		return nil, err
 	}
 	for _, contractPath := range paths {
@@ -64,19 +67,19 @@ func VerifyAll(config Config) (
 		if verifyErr != nil {
 			return nil, verifyErr
 		}
-		if err := certificate.add(implementation); err != nil {
+		if err := prepared.certificate.add(implementation); err != nil {
 			return nil, err
 		}
 	}
 	digest := sha256.New()
-	for _, implementation := range certificate.Implementations() {
+	for _, implementation := range prepared.certificate.Implementations() {
 		digest.Write([]byte(implementation.packagePath))
 		digest.Write([]byte{0})
 		digest.Write([]byte(implementation.digest))
 		digest.Write([]byte{0})
 	}
-	certificate.digest = hex.EncodeToString(digest.Sum(nil))
-	return certificate, nil
+	prepared.certificate.digest = hex.EncodeToString(digest.Sum(nil))
+	return prepared, nil
 }
 
 func verifyOne(
@@ -99,17 +102,7 @@ func verifyOne(
 	if err := validateDocument(document); err != nil {
 		return Implementation{}, err
 	}
-	selected := config.Program.PackageByPath(document.Package.ImportPath)
-	if selected == nil || selected.Kind() != load.PackageSource ||
-		selected.ModulePath() != document.Package.ModulePath ||
-		selected.ModuleVersion() != document.Package.ModuleVersion {
-		return Implementation{}, &Error{
-			Operation: "join package",
-			Subject:   document.Package.ImportPath,
-			Reason:    "selected source package identity differs",
-		}
-	}
-	if err := verifyBuild(config.Program, document.Build); err != nil {
+	if err := verifyBuild(config.BuildProfile, document.Build); err != nil {
 		return Implementation{}, err
 	}
 	if document.Compilation != config.Compilation {
@@ -184,7 +177,6 @@ func verifyOne(
 	privateHashes := make([][32]byte, 0, len(document.PrivateModules))
 	for _, selectedModule := range document.PrivateModules {
 		module, moduleHash, moduleErr := verifyPrivateModule(
-			selected,
 			directory,
 			project,
 			selectedModule,
@@ -242,26 +234,11 @@ func verifyOne(
 }
 
 func verifyPrivateModule(
-	selected *load.Package,
 	directory string,
 	project *tsgo.ProjectInspection,
 	document PrivateModuleDocument,
 ) (PrivateModule, [32]byte, error) {
 	var zero [32]byte
-	matched := false
-	for _, sourceFile := range selected.Files() {
-		if filepath.Base(sourceFile.Path()) == document.GoFile {
-			matched = true
-			break
-		}
-	}
-	if !matched {
-		return PrivateModule{}, zero, &Error{
-			Operation: "join private module",
-			Subject:   document.GoFile,
-			Reason:    "selected Go source file is absent",
-		}
-	}
 	sourcePath, err := resolveOwnedPath(directory, document.Source)
 	if err != nil {
 		return PrivateModule{}, zero, err
@@ -406,8 +383,7 @@ func validateDocument(document Document) error {
 	return nil
 }
 
-func verifyBuild(program *load.Program, selected BuildDocument) error {
-	profile := program.BuildProfile()
+func verifyBuild(profile load.BuildProfile, selected BuildDocument) error {
 	if profile.ToolchainVersion() != selected.GoVersion ||
 		profile.GOOS() != selected.GOOS || profile.GOARCH() != selected.GOARCH ||
 		profile.CgoEnabled() != selected.CGOEnabled ||

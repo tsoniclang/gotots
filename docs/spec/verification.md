@@ -1186,6 +1186,16 @@ final module-resolution configuration. The installed check proves all selected
 consumer requirements; TSTS exact-joins callable source signatures in that
 canonical check.
 
+The lifecycle fixture prepares authored projects before loading its Go program,
+then proves that package identity, build profile, and every private Go-file
+claim are still checked by the post-load join. Missing packages, changed module
+identity, build drift, and missing private files fail only at that join with
+the exact claimed identity. The prepared type exposes no emission certificate
+and retains no loader/checker object. The guarded whole-product resource gate
+is the mutation proof for phase ordering: moving TS-Go preparation after the
+whole-product load must exceed the frozen process-tree peak bound, while the
+prerequisite-first transaction stays below it with identical sealed evidence.
+
 The final-artifact gate additionally proves session isolation. A fixture with
 a public package value and an unrelated private type must retain the public
 observable contract while producing no selected-package storage/body and no
