@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "44d2025ea1f470537c6ae6c882ae341b1a6a496831b5b04a840723b72c7ab71c",
+  "providerDigest": "e879350beee283745c2f4ad126e60e50fe40cd40fcc05a255862e4c96d5b52a9",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -26645,7 +26645,7 @@
             "io|kind=2|receiver=|name=Reader"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-io-read.ts#IoReadFullCanonical@55"
+            "src/internal/facets/provider-io-read.ts#IoReadFullCanonical@166"
           ],
           "interfaces": [
             {
@@ -26694,6 +26694,79 @@
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-io-read.ts",
           "targetFingerprint": "78e5828c2462b345eeb284612f6b536a0d1cb1b420f7bfd3f01161d29ec31ce7"
+        },
+        {
+          "sourceIdentity": "io|kind=4|receiver=|name=ReadFull",
+          "profileKey": "90f39f8d61a8fb29ff08c537afb8f4679a1b635dc187f5872cc27f5f37d087bf",
+          "export": "IoReadFullDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "canonicalValues": [
+            {
+              "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+              "targetParameter": "eof"
+            },
+            {
+              "sourceIdentity": "io|kind=3|receiver=|name=ErrUnexpectedEOF",
+              "targetParameter": "unexpectedEOF"
+            }
+          ],
+          "canonicalTypeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Reader"
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-io-read.ts#IoReadFullDirect@74"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+              "export": "ProviderReaderInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Reader|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "contractSignature": "func(p []byte) (n int, err error)",
+                    "sourceLocation": "io/io.go:87:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "8450bfcabdd5ad628007ad78f452b9f28c35a7fc25159ebbafe720f861cdbb38"
+                  }
+                ]
+              },
+              "targetFingerprint": "640ffcfa00a6626ca57ed7e61204b80fe6a550a32f35da3dc2a2b7947d54110e"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-io-read.ts",
+          "targetFingerprint": "abb3f7e1eb87e8077686d1b58d6a18d71a67335df1e0b7a1866d691d04a10c58"
         }
       ],
       "facets": []
@@ -31275,15 +31348,23 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-io-read.ts#IoReadFullCanonical@55",
+      "identity": "src/internal/facets/provider-io-read.ts#IoReadFullCanonical@166",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-io-read.ts#requireValue@151",
+        "src/internal/facets/provider-io-read.ts#requireValue@262",
         "src/internal/portable/io/read.ts#readFullAsync@300"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-io-read.ts#requireValue@151",
+      "identity": "src/internal/facets/provider-io-read.ts#IoReadFullDirect@74",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-io-read.ts#requireValue@262",
+        "src/internal/portable/io/read.ts#readFullSync@112"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-io-read.ts#requireValue@262",
       "disposition": "implemented"
     },
     {
@@ -38222,5 +38303,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "a54dfceba15c99fd7a9c8a9a2c00a33f682a1116ab845cd8045233728dfad0d3"
+  "manifestDigest": "fb44bd961ca9ff6300a8e90c21d0fdd518a6071cbf8fe03f5f58046694d2d452"
 }

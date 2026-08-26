@@ -1403,6 +1403,39 @@
       "sourceIdentity": "io|kind=4|receiver=|name=ReadFull",
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-read.js",
       "sourcePath": "src/internal/facets/provider-io-read.ts",
+      "export": "IoReadFullDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrUnexpectedEOF",
+          "targetParameter": "unexpectedEOF"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "ProviderReaderInterface"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io|kind=4|receiver=|name=ReadFull",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-read.js",
+      "sourcePath": "src/internal/facets/provider-io-read.ts",
       "export": "IoReadFullCanonical",
       "canonicalParameters": [
         0
