@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "e879350beee283745c2f4ad126e60e50fe40cd40fcc05a255862e4c96d5b52a9",
+  "providerDigest": "6cf8b2acbd409559df75a36a123e361f079d0ea61bfa9094cdbde139bc0d8d2d",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -24029,7 +24029,7 @@
             "go:universe|error"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryReadCanonical@254"
+            "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryReadCanonical@382"
           ],
           "interfaces": [
             {
@@ -24167,6 +24167,153 @@
           "targetFingerprint": "6943473f7fd1d53b12317c1691df16d90ed15166d3f1660d2c5f8162713637cd"
         },
         {
+          "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+          "profileKey": "f2f39ec0dcbc8d83d05c2b83d6e014fbc1a59fdb8fcc9c50f5c379659127c6e7",
+          "export": "EncodingBinaryReadDirect",
+          "canonicalParameters": [
+            0,
+            1
+          ],
+          "canonicalResults": null,
+          "implementationSites": [
+            "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryReadDirect@144"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+              "export": "ProviderByteOrder",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=PutUint16",
+                    "kind": "callable",
+                    "member": "PutUint16",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte, uint16)|params=,|results=",
+                    "contractSignature": "func([]byte, uint16)",
+                    "sourceLocation": "encoding/binary/binary.go:43:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "126a3fd096c16d9b12b38ed02783e654e4fbd196917188d5091ac7205abf0e99"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=PutUint32",
+                    "kind": "callable",
+                    "member": "PutUint32",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte, uint32)|params=,|results=",
+                    "contractSignature": "func([]byte, uint32)",
+                    "sourceLocation": "encoding/binary/binary.go:44:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "523407a356433cedd7f300e299e6d49e9a1c2127bd0d22b028c9274aa865bffc"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=PutUint64",
+                    "kind": "callable",
+                    "member": "PutUint64",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte, uint64)|params=,|results=",
+                    "contractSignature": "func([]byte, uint64)",
+                    "sourceLocation": "encoding/binary/binary.go:45:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "4bca9c0edcd2dcb736b6c78d56db8806f67997c96eb0d661bf595f74ecfe047e"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=String",
+                    "kind": "callable",
+                    "member": "String",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "encoding/binary/binary.go:46:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "a631bc5c2b15b4bb1ed5f422cbd1c1ad7e94ed999bde247d475e01ca89be3f8a"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=Uint16",
+                    "kind": "callable",
+                    "member": "Uint16",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) uint16|params=|results=",
+                    "contractSignature": "func([]byte) uint16",
+                    "sourceLocation": "encoding/binary/binary.go:40:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "49b23159b4993a3d918f0baf6d65549fa817cb5274dc363a34484dd0be4ebe9c"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=Uint32",
+                    "kind": "callable",
+                    "member": "Uint32",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) uint32|params=|results=",
+                    "contractSignature": "func([]byte) uint32",
+                    "sourceLocation": "encoding/binary/binary.go:41:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "f1b3ac252e9c90312381eaedf92b4b50b294155316807929f4cda8cf88e88807"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=Uint64",
+                    "kind": "callable",
+                    "member": "Uint64",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) uint64|params=|results=",
+                    "contractSignature": "func([]byte) uint64",
+                    "sourceLocation": "encoding/binary/binary.go:42:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "e0a56b35483a54c7b9018b840a2af745f1a4f041b9af49e2c1294523f84324ea"
+                  }
+                ]
+              },
+              "targetFingerprint": "21104eb101ec8b5da1b4cad422949f3c1315dd140ee3b1f0c3ae6f9696fa1d18"
+            },
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+              "export": "ProviderReaderInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Reader|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "contractSignature": "func(p []byte) (n int, err error)",
+                    "sourceLocation": "io/io.go:87:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "8450bfcabdd5ad628007ad78f452b9f28c35a7fc25159ebbafe720f861cdbb38"
+                  }
+                ]
+              },
+              "targetFingerprint": "640ffcfa00a6626ca57ed7e61204b80fe6a550a32f35da3dc2a2b7947d54110e"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-encoding-binary.ts",
+          "targetFingerprint": "5a7c2bac4f97feabbe5cf47de7808276d246d25a27cc26e7d55589267f4fb405"
+        },
+        {
           "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
           "profileKey": "21344b97030e6fa4cd8ae97bd0ce01bb3dbfb7b2ec726a0298d6ff4a0caf5cc9",
           "export": "EncodingBinaryWriteCanonical",
@@ -24181,7 +24328,7 @@
             "go:universe|error"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryWriteCanonical@623"
+            "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryWriteCanonical@751"
           ],
           "interfaces": [
             {
@@ -24317,6 +24464,153 @@
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-encoding-binary.ts",
           "targetFingerprint": "30663c7ee77278a76c634f52cb1c55a23548cdb04e848707d89db66ee735382a"
+        },
+        {
+          "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+          "profileKey": "a0e1c06e15cdef1a9fab4e442cbe69b244f29484c30e66b136170c0088af3972",
+          "export": "EncodingBinaryWriteDirect",
+          "canonicalParameters": [
+            0,
+            1
+          ],
+          "canonicalResults": null,
+          "implementationSites": [
+            "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryWriteDirect@187"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+              "export": "ProviderByteOrder",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=PutUint16",
+                    "kind": "callable",
+                    "member": "PutUint16",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte, uint16)|params=,|results=",
+                    "contractSignature": "func([]byte, uint16)",
+                    "sourceLocation": "encoding/binary/binary.go:43:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "126a3fd096c16d9b12b38ed02783e654e4fbd196917188d5091ac7205abf0e99"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=PutUint32",
+                    "kind": "callable",
+                    "member": "PutUint32",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte, uint32)|params=,|results=",
+                    "contractSignature": "func([]byte, uint32)",
+                    "sourceLocation": "encoding/binary/binary.go:44:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "523407a356433cedd7f300e299e6d49e9a1c2127bd0d22b028c9274aa865bffc"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=PutUint64",
+                    "kind": "callable",
+                    "member": "PutUint64",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte, uint64)|params=,|results=",
+                    "contractSignature": "func([]byte, uint64)",
+                    "sourceLocation": "encoding/binary/binary.go:45:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "4bca9c0edcd2dcb736b6c78d56db8806f67997c96eb0d661bf595f74ecfe047e"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=String",
+                    "kind": "callable",
+                    "member": "String",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "encoding/binary/binary.go:46:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "a631bc5c2b15b4bb1ed5f422cbd1c1ad7e94ed999bde247d475e01ca89be3f8a"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=Uint16",
+                    "kind": "callable",
+                    "member": "Uint16",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) uint16|params=|results=",
+                    "contractSignature": "func([]byte) uint16",
+                    "sourceLocation": "encoding/binary/binary.go:40:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "49b23159b4993a3d918f0baf6d65549fa817cb5274dc363a34484dd0be4ebe9c"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=Uint32",
+                    "kind": "callable",
+                    "member": "Uint32",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) uint32|params=|results=",
+                    "contractSignature": "func([]byte) uint32",
+                    "sourceLocation": "encoding/binary/binary.go:41:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "f1b3ac252e9c90312381eaedf92b4b50b294155316807929f4cda8cf88e88807"
+                  },
+                  {
+                    "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.ByteOrder|name=Uint64",
+                    "kind": "callable",
+                    "member": "Uint64",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) uint64|params=|results=",
+                    "contractSignature": "func([]byte) uint64",
+                    "sourceLocation": "encoding/binary/binary.go:42:2",
+                    "implementationOwner": "src/encoding/binary.ts",
+                    "targetFingerprint": "e0a56b35483a54c7b9018b840a2af745f1a4f041b9af49e2c1294523f84324ea"
+                  }
+                ]
+              },
+              "targetFingerprint": "21104eb101ec8b5da1b4cad422949f3c1315dd140ee3b1f0c3ae6f9696fa1d18"
+            },
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+              "export": "ProviderWriterInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Writer|name=Write",
+                    "kind": "callable",
+                    "member": "Write",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "contractSignature": "func(p []byte) (n int, err error)",
+                    "sourceLocation": "io/io.go:100:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "b82c95dbb864d6c64bb25a0a048c21db1f1a5c098939281fc17a9a850a4fc065"
+                  }
+                ]
+              },
+              "targetFingerprint": "488d64c278ba4dcab615ce6c95b7ce02a7da47e62d416a60fd14f554a817206b"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-encoding-binary.ts",
+          "targetFingerprint": "5f6947d36cfdfdabe1e7ab26b1a73b6e8cd46ddfa99f3fc9272b49e8b7c68677"
         }
       ],
       "facets": []
@@ -31043,11 +31337,11 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryReadCanonical@254",
+      "identity": "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryReadCanonical@382",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/facets/provider-encoding-binary.ts#RuntimeSliceValue@52",
-        "src/internal/facets/provider-encoding-binary.ts#invalidCanonicalType@526",
+        "src/internal/facets/provider-encoding-binary.ts#invalidCanonicalType@654",
         "src/internal/facets/provider-encoding-binary.ts#reflect@58",
         "src/internal/facets/provider-io-contract.ts#CanonicalBoundaryError@82",
         "src/internal/portable/encoding/binary/reflection-codec.ts#decodeIntoAwaited@1586",
@@ -31061,17 +31355,31 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryWriteCanonical@623",
+      "identity": "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryReadDirect@144",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-encoding-binary.ts#readDirect@68"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryWriteCanonical@751",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/facets/provider-encoding-binary.ts#RuntimeSliceValue@52",
-        "src/internal/facets/provider-encoding-binary.ts#canonicalTypeText@563",
+        "src/internal/facets/provider-encoding-binary.ts#canonicalTypeText@691",
         "src/internal/facets/provider-encoding-binary.ts#reflect@58",
         "src/internal/facets/provider-io-contract.ts#CanonicalBoundaryError@82",
         "src/internal/portable/encoding/binary/reflection-codec.ts#encodeFromAwaited@1776",
         "src/internal/portable/encoding/binary/reflection-codec.ts#encodedSize@275",
         "src/reflect.ts#Indirect@6160",
         "src/reflect.ts#ValueOf@4182"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-encoding-binary.ts#EncodingBinaryWriteDirect@187",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-encoding-binary.ts#writeDirect@71"
       ]
     },
     {
@@ -31082,7 +31390,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-encoding-binary.ts#canonicalTypeText@563",
+      "identity": "src/internal/facets/provider-encoding-binary.ts#canonicalTypeText@691",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/facets/provider-encoding-binary.ts#reflect@58",
@@ -31093,11 +31401,19 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-encoding-binary.ts#invalidCanonicalType@526",
+      "identity": "src/internal/facets/provider-encoding-binary.ts#invalidCanonicalType@654",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-encoding-binary.ts#canonicalTypeText@563",
+        "src/internal/facets/provider-encoding-binary.ts#canonicalTypeText@691",
         "src/internal/facets/provider-io-contract.ts#CanonicalBoundaryError@82"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-encoding-binary.ts#readDirect@68",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/encoding/binary.ts#Read@342",
+        "src/internal/facets/provider-encoding-binary.ts#readDirect@68"
       ]
     },
     {
@@ -31105,6 +31421,14 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/facets/provider-encoding-binary.ts#reflect@58"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-encoding-binary.ts#writeDirect@71",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/encoding/binary.ts#Write@620",
+        "src/internal/facets/provider-encoding-binary.ts#writeDirect@71"
       ]
     },
     {
@@ -38303,5 +38627,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "fb44bd961ca9ff6300a8e90c21d0fdd518a6071cbf8fe03f5f58046694d2d452"
+  "manifestDigest": "7e5767e22b7941ab53d7f243b278df0ecd12e91a6f50cd0af3fc9399107a4005"
 }

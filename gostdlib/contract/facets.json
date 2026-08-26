@@ -1373,6 +1373,30 @@
       "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
       "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
       "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadDirect",
+      "canonicalParameters": [
+        0,
+        1
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "ProviderByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "ProviderReaderInterface"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
       "export": "EncodingBinaryReadCanonical",
       "canonicalParameters": [
         0,
@@ -1465,6 +1489,30 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Reader",
           "export": "CanonicalReader"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteDirect",
+      "canonicalParameters": [
+        0,
+        1
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "ProviderByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "ProviderWriterInterface"
         }
       ]
     },

@@ -14,6 +14,11 @@ import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice as RuntimeSliceValue } from "@gotots/runtime/slice.js";
 import * as reflect from "../../reflect.js";
 import {
+  type ByteOrder as ProviderByteOrder,
+  Read as readDirect,
+  Write as writeDirect,
+} from "../../encoding/binary.js";
+import {
   decodeIntoAwaited,
   encodeFromAwaited,
   encodedSize,
@@ -23,14 +28,37 @@ import {
   type CanonicalError,
   type CanonicalReader,
   type CanonicalWriter,
+  type ProviderReaderInterface,
+  type ProviderWriterInterface,
 } from "./provider-io-contract.js";
+import type { ProviderErrorInterface } from "./provider-error.js";
 import type { InterfaceContract } from "./provider-support.js";
 
 export type {
   CanonicalError,
   CanonicalReader,
   CanonicalWriter,
+  ProviderReaderInterface,
+  ProviderWriterInterface,
 } from "./provider-io-contract.js";
+export type { ByteOrder as ProviderByteOrder } from "../../encoding/binary.js";
+export type { ProviderErrorInterface } from "./provider-error.js";
+
+export function EncodingBinaryReadDirect(
+  reader: ProviderReaderInterface<ProviderErrorInterface> | undefined,
+  order: ProviderByteOrder | undefined,
+  data: GoInterfaceValue | undefined,
+): ProviderErrorInterface | undefined {
+  return readDirect(reader, order, data);
+}
+
+export function EncodingBinaryWriteDirect(
+  writer: ProviderWriterInterface<ProviderErrorInterface> | undefined,
+  order: ProviderByteOrder | undefined,
+  data: GoInterfaceValue | undefined,
+): ProviderErrorInterface | undefined {
+  return writeDirect(writer, order, data);
+}
 
 export interface CanonicalByteOrder extends GoInterfaceValue {
   PutUint16(
