@@ -22,6 +22,7 @@ export interface RuntimeValueLocation {
   readonly settable: bool;
   readonly get: () => GoInterfaceValue | undefined;
   readonly set: (box: GoInterfaceValue | undefined) => void;
+  readonly address?: () => GoInterfaceValue;
 }
 
 export interface RuntimeValueAdapter<T> {
@@ -41,6 +42,7 @@ export interface RuntimeStructFieldOperations<T> {
     value: T,
     field: GoInterfaceValue | undefined,
   ) => void;
+  readonly address?: (value: T) => GoInterfaceValue;
 }
 
 export interface RuntimePointerElementOperations<P> {
@@ -212,6 +214,10 @@ export function registerRuntimeStructValueOperations<T>(
         return GoPanic.raiseRuntime("reflect: Field index out of range");
       }
       const value = box.$go$value;
+      const selectedAddress = selected.address;
+      const address = selectedAddress === undefined
+        ? {}
+        : { address: (): GoInterfaceValue => selectedAddress(value) };
       return {
         type: selected.type,
         settable: selected.settable,
@@ -219,6 +225,7 @@ export function registerRuntimeStructValueOperations<T>(
         set: (fieldValue: GoInterfaceValue | undefined): void => {
           selected.set(value, fieldValue);
         },
+        ...address,
       };
     };
     if (clone === undefined) {
@@ -298,6 +305,7 @@ export function registerRuntimePointerValueOperations<P>(
             set: (value: GoInterfaceValue | undefined): void => {
               element.set(pointer, value);
             },
+            address: (): GoInterfaceValue => box,
           };
         },
       };

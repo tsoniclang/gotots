@@ -848,6 +848,12 @@ represented structs use a distinct typed opaque-field registration whose
 only generated facts are field-order-preserving failure messages; they do not
 retain the ordinary field-access path behind a fallback.
 
+An addressable registration also carries its canonical pointer box callback.
+For example, a field callback returns the exact adapter around
+`addressOf(entry.Name)`, while a pointer-element callback returns the original
+pointer box. The portable `Value.Addr` implementation consumes that callback;
+it never invents a second cell or an unboxed pointer-shaped object.
+
 For an open generic body:
 
 ```go

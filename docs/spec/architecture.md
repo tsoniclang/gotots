@@ -765,6 +765,16 @@ closures is a source-size and typecheck regression even when behavior remains
 correct. Erasing callback payloads or recovering their types dynamically is
 equally invalid.
 
+Every addressable reflected location carries one exact callback that returns
+the canonical non-nil pointer interface box for that same storage. Pointer
+elements return their existing pointer box; struct fields and slice elements
+use the ordinary typed address and storage-projection owners. `Value.Addr`
+resolves the canonical `*T` descriptor and consumes that callback, so
+`Addr().Type`, `Addr().Elem`, `Addr().Interface`, `TypeAssert`, pointer equality,
+and mutation all observe one location. A source-less synthetic address value,
+detached cell, reconstructed pointer, or provider-side storage inspection is
+forbidden.
+
 Container descriptors are total over every statically representable Go
 element, key, and value type; basic scalars do not define a privileged
 reflection subset. Slice indexing, append, construction, and growth use the

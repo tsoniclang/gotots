@@ -85,6 +85,7 @@ func structValueOperationsStatement(
 		var boxedField tsgo.Expression
 		var boxedFieldBlock tsgo.Block
 		var setBlock tsgo.Block
+		var address tsgo.Expression
 		if field.Name() == "_" {
 			settable = false
 			setBlock = unaddressableFieldSetter(scaffold)
@@ -134,21 +135,51 @@ func structValueOperationsStatement(
 				}
 			}
 		} else {
+			target, targetErr := reflectedStructFieldTarget(
+				context.WithRole(api.RoleStructField),
+				sourceType,
+				field,
+				api.DirectExpression(factory.Identifier("instance")),
+			)
+			if targetErr != nil {
+				return nil, nil, false, targetErr
+			}
 			var fieldRequests []api.RootRequest
 			boxedField, boxedFieldBlock, setBlock, fieldRequests, descriptorErr =
-				nonBlankStructFieldCallbacks(
+				storageStructFieldCallbacks(
 					context,
-					sourceType,
 					field,
+					target,
 					settable,
 					scaffold,
 				)
 			if descriptorErr != nil {
 				return nil, nil, false, descriptorErr
 			}
+			fieldAddress, addressErr := reflectedStoreTargetAddress(
+				context,
+				names,
+				reflectionType,
+				field.Type(),
+				target,
+			)
+			if addressErr != nil {
+				return nil, nil, false, addressErr
+			}
+			address = addressCallback(
+				factory,
+				[]tsgo.ParameterDeclaration{
+					untypedParameter(factory, "instance"),
+				},
+				fieldAddress,
+			)
 			scaffold.requests = append(
 				scaffold.requests,
 				fieldRequests...,
+			)
+			scaffold.requests = append(
+				scaffold.requests,
+				fieldAddress.Requests()...,
 			)
 		}
 		fields = append(fields, structFieldOperations(
@@ -158,6 +189,7 @@ func structValueOperationsStatement(
 			boxedField,
 			boxedFieldBlock,
 			setBlock,
+			address,
 		))
 	}
 	clone, err := structCloneCallback(context, sourceType, scaffold)
@@ -256,6 +288,7 @@ func structFieldOperations(
 	get tsgo.Expression,
 	getBlock tsgo.Block,
 	set tsgo.Block,
+	address tsgo.Expression,
 ) tsgo.ObjectLiteralExpression {
 	factory := scaffold.factory
 	var getBody tsgo.ConciseBody
@@ -264,7 +297,7 @@ func structFieldOperations(
 	} else {
 		getBody = factory.ParenthesizedExpression(get)
 	}
-	return factory.ObjectLiteralExpression([]tsgo.ObjectLiteralElementLike{
+	properties := []tsgo.ObjectLiteralElementLike{
 		expressionProperty(factory, "type", arrow(
 			factory,
 			scaffold.descriptorType,
@@ -290,7 +323,14 @@ func structFieldOperations(
 			factory.EqualsGreaterThanToken(),
 			set,
 		)),
-	}, true)
+	}
+	if address != nil {
+		properties = append(
+			properties,
+			expressionProperty(factory, "address", address),
+		)
+	}
+	return factory.ObjectLiteralExpression(properties, true)
 }
 
 func structRegistrationCall(

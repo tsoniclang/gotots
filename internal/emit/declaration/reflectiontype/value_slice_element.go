@@ -115,6 +115,8 @@ func (e reflectionSliceElement) copyFromBox(
 
 func (e reflectionSliceElement) indexOperation(
 	context api.Context,
+	names api.ReflectionNames,
+	reflectionType *types.TypeName,
 	indexType api.NameReference,
 	scaffold *locationScaffold,
 ) (tsgo.ArrowFunction, error) {
@@ -166,12 +168,59 @@ func (e reflectionSliceElement) indexOperation(
 		setStatements,
 		factory.ExpressionStatement(stored.Value()),
 	)
+	addressOperation, err := context.Names().Runtime(
+		api.RuntimeSliceAddress,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return nil, err
+	}
+	storagePointer, err := api.NewExpressionEmission(
+		nil,
+		factory.CallExpression(
+			addressOperation.Expression(factory),
+			nil,
+			[]tsgo.TypeNode{e.storage.Value()},
+			[]tsgo.Expression{
+				factory.Identifier("instance"),
+				factory.Identifier("index"),
+			},
+			tsgo.NodeFlagsNone,
+		),
+		api.CombineRequests(
+			addressOperation.Requests(),
+			e.storage.Requests(),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+	pointer, err := context.Values().ProjectStoragePointer(
+		context.WithRole(api.RoleSliceElement),
+		nil,
+		e.member.sourceType,
+		storagePointer,
+	)
+	if err != nil {
+		return nil, err
+	}
+	boxedAddress, err := boxedReflectionAddress(
+		context,
+		names,
+		reflectionType,
+		e.member.sourceType,
+		pointer,
+	)
+	if err != nil {
+		return nil, err
+	}
 	location := locationLiteral(scaffold, locationCallbacks{
 		descriptor: e.descriptor,
 		settable:   true,
 		get:        get,
 		getBlock:   getBlock,
 		set:        factory.Block(setStatements, true),
+		address:    addressCallback(factory, nil, boxedAddress),
 	})
 	indexBody := factory.Block([]tsgo.Statement{
 		foreignBoxGuardStatement(scaffold, "Value.Index"),
@@ -180,6 +229,7 @@ func (e reflectionSliceElement) indexOperation(
 	}, true)
 	scaffold.requests = append(scaffold.requests, read.Requests()...)
 	scaffold.requests = append(scaffold.requests, stored.Requests()...)
+	scaffold.requests = append(scaffold.requests, boxedAddress.Requests()...)
 	return factory.ArrowFunction(
 		nil,
 		nil,

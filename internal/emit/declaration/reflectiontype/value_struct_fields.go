@@ -8,37 +8,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func nonBlankStructFieldCallbacks(
-	context api.Context,
-	sourceType types.Type,
-	field *types.Var,
-	settable bool,
-	scaffold *locationScaffold,
-) (
-	tsgo.Expression,
-	tsgo.Block,
-	tsgo.Block,
-	[]api.RootRequest,
-	error,
-) {
-	target, err := reflectedStructFieldTarget(
-		context.WithRole(api.RoleStructField),
-		sourceType,
-		field,
-		api.DirectExpression(scaffold.factory.Identifier("instance")),
-	)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	return storageStructFieldCallbacks(
-		context,
-		field,
-		target,
-		settable,
-		scaffold,
-	)
-}
-
 func reflectedStructFieldTarget(
 	context api.Context,
 	sourceType types.Type,

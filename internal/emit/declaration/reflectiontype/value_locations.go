@@ -3,7 +3,9 @@ package reflectiontype
 import (
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -75,6 +77,7 @@ type locationCallbacks struct {
 	get        tsgo.Expression
 	getBlock   tsgo.Block
 	set        tsgo.Block
+	address    tsgo.Expression
 }
 
 func locationLiteral(
@@ -88,41 +91,179 @@ func locationLiteral(
 	} else {
 		get = factory.ParenthesizedExpression(callbacks.get)
 	}
-	return factory.ObjectLiteralExpression(
-		[]tsgo.ObjectLiteralElementLike{
-			expressionProperty(factory, "type", arrow(
-				factory,
-				scaffold.descriptorType,
-				callbacks.descriptor.Expression(factory),
-			)),
-			booleanProperty(factory, "settable", callbacks.settable),
-			expressionProperty(factory, "get", factory.ArrowFunction(
+	properties := []tsgo.ObjectLiteralElementLike{
+		expressionProperty(factory, "type", arrow(
+			factory,
+			scaffold.descriptorType,
+			callbacks.descriptor.Expression(factory),
+		)),
+		booleanProperty(factory, "settable", callbacks.settable),
+		expressionProperty(factory, "get", factory.ArrowFunction(
+			nil,
+			nil,
+			nil,
+			optionalInterfaceBoxType(factory, scaffold.boxType),
+			factory.EqualsGreaterThanToken(),
+			get,
+		)),
+		expressionProperty(factory, "set", factory.ArrowFunction(
+			nil,
+			nil,
+			[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
 				nil,
 				nil,
+				factory.Identifier("value"),
 				nil,
 				optionalInterfaceBoxType(factory, scaffold.boxType),
-				factory.EqualsGreaterThanToken(),
-				get,
-			)),
-			expressionProperty(factory, "set", factory.ArrowFunction(
 				nil,
-				nil,
-				[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
-					nil,
-					nil,
-					factory.Identifier("value"),
-					nil,
-					optionalInterfaceBoxType(factory, scaffold.boxType),
-					nil,
-				)},
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindVoidKeyword,
-				),
-				factory.EqualsGreaterThanToken(),
-				callbacks.set,
-			)),
-		},
-		true,
+			)},
+			factory.KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindVoidKeyword,
+			),
+			factory.EqualsGreaterThanToken(),
+			callbacks.set,
+		)),
+	}
+	if callbacks.address != nil {
+		properties = append(
+			properties,
+			expressionProperty(factory, "address", callbacks.address),
+		)
+	}
+	return factory.ObjectLiteralExpression(properties, true)
+}
+
+func reflectedStoreTargetAddress(
+	context api.Context,
+	names api.ReflectionNames,
+	reflectionType *types.TypeName,
+	elementType types.Type,
+	target api.StoreTargetEmission,
+) (api.ExpressionEmission, error) {
+	if target.IsAccessor() {
+		return api.ExpressionEmission{}, &api.GeneratedArtifactShapeError{
+			Artifact: elementType.String(),
+			Reason:   "reflected address target is accessor-backed",
+		}
+	}
+	var typeArguments []api.TypeEmission
+	if target.UsesCanonicalStorage() || explicitAddressMarkerType(elementType) {
+		storageType, err := context.Values().StorageType(
+			context.WithRole(api.RoleStorageType),
+			nil,
+			elementType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		typeArguments = []api.TypeEmission{storageType}
+	}
+	pointer, err := pointermarker.Operation(
+		context,
+		tsoniccore.SymbolAddressOf,
+		typeArguments,
+		[]api.ExpressionEmission{api.DirectExpression(
+			target.Value(),
+			target.Requests()...,
+		)},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	pointer, err = api.NewExpressionEmission(
+		append(target.Before(), pointer.Before()...),
+		pointer.Value(),
+		pointer.Requests(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if target.UsesCanonicalStorage() {
+		pointer, err = context.Values().ProjectStoragePointer(
+			context.WithRole(api.RoleStructField),
+			nil,
+			elementType,
+			pointer,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	return boxedReflectionAddress(
+		context,
+		names,
+		reflectionType,
+		elementType,
+		pointer,
+	)
+}
+
+func explicitAddressMarkerType(sourceType types.Type) bool {
+	switch selected := types.Unalias(sourceType).Underlying().(type) {
+	case *types.Pointer, *types.Interface, *types.Signature, *types.Chan:
+		return true
+	case *types.Basic:
+		return selected.Kind() == types.UnsafePointer
+	default:
+		return false
+	}
+}
+
+func boxedReflectionAddress(
+	context api.Context,
+	names api.ReflectionNames,
+	reflectionType *types.TypeName,
+	elementType types.Type,
+	pointer api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	pointerType := types.NewPointer(elementType)
+	adapter, err := context.Names().InterfaceAdapter(pointerType, nil)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	descriptor, err := names.ReflectionValueType(pointerType, reflectionType)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		pointer.Before(),
+		context.Factory().NewExpression(
+			adapter.Expression(context.Factory()),
+			nil,
+			[]tsgo.Expression{pointer.Value()},
+		),
+		api.CombineRequests(
+			pointer.Requests(),
+			adapter.Requests(),
+			descriptor.Requests(),
+		),
+	)
+}
+
+func addressCallback(
+	factory tsgo.Factory,
+	parameters []tsgo.ParameterDeclaration,
+	address api.ExpressionEmission,
+) tsgo.ArrowFunction {
+	if len(address.Before()) == 0 {
+		return factory.ArrowFunction(
+			nil,
+			nil,
+			parameters,
+			nil,
+			factory.EqualsGreaterThanToken(),
+			factory.ParenthesizedExpression(address.Value()),
+		)
+	}
+	statements := append([]tsgo.Statement(nil), address.Before()...)
+	statements = append(statements, factory.ReturnStatement(address.Value()))
+	return factory.ArrowFunction(
+		nil,
+		nil,
+		parameters,
+		nil,
+		factory.EqualsGreaterThanToken(),
+		factory.Block(statements, true),
 	)
 }
 

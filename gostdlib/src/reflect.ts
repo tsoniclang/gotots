@@ -163,7 +163,16 @@ export abstract class Value {
         ),
       );
     }
-    return new AddressValue(this.location);
+    const pointerType = pointerDescriptorFor(this.location.type());
+    const address = this.location.address;
+    if (pointerType === undefined || address === undefined) {
+      return GoPanic.raise(
+        new ProviderError(
+          `reflect.Value.Addr requires a generated address facet for ${this.location.type().String()}`,
+        ),
+      );
+    }
+    return new InterfaceValue(address(), pointerType);
   }
 
   Bool(): bool {
@@ -709,31 +718,6 @@ class LocatedValue extends Value {
     addressable: bool = false,
   ) {
     super(source, location, addressable);
-  }
-}
-
-// AddressValue is the exact pointer view produced by Addr: it has no
-// interface box of its own, is always valid and non-nil, and Elem returns
-// the held addressable location.
-class AddressValue extends Value {
-  constructor(private readonly held: RuntimeValueLocation) {
-    super(undefined, undefined, false);
-  }
-
-  override IsValid(): bool {
-    return true;
-  }
-
-  override IsNil(): bool {
-    return false;
-  }
-
-  override Kind(): Kind {
-    return Pointer;
-  }
-
-  override Elem(): Value {
-    return new LocatedValue(this.held.get(), this.held, true);
   }
 }
 

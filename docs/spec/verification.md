@@ -523,6 +523,9 @@ ESM for:
 - field count/index/name/tag/embedding/export and recursive field types;
 - `ValueOf`, nil/invalid/addressable/settable state, pointer `Elem`, fields,
   indexes, maps, scalar projections, mutation, zero, and interface recovery;
+- `Addr` over pointer elements, struct fields, and slice elements, including
+  exact pointer-interface assertion, repeated-address equality, `Type`/`Elem`
+  identity, and mutation of the original storage;
 - reflective map/slice/pointer construction and iterator behavior;
 - pointer and aggregate slice index/append/make/grow behavior, including
   capacity reuse versus reallocation, fresh aggregate zeros, value-copy
