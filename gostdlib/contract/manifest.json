@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "cf55879e5867e986f12f877d1c053b653aa2c9fa3af3a95fd6982d4b0dfb28ca",
+  "providerDigest": "68b6571d0cf430fafd8f5520c3f1c0acaa94eddbad8baef4b02fca7a9d9fea9c",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -24781,6 +24781,69 @@
       "callableProfiles": [
         {
           "sourceIdentity": "fmt|kind=4|receiver=|name=Fprint",
+          "profileKey": "6f99d07e8e379bff414c0849e3dfb9a915f634b21850774460e52afccb171ed3",
+          "export": "FprintDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "canonicalTypeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Writer"
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-fmt-writer.ts#FprintDirect@81"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+              "export": "ProviderWriterInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Writer|name=Write",
+                    "kind": "callable",
+                    "member": "Write",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "contractSignature": "func(p []byte) (n int, err error)",
+                    "sourceLocation": "io/io.go:100:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "b82c95dbb864d6c64bb25a0a048c21db1f1a5c098939281fc17a9a850a4fc065"
+                  }
+                ]
+              },
+              "targetFingerprint": "488d64c278ba4dcab615ce6c95b7ce02a7da47e62d416a60fd14f554a817206b"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-fmt-writer.ts",
+          "targetFingerprint": "220d15026c8c1aef9360a2daa9c457405b513c26ba960637aeb5cf627ba80960"
+        },
+        {
+          "sourceIdentity": "fmt|kind=4|receiver=|name=Fprint",
           "profileKey": "98282c66143e376e47ad4becf33a0972ec58fd13f66d5a6fd4085e362e4a4726",
           "export": "FprintCanonical",
           "canonicalParameters": [
@@ -24794,7 +24857,7 @@
             "io|kind=2|receiver=|name=Writer"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-fmt-writer.ts#FprintCanonical@64"
+            "src/internal/facets/provider-fmt-writer.ts#FprintCanonical@252"
           ],
           "interfaces": [
             {
@@ -24846,6 +24909,69 @@
         },
         {
           "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintf",
+          "profileKey": "6f99d07e8e379bff414c0849e3dfb9a915f634b21850774460e52afccb171ed3",
+          "export": "FprintfDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "canonicalTypeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Writer"
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-fmt-writer.ts#FprintfDirect@136"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+              "export": "ProviderWriterInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Writer|name=Write",
+                    "kind": "callable",
+                    "member": "Write",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "contractSignature": "func(p []byte) (n int, err error)",
+                    "sourceLocation": "io/io.go:100:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "b82c95dbb864d6c64bb25a0a048c21db1f1a5c098939281fc17a9a850a4fc065"
+                  }
+                ]
+              },
+              "targetFingerprint": "488d64c278ba4dcab615ce6c95b7ce02a7da47e62d416a60fd14f554a817206b"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-fmt-writer.ts",
+          "targetFingerprint": "ba2b44d4b0fb4c2585335895ecb2ffc8490b5cc49b0e0e551338a44ded0ae9a8"
+        },
+        {
+          "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintf",
           "profileKey": "98282c66143e376e47ad4becf33a0972ec58fd13f66d5a6fd4085e362e4a4726",
           "export": "FprintfCanonical",
           "canonicalParameters": [
@@ -24859,7 +24985,7 @@
             "io|kind=2|receiver=|name=Writer"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-fmt-writer.ts#FprintfCanonical@123"
+            "src/internal/facets/provider-fmt-writer.ts#FprintfCanonical@311"
           ],
           "interfaces": [
             {
@@ -24911,6 +25037,69 @@
         },
         {
           "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintln",
+          "profileKey": "6f99d07e8e379bff414c0849e3dfb9a915f634b21850774460e52afccb171ed3",
+          "export": "FprintlnDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "canonicalTypeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Writer"
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-fmt-writer.ts#FprintlnDirect@197"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+              "export": "ProviderWriterInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Writer|name=Write",
+                    "kind": "callable",
+                    "member": "Write",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "contractSignature": "func(p []byte) (n int, err error)",
+                    "sourceLocation": "io/io.go:100:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "b82c95dbb864d6c64bb25a0a048c21db1f1a5c098939281fc17a9a850a4fc065"
+                  }
+                ]
+              },
+              "targetFingerprint": "488d64c278ba4dcab615ce6c95b7ce02a7da47e62d416a60fd14f554a817206b"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-fmt-writer.ts",
+          "targetFingerprint": "d35e7883cafdb92181bff981c0d6c5577e266182906dfe03ba044cf83e762f57"
+        },
+        {
+          "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintln",
           "profileKey": "98282c66143e376e47ad4becf33a0972ec58fd13f66d5a6fd4085e362e4a4726",
           "export": "FprintlnCanonical",
           "canonicalParameters": [
@@ -24924,7 +25113,7 @@
             "io|kind=2|receiver=|name=Writer"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-fmt-writer.ts#FprintlnCanonical@188"
+            "src/internal/facets/provider-fmt-writer.ts#FprintlnCanonical@376"
           ],
           "interfaces": [
             {
@@ -30553,38 +30742,70 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-fmt-writer.ts#FprintCanonical@64",
+      "identity": "src/internal/facets/provider-fmt-writer.ts#FprintCanonical@252",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-fmt-writer.ts#write@247",
+        "src/internal/facets/provider-fmt-writer.ts#write@435",
         "src/internal/portable/fmt/format.ts#formatOperands@365"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-fmt-writer.ts#FprintfCanonical@123",
+      "identity": "src/internal/facets/provider-fmt-writer.ts#FprintDirect@81",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-fmt-writer.ts#write@247",
+        "src/internal/facets/provider-fmt-writer.ts#writeDirect@496",
+        "src/internal/portable/fmt/format.ts#formatOperands@365"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-fmt-writer.ts#FprintfCanonical@311",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-fmt-writer.ts#write@435",
         "src/internal/portable/fmt/format.ts#formatText@78"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-fmt-writer.ts#FprintlnCanonical@188",
+      "identity": "src/internal/facets/provider-fmt-writer.ts#FprintfDirect@136",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-fmt-writer.ts#write@247",
+        "src/internal/facets/provider-fmt-writer.ts#writeDirect@496",
+        "src/internal/portable/fmt/format.ts#formatText@78"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-fmt-writer.ts#FprintlnCanonical@376",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-fmt-writer.ts#write@435",
         "src/internal/portable/fmt/format.ts#formatOperands@365"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-fmt-writer.ts#requireWriter@308",
+      "identity": "src/internal/facets/provider-fmt-writer.ts#FprintlnDirect@197",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-fmt-writer.ts#writeDirect@496",
+        "src/internal/portable/fmt/format.ts#formatOperands@365"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-fmt-writer.ts#requireWriter@552",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-fmt-writer.ts#write@247",
+      "identity": "src/internal/facets/provider-fmt-writer.ts#write@435",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-fmt-writer.ts#requireWriter@308",
+        "src/internal/facets/provider-fmt-writer.ts#requireWriter@552",
+        "src/internal/runtime/slice.ts#byteSlice@108"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-fmt-writer.ts#writeDirect@496",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-fmt-writer.ts#requireWriter@552",
         "src/internal/runtime/slice.ts#byteSlice@108"
       ]
     },
@@ -37602,5 +37823,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "9fb2c919eb2b9d0bdd3291c5061175df6595e48158ebba7f9cfe5bba41eb7980"
+  "manifestDigest": "c757b9ceb7c9852aa1211b1afff58d853d24c603d567e993e4e2cf63fe7b47b4"
 }

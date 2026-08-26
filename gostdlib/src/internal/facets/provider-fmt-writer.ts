@@ -5,12 +5,49 @@ import type { gostring, int } from "@gotots/gostdlib/internal/scalars.js";
 
 import { formatOperands, formatText } from "../portable/fmt/format.js";
 import { byteSlice } from "../runtime/slice.js";
-import type { CanonicalWriter } from "./provider-io-contract.js";
+import type {
+  CanonicalWriter,
+  ProviderWriterInterface,
+} from "./provider-io-contract.js";
+import type { ProviderErrorInterface } from "./provider-error.js";
 
 export type {
   CanonicalError,
   CanonicalWriter,
+  ProviderWriterInterface,
 } from "./provider-io-contract.js";
+export type { ProviderErrorInterface } from "./provider-error.js";
+
+export function FprintDirect<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
+>(
+  writer: Target | undefined,
+  arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
+): [int, Failure | undefined] {
+  return writeDirect(writer, formatOperands(arguments_, false));
+}
+
+export function FprintfDirect<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
+>(
+  writer: Target | undefined,
+  format: gostring,
+  arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
+): [int, Failure | undefined] {
+  return writeDirect(writer, formatText(format, arguments_).text);
+}
+
+export function FprintlnDirect<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
+>(
+  writer: Target | undefined,
+  arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
+): [int, Failure | undefined] {
+  return writeDirect(writer, formatOperands(arguments_, true));
+}
 
 export async function FprintCanonical<
   Failure extends GoInterfaceValue,
@@ -50,6 +87,18 @@ async function write<
   writer: Target | undefined,
   text: string,
 ): Promise<[int, Failure | undefined]> {
+  return requireWriter(writer).Write(
+    byteSlice(new TextEncoder().encode(text)),
+  );
+}
+
+function writeDirect<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
+>(
+  writer: Target | undefined,
+  text: string,
+): [int, Failure | undefined] {
   return requireWriter(writer).Write(
     byteSlice(new TextEncoder().encode(text)),
   );

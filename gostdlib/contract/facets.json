@@ -793,6 +793,29 @@
       "sourceIdentity": "fmt|kind=4|receiver=|name=Fprint",
       "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
       "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "ProviderWriterInterface"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprint",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
       "export": "FprintCanonical",
       "canonicalParameters": [
         0
@@ -819,6 +842,29 @@
       "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintf",
       "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
       "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintfDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "ProviderWriterInterface"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintf",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
       "export": "FprintfCanonical",
       "canonicalParameters": [
         0
@@ -838,6 +884,29 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Writer",
           "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintln",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintlnDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "ProviderWriterInterface"
         }
       ]
     },
