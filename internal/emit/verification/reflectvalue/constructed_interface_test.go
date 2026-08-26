@@ -19,6 +19,10 @@ func (label Label) Text() string {
 	return string(label)
 }
 
+func (label Label) Unused() string {
+	return "unused"
+}
+
 func (label *Label) Decode(text []byte) error {
 	*label = Label(string(text))
 	return nil
@@ -65,20 +69,18 @@ func main() {
 `,
 		func(artifacts renderedArtifacts) {
 			for _, expectation := range []struct {
-				adapter string
-				method  string
+				adapter   string
+				method    string
+				forbidden string
 			}{
 				{
 					adapter: "$goInterfaceAdapter$Named_reflectvalue$Label",
 					method:  "Text(",
 				},
 				{
-					adapter: "$goInterfaceAdapter$PointerTo_Named_reflectvalue$Label",
-					method:  "Decode(",
-				},
-				{
-					adapter: "$goInterfaceAdapter$PointerTo_Named_reflectvalue$Label",
-					method:  "Text(",
+					adapter:   "$goInterfaceAdapter$PointerTo_Named_reflectvalue$Label",
+					method:    "Decode(",
+					forbidden: "Unused(",
 				},
 			} {
 				start := strings.Index(
@@ -109,6 +111,16 @@ func main() {
 						"constructed adapter %q lacks %q",
 						expectation.adapter,
 						expectation.method,
+					)
+				}
+				if expectation.forbidden != "" && strings.Contains(
+					artifacts.printed[start:end],
+					expectation.forbidden,
+				) {
+					t.Fatalf(
+						"constructed adapter %q contains unasserted %q",
+						expectation.adapter,
+						expectation.forbidden,
 					)
 				}
 			}

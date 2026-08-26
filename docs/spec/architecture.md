@@ -690,14 +690,15 @@ statically typed; it performs no erased payload recovery, runtime method
 lookup, source spelling test, or dynamic semantic dispatch. The factory is
 absent unless at least one zero-method adapter requests it.
 
-A concrete adapter that can leave `reflect.Value` instead owns one complete
-method-set demand. Reflection can return the same dynamic value through any
-later statically selected interface assertion, so the selected toolchain's
-finite concrete Go method set is the direct semantic authority. The adapter
-emits each concrete method and its canonical interface-method token exactly
-once; it does not join that type against the program's interface-demand graph.
-This reflection-only shape is linear in actual methods and does not change the
-demand-selected shape of ordinary conversion adapters.
+A concrete adapter that can leave `reflect.Value` remains demand-selected.
+Reflection exposure and interface transitions are recorded during emission,
+then their exact `go/types` satisfaction join is released only when ordinary
+emission reaches quiescence. All newly matched contracts for one adapter enter
+the requirement scheduler in one batch, so that adapter is reconstructed once
+per quiescent wave rather than once per discovered contract. Unmatched methods
+are not emitted. The relation retains only exposures and selected contracts;
+it does not materialize negative type pairs or become ordinary interface
+membership.
 
 Interface calls are O(1) and do not emit implementer switches. Adapter methods
 invoke the exact concrete owner, preserving value-copy and pointer semantics.
@@ -785,23 +786,23 @@ pointer box's generated dynamic token to that descriptor, including when the
 descriptor is composed lazily from `T`; addressability does not force static
 reflection closure over every possible `*T`. Because `Addr().Interface()` and
 `TypeAssert` can expose that box through any statically selected interface
-contract, the address callback requests the canonical `*T` adapter's complete
-concrete method set. The selected `go/types` method set is finite and
-authoritative; each method maps to the same canonical method token used by a
-matching interface declaration. This request is not ordinary empty-interface
-adapter membership, does not inspect the set of interface assertions, and can
-never request the `*T` reflection descriptor or value-operation facet. A
+contract, the address callback records the canonical `*T` adapter at the
+reflection-interface boundary. At quiescence, the dedicated relation follows
+the exact reached interface-transition graph and requests only target
+contracts that the selected `go/types` graph proves `*T` implements. This is
+not ordinary empty-interface adapter membership and can never request the `*T`
+reflection descriptor or value-operation facet. A
 source-less synthetic address value, detached cell,
 reconstructed pointer, or provider-side storage inspection is forbidden.
 
-The same complete-method-set request is attached to every concrete adapter
-installed in a reflected value-operation registration, including values
-created by `Zero`, `New`, and container constructors. Therefore
-provider-created values can satisfy any matching selected assertion even when
-no authored value of that concrete type first crossed an ordinary interface
-conversion. This adds no second reflection graph or type-pair relation: normal
-value-operation demand still owns each descriptor, while one adapter request
-owns the finite source method set.
+The same exposure owner records every concrete adapter installed in a
+reflected value-operation registration, including values created by `Zero`,
+`New`, and container constructors. Therefore provider-created values receive
+each reached, proven assertion contract even when no authored value of that
+concrete type first crossed an ordinary interface conversion. This adds no
+second reflection graph: normal value-operation demand still owns each
+descriptor, while the quiescent relation carries selected method contracts
+only.
 
 Container descriptors are total over every statically representable Go
 element, key, and value type; basic scalars do not define a privileged

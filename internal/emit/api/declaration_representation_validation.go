@@ -43,10 +43,6 @@ func (r DeclarationRequirement) Valid() bool {
 		return false
 	}
 	if r.kind != DeclarationRequirementInterfaceAdapter &&
-		r.interfaceCompleteSet {
-		return false
-	}
-	if r.kind != DeclarationRequirementInterfaceAdapter &&
 		r.interfaceContractType != nil {
 		return false
 	}
@@ -210,11 +206,6 @@ func (r DeclarationRequirement) Valid() bool {
 			GeneratedArtifactInterfaceAdapter,
 		) {
 			return false
-		}
-		if r.interfaceCompleteSet {
-			return r.interfaceContractType == nil &&
-				r.interfaceContract == nil &&
-				r.interfaceContractKey == ""
 		}
 		if r.interfaceContract == nil {
 			return r.interfaceContractType == nil &&

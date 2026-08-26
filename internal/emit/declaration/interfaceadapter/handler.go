@@ -25,7 +25,6 @@ func Build(
 	name string,
 	sourceType types.Type,
 	contracts []Contract,
-	completeMethodSet bool,
 	modifiers []tsgo.ModifierLike,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	if name == "" || sourceType == nil {
@@ -56,7 +55,6 @@ func Build(
 	demanded, err := demandedMethods(
 		sourceType,
 		contracts,
-		completeMethodSet,
 	)
 	if err != nil {
 		return nil, nil, err

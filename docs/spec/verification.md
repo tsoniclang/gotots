@@ -237,12 +237,13 @@ the class path, drop one concrete operation, or route a method-bearing type
 through the zero-method factory; each fails the shape, strict-typecheck,
 differential, or method-demand join before output is sealed.
 
-Reflection-created adapters are the closed exception: their generated method
-multiset must exact-join the selected concrete Go method set, with every method
-appearing once under its canonical interface-method token. A scaling fixture
-varies both reflected concrete types and methods and proves linear growth in
-their sum, independent of the number or discovery order of interface
-assertions.
+Reflection-created adapters use the same demanded-method shape, but their
+requirements are released by the quiescent reflection-interface join. A
+fixture presents many matching assertion contracts before and after one
+exposure and proves one reconstruction per quiescent wave, one requirement per
+distinct matched contract, no unasserted concrete methods, and output growth
+linear in selected methods. A foil reflected `*sync.Mutex` must not demand
+`TryLock` when no reached assertion contains it.
 
 For each function, literal, concrete method, interface method, function type,
 method value/expression, provider/environment callable, and generic
@@ -553,18 +554,18 @@ ESM for:
 - open generic `TypeFor[T]` through exact private capability or
   concretization, with unchanged source value arity.
 
-Mutating an address callback to omit the complete-method-set request must
+Mutating an address callback to omit reflection-interface exposure must
 remove the address-only interface method and fail artifact inspection before
-runtime. Mutating it to ordinary empty-interface membership, an
-interface-demand cross-product, or eager pointer-descriptor demand must fail
-the bounded-closure gate. Registry proof exact-joins the requested adapter's
-method multiset to its concrete `go/types` method set and asserts that the
-request yields one method-set requirement but zero reflection-descriptor or
-value-operation requests.
+runtime. Mutating it to ordinary empty-interface membership, eager per-contract
+reconstruction, complete concrete-method-set emission, or eager pointer-
+descriptor demand must fail the bounded-closure gate. Registry proof covers
+both discovery orders, exact-joins only implemented reached contracts, and
+asserts that exposure itself yields zero contract, reflection-descriptor, or
+value-operation requests before quiescence.
 
 Constructor proof covers value- and pointer-method contracts on values created
 by `Zero` and `New`, where no concrete source value previously crossed the
-empty-interface boundary. Removing the complete-method-set request from a
+empty-interface boundary. Removing reflection exposure from a
 value-operation registration must leave the constructed adapter without its
 asserted method and fail artifact inspection before runtime.
 

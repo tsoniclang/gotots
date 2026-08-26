@@ -157,8 +157,7 @@ type ReflectionNames interface {
 	DeclarationOwnershipNames
 	ReflectionMethodIdentity(*types.Func) (string, error)
 	// ReflectionInterfaceAdapter returns the canonical adapter for a value that
-	// can leave reflection, demands its complete concrete method set, and does
-	// not demand that value's descriptor.
+	// can leave reflection without demanding that value's descriptor.
 	ReflectionInterfaceAdapter(types.Type) (NameReference, error)
 	ReflectionType(types.Type, *types.TypeName) (NameReference, error)
 	ReflectionOperations(*types.TypeName) (NameReference, error)

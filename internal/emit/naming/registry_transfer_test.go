@@ -24,6 +24,13 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 		map[string]struct{}{"bridge": {}}
 	registry.interfaceAdaptersByContract["interface"] =
 		map[string]struct{}{"adapter": {}}
+	registry.reflectionInterfaceExposures["reflection-interface"] =
+		reflectionInterfaceExposure{
+			adapters: map[string]struct{}{"adapter": {}},
+		}
+	registry.reflectionInterfaceContracts["adapter"] =
+		map[string]struct{}{"contract": {}}
+	registry.reflectionInterfaceDirty = true
 	registry.interfaceContractDemands["source"] =
 		map[string]interfaceContractDemand{"target": {}}
 	registry.interfaceReflectionDemands["reflection"] =
@@ -50,6 +57,9 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 	if len(registry.providerInterfaceCapabilityDemands) != 0 ||
 		len(registry.providerInterfaceBridgesByContract) != 0 ||
 		len(registry.interfaceAdaptersByContract) != 0 ||
+		len(registry.reflectionInterfaceExposures) != 0 ||
+		len(registry.reflectionInterfaceContracts) != 0 ||
+		registry.reflectionInterfaceDirty ||
 		len(registry.interfaceContractDemands) != 0 ||
 		len(registry.interfaceReflectionDemands) != 0 ||
 		len(registry.reflectionValueDemands) != 0 ||

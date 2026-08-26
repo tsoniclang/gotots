@@ -112,6 +112,7 @@ func (r *Registry) recordInterfaceContractDemand(
 			target: target,
 		}
 		r.invalidateInterfaceDemandRequests()
+		r.reflectionInterfaceDirty = true
 	}
 	reached := r.interfaceAdaptersByContract[source.contractKey]
 	adapterKeys := make([]string, 0, len(reached))

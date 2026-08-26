@@ -544,13 +544,6 @@ func NewInterfaceAdapterContractRequest(
 	return generatedDefinitionRequest(requirement, err)
 }
 
-func NewInterfaceAdapterCompleteMethodSetRequest(
-	artifact *GeneratedArtifact,
-) (RootRequest, error) {
-	requirement, err := NewInterfaceAdapterCompleteMethodSetRequirement(artifact)
-	return generatedDefinitionRequest(requirement, err)
-}
-
 func NewAnonymousInterfaceRequest(
 	artifact *GeneratedArtifact,
 ) (RootRequest, error) {

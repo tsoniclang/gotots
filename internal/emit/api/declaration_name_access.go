@@ -128,18 +128,6 @@ func (r DeclarationRequirement) InterfaceAdapterContract() (
 		true
 }
 
-func (r DeclarationRequirement) InterfaceAdapterCompleteMethodSet() (
-	*GeneratedArtifact,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementInterfaceAdapter ||
-		!r.interfaceCompleteSet {
-		return nil, false
-	}
-	return r.generated, true
-}
-
 func (r DeclarationRequirement) AnonymousInterface() (
 	*GeneratedArtifact,
 	bool,

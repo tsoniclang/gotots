@@ -16,21 +16,9 @@ type demandedMethod struct {
 func demandedMethods(
 	sourceType types.Type,
 	contracts []Contract,
-	completeMethodSet bool,
 ) ([]demandedMethod, error) {
 	methodSet := types.NewMethodSet(sourceType)
 	required := make(map[*types.Func][]*types.Func)
-	if completeMethodSet {
-		for index := range methodSet.Len() {
-			method, ok := methodSet.At(index).Obj().(*types.Func)
-			if !ok {
-				return nil, &api.GeneratedArtifactShapeError{
-					Reason: "adapter method set contains a non-method object",
-				}
-			}
-			required[method] = nil
-		}
-	}
 	for _, selected := range contracts {
 		contract := selected.methodSet
 		if contract == nil ||
@@ -71,12 +59,6 @@ func demandedMethods(
 				selection: selection,
 				method:    method,
 				contracts: targetContracts,
-			})
-		} else if completeMethodSet {
-			demanded = append(demanded, demandedMethod{
-				selection: selection,
-				method:    method,
-				contracts: []*types.Func{method},
 			})
 		}
 	}

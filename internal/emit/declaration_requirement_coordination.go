@@ -194,18 +194,10 @@ func compareDeclarationRequirements(
 			left.InterfaceAdapterContract()
 		rightArtifact, _, _, rightKey, rightDemand :=
 			right.InterfaceAdapterContract()
-		leftCompleteArtifact, leftComplete :=
-			left.InterfaceAdapterCompleteMethodSet()
-		rightCompleteArtifact, rightComplete :=
-			right.InterfaceAdapterCompleteMethodSet()
-		if leftComplete {
-			leftArtifact = leftCompleteArtifact
-		} else if !leftDemand {
+		if !leftDemand {
 			leftArtifact, _ = left.InterfaceAdapter()
 		}
-		if rightComplete {
-			rightArtifact = rightCompleteArtifact
-		} else if !rightDemand {
+		if !rightDemand {
 			rightArtifact, _ = right.InterfaceAdapter()
 		}
 		if order := compareGeneratedArtifacts(
@@ -215,13 +207,9 @@ func compareDeclarationRequirements(
 			return order
 		}
 		switch {
-		case !leftDemand && !leftComplete && (rightDemand || rightComplete):
+		case !leftDemand && rightDemand:
 			return -1
-		case (leftDemand || leftComplete) && !rightDemand && !rightComplete:
-			return 1
-		case leftComplete && rightDemand:
-			return -1
-		case leftDemand && rightComplete:
+		case leftDemand && !rightDemand:
 			return 1
 		case leftKey < rightKey:
 			return -1
@@ -372,8 +360,44 @@ func (s *programSession) settle() error {
 			}
 			continue
 		}
+		if scheduled, err := s.scheduleReflectionInterfaceDemands(); err != nil {
+			return err
+		} else if scheduled {
+			continue
+		}
 		return nil
 	}
+}
+
+func (s *programSession) scheduleReflectionInterfaceDemands() (
+	bool,
+	error,
+) {
+	requests, err := s.registry.FlushReflectionInterfaceDemands()
+	if err != nil {
+		return false, err
+	}
+	if len(requests) == 0 {
+		return false, nil
+	}
+	scheduled := false
+	err = api.WalkUniqueRootRequestPayloads(
+		requests,
+		func(request api.RootRequest) error {
+			requirement, ok := request.DeclarationRequirement()
+			if !ok {
+				return &ScheduleError{
+					Reason: "reflection interface batch contains a non-declaration request",
+				}
+			}
+			if err := s.scheduleDeclarationRequirement(requirement); err != nil {
+				return err
+			}
+			scheduled = true
+			return nil
+		},
+	)
+	return scheduled, err
 }
 
 func (s *programSession) removeTargetDeclaration(
