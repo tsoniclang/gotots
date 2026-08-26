@@ -96,33 +96,43 @@ func TestRequirementsRejectsMissingDefinitionAndDivergentDuplicate(t *testing.T)
 }
 
 func TestProfileRequirementsExactJoinNamedCapabilityTargets(t *testing.T) {
-	artifact, target := profileRequirementFixture(t)
-	definition, err := api.NewProviderInterfaceBridgeRequirement(artifact)
-	if err != nil {
-		t.Fatal(err)
-	}
-	demand, err := api.NewProviderProfileInterfaceCapabilityRequirement(
-		artifact,
-		target,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	capabilities, contracts, err := ProfileRequirements(
-		artifact,
-		[]api.DeclarationRequirement{demand, definition, demand},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(capabilities) != 0 || len(contracts) != 1 || contracts[0].Target != target {
-		t.Fatalf("profile capability contracts = %#v", contracts)
-	}
-	if _, err := Requirements(
-		artifact,
-		[]api.DeclarationRequirement{definition},
-	); err == nil {
-		t.Fatal("profile artifact was admitted by ordinary capability requirements")
+	for _, profileExport := range []string{
+		"IoFsReadFileCanonical",
+		"IoFsReadFileDirect",
+	} {
+		t.Run(profileExport, func(t *testing.T) {
+			artifact, target := profileRequirementFixture(t, profileExport)
+			definition, err := api.NewProviderInterfaceBridgeRequirement(artifact)
+			if err != nil {
+				t.Fatal(err)
+			}
+			demand, err := api.NewProviderProfileInterfaceCapabilityRequirement(
+				artifact,
+				target,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			capabilities, contracts, err := ProfileRequirements(
+				artifact,
+				[]api.DeclarationRequirement{demand, definition, demand},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(capabilities) != 0 || len(contracts) != 1 ||
+				contracts[0].Target != target {
+				t.Fatalf("profile capability contracts = %#v", contracts)
+			}
+			if _, err := Requirements(
+				artifact,
+				[]api.DeclarationRequirement{definition},
+			); err == nil {
+				t.Fatal(
+					"profile artifact was admitted by ordinary capability requirements",
+				)
+			}
+		})
 	}
 }
 
@@ -163,6 +173,7 @@ func requirementFixture(
 
 func profileRequirementFixture(
 	t *testing.T,
+	profileExport string,
 ) (*api.GeneratedArtifact, *api.GeneratedArtifact) {
 	t.Helper()
 	payload, err := os.ReadFile(filepath.Join(
@@ -179,8 +190,18 @@ func profileRequirementFixture(
 	profiles := manifest.ProviderCallableProfiles(
 		"io/fs|kind=4|receiver=|name=ReadFile",
 	)
-	if len(profiles) != 1 {
-		t.Fatalf("ReadFile profiles = %#v", profiles)
+	if len(profiles) != 2 {
+		t.Fatalf("ReadFile profiles = %d, want 2", len(profiles))
+	}
+	var profile gostdlib.ProviderCallableProfile
+	for _, candidate := range profiles {
+		if candidate.Export() == profileExport {
+			profile = candidate
+			break
+		}
+	}
+	if !profile.Valid() {
+		t.Fatalf("ReadFile profile %q is absent", profileExport)
 	}
 	goPackage, err := importer.Default().Import("io/fs")
 	if err != nil {
@@ -195,7 +216,7 @@ func profileRequirementFixture(
 	}
 	artifact, err := api.NewCompilationProviderProfileBridgeArtifact(
 		base,
-		profiles[0].Interfaces(),
+		profile.Interfaces(),
 		"profile-key",
 		"ProfileBridge",
 		"support/profile-bridge.ts",
@@ -205,7 +226,7 @@ func profileRequirementFixture(
 	}
 	targetArtifact, err := api.NewCompilationProviderProfileBridgeArtifact(
 		target,
-		profiles[0].Interfaces(),
+		profile.Interfaces(),
 		"target-profile-key",
 		"TargetProfileBridge",
 		"support/target-profile-bridge.ts",
