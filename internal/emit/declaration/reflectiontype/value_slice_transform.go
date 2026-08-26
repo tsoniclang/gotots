@@ -16,12 +16,8 @@ func (e reflectionSliceElement) appendOperation(
 	factory := scaffold.factory
 	stored, err := e.copyToStorage(
 		context,
-		guardedForeignOperand(
-			scaffold,
-			e.adapter,
-			"value",
-			"Value.Append",
-		),
+		"Value.Append",
+		scaffold,
 	)
 	if err != nil {
 		return nil, err
@@ -71,7 +67,7 @@ func reflectionSliceStorageArrow(
 		nil,
 		factory.Identifier("value"),
 		nil,
-		factory.TypeReferenceNode(scaffold.boxType.EntityName(factory), nil),
+		optionalInterfaceBoxType(factory, scaffold.boxType),
 		nil,
 	)
 	if len(stored.Before()) == 0 {

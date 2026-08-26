@@ -110,11 +110,11 @@ export abstract class Value {
         ),
       );
     }
-    const boxes: GoInterfaceValue[] = [];
+    const boxes: Array<GoInterfaceValue | undefined> = [];
     for (let index = 0; index < values.length; index++) {
       const element = values.get(index);
       const box = element.source;
-      if (box === undefined) {
+      if (!element.IsValid()) {
         return GoPanic.raise(
           new ProviderError(
             "reflect: call of reflect.Append on zero Value",

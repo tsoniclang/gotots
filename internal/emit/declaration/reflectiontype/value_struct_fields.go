@@ -203,9 +203,11 @@ func storageInterfaceFieldCallbacks(
 		return get, getBlock, unaddressableFieldSetter(scaffold),
 			read.Requests(), nil
 	}
-	assigned, contractRequests, err := admittedInterfaceFieldValue(
+	assigned, contractRequests, err := admittedInterfaceValue(
 		context,
-		field,
+		field.Type(),
+		scaffold.factory.Identifier("value"),
+		"Value.Set",
 		scaffold,
 	)
 	if err != nil {

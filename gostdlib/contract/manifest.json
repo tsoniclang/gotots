@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "5ad508990b715178aba4fefa370aa05441e16d94a4b014877113944c1b5accb1",
-  "providerDigest": "131cf385855fa68c95a563509bba0a02cef7d26e306192e96aa2bd8a079caf01",
+  "providerDigest": "c40c11145c843f0ba5df95afdeb6fc113f1ced8a55cf40615e4ea0f0153811b2",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -1979,11 +1979,11 @@
             "src/internal/portable/encoding/binary/reflection-codec.ts#decodeInto@348",
             "src/internal/portable/encoding/binary/reflection-codec.ts#encodedSize@150",
             "src/io.ts#ReadFull@315",
-            "src/reflect.ts#Elem@1609",
-            "src/reflect.ts#Kind@2545",
+            "src/reflect.ts#Elem@1616",
+            "src/reflect.ts#Kind@2552",
             "src/reflect.ts#Pointer@416",
             "src/reflect.ts#Slice@435",
-            "src/reflect.ts#ValueOf@4182",
+            "src/reflect.ts#ValueOf@4189",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
@@ -2008,8 +2008,8 @@
             "src/encoding/binary.ts#reflect@102",
             "src/internal/portable/encoding/binary/reflection-codec.ts#encodeFrom@531",
             "src/internal/portable/encoding/binary/reflection-codec.ts#encodedSize@150",
-            "src/reflect.ts#Indirect@6160",
-            "src/reflect.ts#ValueOf@4182"
+            "src/reflect.ts#Indirect@6167",
+            "src/reflect.ts#ValueOf@4189"
           ],
           "implementationSites": [
             "src/encoding/binary.ts#Write@620"
@@ -7264,8 +7264,8 @@
           "targetFingerprint": "ed7aff95b038178f0d2a12708c4ddce1eafe36cb5a36a80901e8bcd1d3aef6d7",
           "disposition": "implemented",
           "implementationSites": [
-            "src/reflect.ts#MapIter@4413",
-            "src/reflect.ts#MapIter@4424"
+            "src/reflect.ts#MapIter@4420",
+            "src/reflect.ts#MapIter@4431"
           ]
         },
         {
@@ -7327,7 +7327,7 @@
           "targetFingerprint": "4ab215ed401a95f5feb64a82828cbb314c024cb9043d71b1dc4577bedb07628b",
           "disposition": "implemented",
           "implementationSites": [
-            "src/reflect.ts#Method@4605"
+            "src/reflect.ts#Method@4612"
           ]
         },
         {
@@ -7407,7 +7407,7 @@
           "targetFingerprint": "73b02a255bc9f79800feb028791c1fdaa31f246384cf1b3ea41bccc8088701e7",
           "disposition": "implemented",
           "implementationSites": [
-            "src/reflect.ts#StructField@4709"
+            "src/reflect.ts#StructField@4716"
           ]
         },
         {
@@ -7423,7 +7423,7 @@
           "targetFingerprint": "9c16decdc5eba849252c39f99fe871573d21b329c6151f2bfa03ac13e3971fc2",
           "disposition": "implemented",
           "implementationSites": [
-            "src/reflect.ts#StructTag@4867"
+            "src/reflect.ts#StructTag@4874"
           ]
         },
         {
@@ -7886,7 +7886,7 @@
           "targetFingerprint": "1d3d239cfaafdc23f0e9ecadd891810ead48813f8932071753ad6c2381167551",
           "disposition": "implemented",
           "implementationSites": [
-            "src/reflect.ts#Type@4924"
+            "src/reflect.ts#Type@4931"
           ]
         },
         {
@@ -7917,12 +7917,12 @@
           "targetFingerprint": "ecfa7d4a55aacaf3422202dddfb0cdd54475e61317620cc3516aacc2ccc59089",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#InterfaceValue@4031",
-            "src/reflect.ts#currentKey@4269",
-            "src/reflect.ts#mapIteratorState@4328"
+            "src/reflect.ts#InterfaceValue@4038",
+            "src/reflect.ts#currentKey@4276",
+            "src/reflect.ts#mapIteratorState@4335"
           ],
           "implementationSites": [
-            "src/reflect.ts#Key@4433"
+            "src/reflect.ts#Key@4440"
           ]
         },
         {
@@ -7939,12 +7939,12 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#currentValue@4307",
-            "src/reflect.ts#keys@4212",
-            "src/reflect.ts#position@4206"
+            "src/reflect.ts#currentValue@4314",
+            "src/reflect.ts#keys@4219",
+            "src/reflect.ts#position@4213"
           ],
           "implementationSites": [
-            "src/reflect.ts#Next@4460"
+            "src/reflect.ts#Next@4467"
           ]
         },
         {
@@ -7961,12 +7961,12 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#InterfaceValue@4031",
-            "src/reflect.ts#currentValue@4307",
-            "src/reflect.ts#mapIteratorState@4328"
+            "src/reflect.ts#InterfaceValue@4038",
+            "src/reflect.ts#currentValue@4314",
+            "src/reflect.ts#mapIteratorState@4335"
           ],
           "implementationSites": [
-            "src/reflect.ts#Value@4555"
+            "src/reflect.ts#Value@4562"
           ]
         },
         {
@@ -7983,7 +7983,7 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/host-integer.ts#hostInteger@27",
-            "src/reflect.ts#kindNames@6948",
+            "src/reflect.ts#kindNames@6955",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
@@ -8003,10 +8003,10 @@
           "targetFingerprint": "1423c16eb9dd9bfdb93be9208e19d1973c4eeaa675257f4635c91f54068a7305",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#PkgPath@4718"
+            "src/reflect.ts#PkgPath@4725"
           ],
           "implementationSites": [
-            "src/reflect.ts#IsExported@4853"
+            "src/reflect.ts#IsExported@4860"
           ]
         },
         {
@@ -8023,10 +8023,10 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/reflect/struct-tag.ts#getStructTag@751",
-            "src/reflect.ts#value@4874"
+            "src/reflect.ts#value@4881"
           ],
           "implementationSites": [
-            "src/reflect.ts#Get@4882"
+            "src/reflect.ts#Get@4889"
           ]
         },
         {
@@ -8043,10 +8043,10 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/reflect/struct-tag.ts#lookupStructTag@463",
-            "src/reflect.ts#value@4874"
+            "src/reflect.ts#value@4881"
           ],
           "implementationSites": [
-            "src/reflect.ts#Lookup@4901"
+            "src/reflect.ts#Lookup@4908"
           ]
         },
         {
@@ -8063,12 +8063,12 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#AddressValue@4099",
+            "src/reflect.ts#AddressValue@4106",
             "src/reflect.ts#addressable@500",
             "src/reflect.ts#location@492"
           ],
           "implementationSites": [
-            "src/reflect.ts#Addr@890"
+            "src/reflect.ts#Addr@897"
           ]
         },
         {
@@ -8084,12 +8084,12 @@
           "targetFingerprint": "6eff503e5e17ec653dda188eb433a35f4c658726b961573ed9d1fbb337b92abd",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#Bool@929"
+            "src/reflect.ts#Bool@936"
           ]
         },
         {
@@ -8107,14 +8107,14 @@
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
             "src/reflect.ts#Slice@435",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#resolvedType@736",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#resolvedType@743",
             "src/reflect.ts#source@532",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
-            "src/reflect.ts#Bytes@978"
+            "src/reflect.ts#Bytes@985"
           ]
         },
         {
@@ -8130,10 +8130,10 @@
           "targetFingerprint": "93dcb7965f590bad189bcf9191e08616e1caa5fbf6df5351528e908b5521bdd9",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operations@795"
+            "src/reflect.ts#operations@802"
           ],
           "implementationSites": [
-            "src/reflect.ts#CanInt@1094"
+            "src/reflect.ts#CanInt@1101"
           ]
         },
         {
@@ -8153,7 +8153,7 @@
             "src/reflect.ts#location@492"
           ],
           "implementationSites": [
-            "src/reflect.ts#CanSet@1113"
+            "src/reflect.ts#CanSet@1120"
           ]
         },
         {
@@ -8169,12 +8169,12 @@
           "targetFingerprint": "a3aecd67327ce98d42e0fb497ef317c81b1caa6d6661eb263c5cecf0aabffc9c",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#Cap@1139"
+            "src/reflect.ts#Cap@1146"
           ]
         },
         {
@@ -8190,16 +8190,16 @@
           "targetFingerprint": "1a81dac895989847e935d9b4537e2e367a776ed346eabe0a0a0117e6adb462df",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1685",
+            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1689",
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#InterfaceValue@4031",
-            "src/reflect.ts#convertedBox@1326",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#resolvedType@736"
+            "src/reflect.ts#InterfaceValue@4038",
+            "src/reflect.ts#convertedBox@1333",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#resolvedType@743"
           ],
           "implementationSites": [
-            "src/reflect.ts#Convert@1188"
+            "src/reflect.ts#Convert@1195"
           ]
         },
         {
@@ -8216,18 +8216,18 @@
           "disposition": "implemented",
           "dependencies": [
             "src/reflect.ts#Interface@394",
-            "src/reflect.ts#InterfaceValue@4031",
-            "src/reflect.ts#LocatedValue@4063",
+            "src/reflect.ts#InterfaceValue@4038",
+            "src/reflect.ts#LocatedValue@4070",
             "src/reflect.ts#Value@474",
             "src/reflect.ts#located@564",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#resolvedType@736",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#resolvedType@743",
             "src/reflect.ts#source@532",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
-            "src/reflect.ts#Elem@1609"
+            "src/reflect.ts#Elem@1616"
           ]
         },
         {
@@ -8244,14 +8244,14 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#LocatedValue@4063",
+            "src/reflect.ts#LocatedValue@4070",
             "src/reflect.ts#addressable@500",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#Field@1731"
+            "src/reflect.ts#Field@1738"
           ]
         },
         {
@@ -8267,12 +8267,12 @@
           "targetFingerprint": "d13d15a5958b59a332b62996cffdb0161a70bf5042945cc6b8ea7b9dde10fc6f",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#Float@1846"
+            "src/reflect.ts#Float@1853"
           ]
         },
         {
@@ -8289,13 +8289,13 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#settableLocation@2930",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#settableLocation@2937",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#Grow@1895"
+            "src/reflect.ts#Grow@1902"
           ]
         },
         {
@@ -8312,14 +8312,14 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#Len@2593",
-            "src/reflect.ts#LocatedValue@4063",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#Len@2600",
+            "src/reflect.ts#LocatedValue@4070",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#Index@1985"
+            "src/reflect.ts#Index@1992"
           ]
         },
         {
@@ -8335,12 +8335,12 @@
           "targetFingerprint": "9bda73b70b68c2755735ab85b532198ea626024fa972e76b94423cdc3e0cbf83",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#Int@2081"
+            "src/reflect.ts#Int@2088"
           ]
         },
         {
@@ -8357,16 +8357,16 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#IsValid@2345",
+            "src/reflect.ts#IsValid@2352",
             "src/reflect.ts#Struct@457",
             "src/reflect.ts#location@492",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#resolvedType@736",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#resolvedType@743",
             "src/reflect.ts#source@532",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
-            "src/reflect.ts#Interface@2130"
+            "src/reflect.ts#Interface@2137"
           ]
         },
         {
@@ -8383,14 +8383,14 @@
           "disposition": "implemented",
           "dependencies": [
             "src/reflect.ts#Interface@394",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#resolvedType@736",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#resolvedType@743",
             "src/reflect.ts#source@532",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
-            "src/reflect.ts#IsNil@2258"
+            "src/reflect.ts#IsNil@2265"
           ]
         },
         {
@@ -8411,7 +8411,7 @@
             "src/reflect.ts#staticType@508"
           ],
           "implementationSites": [
-            "src/reflect.ts#IsValid@2345"
+            "src/reflect.ts#IsValid@2352"
           ]
         },
         {
@@ -8427,16 +8427,16 @@
           "targetFingerprint": "825adc1498a1d9c243ed91e83de3005b6eaa61f9d2bbf838d76da142e5e424c0",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#Field@1731",
+            "src/reflect.ts#Field@1738",
             "src/reflect.ts#Interface@394",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#resolvedType@736",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#resolvedType@743",
             "src/reflect.ts#source@532",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
-            "src/reflect.ts#IsZero@2375"
+            "src/reflect.ts#IsZero@2382"
           ]
         },
         {
@@ -8453,11 +8453,11 @@
           "disposition": "implemented",
           "dependencies": [
             "src/reflect.ts#Invalid@174",
-            "src/reflect.ts#resolvedType@736",
+            "src/reflect.ts#resolvedType@743",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#Kind@2545"
+            "src/reflect.ts#Kind@2552"
           ]
         },
         {
@@ -8473,12 +8473,12 @@
           "targetFingerprint": "40671fe31f09e87a4a86f991a8db41a561a127cba2eececae73cb144720b8404",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#Len@2593"
+            "src/reflect.ts#Len@2600"
           ]
         },
         {
@@ -8494,13 +8494,13 @@
           "targetFingerprint": "389e797734bf2977b9dabe6d2198ca96ac5577b32d22f694a4b8a568c459167a",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#InterfaceValue@4031",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#InterfaceValue@4038",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#MapIndex@2642"
+            "src/reflect.ts#MapIndex@2649"
           ]
         },
         {
@@ -8516,13 +8516,13 @@
           "targetFingerprint": "fe4a05dcf7913140c246d2d1dd001f6e9384f6428e43f075d847a12657bab641",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#MapIterator@4203",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#MapIterator@4210",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#MapRange@2717"
+            "src/reflect.ts#MapRange@2724"
           ]
         },
         {
@@ -8538,12 +8538,12 @@
           "targetFingerprint": "de7fc7515b1dee19672804612c50e8f3c140fb6796e57556c115f4c041783fae",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#NumField@2807"
+            "src/reflect.ts#NumField@2814"
           ]
         },
         {
@@ -8560,15 +8560,15 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#Interface@2130",
+            "src/reflect.ts#Interface@2137",
             "src/reflect.ts#Interface@394",
-            "src/reflect.ts#IsValid@2345",
-            "src/reflect.ts#settableLocation@2930",
+            "src/reflect.ts#IsValid@2352",
+            "src/reflect.ts#settableLocation@2937",
             "src/reflect.ts#source@532",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
-            "src/reflect.ts#Set@2851"
+            "src/reflect.ts#Set@2858"
           ]
         },
         {
@@ -8584,12 +8584,12 @@
           "targetFingerprint": "3b21341bb83ad5f928fe379468b12b37607b264ea2ac3249d793b3e162e68ec8",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#settableLocation@2930"
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#settableLocation@2937"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetBool@3000"
+            "src/reflect.ts#SetBool@3007"
           ]
         },
         {
@@ -8607,15 +8607,15 @@
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
             "src/reflect.ts#Slice@435",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#resolvedType@736",
-            "src/reflect.ts#settableLocation@2930",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#resolvedType@743",
+            "src/reflect.ts#settableLocation@2937",
             "src/reflect.ts#source@532",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetBytes@3058"
+            "src/reflect.ts#SetBytes@3065"
           ]
         },
         {
@@ -8631,12 +8631,12 @@
           "targetFingerprint": "70a121e60e50fa6e5fe0bdd502b3f8b249374287477f268767b4fc696a561487",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#settableLocation@2930"
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#settableLocation@2937"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetFloat@3193"
+            "src/reflect.ts#SetFloat@3200"
           ]
         },
         {
@@ -8652,12 +8652,12 @@
           "targetFingerprint": "c1afb9edeca736be981440ff49b01d76b8908155822871531e228a49cc3cfb46",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#settableLocation@2930"
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#settableLocation@2937"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetInt@3251"
+            "src/reflect.ts#SetInt@3258"
           ]
         },
         {
@@ -8673,12 +8673,12 @@
           "targetFingerprint": "2d790737547d49ebada1b0c7b91cf2f5b3e313562e96e14a51e55e863f73ce6e",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#currentKey@4269",
-            "src/reflect.ts#mapIteratorState@4328",
-            "src/reflect.ts#settableLocation@2930"
+            "src/reflect.ts#currentKey@4276",
+            "src/reflect.ts#mapIteratorState@4335",
+            "src/reflect.ts#settableLocation@2937"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetIterKey@3309"
+            "src/reflect.ts#SetIterKey@3316"
           ]
         },
         {
@@ -8695,12 +8695,12 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#currentValue@4307",
-            "src/reflect.ts#mapIteratorState@4328",
-            "src/reflect.ts#settableLocation@2930"
+            "src/reflect.ts#currentValue@4314",
+            "src/reflect.ts#mapIteratorState@4335",
+            "src/reflect.ts#settableLocation@2937"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetIterValue@3354"
+            "src/reflect.ts#SetIterValue@3361"
           ]
         },
         {
@@ -8717,13 +8717,13 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#settableLocation@2930",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#settableLocation@2937",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetLen@3422"
+            "src/reflect.ts#SetLen@3429"
           ]
         },
         {
@@ -8739,12 +8739,12 @@
           "targetFingerprint": "195ac90e79a317676c816f09aea0b23abf610657179e51346187d53d1482a2ad",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetMapIndex@3542"
+            "src/reflect.ts#SetMapIndex@3549"
           ]
         },
         {
@@ -8760,12 +8760,12 @@
           "targetFingerprint": "9c4b45e41fdc9a964cadc975337fb58b3cf926525234ee1d828d8501cff2ff73",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#settableLocation@2930"
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#settableLocation@2937"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetString@3620"
+            "src/reflect.ts#SetString@3627"
           ]
         },
         {
@@ -8781,12 +8781,12 @@
           "targetFingerprint": "88f59e60aec6271f1270cdb9dab237284fcf08da69f96e0b15096ed1c9dad279",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#settableLocation@2930"
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#settableLocation@2937"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetUint@3678"
+            "src/reflect.ts#SetUint@3685"
           ]
         },
         {
@@ -8802,12 +8802,12 @@
           "targetFingerprint": "32bb0c655db66afac39829e9f452be8c25790abf807a458f74be388bf20cd6dd",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#settableLocation@2930"
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#settableLocation@2937"
           ],
           "implementationSites": [
-            "src/reflect.ts#SetZero@3736"
+            "src/reflect.ts#SetZero@3743"
           ]
         },
         {
@@ -8823,13 +8823,13 @@
           "targetFingerprint": "83df6414adb7776d41e508393b4d56f6d8faa5e81eb34ea7ca2435dc31e63db9",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#IsValid@2345",
-            "src/reflect.ts#operations@795",
-            "src/reflect.ts#resolvedType@736",
+            "src/reflect.ts#IsValid@2352",
+            "src/reflect.ts#operations@802",
+            "src/reflect.ts#resolvedType@743",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#String@3789"
+            "src/reflect.ts#String@3796"
           ]
         },
         {
@@ -8846,11 +8846,11 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#IsValid@2345",
-            "src/reflect.ts#resolvedType@736"
+            "src/reflect.ts#IsValid@2352",
+            "src/reflect.ts#resolvedType@743"
           ],
           "implementationSites": [
-            "src/reflect.ts#Type@3875"
+            "src/reflect.ts#Type@3882"
           ]
         },
         {
@@ -8866,12 +8866,12 @@
           "targetFingerprint": "ad0a8314259c1e39044988a3f87cf39e51b4bd698fddc4ab1d70e134ab7d2530",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#Uint@3930"
+            "src/reflect.ts#Uint@3937"
           ]
         },
         {
@@ -8887,12 +8887,12 @@
           "targetFingerprint": "842ffe1b3a4a38fc87e443853ca6694a92ab40430e01e126f69aab603fd4b256",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#operationPanic@857",
-            "src/reflect.ts#operations@795",
+            "src/reflect.ts#operationPanic@864",
+            "src/reflect.ts#operations@802",
             "src/reflect.ts#source@532"
           ],
           "implementationSites": [
-            "src/reflect.ts#UnsafePointer@3979"
+            "src/reflect.ts#UnsafePointer@3986"
           ]
         },
         {
@@ -8911,7 +8911,7 @@
             "src/reflect.ts#Value@474"
           ],
           "implementationSites": [
-            "src/reflect.ts#Append@5253"
+            "src/reflect.ts#Append@5260"
           ]
         },
         {
@@ -8926,10 +8926,10 @@
           "targetFingerprint": "87915dfe71834f9fd6e7418be30cc4e4d51967a15ba5a98affe548c61104fbf6",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#deepValueEqual@5333"
+            "src/reflect.ts#deepValueEqual@5340"
           ],
           "implementationSites": [
-            "src/reflect.ts#DeepEqual@5281"
+            "src/reflect.ts#DeepEqual@5288"
           ]
         },
         {
@@ -8944,13 +8944,13 @@
           "targetFingerprint": "bfda6e7ab64218b12b6046615558b8705d866d87e0dc0caaae5695d58b25e29e",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#Elem@1609",
-            "src/reflect.ts#Kind@2545",
+            "src/reflect.ts#Elem@1616",
+            "src/reflect.ts#Kind@2552",
             "src/reflect.ts#Pointer@416",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
-            "src/reflect.ts#Indirect@6160"
+            "src/reflect.ts#Indirect@6167"
           ]
         },
         {
@@ -8965,14 +8965,14 @@
           "targetFingerprint": "daf0d75b33b08283a176d1187a7f640fe013e634ccb499f0d344ac0cae5af20a",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1685",
+            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1689",
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#InterfaceValue@4031",
+            "src/reflect.ts#InterfaceValue@4038",
             "src/reflect.ts#Map@405",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
-            "src/reflect.ts#MakeMap@6196"
+            "src/reflect.ts#MakeMap@6203"
           ]
         },
         {
@@ -8987,14 +8987,14 @@
           "targetFingerprint": "a44d3d97838ff8f31beefc333f2b36ba4a5fd67661d644c9b9473024588d3628",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1685",
+            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1689",
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#InterfaceValue@4031",
+            "src/reflect.ts#InterfaceValue@4038",
             "src/reflect.ts#Slice@435",
             "src/reflect.ts#value@135"
           ],
           "implementationSites": [
-            "src/reflect.ts#MakeSlice@6288"
+            "src/reflect.ts#MakeSlice@6295"
           ]
         },
         {
@@ -9012,7 +9012,7 @@
             "src/internal/runtime/error.ts#ProviderError@16"
           ],
           "implementationSites": [
-            "src/reflect.ts#MapOf@6441"
+            "src/reflect.ts#MapOf@6448"
           ]
         },
         {
@@ -9027,13 +9027,13 @@
           "targetFingerprint": "af1d4a5da91b1aeac81af8d49d366ec655f46c919bec7d0fc7269e5e174a37b1",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/reflect/runtime-value.ts#pointerDescriptorFor@830",
-            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1685",
+            "src/internal/portable/reflect/runtime-value.ts#pointerDescriptorFor@834",
+            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1689",
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#InterfaceValue@4031"
+            "src/reflect.ts#InterfaceValue@4038"
           ],
           "implementationSites": [
-            "src/reflect.ts#New@6509"
+            "src/reflect.ts#New@6516"
           ]
         },
         {
@@ -9048,11 +9048,11 @@
           "targetFingerprint": "f8cc4b9dd75a51e82cb92ae4b98414e78d5e9557fc18183a364e1c4ed8d83b2d",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/reflect/runtime-value.ts#pointerDescriptorFor@830",
+            "src/internal/portable/reflect/runtime-value.ts#pointerDescriptorFor@834",
             "src/internal/runtime/error.ts#ProviderError@16"
           ],
           "implementationSites": [
-            "src/reflect.ts#PointerTo@6604"
+            "src/reflect.ts#PointerTo@6611"
           ]
         },
         {
@@ -9070,7 +9070,7 @@
             "src/internal/runtime/error.ts#ProviderError@16"
           ],
           "implementationSites": [
-            "src/reflect.ts#SliceOf@6677"
+            "src/reflect.ts#SliceOf@6684"
           ]
         },
         {
@@ -9094,7 +9094,7 @@
             "src/internal/runtime/placeholder.ts#providerPlaceholder@24"
           ],
           "implementationSites": [
-            "src/reflect.ts#TypeAssert@6723"
+            "src/reflect.ts#TypeAssert@6730"
           ]
         },
         {
@@ -9118,7 +9118,7 @@
             "src/internal/runtime/placeholder.ts#providerPlaceholder@24"
           ],
           "implementationSites": [
-            "src/reflect.ts#TypeFor@6748"
+            "src/reflect.ts#TypeFor@6755"
           ]
         },
         {
@@ -9136,7 +9136,7 @@
             "src/internal/runtime/placeholder.ts#providerPlaceholder@24"
           ],
           "implementationSites": [
-            "src/reflect.ts#TypeOf@6768"
+            "src/reflect.ts#TypeOf@6775"
           ]
         },
         {
@@ -9151,10 +9151,10 @@
           "targetFingerprint": "15fcb1b500d5688c429b289c180ac857f06e4422b434fb9b8e73591b93d50845",
           "disposition": "implemented",
           "dependencies": [
-            "src/reflect.ts#InterfaceValue@4031"
+            "src/reflect.ts#InterfaceValue@4038"
           ],
           "implementationSites": [
-            "src/reflect.ts#ValueOf@4182"
+            "src/reflect.ts#ValueOf@4189"
           ]
         },
         {
@@ -9169,12 +9169,12 @@
           "targetFingerprint": "174b23afd9a5686c94d361308df395d5b06c59004c4cc0cc0aa55083c57f3b44",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1685",
+            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1689",
             "src/internal/runtime/error.ts#ProviderError@16",
-            "src/reflect.ts#InterfaceValue@4031"
+            "src/reflect.ts#InterfaceValue@4038"
           ],
           "implementationSites": [
-            "src/reflect.ts#Zero@6792"
+            "src/reflect.ts#Zero@6799"
           ]
         }
       ]
@@ -26880,8 +26880,8 @@
       "dependencies": [
         "src/encoding/binary.ts#reflect@102",
         "src/reflect.ts#Invalid@174",
-        "src/reflect.ts#Kind@2545",
-        "src/reflect.ts#Type@3875",
+        "src/reflect.ts#Kind@2552",
+        "src/reflect.ts#Type@3882",
         "src/reflect.ts#value@135"
       ]
     },
@@ -27170,32 +27170,32 @@
       "identity": "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@477",
       "disposition": "implemented",
       "dependencies": [
-        "src/reflect.ts#$copy@4237",
-        "src/reflect.ts#keys@4212",
-        "src/reflect.ts#position@4206",
-        "src/reflect.ts#valueAt@4220"
+        "src/reflect.ts#$copy@4244",
+        "src/reflect.ts#keys@4219",
+        "src/reflect.ts#position@4213",
+        "src/reflect.ts#valueAt@4227"
       ]
     },
     {
       "identity": "src/internal/facets/named-reflect.ts#ReflectStructFieldOperations@418",
       "disposition": "implemented",
       "dependencies": [
-        "src/reflect.ts#Anonymous@4744",
-        "src/reflect.ts#Index@4737",
-        "src/reflect.ts#Name@4714",
-        "src/reflect.ts#Offset@4733",
-        "src/reflect.ts#PkgPath@4718",
-        "src/reflect.ts#StructField@4709",
-        "src/reflect.ts#Tag@4729",
-        "src/reflect.ts#Type@4722"
+        "src/reflect.ts#Anonymous@4751",
+        "src/reflect.ts#Index@4744",
+        "src/reflect.ts#Name@4721",
+        "src/reflect.ts#Offset@4740",
+        "src/reflect.ts#PkgPath@4725",
+        "src/reflect.ts#StructField@4716",
+        "src/reflect.ts#Tag@4736",
+        "src/reflect.ts#Type@4729"
       ]
     },
     {
       "identity": "src/internal/facets/named-reflect.ts#ReflectStructTagValueOperations@378",
       "disposition": "implemented",
       "dependencies": [
-        "src/reflect.ts#StructTag@4867",
-        "src/reflect.ts#value@4874"
+        "src/reflect.ts#StructTag@4874",
+        "src/reflect.ts#value@4881"
       ]
     },
     {
@@ -27204,10 +27204,10 @@
       "dependencies": [
         "src/internal/portable/reflect/runtime-type.ts#createRuntimeType@2683",
         "src/internal/portable/reflect/runtime-type.ts#runtimeTypeOf@2761",
-        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeOpaqueStructValueOperations@1261",
-        "src/internal/portable/reflect/runtime-value.ts#registerRuntimePointerValueOperations@1399",
-        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeStructValueOperations@985",
-        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@956"
+        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeOpaqueStructValueOperations@1265",
+        "src/internal/portable/reflect/runtime-value.ts#registerRuntimePointerValueOperations@1403",
+        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeStructValueOperations@989",
+        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@960"
       ]
     },
     {
@@ -30266,7 +30266,7 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16",
-        "src/reflect.ts#Kind@2545",
+        "src/reflect.ts#Kind@2552",
         "src/reflect.ts#String@143"
       ]
     },
@@ -30278,11 +30278,11 @@
         "src/internal/portable/encoding/binary/reflection-codec.ts#decodeScalar@859",
         "src/internal/portable/encoding/binary/reflection-codec.ts#reflect@41",
         "src/internal/portable/encoding/binary/reflection-codec.ts#scalarWidth@714",
-        "src/reflect.ts#Field@1731",
-        "src/reflect.ts#Index@1985",
-        "src/reflect.ts#Kind@2545",
-        "src/reflect.ts#Len@2593",
-        "src/reflect.ts#NumField@2807",
+        "src/reflect.ts#Field@1738",
+        "src/reflect.ts#Index@1992",
+        "src/reflect.ts#Kind@2552",
+        "src/reflect.ts#Len@2600",
+        "src/reflect.ts#NumField@2814",
         "src/reflect.ts#Slice@435",
         "src/reflect.ts#Struct@457",
         "src/reflect.ts#value@135"
@@ -30303,10 +30303,10 @@
         "src/reflect.ts#Int32@229",
         "src/reflect.ts#Int64@240",
         "src/reflect.ts#Int8@207",
-        "src/reflect.ts#SetBool@3000",
-        "src/reflect.ts#SetFloat@3193",
-        "src/reflect.ts#SetInt@3251",
-        "src/reflect.ts#SetUint@3678",
+        "src/reflect.ts#SetBool@3007",
+        "src/reflect.ts#SetFloat@3200",
+        "src/reflect.ts#SetInt@3258",
+        "src/reflect.ts#SetUint@3685",
         "src/reflect.ts#value@135"
       ]
     },
@@ -30318,11 +30318,11 @@
         "src/internal/portable/encoding/binary/reflection-codec.ts#encodeScalar@1146",
         "src/internal/portable/encoding/binary/reflection-codec.ts#reflect@41",
         "src/internal/portable/encoding/binary/reflection-codec.ts#scalarWidth@714",
-        "src/reflect.ts#Field@1731",
-        "src/reflect.ts#Index@1985",
-        "src/reflect.ts#Kind@2545",
-        "src/reflect.ts#Len@2593",
-        "src/reflect.ts#NumField@2807",
+        "src/reflect.ts#Field@1738",
+        "src/reflect.ts#Index@1992",
+        "src/reflect.ts#Kind@2552",
+        "src/reflect.ts#Len@2600",
+        "src/reflect.ts#NumField@2814",
         "src/reflect.ts#Slice@435",
         "src/reflect.ts#Struct@457",
         "src/reflect.ts#value@135"
@@ -30337,16 +30337,16 @@
         "src/internal/portable/math/scalars.ts#Float32bits@225",
         "src/internal/portable/math/scalars.ts#Float64bits@195",
         "src/reflect.ts#Bool@185",
-        "src/reflect.ts#Bool@929",
+        "src/reflect.ts#Bool@936",
         "src/reflect.ts#Float32@317",
         "src/reflect.ts#Float64@328",
-        "src/reflect.ts#Float@1846",
+        "src/reflect.ts#Float@1853",
         "src/reflect.ts#Int16@218",
         "src/reflect.ts#Int32@229",
         "src/reflect.ts#Int64@240",
         "src/reflect.ts#Int8@207",
-        "src/reflect.ts#Int@2081",
-        "src/reflect.ts#Uint@3930",
+        "src/reflect.ts#Int@2088",
+        "src/reflect.ts#Uint@3937",
         "src/reflect.ts#value@135"
       ]
     },
@@ -30356,11 +30356,11 @@
       "dependencies": [
         "src/internal/portable/encoding/binary/reflection-codec.ts#reflect@41",
         "src/internal/portable/encoding/binary/reflection-codec.ts#scalarWidth@714",
-        "src/reflect.ts#Field@1731",
-        "src/reflect.ts#Index@1985",
-        "src/reflect.ts#Kind@2545",
-        "src/reflect.ts#Len@2593",
-        "src/reflect.ts#NumField@2807",
+        "src/reflect.ts#Field@1738",
+        "src/reflect.ts#Index@1992",
+        "src/reflect.ts#Kind@2552",
+        "src/reflect.ts#Len@2600",
+        "src/reflect.ts#NumField@2814",
         "src/reflect.ts#Slice@435",
         "src/reflect.ts#Struct@457",
         "src/reflect.ts#value@135"
@@ -31140,7 +31140,7 @@
         "src/reflect.ts#ChanDir@113",
         "src/reflect.ts#Invalid@174",
         "src/reflect.ts#Kind@128",
-        "src/reflect.ts#Type@4722"
+        "src/reflect.ts#Type@4729"
       ]
     },
     {
@@ -31149,7 +31149,7 @@
       "dependencies": [
         "src/internal/portable/reflect/runtime-type.ts#RuntimeType@430",
         "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@417",
-        "src/internal/portable/reflect/runtime-value.ts#recordPointerDescriptor@802"
+        "src/internal/portable/reflect/runtime-value.ts#recordPointerDescriptor@806"
       ]
     },
     {
@@ -31171,8 +31171,8 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
-        "src/reflect.ts#StructField@4709",
-        "src/reflect.ts#StructTag@4867"
+        "src/reflect.ts#StructField@4716",
+        "src/reflect.ts#StructTag@4874"
       ]
     },
     {
@@ -31180,7 +31180,7 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@3000",
-        "src/reflect.ts#Method@4605"
+        "src/reflect.ts#Method@4612"
       ]
     },
     {
@@ -31244,88 +31244,88 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@3000",
-        "src/reflect.ts#Method@4605"
+        "src/reflect.ts#Method@4612"
       ]
     },
     {
       "identity": "src/internal/portable/reflect/runtime-type.ts#zeroStructField@3005",
       "disposition": "implemented",
       "dependencies": [
-        "src/reflect.ts#StructField@4709",
-        "src/reflect.ts#StructTag@4867"
+        "src/reflect.ts#StructField@4716",
+        "src/reflect.ts#StructTag@4874"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#operationsByType@946",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#operationsByType@950",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#pointerDescriptorFor@830",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#pointerDescriptorFor@834",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#pointerDescriptors@767",
-        "src/internal/portable/reflect/runtime-value.ts#pointerTypeFactory@785"
+        "src/internal/portable/reflect/runtime-value.ts#pointerDescriptors@771",
+        "src/internal/portable/reflect/runtime-value.ts#pointerTypeFactory@789"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#pointerDescriptors@767",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#pointerDescriptors@771",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#pointerTypeFactory@785",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#pointerTypeFactory@789",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#recordPointerDescriptor@802",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#recordPointerDescriptor@806",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#pointerDescriptors@767"
+        "src/internal/portable/reflect/runtime-value.ts#pointerDescriptors@771"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#registerRuntimeOpaqueStructValueOperations@1261",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#registerRuntimeOpaqueStructValueOperations@1265",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@956"
+        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@960"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#registerRuntimePointerValueOperations@1399",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#registerRuntimePointerValueOperations@1403",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@956"
+        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@960"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#registerRuntimeStructValueOperations@985",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#registerRuntimeStructValueOperations@989",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@956"
+        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@960"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@956",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@960",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#operationsByType@946"
+        "src/internal/portable/reflect/runtime-value.ts#operationsByType@950"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@1794",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@1798",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#typeResolver@1751"
+        "src/internal/portable/reflect/runtime-value.ts#typeResolver@1755"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1685",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1689",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#operationsByType@946"
+        "src/internal/portable/reflect/runtime-value.ts#operationsByType@950"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#typeResolver@1751",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#typeResolver@1755",
       "disposition": "implemented"
     },
     {
@@ -34217,33 +34217,34 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16",
-        "src/reflect.ts#InterfaceValue@4031",
-        "src/reflect.ts#kindText@816",
-        "src/reflect.ts#operations@795",
+        "src/reflect.ts#InterfaceValue@4038",
+        "src/reflect.ts#IsValid@2352",
+        "src/reflect.ts#kindText@823",
+        "src/reflect.ts#operations@802",
         "src/reflect.ts#source@532"
       ]
     },
     {
-      "identity": "src/reflect.ts#$copy@4237",
+      "identity": "src/reflect.ts#$copy@4244",
       "disposition": "implemented",
       "dependencies": [
-        "src/reflect.ts#MapIterator@4203",
-        "src/reflect.ts#keys@4212",
-        "src/reflect.ts#position@4206",
-        "src/reflect.ts#valueAt@4220"
+        "src/reflect.ts#MapIterator@4210",
+        "src/reflect.ts#keys@4219",
+        "src/reflect.ts#position@4213",
+        "src/reflect.ts#valueAt@4227"
       ]
     },
     {
-      "identity": "src/reflect.ts#AddressValue@4099",
+      "identity": "src/reflect.ts#AddressValue@4106",
       "disposition": "implemented",
       "dependencies": [
-        "src/reflect.ts#LocatedValue@4063",
+        "src/reflect.ts#LocatedValue@4070",
         "src/reflect.ts#Pointer@416",
         "src/reflect.ts#Value@474"
       ]
     },
     {
-      "identity": "src/reflect.ts#Anonymous@4744",
+      "identity": "src/reflect.ts#Anonymous@4751",
       "disposition": "implemented"
     },
     {
@@ -34268,7 +34269,7 @@
       ]
     },
     {
-      "identity": "src/reflect.ts#Index@4737",
+      "identity": "src/reflect.ts#Index@4744",
       "disposition": "implemented"
     },
     {
@@ -34307,7 +34308,7 @@
       ]
     },
     {
-      "identity": "src/reflect.ts#InterfaceValue@4031",
+      "identity": "src/reflect.ts#InterfaceValue@4038",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Value@474"
@@ -34321,7 +34322,7 @@
       ]
     },
     {
-      "identity": "src/reflect.ts#LocatedValue@4063",
+      "identity": "src/reflect.ts#LocatedValue@4070",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Value@474"
@@ -34335,22 +34336,22 @@
       ]
     },
     {
-      "identity": "src/reflect.ts#MapIterator@4203",
+      "identity": "src/reflect.ts#MapIterator@4210",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16"
       ]
     },
     {
-      "identity": "src/reflect.ts#Name@4714",
+      "identity": "src/reflect.ts#Name@4721",
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#Offset@4733",
+      "identity": "src/reflect.ts#Offset@4740",
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#PkgPath@4718",
+      "identity": "src/reflect.ts#PkgPath@4725",
       "disposition": "implemented"
     },
     {
@@ -34375,11 +34376,11 @@
       ]
     },
     {
-      "identity": "src/reflect.ts#Tag@4729",
+      "identity": "src/reflect.ts#Tag@4736",
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#Type@4722",
+      "identity": "src/reflect.ts#Type@4729",
       "disposition": "implemented"
     },
     {
@@ -34415,81 +34416,81 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#convertedBox@1326",
+      "identity": "src/reflect.ts#convertedBox@1333",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#source@532",
-        "src/reflect.ts#stringFromRune@6871"
+        "src/reflect.ts#stringFromRune@6878"
       ]
     },
     {
-      "identity": "src/reflect.ts#currentKey@4269",
+      "identity": "src/reflect.ts#currentKey@4276",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16",
-        "src/reflect.ts#keys@4212",
-        "src/reflect.ts#position@4206"
+        "src/reflect.ts#keys@4219",
+        "src/reflect.ts#position@4213"
       ]
     },
     {
-      "identity": "src/reflect.ts#currentValue@4307",
+      "identity": "src/reflect.ts#currentValue@4314",
       "disposition": "implemented",
       "dependencies": [
-        "src/reflect.ts#currentKey@4269",
-        "src/reflect.ts#valueAt@4220"
+        "src/reflect.ts#currentKey@4276",
+        "src/reflect.ts#valueAt@4227"
       ]
     },
     {
-      "identity": "src/reflect.ts#deepValueEqual@5333",
+      "identity": "src/reflect.ts#deepValueEqual@5340",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@1794",
-        "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1685",
+        "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@1798",
+        "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1689",
         "src/internal/runtime/error.ts#ProviderError@16",
-        "src/reflect.ts#Elem@1609",
-        "src/reflect.ts#Field@1731",
-        "src/reflect.ts#Index@1985",
-        "src/reflect.ts#Interface@2130",
-        "src/reflect.ts#InterfaceValue@4031",
-        "src/reflect.ts#IsNil@2258",
-        "src/reflect.ts#IsValid@2345",
-        "src/reflect.ts#Key@4433",
-        "src/reflect.ts#Len@2593",
+        "src/reflect.ts#Elem@1616",
+        "src/reflect.ts#Field@1738",
+        "src/reflect.ts#Index@1992",
+        "src/reflect.ts#Interface@2137",
+        "src/reflect.ts#InterfaceValue@4038",
+        "src/reflect.ts#IsNil@2265",
+        "src/reflect.ts#IsValid@2352",
+        "src/reflect.ts#Key@4440",
+        "src/reflect.ts#Len@2600",
         "src/reflect.ts#Map@405",
-        "src/reflect.ts#MapIndex@2642",
-        "src/reflect.ts#MapIter@4424",
-        "src/reflect.ts#MapRange@2717",
-        "src/reflect.ts#Next@4460",
-        "src/reflect.ts#NumField@2807",
+        "src/reflect.ts#MapIndex@2649",
+        "src/reflect.ts#MapIter@4431",
+        "src/reflect.ts#MapRange@2724",
+        "src/reflect.ts#Next@4467",
+        "src/reflect.ts#NumField@2814",
         "src/reflect.ts#Pointer@416",
         "src/reflect.ts#Slice@435",
         "src/reflect.ts#String@143",
         "src/reflect.ts#Struct@457",
-        "src/reflect.ts#Value@4555",
+        "src/reflect.ts#Value@4562",
         "src/reflect.ts#value@135"
       ]
     },
     {
-      "identity": "src/reflect.ts#keys@4212",
+      "identity": "src/reflect.ts#keys@4219",
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#kindNames@6948",
+      "identity": "src/reflect.ts#kindNames@6955",
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#kindText@816",
+      "identity": "src/reflect.ts#kindText@823",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#String@143",
-        "src/reflect.ts#resolvedType@736"
+        "src/reflect.ts#resolvedType@743"
       ]
     },
     {
       "identity": "src/reflect.ts#located@564",
       "disposition": "implemented",
       "dependencies": [
-        "src/reflect.ts#LocatedValue@4063"
+        "src/reflect.ts#LocatedValue@4070"
       ]
     },
     {
@@ -34497,53 +34498,53 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#mapIteratorState@4328",
+      "identity": "src/reflect.ts#mapIteratorState@4335",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16",
-        "src/reflect.ts#keys@4212",
-        "src/reflect.ts#position@4206"
+        "src/reflect.ts#keys@4219",
+        "src/reflect.ts#position@4213"
       ]
     },
     {
-      "identity": "src/reflect.ts#operationPanic@857",
+      "identity": "src/reflect.ts#operationPanic@864",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16",
-        "src/reflect.ts#kindText@816"
+        "src/reflect.ts#kindText@823"
       ]
     },
     {
-      "identity": "src/reflect.ts#operations@795",
+      "identity": "src/reflect.ts#operations@802",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1685",
-        "src/reflect.ts#resolvedType@736"
+        "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@1689",
+        "src/reflect.ts#resolvedType@743"
       ]
     },
     {
-      "identity": "src/reflect.ts#position@4206",
+      "identity": "src/reflect.ts#position@4213",
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#resolvedType@736",
+      "identity": "src/reflect.ts#resolvedType@743",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@1794",
+        "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@1798",
         "src/reflect.ts#location@492",
         "src/reflect.ts#source@532",
         "src/reflect.ts#staticType@508"
       ]
     },
     {
-      "identity": "src/reflect.ts#settableLocation@2930",
+      "identity": "src/reflect.ts#settableLocation@2937",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16",
-        "src/reflect.ts#IsValid@2345",
+        "src/reflect.ts#IsValid@2352",
         "src/reflect.ts#addressable@500",
         "src/reflect.ts#location@492",
-        "src/reflect.ts#operationPanic@857"
+        "src/reflect.ts#operationPanic@864"
       ]
     },
     {
@@ -34563,7 +34564,7 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#stringFromRune@6871",
+      "identity": "src/reflect.ts#stringFromRune@6878",
       "disposition": "implemented"
     },
     {
@@ -34575,11 +34576,11 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#value@4874",
+      "identity": "src/reflect.ts#value@4881",
       "disposition": "implemented"
     },
     {
-      "identity": "src/reflect.ts#valueAt@4220",
+      "identity": "src/reflect.ts#valueAt@4227",
       "disposition": "implemented"
     },
     {
@@ -34873,5 +34874,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "95cdc4b9c1b2b71b366ef3574044b78a9c47db685dfd69dc9947a6da5bef03c0"
+  "manifestDigest": "23e1ca3ce20580fc2534fca94146abce0eb40eaa5835be642d20560c7c006df4"
 }

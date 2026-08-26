@@ -88,7 +88,7 @@ export interface RuntimeValueOperations {
   ) => RuntimeValueLocation;
   readonly append?: (
     box: GoInterfaceValue,
-    values: readonly GoInterfaceValue[],
+    values: readonly (GoInterfaceValue | undefined)[],
   ) => GoInterfaceValue;
   readonly makeSlice?: (
     length: int64,
