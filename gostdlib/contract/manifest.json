@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "017379a7a259ee1073b3618003abd7c2ba6baba745756788248b704738599f95",
+  "providerDigest": "44d2025ea1f470537c6ae6c882ae341b1a6a496831b5b04a840723b72c7ab71c",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -23788,6 +23788,109 @@
       "callableProfiles": [
         {
           "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
+          "profileKey": "0ba24f73bb6b874b939ba4040bde514ae0924219275c5320a19f302e98caae9a",
+          "export": "Base64NewEncoderDirect",
+          "canonicalParameters": [
+            1
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "canonicalTypeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Writer"
+          ],
+          "contractInterfaces": [
+            "io|kind=2|receiver=|name=WriteCloser"
+          ],
+          "implementedResultInterfaces": [
+            "io|kind=2|receiver=|name=WriteCloser"
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-encoding-base64.ts#Base64NewEncoderDirect@658"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=WriteCloser",
+              "export": "ProviderWriteCloser",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Closer|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "io/io.go:108:2",
+                    "implementationOwner": "src/internal/facets/provider-encoding-base64.ts",
+                    "targetFingerprint": "c8899bf9ca054e1acfdb4c906764c70ddd8c81ba7f181da2aaece7be365c3440"
+                  },
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Writer|name=Write",
+                    "kind": "callable",
+                    "member": "Write",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "contractSignature": "func(p []byte) (n int, err error)",
+                    "sourceLocation": "io/io.go:100:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "b82c95dbb864d6c64bb25a0a048c21db1f1a5c098939281fc17a9a850a4fc065"
+                  }
+                ]
+              },
+              "targetFingerprint": "54efa912b4a8d66e3b07ca23a194b5385681859741107f924b7da64f4cb92769"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+              "export": "ProviderWriterInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Writer|name=Write",
+                    "kind": "callable",
+                    "member": "Write",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "contractSignature": "func(p []byte) (n int, err error)",
+                    "sourceLocation": "io/io.go:100:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "b82c95dbb864d6c64bb25a0a048c21db1f1a5c098939281fc17a9a850a4fc065"
+                  }
+                ]
+              },
+              "targetFingerprint": "488d64c278ba4dcab615ce6c95b7ce02a7da47e62d416a60fd14f554a817206b"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-encoding-base64.ts",
+          "targetFingerprint": "34057510d260a8ddff5b098844859c9c0120efd44cecede87a07ee9356b33fb0"
+        },
+        {
+          "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
           "profileKey": "905b62c02cdcea8e689a8086bdb6e2dc8078ff0e81761d3f7ee09f6297ed7735",
           "export": "Base64NewEncoderCanonical",
           "canonicalParameters": [
@@ -23807,7 +23910,7 @@
             "io|kind=2|receiver=|name=WriteCloser"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-encoding-base64.ts#Base64NewEncoderCanonical@399"
+            "src/internal/facets/provider-encoding-base64.ts#Base64NewEncoderCanonical@707"
           ],
           "interfaces": [
             {
@@ -23902,7 +24005,7 @@
           "implementationOwner": "src/internal/facets/provider-encoding-base64.ts",
           "targetFingerprint": "baac6e22f3d2c9e771bcf8b89ead7fc0d46d88d678ffee3a67e651a99bb68bea",
           "implementationSites": [
-            "src/internal/facets/provider-encoding-base64.ts#Base64EncodingOperations@81"
+            "src/internal/facets/provider-encoding-base64.ts#Base64EncodingOperations@100"
           ]
         }
       ]
@@ -30807,7 +30910,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-encoding-base64.ts#Base64EncodingOperations@81",
+      "identity": "src/internal/facets/provider-encoding-base64.ts#Base64EncodingOperations@100",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/encoding/base64.ts#encodingRepresentationAssign@1415",
@@ -30815,18 +30918,25 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-encoding-base64.ts#Base64NewEncoderCanonical@399",
+      "identity": "src/internal/facets/provider-encoding-base64.ts#Base64NewEncoderCanonical@707",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-encoding-base64.ts#CanonicalBase64Encoder@199"
+        "src/internal/facets/provider-encoding-base64.ts#CanonicalBase64Encoder@249"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-encoding-base64.ts#CanonicalBase64Encoder@199",
+      "identity": "src/internal/facets/provider-encoding-base64.ts#Base64NewEncoderDirect@658",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-encoding-base64.ts#canonicalBase64EncoderType@187",
-        "src/internal/facets/provider-encoding-base64.ts#requireTarget@448",
+        "src/internal/facets/provider-encoding-base64.ts#DirectBase64Encoder@464"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-encoding-base64.ts#CanonicalBase64Encoder@249",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-encoding-base64.ts#canonicalBase64EncoderType@237",
+        "src/internal/facets/provider-encoding-base64.ts#requireTarget@756",
         "src/internal/portable/encoding/base64.ts#Base64EncoderState@1554",
         "src/internal/portable/encoding/base64.ts#beginClose@1788",
         "src/internal/portable/encoding/base64.ts#beginWrite@1592",
@@ -30835,11 +30945,28 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-encoding-base64.ts#canonicalBase64EncoderType@187",
+      "identity": "src/internal/facets/provider-encoding-base64.ts#DirectBase64Encoder@464",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-encoding-base64.ts#directBase64EncoderType@452",
+        "src/internal/facets/provider-encoding-base64.ts#requireTarget@756",
+        "src/internal/portable/encoding/base64.ts#Base64EncoderState@1554",
+        "src/internal/portable/encoding/base64.ts#beginClose@1788",
+        "src/internal/portable/encoding/base64.ts#beginWrite@1592",
+        "src/internal/portable/encoding/base64.ts#runBase64EncoderSync@2151",
+        "src/internal/portable/io/value.ts#ProviderInterfaceValue@17"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-encoding-base64.ts#canonicalBase64EncoderType@237",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-encoding-base64.ts#requireTarget@448",
+      "identity": "src/internal/facets/provider-encoding-base64.ts#directBase64EncoderType@452",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/facets/provider-encoding-base64.ts#requireTarget@756",
       "disposition": "implemented"
     },
     {
@@ -38095,5 +38222,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "4ca27d4daca0a39631c062359583b15515bb3ef06767ec90c941e5693f260cb1"
+  "manifestDigest": "a54dfceba15c99fd7a9c8a9a2c00a33f682a1116ab845cd8045233728dfad0d3"
 }

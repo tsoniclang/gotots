@@ -1781,6 +1781,42 @@
       "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
       "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
       "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
+      "export": "Base64NewEncoderDirect",
+      "canonicalParameters": [
+        1
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "contractInterfaces": [
+        "io|kind=2|receiver=|name=WriteCloser"
+      ],
+      "implementedResultInterfaces": [
+        "io|kind=2|receiver=|name=WriteCloser"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=WriteCloser",
+          "export": "ProviderWriteCloser"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "ProviderWriterInterface"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
       "export": "Base64NewEncoderCanonical",
       "canonicalParameters": [
         1

@@ -9,15 +9,22 @@ import {
   encodingRepresentationAssign,
   encodingRepresentationCopy,
   runBase64EncoderAsync,
+  runBase64EncoderSync,
 } from "../portable/encoding/base64.js";
 import { ProviderInterfaceValue } from "../portable/io/value.js";
-import type { CanonicalWriter } from "./provider-io-contract.js";
+import type {
+  CanonicalWriter,
+  ProviderWriterInterface,
+} from "./provider-io-contract.js";
+import type { ProviderErrorInterface } from "./provider-error.js";
 import type { InterfaceContract } from "./provider-support.js";
 
 export type {
   CanonicalError,
   CanonicalWriter,
+  ProviderWriterInterface,
 } from "./provider-io-contract.js";
+export type { ProviderErrorInterface } from "./provider-error.js";
 
 export class Base64EncodingOperations {
   static $copy(source: Encoding): Encoding {
@@ -36,6 +43,11 @@ export interface CanonicalWriteCloser<Failure extends GoInterfaceValue>
     recovery?: GoRecovery,
   ): Awaitable<[int, Failure | undefined]>;
   Close(recovery?: GoRecovery): Awaitable<Failure | undefined>;
+}
+
+export interface ProviderWriteCloser<Failure extends ProviderErrorInterface>
+  extends ProviderWriterInterface<Failure> {
+  Close(recovery?: GoRecovery): Failure | undefined;
 }
 
 const canonicalBase64EncoderType = Object.freeze({ comparable: true });
@@ -73,6 +85,58 @@ class CanonicalBase64Encoder<
       (output) => requireTarget(this.target).Write(output, recovery),
     );
   }
+}
+
+const directBase64EncoderType = Object.freeze({ comparable: true });
+
+class DirectBase64Encoder<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
+> extends ProviderInterfaceValue implements ProviderWriteCloser<Failure> {
+  override readonly $go$methods: ReadonlySet<object>;
+  readonly #state: Base64EncoderState<Failure>;
+
+  constructor(
+    encoding: Encoding | undefined,
+    private readonly target: Target | undefined,
+    contract: readonly object[],
+  ) {
+    super(directBase64EncoderType);
+    this.#state = new Base64EncoderState(encoding);
+    this.$go$methods = new Set(contract);
+  }
+
+  Write(
+    source: RuntimeSlice<uint8>,
+    recovery?: GoRecovery,
+  ): [int, Failure | undefined] {
+    return runBase64EncoderSync(
+      this.#state.beginWrite(source),
+      (output) => requireTarget(this.target).Write(output, recovery),
+    );
+  }
+
+  Close(recovery?: GoRecovery): Failure | undefined {
+    return runBase64EncoderSync(
+      this.#state.beginClose(),
+      (output) => requireTarget(this.target).Write(output, recovery),
+    );
+  }
+}
+
+export function Base64NewEncoderDirect<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
+>(
+  encoding: Encoding | undefined,
+  target: Target | undefined,
+  writeCloserContract: InterfaceContract,
+): ProviderWriteCloser<Failure> {
+  return new DirectBase64Encoder(
+    encoding,
+    target,
+    writeCloserContract,
+  );
 }
 
 export function Base64NewEncoderCanonical<
