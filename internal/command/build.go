@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime/debug"
 
 	"github.com/tsoniclang/gotots/internal/config"
 	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
@@ -29,6 +30,50 @@ func (r Report) Summary() string {
 }
 
 func Build(ctx context.Context, project config.Project) (Report, error) {
+	var semanticDigest string
+	files, err := writeOutputTransaction(
+		project.OutputDirectory(),
+		func(outputDirectory string) (int, error) {
+			plan, digest, prepareErr := prepareBuild(
+				ctx,
+				project,
+				outputDirectory,
+			)
+			if prepareErr != nil {
+				return 0, prepareErr
+			}
+			semanticDigest = digest
+			debug.FreeOSMemory()
+			written, writeErr := writePrintPlanTo(
+				project,
+				plan,
+				semanticDigest,
+				outputDirectory,
+			)
+			if writeErr != nil {
+				return 0, writeErr
+			}
+			if verifyErr := project.GoTool().VerifyComplete(); verifyErr != nil {
+				return 0, verifyErr
+			}
+			return written, nil
+		},
+	)
+	if err != nil {
+		return Report{}, err
+	}
+	return Report{
+		files:          files,
+		semanticDigest: semanticDigest,
+		output:         project.OutputDirectory(),
+	}, nil
+}
+
+func prepareBuild(
+	ctx context.Context,
+	project config.Project,
+	outputDirectory string,
+) (printPlan, string, error) {
 	program, err := load.Load(ctx, load.Request{
 		Directory:    project.SourceRoot(),
 		Pattern:      project.PackagePattern(),
@@ -36,11 +81,11 @@ func Build(ctx context.Context, project config.Project) (Report, error) {
 		GoTool:       project.GoTool(),
 	})
 	if err != nil {
-		return Report{}, err
+		return printPlan{}, "", err
 	}
 	roots, err := selectRoots(program, project.RootMode())
 	if err != nil {
-		return Report{}, err
+		return printPlan{}, "", err
 	}
 	options := emit.DefaultOptions()
 	options.IntegerRepresentation = project.IntegerRepresentation()
@@ -48,23 +93,23 @@ func Build(ctx context.Context, project config.Project) (Report, error) {
 
 	standardLibrary, externalProvider, err := certifyProviders(project)
 	if err != nil {
-		return Report{}, err
+		return printPlan{}, "", err
 	}
 	options.StandardLibrary = standardLibrary
 	options.ExternalProvider = externalProvider
 	sourceImplementations, err := certifySourceImplementations(project, program)
 	if err != nil {
-		return Report{}, err
+		return printPlan{}, "", err
 	}
 	options.SourceImplementations = sourceImplementations
 
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {
-		return Report{}, err
+		return printPlan{}, "", err
 	}
 	sourceDigest, err := programDigest(program)
 	if err != nil {
-		return Report{}, err
+		return printPlan{}, "", err
 	}
 	evidence := config.EvidenceDigests{Source: sourceDigest}
 	if sourceImplementations != nil {
@@ -78,17 +123,13 @@ func Build(ctx context.Context, project config.Project) (Report, error) {
 	}
 	semanticDigest, err := project.SemanticDigest(evidence)
 	if err != nil {
-		return Report{}, err
+		return printPlan{}, "", err
 	}
-	files, err := writeEmission(project, emission, semanticDigest)
+	plan, err := stagePrintPlan(outputDirectory, emission)
 	if err != nil {
-		return Report{}, err
+		return printPlan{}, "", err
 	}
-	return Report{
-		files:          files,
-		semanticDigest: semanticDigest,
-		output:         project.OutputDirectory(),
-	}, nil
+	return plan, semanticDigest, nil
 }
 
 func certifySourceImplementations(

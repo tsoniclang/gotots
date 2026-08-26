@@ -1118,6 +1118,21 @@ complete compiler-owned artifact set: a seeded obsolete source file and an old
 target `tsconfig` must both disappear, and the sorted manifest membership
 (including the manifest itself) must exact-join the physical file set.
 
+The output-lifecycle gate proves the compiler seals and officially encodes the
+complete TS-Go AST before starting the printer. The post-compilation print plan
+may retain only output identities, official encoded protocol payload locations,
+the flattened runtime manifest, package dependencies, and semantic digest; a
+structural reachability audit rejects source AST, `go/types`, loader,
+certificate, emitter-session, mutable TS-Go node, or callback state. A focused
+round trip exact-compares direct `PrintNode` output with printing the staged
+official encoding, including multiple files, payload mutation, and a printer failure. Successful
+publication contains no protocol scratch. The guarded whole-product gate runs
+compiler and printer under one process-tree ceiling and records both phase
+peaks. Mutations that start the printer before the release boundary, retain one
+target node in the print plan, omit the explicit release, publish protocol
+scratch, or accumulate every printed file in memory fail at the lifecycle,
+membership, or resource gate.
+
 For each source implementation, GoToTS certification independently inspects the
 selected Go package, the ordinary generated package assembly, and the authored
 strict TypeScript project. It exact-joins exported identities, binds the build
