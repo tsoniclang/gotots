@@ -1193,8 +1193,9 @@ identity, build drift, and missing private files fail only at that join with
 the exact claimed identity. The prepared type exposes no emission certificate
 and retains no loader/checker object. The guarded whole-product resource gate
 is the mutation proof for phase ordering: moving TS-Go preparation after the
-whole-product load must exceed the frozen process-tree peak bound, while the
-prerequisite-first transaction stays below it with identical sealed evidence.
+provider certificate or whole-product load must exceed the frozen process-tree
+peak bound, while the prerequisite-first transaction stays below it with
+identical sealed evidence.
 
 The final-artifact gate additionally proves session isolation. A fixture with
 a public package value and an unrelated private type must retain the public

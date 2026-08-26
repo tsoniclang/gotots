@@ -74,11 +74,11 @@ func prepareBuild(
 	project config.Project,
 	outputDirectory string,
 ) (printPlan, string, error) {
-	standardLibrary, externalProvider, err := certifyProviders(project)
+	preparedImplementations, err := prepareSourceImplementations(project)
 	if err != nil {
 		return printPlan{}, "", err
 	}
-	preparedImplementations, err := prepareSourceImplementations(project)
+	standardLibrary, externalProvider, err := certifyProviders(project)
 	if err != nil {
 		return printPlan{}, "", err
 	}
