@@ -13,8 +13,6 @@ import (
 // semantics; reflection owns only guarded boxing and operation topology.
 func mapValueProperties(
 	context api.Context,
-	names api.ReflectionNames,
-	reflectionType *types.TypeName,
 	sourceType types.Type,
 	mapType *types.Map,
 	scaffold *locationScaffold,
@@ -87,28 +85,11 @@ func mapValueProperties(
 			lengthProjected,
 		)),
 	)
-	keyAdapter, err := context.Names().InterfaceAdapter(mapType.Key(), nil)
+	keyMember, err := newReflectionMemberBox(context, mapType.Key())
 	if err != nil {
 		return nil, err
 	}
-	elementAdapter, err := context.Names().InterfaceAdapter(
-		mapType.Elem(),
-		nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-	keyDescriptor, err := names.ReflectionValueType(
-		mapType.Key(),
-		reflectionType,
-	)
-	if err != nil {
-		return nil, err
-	}
-	elementDescriptor, err := names.ReflectionValueType(
-		mapType.Elem(),
-		reflectionType,
-	)
+	elementMember, err := newReflectionMemberBox(context, mapType.Elem())
 	if err != nil {
 		return nil, err
 	}
@@ -121,31 +102,26 @@ func mapValueProperties(
 		return nil, err
 	}
 	scaffold.requests = append(scaffold.requests, extentType.Requests()...)
-	scaffold.requests = append(scaffold.requests, keyAdapter.Requests()...)
-	scaffold.requests = append(
-		scaffold.requests,
-		elementAdapter.Requests()...,
-	)
-	scaffold.requests = append(
-		scaffold.requests,
-		keyDescriptor.Requests()...,
-	)
-	scaffold.requests = append(
-		scaffold.requests,
-		elementDescriptor.Requests()...,
-	)
+	scaffold.requests = append(scaffold.requests, keyMember.requests()...)
+	scaffold.requests = append(scaffold.requests, elementMember.requests()...)
 	scaffold.requests = append(scaffold.requests, elementZero.Requests()...)
 	keyParameter := factory.ParameterDeclaration(
 		nil,
 		nil,
 		factory.Identifier("key"),
 		nil,
-		factory.TypeReferenceNode(
-			scaffold.boxType.EntityName(factory),
-			nil,
-		),
+		optionalInterfaceBoxType(factory, scaffold.boxType),
 		nil,
 	)
+	indexKey, err := keyMember.admittedValue(
+		context,
+		"key",
+		"Value.MapIndex",
+		scaffold,
+	)
+	if err != nil {
+		return nil, err
+	}
 	lookupCall := factory.CallExpression(
 		factory.PropertyAccessExpression(
 			factory.Identifier("instance"),
@@ -155,14 +131,22 @@ func mapValueProperties(
 		),
 		nil,
 		nil,
-		[]tsgo.Expression{guardedForeignOperand(
-			scaffold,
-			keyAdapter,
-			"key",
-			"Value.MapIndex",
-		)},
+		[]tsgo.Expression{indexKey.Value()},
 		tsgo.NodeFlagsNone,
 	)
+	entryValue := elementMember.boxedValue(
+		factory,
+		factory.ElementAccessExpression(
+			factory.Identifier("entry"),
+			nil,
+			factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+			tsgo.NodeFlagsNone,
+		),
+	)
+	mapIndexType := factory.TupleTypeNode([]tsgo.TypeNode{
+		optionalInterfaceBoxType(factory, scaffold.boxType),
+		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
+	})
 	mapIndexBody := factory.Block([]tsgo.Statement{
 		foreignBoxGuardStatement(scaffold, "Value.MapIndex"),
 		constStatement(factory, "instance", scaffoldPayload(scaffold)),
@@ -175,25 +159,25 @@ func mapValueProperties(
 				tsgo.NodeFlagsNone,
 			),
 			factory.QuestionToken(),
-			factory.NewExpression(
-				elementAdapter.Expression(factory),
-				nil,
-				[]tsgo.Expression{factory.ElementAccessExpression(
-					factory.Identifier("entry"),
-					nil,
-					factory.NumericLiteral("0", tsgo.TokenFlagsNone),
-					tsgo.NodeFlagsNone,
-				)},
+			factory.ArrayLiteralExpression(
+				[]tsgo.Expression{entryValue, factory.TrueLiteral()},
+				false,
 			),
 			factory.ColonToken(),
-			factory.Identifier("undefined"),
+			factory.ArrayLiteralExpression(
+				[]tsgo.Expression{
+					factory.Identifier("undefined"),
+					factory.FalseLiteral(),
+				},
+				false,
+			),
 		)),
 	}, true)
 	mapIndex := factory.ArrowFunction(
 		nil,
 		nil,
 		[]tsgo.ParameterDeclaration{boxParameter(scaffold), keyParameter},
-		nil,
+		mapIndexType,
 		factory.EqualsGreaterThanToken(),
 		mapIndexBody,
 	)
@@ -213,25 +197,38 @@ func mapValueProperties(
 		}),
 		nil,
 	)
+	deleteParameter := factory.ParameterDeclaration(
+		nil,
+		nil,
+		factory.Identifier("deleteEntry"),
+		nil,
+		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
+		nil,
+	)
+	storeKey, err := keyMember.admittedValue(
+		context,
+		"key",
+		"Value.SetMapIndex",
+		scaffold,
+	)
+	if err != nil {
+		return nil, err
+	}
+	storedElement, err := elementMember.admittedValue(
+		context,
+		"value",
+		"Value.SetMapIndex",
+		scaffold,
+	)
+	if err != nil {
+		return nil, err
+	}
 	mapStoreBody := factory.Block([]tsgo.Statement{
 		foreignBoxGuardStatement(scaffold, "Value.SetMapIndex"),
 		constStatement(factory, "instance", scaffoldPayload(scaffold)),
-		constStatement(factory, "entry", guardedForeignOperand(
-			scaffold,
-			keyAdapter,
-			"key",
-			"Value.SetMapIndex",
-		)),
+		constStatement(factory, "entry", storeKey.Value()),
 		factory.IfStatement(
-			factory.BinaryExpression(
-				nil,
-				factory.Identifier("value"),
-				nil,
-				factory.BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-				),
-				factory.Identifier("undefined"),
-			),
+			factory.Identifier("deleteEntry"),
 			factory.Block([]tsgo.Statement{
 				factory.ExpressionStatement(factory.CallExpression(
 					factory.PropertyAccessExpression(
@@ -260,11 +257,7 @@ func mapValueProperties(
 			nil,
 			[]tsgo.Expression{
 				factory.Identifier("entry"),
-				guardedForeignPayload(
-					scaffold,
-					elementAdapter,
-					"Value.SetMapIndex",
-				),
+				storedElement.Value(),
 			},
 			tsgo.NodeFlagsNone,
 		)),
@@ -276,6 +269,7 @@ func mapValueProperties(
 			boxParameter(scaffold),
 			keyParameter,
 			valueParameter,
+			deleteParameter,
 		},
 		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindVoidKeyword),
 		factory.EqualsGreaterThanToken(),
@@ -326,12 +320,9 @@ func mapValueProperties(
 					nil,
 					factory.EqualsGreaterThanToken(),
 					factory.ParenthesizedExpression(
-						factory.NewExpression(
-							keyAdapter.Expression(factory),
-							nil,
-							[]tsgo.Expression{
-								factory.Identifier("key"),
-							},
+						keyMember.boxedValue(
+							factory,
+							factory.Identifier("key"),
 						),
 					),
 				)},
@@ -361,6 +352,9 @@ func mapValueProperties(
 	}
 	scaffold.requests = append(scaffold.requests, made.Requests()...)
 	scaffold.requests = append(scaffold.requests, zeroValue.Requests()...)
+	scaffold.requests = append(scaffold.requests, indexKey.Requests()...)
+	scaffold.requests = append(scaffold.requests, storeKey.Requests()...)
+	scaffold.requests = append(scaffold.requests, storedElement.Requests()...)
 	makeMap := reflectionMapBoxArrow(made, scaffold)
 	zero := reflectionMapBoxArrow(zeroValue, scaffold)
 	return []tsgo.ObjectLiteralElementLike{

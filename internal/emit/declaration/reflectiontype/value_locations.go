@@ -55,8 +55,6 @@ func extendedValueProperties(
 	case *types.Map:
 		return mapValueProperties(
 			context,
-			names,
-			reflectionType,
 			sourceType,
 			selected,
 			scaffold,

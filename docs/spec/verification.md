@@ -530,6 +530,8 @@ ESM for:
 - pointer and aggregate map key/value lookup, assignment, deletion,
   construction, key iteration, and value-copy isolation through each selected
   canonical map representation;
+- interface map keys and values, including nil keys, present nil values,
+  absent entries, explicit deletion, mutation, and iterator key/value typing;
 - dynamic `PointerTo` composition with no source-level `*T`, canonical repeated
   lookup, repeated pointer depth, and value-versus-pointer method-set
   implementation checks;

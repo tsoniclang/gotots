@@ -106,16 +106,17 @@ export interface RuntimeValueOperations {
   readonly boxBytes?: (value: RuntimeSlice<uint8>) => GoInterfaceValue;
   readonly mapIndex?: (
     box: GoInterfaceValue,
-    key: GoInterfaceValue,
-  ) => GoInterfaceValue | undefined;
+    key: GoInterfaceValue | undefined,
+  ) => readonly [GoInterfaceValue | undefined, bool];
   readonly mapStore?: (
     box: GoInterfaceValue,
-    key: GoInterfaceValue,
+    key: GoInterfaceValue | undefined,
     value: GoInterfaceValue | undefined,
+    deleteEntry: bool,
   ) => void;
   readonly mapKeys?: (
     box: GoInterfaceValue,
-  ) => readonly GoInterfaceValue[];
+  ) => readonly (GoInterfaceValue | undefined)[];
   readonly makeMap?: () => GoInterfaceValue;
   readonly zero?: () => GoInterfaceValue | undefined;
   readonly boxInt?: (value: int64) => GoInterfaceValue;

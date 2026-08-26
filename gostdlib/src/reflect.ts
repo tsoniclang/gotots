@@ -453,25 +453,46 @@ export abstract class Value {
   MapIndex(key: Value): Value {
     const operation = this.operations()?.mapIndex;
     const box = this.source;
-    const keyBox = key.source;
     if (
       operation === undefined ||
       box === undefined ||
-      keyBox === undefined
+      !key.IsValid()
     ) {
       return this.operationPanic("MapIndex");
     }
-    return new InterfaceValue(operation(box, keyBox));
+    const [value, present] = operation(box, key.source);
+    if (!present) {
+      return new InterfaceValue(undefined);
+    }
+    const elementType = this.resolvedType()?.Elem();
+    if (elementType === undefined) {
+      return this.operationPanic("MapIndex");
+    }
+    return new InterfaceValue(value, elementType);
   }
   MapRange(): MapIter | undefined {
     const operations = this.operations();
     const keys = operations?.mapKeys;
     const lookup = operations?.mapIndex;
     const box = this.source;
-    if (keys === undefined || lookup === undefined || box === undefined) {
+    const mapType = this.resolvedType();
+    const keyType = mapType?.Key();
+    const elementType = mapType?.Elem();
+    if (
+      keys === undefined ||
+      lookup === undefined ||
+      box === undefined ||
+      keyType === undefined ||
+      elementType === undefined
+    ) {
       return this.operationPanic("MapRange");
     }
-    return new MapIterator(keys(box), (key) => lookup(box, key));
+    return new MapIterator(
+      keys(box),
+      (key) => lookup(box, key),
+      keyType,
+      elementType,
+    );
   }
   NumField(): int {
     const count = this.operations()?.numField;
@@ -559,8 +580,8 @@ export abstract class Value {
   SetIterValue(iterator: MapIter | undefined): void {
     const target = this.settableLocation("SetIterValue");
     const state = mapIteratorState(iterator, "SetIterValue");
-    const value = state.currentValue();
-    if (value === undefined) {
+    const [value, present] = state.currentValue();
+    if (!present) {
       return GoPanic.raise(
         new ProviderError(
           "reflect: map entry deleted during iteration",
@@ -594,15 +615,14 @@ export abstract class Value {
   SetMapIndex(key: Value, element: Value): void {
     const operation = this.operations()?.mapStore;
     const box = this.source;
-    const keyBox = key.source;
     if (
       operation === undefined ||
       box === undefined ||
-      keyBox === undefined
+      !key.IsValid()
     ) {
       return this.operationPanic("SetMapIndex");
     }
-    operation(box, keyBox, element.source);
+    operation(box, key.source, element.source, !element.IsValid());
   }
   SetString(value: gostring): void {
     const target = this.settableLocation("SetString");
@@ -725,27 +745,30 @@ class MapIterator {
   position = -1;
 
   constructor(
-    public keys: readonly GoInterfaceValue[],
-    public valueAt: (key: GoInterfaceValue) => GoInterfaceValue | undefined,
+    public keys: readonly (GoInterfaceValue | undefined)[],
+    public valueAt: (
+      key: GoInterfaceValue | undefined,
+    ) => readonly [GoInterfaceValue | undefined, bool],
+    public keyType: Type,
+    public elementType: Type,
   ) {}
 
   $copy(): MapIterator {
-    const result = new MapIterator(this.keys, this.valueAt);
+    const result = new MapIterator(
+      this.keys,
+      this.valueAt,
+      this.keyType,
+      this.elementType,
+    );
     result.position = this.position;
     return result;
   }
 
-  currentKey(): GoInterfaceValue {
-    const key = this.keys[this.position];
-    if (key === undefined) {
-      return GoPanic.raise(
-        new ProviderError("reflect: map iterator has no current entry"),
-      );
-    }
-    return key;
+  currentKey(): GoInterfaceValue | undefined {
+    return this.keys[this.position];
   }
 
-  currentValue(): GoInterfaceValue | undefined {
+  currentValue(): readonly [GoInterfaceValue | undefined, bool] {
     return this.valueAt(this.currentKey());
   }
 }
@@ -780,9 +803,8 @@ export type MapIter = MapIterator;
 
 export const MapIter = Object.freeze({
   Key(receiver: MapIter | undefined): Value {
-    return new InterfaceValue(
-      mapIteratorState(receiver, "Key").currentKey(),
-    );
+    const state = mapIteratorState(receiver, "Key");
+    return new InterfaceValue(state.currentKey(), state.keyType);
   },
   Next(receiver: MapIter | undefined): bool {
     if (receiver === undefined) {
@@ -798,22 +820,23 @@ export const MapIter = Object.freeze({
     receiver.position++;
     while (
       receiver.position < receiver.keys.length &&
-      receiver.currentValue() === undefined
+      !receiver.currentValue()[1]
     ) {
       receiver.position++;
     }
     return receiver.position < receiver.keys.length;
   },
   Value(receiver: MapIter | undefined): Value {
-    const value = mapIteratorState(receiver, "Value").currentValue();
-    if (value === undefined) {
+    const state = mapIteratorState(receiver, "Value");
+    const [value, present] = state.currentValue();
+    if (!present) {
       return GoPanic.raise(
         new ProviderError(
           "reflect: map entry deleted during iteration",
         ),
       );
     }
-    return new InterfaceValue(value);
+    return new InterfaceValue(value, state.elementType);
   },
 });
 

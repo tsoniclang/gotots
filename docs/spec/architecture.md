@@ -777,6 +777,15 @@ through the one canonical map representation, including aggregate keys and
 values. A reduced scalar whitelist, raw JavaScript storage movement, or a
 parallel reflection-only map/slice representation is forbidden.
 
+The reflected-map callback protocol preserves entry presence independently
+from its payload. An absent entry is not represented by the same value as a
+present nil interface, and deletion is an explicit operation disposition
+rather than an inferred undefined payload. Nil interface keys and values carry
+the map descriptor's canonical key or element type, so lookup, mutation, and
+iteration remain valid without fabricating an interface adapter. Key and
+element descriptors come from the canonical runtime map type; value-operation
+callbacks may not duplicate those type facts.
+
 Every generated value-operation registration carries its concrete adapter as
 a zero-argument typed resolver. Registration stores that resolver without
 evaluating it; the provider resolves it once when the operation record is first

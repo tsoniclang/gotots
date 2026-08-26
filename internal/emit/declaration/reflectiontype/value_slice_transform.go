@@ -109,9 +109,9 @@ func reflectionSliceAppendArrow(
 				nil,
 				factory.TypeOperatorNode(
 					tsgo.TypeOperatorNodeOperatorKindReadonlyKeyword,
-					factory.ArrayTypeNode(factory.TypeReferenceNode(
-						scaffold.boxType.EntityName(factory),
-						nil,
+					factory.ArrayTypeNode(optionalInterfaceBoxType(
+						factory,
+						scaffold.boxType,
 					)),
 				),
 				nil,
@@ -307,7 +307,7 @@ func (e reflectionSliceElement) copyStoredElement(
 	loaded, err := context.ContainerStorage().FromContainerStorage(
 		context.WithRole(api.RoleSliceElement),
 		nil,
-		e.sourceType,
+		e.member.sourceType,
 		api.DirectExpression(value),
 	)
 	if err != nil {
@@ -316,8 +316,8 @@ func (e reflectionSliceElement) copyStoredElement(
 	copied, err := context.Values().Transfer(
 		context.WithRole(api.RoleSliceElement),
 		nil,
-		e.sourceType,
-		e.sourceType,
+		e.member.sourceType,
+		e.member.sourceType,
 		api.ValueTransferCopy,
 		loaded,
 	)
@@ -327,7 +327,7 @@ func (e reflectionSliceElement) copyStoredElement(
 	return context.ContainerStorage().ToContainerStorage(
 		context.WithRole(api.RoleSliceElement),
 		nil,
-		e.sourceType,
+		e.member.sourceType,
 		copied,
 	)
 }
@@ -347,7 +347,7 @@ func (e reflectionSliceElement) makeOperation(
 			context,
 			e.storage,
 			nil,
-			e.sourceType,
+			e.member.sourceType,
 			factory.Identifier("length"),
 			factory.Identifier("capacity"),
 			nil,

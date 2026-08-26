@@ -8,13 +8,11 @@ import (
 )
 
 type reflectionSliceElement struct {
-	sourceType     types.Type
-	storage        api.TypeEmission
-	adapter        api.NameReference
-	descriptor     api.NameReference
-	zero           api.ExpressionEmission
-	interfaceValue bool
-	structural     bool
+	member     reflectionMemberBox
+	storage    api.TypeEmission
+	descriptor api.NameReference
+	zero       api.ExpressionEmission
+	structural bool
 }
 
 func newReflectionSliceElement(
@@ -24,14 +22,9 @@ func newReflectionSliceElement(
 	elementType types.Type,
 	scaffold *locationScaffold,
 ) (reflectionSliceElement, error) {
-	_, interfaceValue := types.Unalias(elementType).Underlying().(*types.Interface)
-	var adapter api.NameReference
-	var err error
-	if !interfaceValue {
-		adapter, err = context.Names().InterfaceAdapter(elementType, nil)
-		if err != nil {
-			return reflectionSliceElement{}, err
-		}
+	member, err := newReflectionMemberBox(context, elementType)
+	if err != nil {
+		return reflectionSliceElement{}, err
 	}
 	descriptor, err := names.ReflectionValueType(elementType, reflectionType)
 	if err != nil {
@@ -62,20 +55,16 @@ func newReflectionSliceElement(
 	if err != nil {
 		return reflectionSliceElement{}, err
 	}
-	if !interfaceValue {
-		scaffold.requests = append(scaffold.requests, adapter.Requests()...)
-	}
+	scaffold.requests = append(scaffold.requests, member.requests()...)
 	scaffold.requests = append(scaffold.requests, descriptor.Requests()...)
 	scaffold.requests = append(scaffold.requests, storage.Requests()...)
 	scaffold.requests = append(scaffold.requests, zero.Requests()...)
 	return reflectionSliceElement{
-		sourceType:     elementType,
-		storage:        storage,
-		adapter:        adapter,
-		descriptor:     descriptor,
-		zero:           zero,
-		interfaceValue: interfaceValue,
-		structural:     context.Values().RequiresStructuralCopy(context, elementType),
+		member:     member,
+		storage:    storage,
+		descriptor: descriptor,
+		zero:       zero,
+		structural: context.Values().RequiresStructuralCopy(context, elementType),
 	}, nil
 }
 
@@ -91,7 +80,7 @@ func (e reflectionSliceElement) copyToStorage(
 	return context.ContainerStorage().ToContainerStorage(
 		context.WithRole(api.RoleSliceElement),
 		nil,
-		e.sourceType,
+		e.member.sourceType,
 		copied,
 	)
 }
@@ -101,32 +90,20 @@ func (e reflectionSliceElement) copyFromBox(
 	operation string,
 	scaffold *locationScaffold,
 ) (api.ExpressionEmission, error) {
-	value := scaffold.factory.Identifier("value")
-	logical := api.DirectExpression(value)
-	if e.interfaceValue {
-		admitted, requests, err := admittedInterfaceValue(
-			context,
-			e.sourceType,
-			value,
-			operation,
-			scaffold,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		logical = api.DirectExpression(admitted, requests...)
-	} else {
-		logical = api.DirectExpression(guardedForeignPayload(
-			scaffold,
-			e.adapter,
-			operation,
-		))
+	logical, err := e.member.admittedValue(
+		context,
+		"value",
+		operation,
+		scaffold,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	copied, err := context.Values().Transfer(
 		context.WithRole(api.RoleSliceElement),
 		nil,
-		e.sourceType,
-		e.sourceType,
+		e.member.sourceType,
+		e.member.sourceType,
 		api.ValueTransferCopy,
 		logical,
 	)
@@ -147,7 +124,7 @@ func (e reflectionSliceElement) indexOperation(
 		"get",
 		"set",
 		[]api.ExpressionEmission{api.DirectExpression(factory.Identifier("index"))},
-		e.sourceType,
+		e.member.sourceType,
 	)
 	if err != nil {
 		return nil, err
@@ -159,14 +136,7 @@ func (e reflectionSliceElement) indexOperation(
 	if err != nil {
 		return nil, err
 	}
-	boxed := read.Value()
-	if !e.interfaceValue {
-		boxed = factory.NewExpression(
-			e.adapter.Expression(factory),
-			nil,
-			[]tsgo.Expression{read.Value()},
-		)
-	}
+	boxed := e.member.boxedValue(factory, read.Value())
 	var get tsgo.Expression = boxed
 	var getBlock tsgo.Block
 	if len(read.Before()) != 0 {
