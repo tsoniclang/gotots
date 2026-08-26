@@ -241,10 +241,18 @@ func assertManifestMatchesOutput(t *testing.T, root string) {
 		t.Fatal(err)
 	}
 	var manifest struct {
-		Files []string `json:"files"`
+		SchemaVersion int      `json:"schemaVersion"`
+		Files         []string `json:"files"`
 	}
 	if err := json.Unmarshal(payload, &manifest); err != nil {
 		t.Fatal(err)
+	}
+	if manifest.SchemaVersion != buildManifestSchemaVersion {
+		t.Fatalf(
+			"build manifest schema = %d, want %d",
+			manifest.SchemaVersion,
+			buildManifestSchemaVersion,
+		)
 	}
 	actual := make([]string, 0, len(manifest.Files))
 	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {

@@ -16,7 +16,10 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-const buildManifestName = "gotots-manifest.json"
+const (
+	buildManifestName          = "gotots-manifest.json"
+	buildManifestSchemaVersion = 1
+)
 
 const projectPackageName = "package.json"
 
@@ -177,7 +180,7 @@ func encodeBuildManifest(semanticDigest string, files []string) ([]byte, error) 
 		SemanticDigest string   `json:"semanticDigest"`
 		Files          []string `json:"files"`
 	}{
-		SchemaVersion:  config.SchemaVersion,
+		SchemaVersion:  buildManifestSchemaVersion,
 		SemanticDigest: semanticDigest,
 		Files:          selected,
 	}
