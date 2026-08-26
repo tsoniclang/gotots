@@ -194,10 +194,18 @@ func compareDeclarationRequirements(
 			left.InterfaceAdapterContract()
 		rightArtifact, _, _, rightKey, rightDemand :=
 			right.InterfaceAdapterContract()
-		if !leftDemand {
+		leftCompleteArtifact, leftComplete :=
+			left.InterfaceAdapterCompleteMethodSet()
+		rightCompleteArtifact, rightComplete :=
+			right.InterfaceAdapterCompleteMethodSet()
+		if leftComplete {
+			leftArtifact = leftCompleteArtifact
+		} else if !leftDemand {
 			leftArtifact, _ = left.InterfaceAdapter()
 		}
-		if !rightDemand {
+		if rightComplete {
+			rightArtifact = rightCompleteArtifact
+		} else if !rightDemand {
 			rightArtifact, _ = right.InterfaceAdapter()
 		}
 		if order := compareGeneratedArtifacts(
@@ -207,9 +215,13 @@ func compareDeclarationRequirements(
 			return order
 		}
 		switch {
-		case !leftDemand && rightDemand:
+		case !leftDemand && !leftComplete && (rightDemand || rightComplete):
 			return -1
-		case leftDemand && !rightDemand:
+		case (leftDemand || leftComplete) && !rightDemand && !rightComplete:
+			return 1
+		case leftComplete && rightDemand:
+			return -1
+		case leftDemand && rightComplete:
 			return 1
 		case leftKey < rightKey:
 			return -1

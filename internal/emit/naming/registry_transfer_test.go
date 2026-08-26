@@ -24,8 +24,6 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 		map[string]struct{}{"bridge": {}}
 	registry.interfaceAdaptersByContract["interface"] =
 		map[string]struct{}{"adapter": {}}
-	registry.reflectionAdaptersByContract["reflection-interface"] =
-		map[string]struct{}{"adapter": {}}
 	registry.interfaceContractDemands["source"] =
 		map[string]interfaceContractDemand{"target": {}}
 	registry.interfaceReflectionDemands["reflection"] =
@@ -52,7 +50,6 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 	if len(registry.providerInterfaceCapabilityDemands) != 0 ||
 		len(registry.providerInterfaceBridgesByContract) != 0 ||
 		len(registry.interfaceAdaptersByContract) != 0 ||
-		len(registry.reflectionAdaptersByContract) != 0 ||
 		len(registry.interfaceContractDemands) != 0 ||
 		len(registry.interfaceReflectionDemands) != 0 ||
 		len(registry.reflectionValueDemands) != 0 ||

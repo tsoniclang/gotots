@@ -400,7 +400,7 @@ func emitLexicalInterfaceAdapter(
 			Reason: "lexical interface adapter has no concrete type",
 		}
 	}
-	contracts, err := interfaceadapter.Contracts(
+	contracts, completeMethodSet, err := interfaceadapter.Contracts(
 		artifact,
 		requirements,
 	)
@@ -413,6 +413,7 @@ func emitLexicalInterfaceAdapter(
 		artifact.TargetName(),
 		sourceType,
 		contracts,
+		completeMethodSet,
 		nil,
 	)
 	if err != nil {

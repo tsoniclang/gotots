@@ -24,23 +24,35 @@ func (c Contract) valid() bool {
 func Contracts(
 	artifact *api.GeneratedArtifact,
 	requirements []api.DeclarationRequirement,
-) ([]Contract, error) {
+) ([]Contract, bool, error) {
 	if artifact == nil ||
 		artifact.Kind() != api.GeneratedArtifactInterfaceAdapter {
-		return nil, &api.GeneratedArtifactShapeError{
+		return nil, false, &api.GeneratedArtifactShapeError{
 			Reason: "interface-adapter requirement owner is invalid",
 		}
 	}
 	baseline := 0
+	completeMethodSet := 0
 	contracts := make([]Contract, 0, len(requirements))
 	keys := make(map[string]Contract)
 	for _, requirement := range requirements {
 		selectedArtifact, ok := requirement.InterfaceAdapter()
 		if !ok || selectedArtifact != artifact {
-			return nil, &api.GeneratedArtifactShapeError{
+			return nil, false, &api.GeneratedArtifactShapeError{
 				Artifact: artifact.TargetName(),
 				Reason:   "interface adapter received a foreign requirement",
 			}
+		}
+		if completeArtifact, complete :=
+			requirement.InterfaceAdapterCompleteMethodSet(); complete {
+			if completeArtifact != artifact {
+				return nil, false, &api.GeneratedArtifactShapeError{
+					Artifact: artifact.TargetName(),
+					Reason:   "interface adapter received a foreign complete method set",
+				}
+			}
+			completeMethodSet++
+			continue
 		}
 		_, sourceType, contract, key, demanded :=
 			requirement.InterfaceAdapterContract()
@@ -50,7 +62,7 @@ func Contracts(
 		}
 		selectedContract := Contract{sourceType: sourceType, methodSet: contract}
 		if !selectedContract.valid() {
-			return nil, &api.GeneratedArtifactShapeError{
+			return nil, false, &api.GeneratedArtifactShapeError{
 				Artifact: artifact.TargetName(),
 				Reason:   "interface adapter contract surface is invalid",
 			}
@@ -58,7 +70,7 @@ func Contracts(
 		if existing, ok := keys[key]; ok {
 			if !types.Identical(existing.sourceType, selectedContract.sourceType) ||
 				!types.Identical(existing.methodSet, selectedContract.methodSet) {
-				return nil, &api.GeneratedArtifactShapeError{
+				return nil, false, &api.GeneratedArtifactShapeError{
 					Artifact: artifact.TargetName(),
 					Reason:   "interface adapter joined non-identical contract demands",
 				}
@@ -69,10 +81,16 @@ func Contracts(
 		contracts = append(contracts, selectedContract)
 	}
 	if baseline != 1 {
-		return nil, &api.GeneratedArtifactShapeError{
+		return nil, false, &api.GeneratedArtifactShapeError{
 			Artifact: artifact.TargetName(),
 			Reason:   "interface adapter requires one definition request",
 		}
 	}
-	return contracts, nil
+	if completeMethodSet > 1 {
+		return nil, false, &api.GeneratedArtifactShapeError{
+			Artifact: artifact.TargetName(),
+			Reason:   "interface adapter has multiple complete method-set demands",
+		}
+	}
+	return contracts, completeMethodSet == 1, nil
 }

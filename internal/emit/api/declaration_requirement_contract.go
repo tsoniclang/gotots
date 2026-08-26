@@ -26,6 +26,7 @@ type DeclarationRequirement struct {
 	interfaceContractType  types.Type
 	interfaceContract      *types.Interface
 	interfaceContractKey   string
+	interfaceCompleteSet   bool
 	providerProfileTarget  *GeneratedArtifact
 	anonymousDemand        AnonymousStructDemand
 	mapDemand              MapSpecializationDemand
@@ -163,6 +164,28 @@ func NewInterfaceAdapterContractRequirement(
 		interfaceContractType: contractType,
 		interfaceContract:     contract,
 		interfaceContractKey:  contractKey,
+	}, nil
+}
+
+func NewInterfaceAdapterCompleteMethodSetRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	if !artifact.Valid() ||
+		artifact.Kind() != GeneratedArtifactInterfaceAdapter {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "interface-adapter complete method-set requirement is invalid",
+		}
+	}
+	if _, ok := artifact.InterfaceAdapterType(); !ok {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "interface-adapter complete method-set source is invalid",
+		}
+	}
+	return DeclarationRequirement{
+		owner:                artifact.ReconstructionOwner(),
+		kind:                 DeclarationRequirementInterfaceAdapter,
+		generated:            artifact,
+		interfaceCompleteSet: true,
 	}, nil
 }
 

@@ -76,6 +76,10 @@ func main() {
 					adapter: "$goInterfaceAdapter$PointerTo_Named_reflectvalue$Label",
 					method:  "Decode(",
 				},
+				{
+					adapter: "$goInterfaceAdapter$PointerTo_Named_reflectvalue$Label",
+					method:  "Text(",
+				},
 			} {
 				start := strings.Index(
 					artifacts.printed,

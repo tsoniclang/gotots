@@ -676,8 +676,8 @@ the exact concrete dynamic type. The adapter owns:
 - Go equality/comparability behavior;
 - native constant-size dispatch methods.
 
-The adapter's emitted shape is selected from its exact demanded method set.
-A type with no demanded Go methods uses the one canonical demand-selected
+An ordinary conversion adapter's emitted shape is selected from its exact
+demanded method set. A type with no demanded Go methods uses the one canonical demand-selected
 typed adapter factory; its generated declaration supplies only
 the concrete payload operations and dynamic-type token. It must not repeat a
 class body containing the common constructor, type guard, method-set test,
@@ -689,6 +689,15 @@ cannot leave stale call sites. The shared factory is generic and
 statically typed; it performs no erased payload recovery, runtime method
 lookup, source spelling test, or dynamic semantic dispatch. The factory is
 absent unless at least one zero-method adapter requests it.
+
+A concrete adapter that can leave `reflect.Value` instead owns one complete
+method-set demand. Reflection can return the same dynamic value through any
+later statically selected interface assertion, so the selected toolchain's
+finite concrete Go method set is the direct semantic authority. The adapter
+emits each concrete method and its canonical interface-method token exactly
+once; it does not join that type against the program's interface-demand graph.
+This reflection-only shape is linear in actual methods and does not change the
+demand-selected shape of ordinary conversion adapters.
 
 Interface calls are O(1) and do not emit implementer switches. Adapter methods
 invoke the exact concrete owner, preserving value-copy and pointer semantics.
@@ -775,22 +784,24 @@ and mutation all observe one location. The runtime-type owner exact-joins the
 pointer box's generated dynamic token to that descriptor, including when the
 descriptor is composed lazily from `T`; addressability does not force static
 reflection closure over every possible `*T`. Because `Addr().Interface()` and
-`TypeAssert` expose that box through Go's canonical empty-interface boundary,
-the address callback records its `*T` adapter in a distinct reflection-
-interface exposure relation. That relation joins only later exact assertions
-from the same boundary to `I`, and adds `I` only when `go/types` proves `*T`
-implements `I`. It is not ordinary empty-interface adapter membership and can
+`TypeAssert` can expose that box through any statically selected interface
+contract, the address callback requests the canonical `*T` adapter's complete
+concrete method set. The selected `go/types` method set is finite and
+authoritative; each method maps to the same canonical method token used by a
+matching interface declaration. This request is not ordinary empty-interface
+adapter membership, does not inspect the set of interface assertions, and can
 never request the `*T` reflection descriptor or value-operation facet. A
 source-less synthetic address value, detached cell,
 reconstructed pointer, or provider-side storage inspection is forbidden.
 
-The same dedicated exposure owner records every concrete adapter installed in
-a reflected value-operation registration, including values created by
-`Zero`, `New`, and container constructors. Therefore provider-created values
-receive later proven interface method contracts even when no source value of
-that concrete type first crossed an ordinary interface conversion. This adds
-no second reflection graph: normal value-operation demand still owns each
-descriptor, while the exposure relation carries method contracts only.
+The same complete-method-set request is attached to every concrete adapter
+installed in a reflected value-operation registration, including values
+created by `Zero`, `New`, and container constructors. Therefore
+provider-created values can satisfy any matching selected assertion even when
+no authored value of that concrete type first crossed an ordinary interface
+conversion. This adds no second reflection graph or type-pair relation: normal
+value-operation demand still owns each descriptor, while one adapter request
+owns the finite source method set.
 
 Container descriptors are total over every statically representable Go
 element, key, and value type; basic scalars do not define a privileged

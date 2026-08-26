@@ -28,14 +28,7 @@ func (n *File) ReflectionInterfaceAdapter(
 			Reason: "reflection interface adapter was not canonicalized",
 		}
 	}
-	empty, err := n.canonicalInterfaceContract(
-		types.Universe.Lookup("any").Type(),
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
 	demands, err := n.owner.registry.recordReflectionInterfaceAdapter(
-		empty,
 		binding,
 	)
 	if err != nil {

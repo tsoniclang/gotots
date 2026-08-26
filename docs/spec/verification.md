@@ -225,8 +225,8 @@ heritage entry, add an unrelated entry, collapse distinct source-owned
 surfaces, change one type argument, or omit one reached provider capability;
 each must fail before output is sealed.
 
-The adapter-shape gate separately partitions adapters by their exact demanded
-Go method set. A zero-method adapter must be one typed call to the canonical
+The adapter-shape gate separately partitions ordinary adapters by their exact
+demanded Go method set. A zero-method ordinary adapter must be one typed call to the canonical
 interface-value adapter factory plus its concrete equality/hash/format
 operations; it must contain no repeated class body or per-adapter method-token
 set. A method-bearing adapter must remain a concrete class and contain exactly
@@ -236,6 +236,13 @@ by duplicated common machinery. Mutations force a zero-method type through
 the class path, drop one concrete operation, or route a method-bearing type
 through the zero-method factory; each fails the shape, strict-typecheck,
 differential, or method-demand join before output is sealed.
+
+Reflection-created adapters are the closed exception: their generated method
+multiset must exact-join the selected concrete Go method set, with every method
+appearing once under its canonical interface-method token. A scaling fixture
+varies both reflected concrete types and methods and proves linear growth in
+their sum, independent of the number or discovery order of interface
+assertions.
 
 For each function, literal, concrete method, interface method, function type,
 method value/expression, provider/environment callable, and generic
@@ -505,7 +512,8 @@ comparability panic, map keys, and method values.
 Scaling fixtures hold one call site constant while implementer count grows.
 Call-site bytes/AST nodes must remain constant. Adapter growth is attributed by
 exact concrete type and demanded contract. Mutations restore implementer
-switches, duplicate adapters, emit complete concrete method sets, use
+switches, duplicate adapters, emit complete concrete method sets for ordinary
+conversion adapters, use
 constructor identity, erase payloads, or bypass selected method ownership.
 
 Every concrete method and generated interface declaration uses the same direct
@@ -545,19 +553,20 @@ ESM for:
 - open generic `TypeFor[T]` through exact private capability or
   concretization, with unchanged source value arity.
 
-Mutating an address callback from the dedicated reflection-interface exposure
-owner to an unsubscribed adapter must remove the address-only interface method
-and fail the artifact assertion before runtime. Mutating it to ordinary empty-
-interface membership or eager pointer-descriptor demand must fail the bounded-
-closure gate. Registry proof covers both discovery orders, excludes unrelated
-adapters, and asserts that exposure yields method-contract requests but zero
-reflection-descriptor requests.
+Mutating an address callback to omit the complete-method-set request must
+remove the address-only interface method and fail artifact inspection before
+runtime. Mutating it to ordinary empty-interface membership, an
+interface-demand cross-product, or eager pointer-descriptor demand must fail
+the bounded-closure gate. Registry proof exact-joins the requested adapter's
+method multiset to its concrete `go/types` method set and asserts that the
+request yields one method-set requirement but zero reflection-descriptor or
+value-operation requests.
 
 Constructor proof covers value- and pointer-method contracts on values created
 by `Zero` and `New`, where no concrete source value previously crossed the
-empty-interface boundary. Removing reflection exposure from a value-operation
-registration must leave the constructed adapter without its asserted method
-and fail artifact inspection before runtime.
+empty-interface boundary. Removing the complete-method-set request from a
+value-operation registration must leave the constructed adapter without its
+asserted method and fail artifact inspection before runtime.
 
 Provider-facet tests independently certify the metadata operation target and
 its concrete result target. The checked return type of `$create` must

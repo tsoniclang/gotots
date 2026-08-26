@@ -196,10 +196,11 @@ func (s *programSession) buildRepresentationArtifactRevision(
 	context := builder.context.WithArtifactOwner(owner)
 	requirements := s.requirements.SelectedFor(owner)
 	var adapterContracts []interfaceadapterdeclaration.Contract
+	adapterCompleteMethodSet := false
 	var providerCapabilities []providerinterfacebridge.CapabilityContract
 	var providerProfileCapabilities []providerinterfacebridge.ProfileCapabilityContract
 	if artifact.Kind() == api.GeneratedArtifactInterfaceAdapter {
-		adapterContracts, err = interfaceadapterdeclaration.Contracts(
+		adapterContracts, adapterCompleteMethodSet, err = interfaceadapterdeclaration.Contracts(
 			artifact,
 			requirements,
 		)
@@ -229,6 +230,7 @@ func (s *programSession) buildRepresentationArtifactRevision(
 		context,
 		artifact,
 		adapterContracts,
+		adapterCompleteMethodSet,
 		providerCapabilities,
 		providerProfileCapabilities,
 	)
@@ -262,6 +264,7 @@ func buildRepresentationArtifact(
 	context api.Context,
 	artifact *api.GeneratedArtifact,
 	adapterContracts []interfaceadapterdeclaration.Contract,
+	adapterCompleteMethodSet bool,
 	providerCapabilities []providerinterfacebridge.CapabilityContract,
 	providerProfileCapabilities []providerinterfacebridge.ProfileCapabilityContract,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
@@ -347,6 +350,7 @@ func buildRepresentationArtifact(
 			artifact.TargetName(),
 			source,
 			adapterContracts,
+			adapterCompleteMethodSet,
 			[]tsgo.ModifierLike{
 				builder.context.Factory().ExportKeyword(),
 			},
