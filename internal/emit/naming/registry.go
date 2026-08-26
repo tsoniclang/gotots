@@ -165,35 +165,6 @@ type providerStatefulRepresentationBinding struct {
 	name  string
 }
 
-type interfaceContractDemand struct {
-	source *types.Interface
-	target interfaceContractSelection
-}
-
-type interfaceDemandRequestKey struct {
-	kind       uint8
-	sourceKey  string
-	targetKey  string
-	adapterKey string
-}
-
-type interfaceContractSelection struct {
-	sourceType  types.Type
-	contract    *types.Interface
-	contractKey string
-	surfaceKey  string
-}
-
-type interfaceReflectionDemand struct {
-	source         *types.Interface
-	reflectionType *types.TypeName
-}
-
-type reflectionInterfaceExposure struct {
-	source   interfaceContractSelection
-	adapters map[string]struct{}
-}
-
 type genericCapabilityBinding struct {
 	owner *api.GeneratedArtifact
 	name  string

@@ -61,7 +61,7 @@ func verifyToolSelectionRoute(
 		switch {
 		case selector.Sel.Name == "VerifyComplete" &&
 			!strings.HasPrefix(relative, "internal/toolchain/") &&
-			relative != "internal/command/output.go":
+			relative != "internal/command/build.go":
 			violation = "complete Go root verification is outside the pre-publication owner"
 		case qualifier.Name == runtimeAlias && selector.Sel.Name == "GOROOT":
 			violation = "compiler runtime GOROOT bypasses selected Go tool"
@@ -134,7 +134,7 @@ func TestCompleteRootVerificationHasOneCompilationConsumer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(consumers) != 1 || consumers[0] != "internal/command/output.go" {
+	if len(consumers) != 1 || consumers[0] != "internal/command/build.go" {
 		t.Fatalf("complete Go root verification consumers = %v", consumers)
 	}
 }
