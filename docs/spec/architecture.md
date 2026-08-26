@@ -966,6 +966,13 @@ type GoStorage<T> = T extends GoStoredValue<infer S> ? S : T;
 type GoContainerStorage<T> = T extends GoContainerStoredValue<infer S> ? S : T;
 ```
 
+Because `GoStorage<T>` is intentionally distinct from logical `T` in an open
+generic body, taking the address of a canonical-storage slot is never a raw
+`Pointer<GoStorage<T>>` result. The address owner must emit the exact
+bidirectional projection to `Pointer<T>` at that location. Consumers,
+including interface adapters, see only the source-level `*T` contract; they do
+not infer or erase the storage representation.
+
 Concrete generated classes declare only the demanded zero-runtime
 `unique symbol` marker members. The marker target is the already-selected
 logical, storage, or container-storage representation; it never

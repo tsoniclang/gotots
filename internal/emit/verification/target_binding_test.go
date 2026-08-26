@@ -392,3 +392,56 @@ func Store(outer *Outer[int], value int) int {
 	}
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }
+
+func TestOpenGenericFieldAddressProjectsCanonicalStorage(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/genericfieldaddress\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package genericfieldaddress
+
+type Box[T any] struct { Value T }
+
+func Replace[T any](box *Box[T], value T) T {
+	location := &box.Value
+	previous := *location
+	*location = value
+	return previous
+}
+
+func Run() int {
+	box := Box[int]{Value: 1}
+	previous := Replace(&box, 2)
+	return previous + box.Value
+}
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: project,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := emit.NewRoot(program.Roots()[0].Types().Scope().Lookup("Run"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(program, []emit.Root{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	if !strings.Contains(
+		artifacts.printed,
+		"projectPointer<GoStorage<T>, T>(addressOf<GoStorage<T>>",
+	) {
+		t.Fatalf(
+			"open generic field address did not project canonical storage:\n%s",
+			artifacts.printed,
+		)
+	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+}

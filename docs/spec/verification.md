@@ -380,6 +380,16 @@ Every test inspects generated source and reports bytes/AST nodes. A mutation
 that always emits copy carriers/helpers, uses JavaScript identity for Go map
 keys, drops nil checks, or restores a target non-null assertion must fail.
 
+An open-generic address fixture takes `&box.Value` where the canonical field
+has storage type `GoStorage<T>`. The generated artifact must address that exact
+slot and project it bidirectionally to `Pointer<T>` before any assignment,
+call, or interface adaptation; generated-AST shape and strict typechecking
+prove that the logical and storage contracts cannot be conflated. The pointer
+runtime differential separately proves that a bidirectional projection keeps
+the same mutable location. A mutation returning the raw
+`Pointer<GoStorage<T>>`, projecting only one direction, or treating an open type
+parameter as identity storage must fail at these owners.
+
 Map proof additionally requires the common `GoMapValue<K,V>` surface to be one
 nominal abstract class with the canonical private Promise-assimilation
 exclusion. The direct map class and every native/hashed specialization must
