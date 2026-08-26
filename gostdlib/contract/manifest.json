@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "6beb0a498ac90a9919e173a0e3ffbc6abb6901ada8ee9f92595836dcd06ff1d4",
+  "providerDigest": "cf55879e5867e986f12f877d1c053b653aa2c9fa3af3a95fd6982d4b0dfb28ca",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -22591,7 +22591,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextAfterFuncCanonical@1732"
+            "src/internal/facets/provider-context.ts#ContextAfterFuncCanonical@1970"
           ],
           "interfaces": [
             {
@@ -22675,6 +22675,98 @@
           "targetFingerprint": "e29278d01574050015036c2d5b4b83bd8ad5f69a97fa6a42dbc1b58f6e1bb6de"
         },
         {
+          "sourceIdentity": "context|kind=4|receiver=|name=AfterFunc",
+          "profileKey": "ab2f0ac45fd093a2cc6abe2a527bff10e7226a27f2e77acbbf0f0b913cbd2882",
+          "export": "ContextAfterFuncDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "implementationSites": [
+            "src/internal/facets/provider-context.ts#ContextAfterFuncDirect@307"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "context|kind=2|receiver=|name=Context",
+              "export": "ProviderContext",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Deadline",
+                    "kind": "callable",
+                    "member": "Deadline",
+                    "effect": "sync",
+                    "sourceSignature": "func() (deadline time.Time, ok bool)|params=|results=deadline,ok",
+                    "contractSignature": "func() (deadline time.Time, ok bool)",
+                    "sourceLocation": "context/context.go:75:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "efcb0437a8d7c5cae132dd554a7015f4d42c408133f674e5fd680fbef46b578e"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Done",
+                    "kind": "callable",
+                    "member": "Done",
+                    "effect": "sync",
+                    "sourceSignature": "func() \u003c-chan struct{}|params=|results=",
+                    "contractSignature": "func() \u003c-chan struct{}",
+                    "sourceLocation": "context/context.go:108:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "cbafc056c1b1c7d7f8c76d140104039a744537d25352798692737d3ddaba17c1"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Err",
+                    "kind": "callable",
+                    "member": "Err",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "context/context.go:115:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "07d881ffdd990c404ad75dbd72502753cce15a2bc8613f15b38baaaad3d1b820"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Value",
+                    "kind": "callable",
+                    "member": "Value",
+                    "effect": "sync",
+                    "sourceSignature": "func(key any) any|params=key|results=",
+                    "contractSignature": "func(key any) any",
+                    "sourceLocation": "context/context.go:162:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "d5a7c1f8ba1d8689381548dc73b09ca08a94c8a9b92bc934f8a609e5b966785e"
+                  }
+                ]
+              },
+              "targetFingerprint": "60a5178b9b50e79e992c89e5e751bd74841bff0052c6d30897775d744d0de88f"
+            },
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-context.ts",
+          "targetFingerprint": "2d3a6335775ff8df13fa74475d2b884e1690e2fe40126b9ff7f608f84b11faab"
+        },
+        {
           "sourceIdentity": "context|kind=4|receiver=|name=Cause",
           "profileKey": "6a61d122138d4de738e83efecaf5d4ce6af23390623ba040ab2e5d0ad13b36c5",
           "export": "ContextCauseCanonical",
@@ -22689,7 +22781,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextCauseCanonical@1890"
+            "src/internal/facets/provider-context.ts#ContextCauseCanonical@2128"
           ],
           "interfaces": [
             {
@@ -22773,6 +22865,98 @@
           "targetFingerprint": "17dea80b7538496bbf4b380a0a0ecc7192c4b537311b2b3ce4c6b9ec301bc8c0"
         },
         {
+          "sourceIdentity": "context|kind=4|receiver=|name=Cause",
+          "profileKey": "ab2f0ac45fd093a2cc6abe2a527bff10e7226a27f2e77acbbf0f0b913cbd2882",
+          "export": "ContextCauseDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "implementationSites": [
+            "src/internal/facets/provider-context.ts#ContextCauseDirect@340"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "context|kind=2|receiver=|name=Context",
+              "export": "ProviderContext",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Deadline",
+                    "kind": "callable",
+                    "member": "Deadline",
+                    "effect": "sync",
+                    "sourceSignature": "func() (deadline time.Time, ok bool)|params=|results=deadline,ok",
+                    "contractSignature": "func() (deadline time.Time, ok bool)",
+                    "sourceLocation": "context/context.go:75:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "efcb0437a8d7c5cae132dd554a7015f4d42c408133f674e5fd680fbef46b578e"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Done",
+                    "kind": "callable",
+                    "member": "Done",
+                    "effect": "sync",
+                    "sourceSignature": "func() \u003c-chan struct{}|params=|results=",
+                    "contractSignature": "func() \u003c-chan struct{}",
+                    "sourceLocation": "context/context.go:108:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "cbafc056c1b1c7d7f8c76d140104039a744537d25352798692737d3ddaba17c1"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Err",
+                    "kind": "callable",
+                    "member": "Err",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "context/context.go:115:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "07d881ffdd990c404ad75dbd72502753cce15a2bc8613f15b38baaaad3d1b820"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Value",
+                    "kind": "callable",
+                    "member": "Value",
+                    "effect": "sync",
+                    "sourceSignature": "func(key any) any|params=key|results=",
+                    "contractSignature": "func(key any) any",
+                    "sourceLocation": "context/context.go:162:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "d5a7c1f8ba1d8689381548dc73b09ca08a94c8a9b92bc934f8a609e5b966785e"
+                  }
+                ]
+              },
+              "targetFingerprint": "60a5178b9b50e79e992c89e5e751bd74841bff0052c6d30897775d744d0de88f"
+            },
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-context.ts",
+          "targetFingerprint": "33ed8b9a982b2e1bd8d08b46fbe46e01fadf87809d2c8a08d7993a9efc8a54bb"
+        },
+        {
           "sourceIdentity": "context|kind=4|receiver=|name=WithCancel",
           "profileKey": "6a61d122138d4de738e83efecaf5d4ce6af23390623ba040ab2e5d0ad13b36c5",
           "export": "ContextWithCancelCanonical",
@@ -22796,7 +22980,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1274"
+            "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1512"
           ],
           "interfaces": [
             {
@@ -22880,6 +23064,100 @@
           "targetFingerprint": "1ea02e6c8d428883f314c3e05f32a587f739fda5771ee64cb69d4059ea0f4f08"
         },
         {
+          "sourceIdentity": "context|kind=4|receiver=|name=WithCancel",
+          "profileKey": "ab2f0ac45fd093a2cc6abe2a527bff10e7226a27f2e77acbbf0f0b913cbd2882",
+          "export": "ContextWithCancelDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-context.ts#ContextWithCancelDirect@218"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "context|kind=2|receiver=|name=Context",
+              "export": "ProviderContext",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Deadline",
+                    "kind": "callable",
+                    "member": "Deadline",
+                    "effect": "sync",
+                    "sourceSignature": "func() (deadline time.Time, ok bool)|params=|results=deadline,ok",
+                    "contractSignature": "func() (deadline time.Time, ok bool)",
+                    "sourceLocation": "context/context.go:75:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "efcb0437a8d7c5cae132dd554a7015f4d42c408133f674e5fd680fbef46b578e"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Done",
+                    "kind": "callable",
+                    "member": "Done",
+                    "effect": "sync",
+                    "sourceSignature": "func() \u003c-chan struct{}|params=|results=",
+                    "contractSignature": "func() \u003c-chan struct{}",
+                    "sourceLocation": "context/context.go:108:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "cbafc056c1b1c7d7f8c76d140104039a744537d25352798692737d3ddaba17c1"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Err",
+                    "kind": "callable",
+                    "member": "Err",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "context/context.go:115:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "07d881ffdd990c404ad75dbd72502753cce15a2bc8613f15b38baaaad3d1b820"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Value",
+                    "kind": "callable",
+                    "member": "Value",
+                    "effect": "sync",
+                    "sourceSignature": "func(key any) any|params=key|results=",
+                    "contractSignature": "func(key any) any",
+                    "sourceLocation": "context/context.go:162:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "d5a7c1f8ba1d8689381548dc73b09ca08a94c8a9b92bc934f8a609e5b966785e"
+                  }
+                ]
+              },
+              "targetFingerprint": "60a5178b9b50e79e992c89e5e751bd74841bff0052c6d30897775d744d0de88f"
+            },
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-context.ts",
+          "targetFingerprint": "0c84712175988c98ef97536feab5fc3b367745b14552ff49e194c09c92817705"
+        },
+        {
           "sourceIdentity": "context|kind=4|receiver=|name=WithCancelCause",
           "profileKey": "6a61d122138d4de738e83efecaf5d4ce6af23390623ba040ab2e5d0ad13b36c5",
           "export": "ContextWithCancelCauseCanonical",
@@ -22904,7 +23182,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextWithCancelCauseCanonical@1386"
+            "src/internal/facets/provider-context.ts#ContextWithCancelCauseCanonical@1624"
           ],
           "interfaces": [
             {
@@ -22988,6 +23266,100 @@
           "targetFingerprint": "b0b8b16c3c633202cf6da0f9e36ae5ddd97d425f5db2dc52510c1b285c815221"
         },
         {
+          "sourceIdentity": "context|kind=4|receiver=|name=WithCancelCause",
+          "profileKey": "ab2f0ac45fd093a2cc6abe2a527bff10e7226a27f2e77acbbf0f0b913cbd2882",
+          "export": "ContextWithCancelCauseDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-context.ts#ContextWithCancelCauseDirect@246"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "context|kind=2|receiver=|name=Context",
+              "export": "ProviderContext",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Deadline",
+                    "kind": "callable",
+                    "member": "Deadline",
+                    "effect": "sync",
+                    "sourceSignature": "func() (deadline time.Time, ok bool)|params=|results=deadline,ok",
+                    "contractSignature": "func() (deadline time.Time, ok bool)",
+                    "sourceLocation": "context/context.go:75:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "efcb0437a8d7c5cae132dd554a7015f4d42c408133f674e5fd680fbef46b578e"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Done",
+                    "kind": "callable",
+                    "member": "Done",
+                    "effect": "sync",
+                    "sourceSignature": "func() \u003c-chan struct{}|params=|results=",
+                    "contractSignature": "func() \u003c-chan struct{}",
+                    "sourceLocation": "context/context.go:108:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "cbafc056c1b1c7d7f8c76d140104039a744537d25352798692737d3ddaba17c1"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Err",
+                    "kind": "callable",
+                    "member": "Err",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "context/context.go:115:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "07d881ffdd990c404ad75dbd72502753cce15a2bc8613f15b38baaaad3d1b820"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Value",
+                    "kind": "callable",
+                    "member": "Value",
+                    "effect": "sync",
+                    "sourceSignature": "func(key any) any|params=key|results=",
+                    "contractSignature": "func(key any) any",
+                    "sourceLocation": "context/context.go:162:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "d5a7c1f8ba1d8689381548dc73b09ca08a94c8a9b92bc934f8a609e5b966785e"
+                  }
+                ]
+              },
+              "targetFingerprint": "60a5178b9b50e79e992c89e5e751bd74841bff0052c6d30897775d744d0de88f"
+            },
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-context.ts",
+          "targetFingerprint": "416134db395c9d1febc2417ead9b6404518b9eafdc90e4370506d9248002d72c"
+        },
+        {
           "sourceIdentity": "context|kind=4|receiver=|name=WithTimeout",
           "profileKey": "6a61d122138d4de738e83efecaf5d4ce6af23390623ba040ab2e5d0ad13b36c5",
           "export": "ContextWithTimeoutCanonical",
@@ -23015,7 +23387,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextWithTimeoutCanonical@1515"
+            "src/internal/facets/provider-context.ts#ContextWithTimeoutCanonical@1753"
           ],
           "interfaces": [
             {
@@ -23099,6 +23471,100 @@
           "targetFingerprint": "73aa956378bd8d9aa7b526e7118dac95492b8763a5bb9566f8fa1f871492af14"
         },
         {
+          "sourceIdentity": "context|kind=4|receiver=|name=WithTimeout",
+          "profileKey": "ab2f0ac45fd093a2cc6abe2a527bff10e7226a27f2e77acbbf0f0b913cbd2882",
+          "export": "ContextWithTimeoutDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-context.ts#ContextWithTimeoutDirect@274"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "context|kind=2|receiver=|name=Context",
+              "export": "ProviderContext",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Deadline",
+                    "kind": "callable",
+                    "member": "Deadline",
+                    "effect": "sync",
+                    "sourceSignature": "func() (deadline time.Time, ok bool)|params=|results=deadline,ok",
+                    "contractSignature": "func() (deadline time.Time, ok bool)",
+                    "sourceLocation": "context/context.go:75:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "efcb0437a8d7c5cae132dd554a7015f4d42c408133f674e5fd680fbef46b578e"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Done",
+                    "kind": "callable",
+                    "member": "Done",
+                    "effect": "sync",
+                    "sourceSignature": "func() \u003c-chan struct{}|params=|results=",
+                    "contractSignature": "func() \u003c-chan struct{}",
+                    "sourceLocation": "context/context.go:108:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "cbafc056c1b1c7d7f8c76d140104039a744537d25352798692737d3ddaba17c1"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Err",
+                    "kind": "callable",
+                    "member": "Err",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "context/context.go:115:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "07d881ffdd990c404ad75dbd72502753cce15a2bc8613f15b38baaaad3d1b820"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Value",
+                    "kind": "callable",
+                    "member": "Value",
+                    "effect": "sync",
+                    "sourceSignature": "func(key any) any|params=key|results=",
+                    "contractSignature": "func(key any) any",
+                    "sourceLocation": "context/context.go:162:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "d5a7c1f8ba1d8689381548dc73b09ca08a94c8a9b92bc934f8a609e5b966785e"
+                  }
+                ]
+              },
+              "targetFingerprint": "60a5178b9b50e79e992c89e5e751bd74841bff0052c6d30897775d744d0de88f"
+            },
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-context.ts",
+          "targetFingerprint": "6dd9a1fbfc72a34b62bcd7b968c7e7f35018691ecd9ef434b1078e94ecece95e"
+        },
+        {
           "sourceIdentity": "context|kind=4|receiver=|name=WithValue",
           "profileKey": "6a61d122138d4de738e83efecaf5d4ce6af23390623ba040ab2e5d0ad13b36c5",
           "export": "ContextWithValueCanonical",
@@ -23116,7 +23582,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextWithValueCanonical@1189"
+            "src/internal/facets/provider-context.ts#ContextWithValueCanonical@1427"
           ],
           "interfaces": [
             {
@@ -23198,6 +23664,100 @@
           "effect": "sync",
           "implementationOwner": "src/internal/facets/provider-context.ts",
           "targetFingerprint": "caa7413b231dc98eb68a28584a5c8529d79cdf3781cd0b1a018298b49a0ca3f6"
+        },
+        {
+          "sourceIdentity": "context|kind=4|receiver=|name=WithValue",
+          "profileKey": "ab2f0ac45fd093a2cc6abe2a527bff10e7226a27f2e77acbbf0f0b913cbd2882",
+          "export": "ContextWithValueDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-context.ts#ContextWithValueDirect@181"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "context|kind=2|receiver=|name=Context",
+              "export": "ProviderContext",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Deadline",
+                    "kind": "callable",
+                    "member": "Deadline",
+                    "effect": "sync",
+                    "sourceSignature": "func() (deadline time.Time, ok bool)|params=|results=deadline,ok",
+                    "contractSignature": "func() (deadline time.Time, ok bool)",
+                    "sourceLocation": "context/context.go:75:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "efcb0437a8d7c5cae132dd554a7015f4d42c408133f674e5fd680fbef46b578e"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Done",
+                    "kind": "callable",
+                    "member": "Done",
+                    "effect": "sync",
+                    "sourceSignature": "func() \u003c-chan struct{}|params=|results=",
+                    "contractSignature": "func() \u003c-chan struct{}",
+                    "sourceLocation": "context/context.go:108:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "cbafc056c1b1c7d7f8c76d140104039a744537d25352798692737d3ddaba17c1"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Err",
+                    "kind": "callable",
+                    "member": "Err",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "context/context.go:115:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "07d881ffdd990c404ad75dbd72502753cce15a2bc8613f15b38baaaad3d1b820"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Value",
+                    "kind": "callable",
+                    "member": "Value",
+                    "effect": "sync",
+                    "sourceSignature": "func(key any) any|params=key|results=",
+                    "contractSignature": "func(key any) any",
+                    "sourceLocation": "context/context.go:162:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "d5a7c1f8ba1d8689381548dc73b09ca08a94c8a9b92bc934f8a609e5b966785e"
+                  }
+                ]
+              },
+              "targetFingerprint": "60a5178b9b50e79e992c89e5e751bd74841bff0052c6d30897775d744d0de88f"
+            },
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-context.ts",
+          "targetFingerprint": "2289078b6cd2410ad9582ab3557c8d27e6e25c0184195f4ad822efaa3758b136"
         }
       ],
       "facets": []
@@ -26187,7 +26747,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-os-signal.ts#OsSignalNotifyContextCanonical@133"
+            "src/internal/facets/provider-os-signal.ts#OsSignalNotifyContextCanonical@213"
           ],
           "interfaces": [
             {
@@ -26303,6 +26863,100 @@
           "targetFingerprint": "12cfce3fbb20ff187772148cd1d13cb7750a0b8226cc0405b5262fe8f51d1e29"
         },
         {
+          "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
+          "profileKey": "ab2f0ac45fd093a2cc6abe2a527bff10e7226a27f2e77acbbf0f0b913cbd2882",
+          "export": "OsSignalNotifyContextDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-os-signal.ts#OsSignalNotifyContextDirect@171"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "context|kind=2|receiver=|name=Context",
+              "export": "ProviderContext",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Deadline",
+                    "kind": "callable",
+                    "member": "Deadline",
+                    "effect": "sync",
+                    "sourceSignature": "func() (deadline time.Time, ok bool)|params=|results=deadline,ok",
+                    "contractSignature": "func() (deadline time.Time, ok bool)",
+                    "sourceLocation": "context/context.go:75:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "efcb0437a8d7c5cae132dd554a7015f4d42c408133f674e5fd680fbef46b578e"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Done",
+                    "kind": "callable",
+                    "member": "Done",
+                    "effect": "sync",
+                    "sourceSignature": "func() \u003c-chan struct{}|params=|results=",
+                    "contractSignature": "func() \u003c-chan struct{}",
+                    "sourceLocation": "context/context.go:108:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "cbafc056c1b1c7d7f8c76d140104039a744537d25352798692737d3ddaba17c1"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Err",
+                    "kind": "callable",
+                    "member": "Err",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "context/context.go:115:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "07d881ffdd990c404ad75dbd72502753cce15a2bc8613f15b38baaaad3d1b820"
+                  },
+                  {
+                    "sourceIdentity": "context|kind=4|receiver=context.Context|name=Value",
+                    "kind": "callable",
+                    "member": "Value",
+                    "effect": "sync",
+                    "sourceSignature": "func(key any) any|params=key|results=",
+                    "contractSignature": "func(key any) any",
+                    "sourceLocation": "context/context.go:162:2",
+                    "implementationOwner": "src/internal/portable/context/context.ts",
+                    "targetFingerprint": "d5a7c1f8ba1d8689381548dc73b09ca08a94c8a9b92bc934f8a609e5b966785e"
+                  }
+                ]
+              },
+              "targetFingerprint": "60a5178b9b50e79e992c89e5e751bd74841bff0052c6d30897775d744d0de88f"
+            },
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-os-signal.ts",
+          "targetFingerprint": "6f2cf0141883986084394303745e6c0dba34ff838c30b8eba00543f3e51786d7"
+        },
+        {
           "sourceIdentity": "os|kind=4|receiver=*os.Process|name=Signal",
           "profileKey": "84a148662f5fe1af880857298009a4c50ed07763551c7711313764c4b1881542",
           "export": "OsProcessSignalCanonical",
@@ -26314,7 +26968,7 @@
             0
           ],
           "implementationSites": [
-            "src/internal/facets/provider-os-signal.ts#OsProcessSignalCanonical@235"
+            "src/internal/facets/provider-os-signal.ts#OsProcessSignalCanonical@315"
           ],
           "interfaces": [
             {
@@ -28041,7 +28695,27 @@
       "disposition": "implemented"
     },
     {
+      "identity": "src/context.ts#AfterFunc@6",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/context.ts#Cause@14",
+      "disposition": "implemented"
+    },
+    {
       "identity": "src/context.ts#WithCancel@22",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/context.ts#WithCancelCause@24",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/context.ts#WithTimeout@26",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/context.ts#WithValue@28",
       "disposition": "implemented"
     },
     {
@@ -29454,16 +30128,16 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#$contextName@487",
+      "identity": "src/internal/facets/provider-context.ts#$contextName@725",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#CancelContext@789",
+      "identity": "src/internal/facets/provider-context.ts#CancelContext@1027",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#ContextValue@216",
-        "src/internal/facets/provider-context.ts#canonicalParentContextName@2058",
-        "src/internal/facets/provider-context.ts#contextCause@2011",
+        "src/internal/facets/provider-context.ts#ContextValue@454",
+        "src/internal/facets/provider-context.ts#canonicalParentContextName@2296",
+        "src/internal/facets/provider-context.ts#contextCause@2249",
         "src/internal/portable/concurrency/channel.ts#ProviderChannel@70",
         "src/internal/portable/concurrency/channel.ts#close@350",
         "src/internal/portable/context/propagation.ts#propagateCancelAwaitable@134",
@@ -29471,62 +30145,90 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#Cause@342",
+      "identity": "src/internal/facets/provider-context.ts#Cause@580",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextAfterFuncCanonical@1732",
+      "identity": "src/internal/facets/provider-context.ts#ContextAfterFuncCanonical@1970",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#requireParent@1934"
+        "src/internal/facets/provider-context.ts#requireParent@2172"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextCauseCanonical@1890",
+      "identity": "src/internal/facets/provider-context.ts#ContextAfterFuncDirect@307",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#contextCause@2011",
-        "src/internal/facets/provider-context.ts#requireParent@1934"
+        "src/internal/facets/provider-context.ts#afterFuncDirect@77"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextValue@216",
+      "identity": "src/internal/facets/provider-context.ts#ContextCauseCanonical@2128",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-context.ts#contextCause@2249",
+        "src/internal/facets/provider-context.ts#requireParent@2172"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#ContextCauseDirect@340",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-context.ts#causeDirect@80"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#ContextValue@454",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1274",
+      "identity": "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1512",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#CancelContext@789",
-        "src/internal/facets/provider-context.ts#Initialize@924",
-        "src/internal/facets/provider-context.ts#cancel@1115",
-        "src/internal/facets/provider-context.ts#requireFailure@1976",
-        "src/internal/facets/provider-context.ts#requireParent@1934"
+        "src/internal/facets/provider-context.ts#CancelContext@1027",
+        "src/internal/facets/provider-context.ts#Initialize@1162",
+        "src/internal/facets/provider-context.ts#cancel@1353",
+        "src/internal/facets/provider-context.ts#requireFailure@2214",
+        "src/internal/facets/provider-context.ts#requireParent@2172"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextWithCancelCauseCanonical@1386",
+      "identity": "src/internal/facets/provider-context.ts#ContextWithCancelCauseCanonical@1624",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#CancelContext@789",
-        "src/internal/facets/provider-context.ts#Initialize@924",
-        "src/internal/facets/provider-context.ts#cancel@1115",
-        "src/internal/facets/provider-context.ts#requireFailure@1976",
-        "src/internal/facets/provider-context.ts#requireParent@1934"
+        "src/internal/facets/provider-context.ts#CancelContext@1027",
+        "src/internal/facets/provider-context.ts#Initialize@1162",
+        "src/internal/facets/provider-context.ts#cancel@1353",
+        "src/internal/facets/provider-context.ts#requireFailure@2214",
+        "src/internal/facets/provider-context.ts#requireParent@2172"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextWithTimeoutCanonical@1515",
+      "identity": "src/internal/facets/provider-context.ts#ContextWithCancelCauseDirect@246",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#CancelContext@789",
-        "src/internal/facets/provider-context.ts#Initialize@924",
-        "src/internal/facets/provider-context.ts#cancel@1115",
-        "src/internal/facets/provider-context.ts#requireFailure@1976",
-        "src/internal/facets/provider-context.ts#requireParent@1934",
+        "src/internal/facets/provider-context.ts#withCancelCauseDirect@86"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#ContextWithCancelDirect@218",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-context.ts#withCancelDirect@83"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#ContextWithTimeoutCanonical@1753",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-context.ts#CancelContext@1027",
+        "src/internal/facets/provider-context.ts#Initialize@1162",
+        "src/internal/facets/provider-context.ts#cancel@1353",
+        "src/internal/facets/provider-context.ts#requireFailure@2214",
+        "src/internal/facets/provider-context.ts#requireParent@2172",
         "src/internal/portable/time/time.ts#Add@535",
         "src/internal/portable/time/time.ts#Before@795",
         "src/internal/portable/time/time.ts#Now@2679",
@@ -29535,76 +30237,138 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextWithValueCanonical@1189",
+      "identity": "src/internal/facets/provider-context.ts#ContextWithTimeoutDirect@274",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#ValueContext@493"
+        "src/internal/facets/provider-context.ts#withTimeoutDirect@89"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#Initialize@924",
+      "identity": "src/internal/facets/provider-context.ts#ContextWithValueCanonical@1427",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#cancel@1115",
-        "src/internal/facets/provider-context.ts#contextCause@2011",
-        "src/internal/facets/provider-context.ts#parent@895",
+        "src/internal/facets/provider-context.ts#ValueContext@731"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#ContextWithValueDirect@181",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-context.ts#withValueDirect@92"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#Initialize@1162",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-context.ts#cancel@1353",
+        "src/internal/facets/provider-context.ts#contextCause@2249",
+        "src/internal/facets/provider-context.ts#parent@1133",
         "src/internal/portable/context/propagation.ts#propagateCancelAwaitable@134"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#PortableContextValue@72",
+      "identity": "src/internal/facets/provider-context.ts#PortableContextValue@107",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#PortableContextValue@72",
+        "src/internal/facets/provider-context.ts#PortableContextValue@107",
         "src/internal/portable/context/context.ts#ContextValue@178"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ValueContext@493",
+      "identity": "src/internal/facets/provider-context.ts#ValueContext@731",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#ContextValue@216",
-        "src/internal/facets/provider-context.ts#contextCause@2011",
+        "src/internal/facets/provider-context.ts#ContextValue@454",
+        "src/internal/facets/provider-context.ts#contextCause@2249",
         "src/internal/runtime/error.ts#ProviderError@16",
         "src/internal/runtime/interface.ts#goInterfaceEqual@10"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#cancel@1115",
+      "identity": "src/internal/facets/provider-context.ts#afterFuncDirect@77",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/context.ts#AfterFunc@6",
+        "src/internal/facets/provider-context.ts#afterFuncDirect@77"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#cancel@1353",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/concurrency/channel.ts#close@350"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#canonicalParentContextName@2058",
+      "identity": "src/internal/facets/provider-context.ts#canonicalParentContextName@2296",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#$contextName@487",
-        "src/internal/facets/provider-context.ts#ContextValue@216",
-        "src/internal/facets/provider-context.ts#PortableContextValue@72",
+        "src/internal/facets/provider-context.ts#$contextName@725",
+        "src/internal/facets/provider-context.ts#ContextValue@454",
+        "src/internal/facets/provider-context.ts#PortableContextValue@107",
         "src/internal/portable/context/context.ts#$contextName@391"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#contextCause@2011",
+      "identity": "src/internal/facets/provider-context.ts#causeDirect@80",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#Cause@342",
-        "src/internal/facets/provider-context.ts#ContextValue@216"
+        "src/context.ts#Cause@14",
+        "src/internal/facets/provider-context.ts#causeDirect@80"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#parent@895",
+      "identity": "src/internal/facets/provider-context.ts#contextCause@2249",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-context.ts#Cause@580",
+        "src/internal/facets/provider-context.ts#ContextValue@454"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#parent@1133",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#requireFailure@1976",
+      "identity": "src/internal/facets/provider-context.ts#requireFailure@2214",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#requireParent@1934",
+      "identity": "src/internal/facets/provider-context.ts#requireParent@2172",
       "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#withCancelCauseDirect@86",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/context.ts#WithCancelCause@24",
+        "src/internal/facets/provider-context.ts#withCancelCauseDirect@86"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#withCancelDirect@83",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/context.ts#WithCancel@22",
+        "src/internal/facets/provider-context.ts#withCancelDirect@83"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#withTimeoutDirect@89",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/context.ts#WithTimeout@26",
+        "src/internal/facets/provider-context.ts#withTimeoutDirect@89"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#withValueDirect@92",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/context.ts#WithValue@28",
+        "src/internal/facets/provider-context.ts#withValueDirect@92"
+      ]
     },
     {
       "identity": "src/internal/facets/provider-encoding-base32.ts#Base32EncodingOperations@19",
@@ -29950,19 +30714,26 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-os-signal.ts#OsProcessSignalCanonical@235",
+      "identity": "src/internal/facets/provider-os-signal.ts#OsProcessSignalCanonical@315",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/node/os/process.ts#signalProcessAsync@167"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-os-signal.ts#OsSignalNotifyContextCanonical@133",
+      "identity": "src/internal/facets/provider-os-signal.ts#OsSignalNotifyContextCanonical@213",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1274",
+        "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1512",
         "src/internal/node/os/signal/notify.ts#selectedSignalsAsync@694",
         "src/internal/node/os/signal/notify.ts#startNotificationAsync@337"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-os-signal.ts#OsSignalNotifyContextDirect@171",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/node/os/signal/notify.ts#notifyContext@110"
       ]
     },
     {
@@ -36831,5 +37602,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "1107758a874bb7468887dbb0ba7c100b7a679cbdc5cab15351172975e892af73"
+  "manifestDigest": "9fb2c919eb2b9d0bdd3291c5061175df6595e48158ebba7f9cfe5bba41eb7980"
 }

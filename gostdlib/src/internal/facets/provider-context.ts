@@ -7,6 +7,20 @@ import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
 import { GoEmptyStruct } from "@gotots/runtime/struct.js";
 
+import type {
+  CancelCauseFunc,
+  CancelFunc,
+  Context as ProviderContext,
+} from "../../context.js";
+import {
+  AfterFunc as afterFuncDirect,
+  Cause as causeDirect,
+  WithCancel as withCancelDirect,
+  WithCancelCause as withCancelCauseDirect,
+  WithTimeout as withTimeoutDirect,
+  WithValue as withValueDirect,
+} from "../../context.js";
+
 import { ProviderChannel } from "../portable/concurrency/channel.js";
 import { ContextValue as PortableContextValue } from "../portable/context/context.js";
 import { propagateCancelAwaitable } from "../portable/context/propagation.js";
@@ -15,8 +29,51 @@ import { After } from "../portable/time/timer.js";
 import { Now, Time } from "../portable/time/time.js";
 import { goInterfaceEqual } from "../runtime/interface.js";
 import type { InterfaceContract } from "./provider-support.js";
+import type { ProviderErrorInterface } from "./provider-error.js";
 
 export type { CanonicalError } from "./provider-io-contract.js";
+export type { Context as ProviderContext } from "../../context.js";
+export type { ProviderErrorInterface } from "./provider-error.js";
+
+export function ContextWithValueDirect(
+  parent: ProviderContext | undefined,
+  key: GoInterfaceValue | undefined,
+  value: GoInterfaceValue | undefined,
+): ProviderContext {
+  return withValueDirect(parent, key, value);
+}
+
+export function ContextWithCancelDirect(
+  parent: ProviderContext | undefined,
+): [ProviderContext, NonNullable<CancelFunc>] {
+  return withCancelDirect(parent);
+}
+
+export function ContextWithCancelCauseDirect(
+  parent: ProviderContext | undefined,
+): [ProviderContext, NonNullable<CancelCauseFunc>] {
+  return withCancelCauseDirect(parent);
+}
+
+export function ContextWithTimeoutDirect(
+  parent: ProviderContext | undefined,
+  timeout: Duration,
+): [ProviderContext, NonNullable<CancelFunc>] {
+  return withTimeoutDirect(parent, timeout);
+}
+
+export function ContextAfterFuncDirect(
+  parent: ProviderContext | undefined,
+  callback: (() => void) | undefined,
+): () => bool {
+  return afterFuncDirect(parent, callback);
+}
+
+export function ContextCauseDirect(
+  parent: ProviderContext | undefined,
+): ProviderErrorInterface | undefined {
+  return causeDirect(parent);
+}
 
 export interface CanonicalContext<Failure extends GoInterfaceValue>
   extends GoInterfaceValue {

@@ -4,9 +4,12 @@ import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { Awaitable, gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { CancelFunc } from "../../context.js";
+import type { Context as ProviderContext } from "../../context.js";
 import type { Process } from "../../os.js";
+import type { Signal as ProviderSignal } from "../../os.js";
 import { signalProcessAsync } from "../node/os/process.js";
 import {
+  notifyContext,
   selectedSignalsAsync,
   startNotificationAsync,
 } from "../node/os/signal/notify.js";
@@ -16,13 +19,23 @@ import {
 } from "./provider-context.js";
 import type { CanonicalError } from "./provider-io-contract.js";
 import type { InterfaceContract } from "./provider-support.js";
+import type { ProviderErrorInterface } from "./provider-error.js";
 
 export type { CanonicalContext } from "./provider-context.js";
 export type { CanonicalError } from "./provider-io-contract.js";
+export type { Context as ProviderContext } from "../../context.js";
+export type { ProviderErrorInterface } from "./provider-error.js";
 
 export interface CanonicalSignal extends GoInterfaceValue {
   Signal(recovery?: GoRecovery): Awaitable<void>;
   String(recovery?: GoRecovery): Awaitable<gostring>;
+}
+
+export function OsSignalNotifyContextDirect(
+  parent: ProviderContext | undefined,
+  signals: RuntimeSlice<ProviderSignal | undefined>,
+): [ProviderContext | undefined, NonNullable<CancelFunc>] {
+  return notifyContext(parent, signals);
 }
 
 export async function OsSignalNotifyContextCanonical<

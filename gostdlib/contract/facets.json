@@ -428,6 +428,28 @@
       "sourceIdentity": "context|kind=4|receiver=|name=WithCancel",
       "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
       "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithCancelDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "ProviderContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithCancel",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
       "export": "ContextWithCancelCanonical",
       "canonicalParameters": [
         0
@@ -456,6 +478,28 @@
         {
           "sourceIdentity": "go:universe|error",
           "export": "CanonicalError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithCancelCause",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithCancelCauseDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "ProviderContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
         }
       ]
     },
@@ -492,6 +536,28 @@
         {
           "sourceIdentity": "go:universe|error",
           "export": "CanonicalError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithTimeout",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithTimeoutDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "ProviderContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
         }
       ]
     },
@@ -538,6 +604,25 @@
       "sourceIdentity": "context|kind=4|receiver=|name=AfterFunc",
       "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
       "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextAfterFuncDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "ProviderContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=AfterFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
       "export": "ContextAfterFuncCanonical",
       "canonicalParameters": [
         0
@@ -554,6 +639,25 @@
         {
           "sourceIdentity": "go:universe|error",
           "export": "CanonicalError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=Cause",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextCauseDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "ProviderContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
         }
       ]
     },
@@ -580,6 +684,28 @@
         {
           "sourceIdentity": "go:universe|error",
           "export": "CanonicalError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithValue",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithValueDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "ProviderContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
         }
       ]
     },
@@ -1455,6 +1581,28 @@
         {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
           "export": "CanonicalStatFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
+      "sourcePath": "src/internal/facets/provider-os-signal.ts",
+      "export": "OsSignalNotifyContextDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "ProviderContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
         }
       ]
     },
