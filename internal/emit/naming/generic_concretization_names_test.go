@@ -30,19 +30,12 @@ func TestGenericConcretizationInterningUsesSemanticIdentity(t *testing.T) {
 
 	first := newGenericConcretizationForTest(
 		t, owner, types.Typ[types.Int], key,
-		api.GenericConcretizationEffectCanonical,
 	)
 	equivalent := newGenericConcretizationForTest(
 		t, owner, types.Typ[types.Int], key,
-		api.GenericConcretizationEffectCanonical,
 	)
 	conflicting := newGenericConcretizationForTest(
 		t, owner, types.Typ[types.String], key,
-		api.GenericConcretizationEffectCanonical,
-	)
-	synchronous := newGenericConcretizationForTest(
-		t, owner, types.Typ[types.Int], key,
-		api.GenericConcretizationEffectSynchronous,
 	)
 	if first == equivalent {
 		t.Fatal("test requires independently allocated concretizations")
@@ -63,9 +56,6 @@ func TestGenericConcretizationInterningUsesSemanticIdentity(t *testing.T) {
 	if _, err := registry.internGenericConcretization(conflicting, "$string"); err == nil {
 		t.Fatal("same-key concretizations with different arguments were joined")
 	}
-	if _, err := registry.internGenericConcretization(synchronous, "$int$synchronous"); err == nil {
-		t.Fatal("same-key concretizations with different effects were joined")
-	}
 }
 
 func TestConcretizationImportsCannotMaskSameSemanticName(t *testing.T) {
@@ -76,14 +66,12 @@ func TestConcretizationImportsCannotMaskSameSemanticName(t *testing.T) {
 		firstOwner,
 		types.Typ[types.Int],
 		strings.Repeat("a", 64),
-		api.GenericConcretizationEffectCanonical,
 	)
 	second := newGenericConcretizationForTest(
 		t,
 		secondOwner,
 		types.Typ[types.Int],
 		strings.Repeat("b", 64),
-		api.GenericConcretizationEffectCanonical,
 	)
 	registry := NewRegistry()
 	names := testFileNames(
@@ -120,14 +108,12 @@ func TestConcreteInstancesShareTheirSemanticOwnerModule(t *testing.T) {
 		owner,
 		types.Typ[types.Int],
 		strings.Repeat("a", 64),
-		api.GenericConcretizationEffectCanonical,
 	)
 	text := newGenericConcretizationForTest(
 		t,
 		owner,
 		types.Typ[types.String],
 		strings.Repeat("b", 64),
-		api.GenericConcretizationEffectCanonical,
 	)
 	registry := NewRegistry()
 	integerBinding, err := registry.internGenericConcretization(integer, "$int")
@@ -242,7 +228,6 @@ func newGenericConcretizationForTest(
 	owner *types.Func,
 	argument types.Type,
 	key string,
-	effect api.GenericConcretizationEffect,
 ) *api.GenericConcretization {
 	t.Helper()
 	instantiated, err := types.Instantiate(
@@ -258,7 +243,6 @@ func newGenericConcretizationForTest(
 		owner,
 		[]types.Type{argument},
 		instantiated.(*types.Signature),
-		effect,
 		key,
 		api.GeneratedArtifactPlacementCompilation,
 		api.ArtifactOwner{},

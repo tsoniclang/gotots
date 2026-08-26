@@ -160,7 +160,7 @@ func ProviderAssignments() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await ProviderAssignments();
+	typescriptRunner := `const facts = ProviderAssignments();
 console.log(facts);
 `
 	goRunner := `package main
@@ -222,8 +222,8 @@ func main() {
 			if !regexp.MustCompile(
 				`GoProviderState\.\$assign`,
 			).MatchString(artifacts.printed) ||
-				!strings.Contains(artifacts.printed, "CanonicalBufioScanner") {
-				t.Fatalf("scanner assignment lacks its canonical provider state operation")
+				!strings.Contains(artifacts.printed, "DirectBufioScanner") {
+				t.Fatalf("scanner assignment lacks its direct provider state operation")
 			}
 		},
 	)

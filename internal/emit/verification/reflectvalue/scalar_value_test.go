@@ -38,7 +38,7 @@ func Facts() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await Facts();
+	typescriptRunner := `const facts = Facts();
 console.log(facts);
 `
 	goRunner := `package main

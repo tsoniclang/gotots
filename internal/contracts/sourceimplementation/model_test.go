@@ -74,7 +74,7 @@ export type DigestView = { value: Digest };
 			CGOEnabled: false,
 		},
 		Compilation: CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+			Integers: "number", EvaluationOrder: "direct",
 		},
 		Source:   "package.ts",
 		TSConfig: "tsconfig.json",
@@ -104,7 +104,7 @@ export type DigestView = { value: Digest };
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".scratch"),
 		Compilation: CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+			Integers: "number", EvaluationOrder: "direct",
 		},
 		TSGoTool: selectedTSGo,
 	})
@@ -142,7 +142,7 @@ export const Marker = 1;
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".mutation-scratch"),
 		Compilation: CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+			Integers: "number", EvaluationOrder: "direct",
 		},
 		TSGoTool: selectedTSGo,
 	}); err == nil || !strings.Contains(err.Error(), "is executable or unsupported") {

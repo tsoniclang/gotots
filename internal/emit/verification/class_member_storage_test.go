@@ -362,10 +362,10 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 	for _, required := range []string{
 		"export interface GenericValue<T>",
 		"export interface IntValue",
-		"Value(): Awaitable<T>;",
-		"Value(): Awaitable<int32>;",
-		"export async function GenericInterfaceAudit(): Promise<int32>",
-		"const __gotots_argument_0 = await goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value();",
+		"Value(): T;",
+		"Value(): int32;",
+		"export function GenericInterfaceAudit(): int32",
+		"const __gotots_argument_0 = goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value();",
 		"return $go$copy$",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
@@ -374,6 +374,11 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 				required,
 				artifacts.printed,
 			)
+		}
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("generic interface callable family contains %q", forbidden)
 		}
 	}
 	if methods := strings.Count(artifacts.printed, "Value$deferred"); methods != 0 {
@@ -395,9 +400,10 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 	if strings.Contains(artifacts.printed, "$goInterfaceCallable$") {
 		t.Fatal("contract-only interface callable leaked into TypeScript output")
 	}
-	if strings.Contains(artifacts.printed, "Value(): Promise<T>;") ||
-		strings.Contains(artifacts.printed, "Value$cooperative_") {
-		t.Fatal("generic interface retained a callable profile variant")
+	for _, forbidden := range []string{"Value(): Promise<T>;", "Value(): Awaitable<T>;"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatal("generic interface retained an asynchronous callable contract")
+		}
 	}
 	writeProgramFile(
 		t,

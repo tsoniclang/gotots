@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
-	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 )
@@ -81,7 +80,6 @@ func Kind(payload Payload) reflect.Kind {
 		roots = append(roots, root)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {
@@ -131,11 +129,9 @@ func Kind(payload Payload) reflect.Kind {
 			profile.ProtocolVersion(),
 		)
 	}
-	if profile.ConcurrencySemantics() != emit.ConcurrencySemanticsCooperative ||
-		profile.IntegerRepresentation() != emit.IntegerRepresentationNumber {
+	if profile.IntegerRepresentation() != emit.IntegerRepresentationNumber {
 		t.Fatalf(
-			"environment profile compilation facts = %v/%v",
-			profile.ConcurrencySemantics(),
+			"environment profile integer representation = %v",
 			profile.IntegerRepresentation(),
 		)
 	}
@@ -203,28 +199,11 @@ func Kind(payload Payload) reflect.Kind {
 	if search.Route() != environmentcontract.RouteProvider {
 		t.Fatalf("sort.Search route = %v, want provider", search.Route())
 	}
-	foundProfile := false
-	for _, selection := range search.ProviderSelections() {
-		if selection.Kind() == gostdlib.UseSelectionCallableProfile {
-			if key, ok := selection.ProfileKey(); !ok || len(key) != 64 {
-				t.Fatalf("callable-profile selection key = %q/%v", key, ok)
-			}
-			foundProfile = true
-		}
-	}
-	if !foundProfile {
+	if selections := search.ProviderSelections(); len(selections) != 0 {
 		t.Fatalf(
-			"sort.Search provider selections = %v, want typed callable profile",
-			search.ProviderSelections(),
+			"sort.Search provider selections = %v, want direct synchronous binding",
+			selections,
 		)
-	}
-	selections := search.ProviderSelections()
-	if len(selections) != 0 {
-		mutated := search.ProviderSelections()
-		mutated[0] = gostdlib.UseSelection{}
-		if search.ProviderSelections()[0] == (gostdlib.UseSelection{}) {
-			t.Fatal("provider selections exposed mutable backing storage")
-		}
 	}
 	demands := trimSpace.Demands()
 	if len(demands) != 0 {

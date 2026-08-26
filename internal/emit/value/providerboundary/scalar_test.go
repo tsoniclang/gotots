@@ -236,7 +236,6 @@ func TestProviderScalarBoundaryFailsWithoutCertifiedABI(t *testing.T) {
 		scalarBoundaryValues{},
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderDirect,
-		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -293,7 +292,6 @@ func scalarBoundaryContextWithNames(
 		scalarBoundaryValues{},
 		product,
 		api.EvaluationOrderDirect,
-		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)

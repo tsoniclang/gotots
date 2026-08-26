@@ -10,12 +10,12 @@ import type { CancelCauseFunc } from "../src/context.js";
 import type { WalkDirFunc } from "../src/io/fs.js";
 import { RegexpReplaceAllStringFuncCanonical } from "../src/internal/facets/provider-regexp.js";
 import {
-  IoFsFileInfoToDirEntryCanonical,
-  type CanonicalFileInfo,
-} from "../src/internal/facets/provider-io-fs.js";
+  IoFsFileInfoToDirEntryDirect,
+  type ProviderFileInfo,
+} from "../src/internal/facets/provider-io-fs-direct.js";
 import {
-  SortCanonical,
-  type SortInterfaceCanonical,
+  SortDirect,
+  type SortInterfaceDirect,
   SortSearchCanonical,
 } from "../src/internal/facets/provider-sort.js";
 import {
@@ -33,14 +33,6 @@ import { MustCompile } from "../src/regexp.js";
 import { EPERM } from "../src/syscall.js";
 import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 
-interface CanonicalFailure {
-  Error(): string | Promise<string>;
-}
-
-interface CanonicalEntry {
-  Name(): string | Promise<string>;
-}
-
 test("provider named callables keep source arity", () => {
   const cancel: NonNullable<CancelCauseFunc> = () => {};
   const walk: NonNullable<WalkDirFunc> = (
@@ -53,21 +45,21 @@ test("provider named callables keep source arity", () => {
   assert.equal(walk(".", undefined, undefined), undefined);
 });
 
-class CooperativeSortable extends ProviderInterfaceValue implements SortInterfaceCanonical {
+class Sortable extends ProviderInterfaceValue implements SortInterfaceDirect {
   constructor(readonly values: number[]) {
     super(Object.freeze({ comparable: true }));
   }
 
-  async Len(): Promise<int64> {
+  Len(): int64 {
     return integerFromHost(this.values.length);
   }
 
-  async Less(left: int64, right: int64): Promise<boolean> {
+  Less(left: int64, right: int64): boolean {
     return (this.values[hostInteger(left)] ?? 0)
       < (this.values[hostInteger(right)] ?? 0);
   }
 
-  async Swap(left: int64, right: int64): Promise<void> {
+  Swap(left: int64, right: int64): void {
     const leftIndex = hostInteger(left);
     const rightIndex = hostInteger(right);
     const saved = this.values[leftIndex];
@@ -80,65 +72,65 @@ class CooperativeSortable extends ProviderInterfaceValue implements SortInterfac
   }
 }
 
-class CooperativeFileInfo extends ProviderInterfaceValue implements CanonicalFileInfo {
+class FileInfoValue extends ProviderInterfaceValue implements ProviderFileInfo {
   constructor() {
     super(Object.freeze({ comparable: true }));
   }
 
-  async IsDir(): Promise<boolean> {
+  IsDir(): boolean {
     return false;
   }
 
-  async ModTime(): Promise<never> {
+  ModTime(): never {
     throw new Error("unused test method");
   }
 
-  async Mode(): Promise<never> {
+  Mode(): never {
     throw new Error("unused test method");
   }
 
-  async Name(): Promise<string> {
+  Name(): string {
     return "entry";
   }
 
-  async Size(): Promise<int64> {
+  Size(): int64 {
     return 3n;
   }
 
-  async Sys(): Promise<undefined> {
+  Sys(): undefined {
     return undefined;
   }
 }
 
-test("provider callable profiles transport cooperative callbacks", async () => {
+test("provider callable profiles transport callbacks", () => {
   assert.equal(
-    await SortSearchCanonical(8n, async (index): Promise<boolean> => index >= 5n),
+    SortSearchCanonical(8n, (index): boolean => index >= 5n),
     5n,
   );
-  const sortable = new CooperativeSortable([3, 1, 2]);
-  await SortCanonical(sortable);
+  const sortable = new Sortable([3, 1, 2]);
+  SortDirect(sortable);
   assert.deepEqual(sortable.values, [1, 2, 3]);
 
-  const isLetterA = async (rune: number): Promise<boolean> => rune === 97;
-  assert.equal(await StringsContainsFuncCanonical("ba", isLetterA), true);
-  assert.equal(await StringsIndexFuncCanonical("ba", isLetterA), 1n);
-  assert.equal(await StringsLastIndexFuncCanonical("aba", isLetterA), 2n);
+  const isLetterA = (rune: number): boolean => rune === 97;
+  assert.equal(StringsContainsFuncCanonical("ba", isLetterA), true);
+  assert.equal(StringsIndexFuncCanonical("ba", isLetterA), 1n);
+  assert.equal(StringsLastIndexFuncCanonical("aba", isLetterA), 2n);
   assert.equal(
-    await StringsMapCanonical(async (rune) => rune === 97 ? 65 : rune, "ab"),
+    StringsMapCanonical((rune) => rune === 97 ? 65 : rune, "ab"),
     "Ab",
   );
-  assert.equal(await StringsTrimFuncCanonical("aabaa", isLetterA), "b");
-  assert.equal(await StringsTrimLeftFuncCanonical("aab", isLetterA), "b");
-  assert.equal(await StringsTrimRightFuncCanonical("baa", isLetterA), "b");
+  assert.equal(StringsTrimFuncCanonical("aabaa", isLetterA), "b");
+  assert.equal(StringsTrimLeftFuncCanonical("aab", isLetterA), "b");
+  assert.equal(StringsTrimRightFuncCanonical("baa", isLetterA), "b");
   assert.equal(
-    await RegexpReplaceAllStringFuncCanonical(
+    RegexpReplaceAllStringFuncCanonical(
       MustCompile("[0-9]+"),
       "a1b22",
-      async (match) => `[${match}]`,
+      (match) => `[${match}]`,
     ),
     "a[1]b[22]",
   );
-  const entry = IoFsFileInfoToDirEntryCanonical(new CooperativeFileInfo(), []);
-  assert.equal(await entry?.Name(), "entry");
+  const entry = IoFsFileInfoToDirEntryDirect(new FileInfoValue(), []);
+  assert.equal(entry?.Name(), "entry");
   assert.equal(SyscallErrnoIsCanonical(EPERM, permission), true);
 });

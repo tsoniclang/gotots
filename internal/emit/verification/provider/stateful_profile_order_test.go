@@ -53,7 +53,6 @@ func Consume() bool {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -91,19 +90,23 @@ func Consume() bool {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Consume"},
-		`console.log(await Consume());
+		`console.log(Consume());
 `,
 	)
-	if !strings.Contains(artifacts.printed, "CanonicalBufioReader") {
-		t.Fatalf("canonical cooperative provider state is absent:\n%s", artifacts.printed)
+	if !strings.Contains(artifacts.printed, "DirectBufioReader") {
+		t.Fatalf("direct provider state is absent:\n%s", artifacts.printed)
 	}
 	for _, forbidden := range []string{
 		"CanonicalReaderSync",
 		"CanonicalReaderAsync",
 		"bufio__from_gostdlib.NewReader(",
+		"async ",
+		"await ",
+		"Promise<",
+		"Awaitable<",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
-			t.Fatalf("cooperative state profile contains stale path %q:\n%s", forbidden, artifacts.printed)
+			t.Fatalf("synchronous state profile contains stale path %q:\n%s", forbidden, artifacts.printed)
 		}
 	}
 }

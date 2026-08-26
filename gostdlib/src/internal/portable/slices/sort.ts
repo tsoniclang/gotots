@@ -1,4 +1,4 @@
-import type { Awaitable, int64 } from "@gotots/gostdlib/internal/scalars.js";
+import type { int64 } from "@gotots/gostdlib/internal/scalars.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { hostInteger } from "../../host-integer.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
@@ -14,10 +14,7 @@ import {
   storeElement,
   type ToContainerStorage,
 } from "./capabilities.js";
-import { callComparison } from "./read.js";
-
-type Comparison<T> = ((left: T, right: T) => Awaitable<int64>) | undefined;
-type SynchronousComparison<T> = ((left: T, right: T) => int64) | undefined;
+type Comparison<T> = ((left: T, right: T) => int64) | undefined;
 
 function denseElement<T>(values: readonly T[], index: number): T {
   if (!(index in values)) {
@@ -46,18 +43,18 @@ export function Sort<S, E, EStorage>(
   );
 }
 
-export async function SortFunc<S, E, EStorage>(
+export function SortFunc<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   copyElement: CopyValue<E>,
   fromStorage: FromContainerStorage<E, EStorage>,
   toStorage: ToContainerStorage<E, EStorage>,
   source: S,
   compare: Comparison<E>,
-): Promise<void> {
+): void {
   const values = toSlice(source);
   writeSorted(
     values,
-    await sortValues(
+    sortValues(
       logicalValues(values, copyElement, fromStorage),
       compare,
     ),
@@ -66,53 +63,15 @@ export async function SortFunc<S, E, EStorage>(
   );
 }
 
-export async function SortStableFunc<S, E, EStorage>(
+export function SortStableFunc<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   copyElement: CopyValue<E>,
   fromStorage: FromContainerStorage<E, EStorage>,
   toStorage: ToContainerStorage<E, EStorage>,
   source: S,
   compare: Comparison<E>,
-): Promise<void> {
-  await SortFunc(
-    toSlice,
-    copyElement,
-    fromStorage,
-    toStorage,
-    source,
-    compare,
-  );
-}
-
-export function SortFuncSynchronous<S, E, EStorage>(
-  toSlice: Convert<S, RuntimeSlice<EStorage>>,
-  copyElement: CopyValue<E>,
-  fromStorage: FromContainerStorage<E, EStorage>,
-  toStorage: ToContainerStorage<E, EStorage>,
-  source: S,
-  compare: SynchronousComparison<E>,
 ): void {
-  const values = toSlice(source);
-  writeSorted(
-    values,
-    sortValuesSynchronous(
-      logicalValues(values, copyElement, fromStorage),
-      compare,
-    ),
-    copyElement,
-    toStorage,
-  );
-}
-
-export function SortStableFuncSynchronous<S, E, EStorage>(
-  toSlice: Convert<S, RuntimeSlice<EStorage>>,
-  copyElement: CopyValue<E>,
-  fromStorage: FromContainerStorage<E, EStorage>,
-  toStorage: ToContainerStorage<E, EStorage>,
-  source: S,
-  compare: SynchronousComparison<E>,
-): void {
-  SortFuncSynchronous(
+  SortFunc(
     toSlice,
     copyElement,
     fromStorage,
@@ -158,53 +117,9 @@ function writeSorted<E, EStorage>(
   }
 }
 
-export async function sortValues<E>(
-  values: readonly E[],
-  compare: Comparison<E>,
-): Promise<E[]> {
-  if (values.length < 2) {
-    return [...values];
-  }
-  let source = [...values];
-  let target = new Array<E>(values.length);
-  for (let width = 1; width < values.length; width *= 2) {
-    for (let start = 0; start < values.length; start += width * 2) {
-      const middle = Math.min(start + width, values.length);
-      const end = Math.min(start + width * 2, values.length);
-      let left = start;
-      let right = middle;
-      let output = start;
-      while (left < middle && right < end) {
-        const leftValue = denseElement(source, left);
-        const rightValue = denseElement(source, right);
-        if (await callComparison(compare, leftValue, rightValue) <= 0n) {
-          target[output] = leftValue;
-          left += 1;
-        } else {
-          target[output] = rightValue;
-          right += 1;
-        }
-        output += 1;
-      }
-      while (left < middle) {
-        target[output] = denseElement(source, left);
-        left += 1;
-        output += 1;
-      }
-      while (right < end) {
-        target[output] = denseElement(source, right);
-        right += 1;
-        output += 1;
-      }
-    }
-    [source, target] = [target, source];
-  }
-  return source;
-}
-
-export function sortValuesSynchronous<E>(
-  values: readonly E[],
-  compare: SynchronousComparison<E>,
+export function sortValues<E>(
+	values: readonly E[],
+	compare: Comparison<E>,
 ): E[] {
   if (values.length < 2) {
     return [...values];

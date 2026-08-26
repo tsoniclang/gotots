@@ -22,7 +22,6 @@ func TestRuntimeSliceProjectionPreservesBidirectionalAlias(t *testing.T) {
 	assembled, err := runtimeemission.AssemblePackage(
 		tsgo.NewFactory(),
 		abi,
-		api.ConcurrencySemanticsDisabled,
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeSliceProjection:   {},
 			api.RuntimeSliceAddress:      {},

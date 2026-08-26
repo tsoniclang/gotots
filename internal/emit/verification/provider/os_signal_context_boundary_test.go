@@ -66,7 +66,6 @@ var _ context.Context = (*fixedContext)(nil)
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	// The context formatting family is implemented: the NotifyContext
 	// construction chain compiles through the used-provider closure with

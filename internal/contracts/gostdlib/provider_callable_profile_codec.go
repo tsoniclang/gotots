@@ -183,7 +183,6 @@ func validateProviderCallableProfile(
 	if err := validateCallableParameters(
 		profile.CallableParameters,
 		field+".callableParameters",
-		false,
 	); err != nil {
 		return err
 	}
@@ -325,22 +324,17 @@ func providerProfileBoundaryEffect(
 				interfaceIndex,
 				methodIndex,
 			)
-			if method.Effect != EffectSynchronous && method.Effect != EffectAwaitable {
+			if !method.Effect.Valid() {
 				return EffectInvalid, manifestError(
 					methodField,
-					"transported method is neither direct nor awaitable",
+					"transported method is not synchronous",
 				)
 			}
 			if effect == EffectInvalid {
 				effect = method.Effect
 				continue
 			}
-			if method.Effect != effect {
-				return EffectInvalid, manifestError(
-					field+".interfaces",
-					"profile mixes direct and cooperative transported methods",
-				)
-			}
+			effect = EffectSynchronous
 		}
 	}
 	for index, callable := range callables {
@@ -349,22 +343,17 @@ func providerProfileBoundaryEffect(
 			field,
 			index,
 		)
-		if callable.Effect != EffectSynchronous && callable.Effect != EffectAwaitable {
+		if !callable.Effect.Valid() {
 			return EffectInvalid, manifestError(
 				callableField,
-				"transported callable is neither direct nor awaitable",
+				"transported callable is not synchronous",
 			)
 		}
 		if effect == EffectInvalid {
 			effect = callable.Effect
 			continue
 		}
-		if callable.Effect != effect {
-			return EffectInvalid, manifestError(
-				field,
-				"profile mixes direct and cooperative transported callables",
-			)
-		}
+		effect = EffectSynchronous
 	}
 	if effect == EffectInvalid {
 		return EffectInvalid, manifestError(

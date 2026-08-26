@@ -4,7 +4,6 @@ import type {
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
-  Awaitable,
   bool,
   gostring,
   int,
@@ -41,11 +40,6 @@ type ReplacementPlan = {
 let createRegexp: (pattern: CompiledPattern) => Regexp;
 let copyRegexpRepresentation: (source: Regexp) => Regexp;
 let assignRegexpRepresentation: (target: Regexp, source: Regexp) => void;
-let replaceAllStringFuncCooperative: (
-  receiver: Regexp | undefined,
-  source: gostring,
-  replacement: ((match: gostring) => Awaitable<gostring>) | undefined,
-) => Promise<gostring>;
 
 export class Regexp {
   #pattern: CompiledPattern;
@@ -59,22 +53,6 @@ export class Regexp {
     copyRegexpRepresentation = (source): Regexp => new Regexp(source.#pattern);
     assignRegexpRepresentation = (target, source): void => {
       target.#pattern = source.#pattern;
-    };
-    replaceAllStringFuncCooperative = async (
-      receiver,
-      source,
-      replacement,
-    ): Promise<gostring> => {
-      const regexp = requireRegexp(receiver);
-      let result = "";
-      const plan = regexp.#replacementPlan(source);
-      for (const part of plan.parts) {
-        if (replacement === undefined) {
-          GoPanic.raiseRuntime("call of nil replacement function");
-        }
-        result += part.prefix + await replacement(part.match);
-      }
-      return result + plan.suffix;
     };
   }
 
@@ -261,8 +239,6 @@ export class Regexp {
     return result;
   }
 }
-
-export { replaceAllStringFuncCooperative as ReplaceAllStringFuncCooperative };
 
 export function regexpRepresentationCopy(source: Regexp): Regexp {
   return copyRegexpRepresentation(source);

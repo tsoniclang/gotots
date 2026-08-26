@@ -10,11 +10,9 @@ import (
 
 func ConcretizationSuffix(
 	arguments []types.Type,
-	synchronous bool,
 ) (string, error) {
 	return concretizationSuffix(
 		arguments,
-		synchronous,
 		typeIdentityResolver{},
 	)
 }

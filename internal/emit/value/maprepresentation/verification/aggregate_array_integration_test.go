@@ -148,7 +148,6 @@ func productionAggregateContext(
 		representation.Owner{},
 		integer,
 		api.EvaluationOrderPreserveGo,
-		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -32,26 +32,13 @@ func emitCallableVariants(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-	facet, err := api.NewSourceCallableFacet(function)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	cooperative, err := cooperativeRequirement(
-		context,
-		facet,
-		requirements,
-	)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
 	target, err := emitCallableVariant(
-		context.WithCooperativeCallable(facet, cooperative),
+		context,
 		children,
 		source,
 		function,
 		signature,
 		requirements,
-		cooperative,
 		kernel,
 	)
 	if err != nil {
@@ -95,7 +82,6 @@ func emitCallableVariant(
 	function *types.Func,
 	signature *types.Signature,
 	requirements []api.DeclarationRequirement,
-	cooperative bool,
 	kernel bool,
 ) (callableVariantEmission, error) {
 	moduleFunction := signature.Recv() == nil
@@ -317,16 +303,6 @@ func emitCallableVariant(
 		}
 	}
 	resultType := targetSignature.Result()
-	if cooperative {
-		modifiers = append(
-			modifiers,
-			context.Factory().AsyncKeyword(),
-		)
-		resultType = callable.PromiseResult(
-			context.Factory(),
-			resultType,
-		)
-	}
 	requests := api.CombineRequests(
 		parameterRequests,
 		body.Requests(),
@@ -447,12 +423,6 @@ func emitCallableVariant(
 		}
 		deferredModifiers := []tsgo.ModifierLike{
 			context.Factory().ExportKeyword(),
-		}
-		if cooperative {
-			deferredModifiers = append(
-				deferredModifiers,
-				context.Factory().AsyncKeyword(),
-			)
 		}
 		target.statements = []tsgo.Statement{
 			context.Factory().FunctionDeclaration(

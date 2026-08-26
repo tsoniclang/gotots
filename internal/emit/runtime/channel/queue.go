@@ -9,17 +9,7 @@ func (b builder) sendReadyMethod() tsgo.MethodDeclaration {
 		nil,
 		b.booleanType(),
 		b.returnStatement(b.logicalOr(
-			b.logicalOr(
-				b.thisProperty("closed"),
-				b.binary(
-					b.property(
-						b.thisProperty("receivers"),
-						"size",
-					),
-					tsgo.BinaryOperatorGreaterThanToken,
-					b.number("0"),
-				),
-			),
+			b.thisProperty("closed"),
 			b.binary(
 				b.liveLength("buffer", "bufferHead"),
 				tsgo.BinaryOperatorLessThanToken,
@@ -36,20 +26,10 @@ func (b builder) receiveReadyMethod() tsgo.MethodDeclaration {
 		nil,
 		b.booleanType(),
 		b.returnStatement(b.logicalOr(
-			b.logicalOr(
-				b.binary(
-					b.liveLength("buffer", "bufferHead"),
-					tsgo.BinaryOperatorGreaterThanToken,
-					b.number("0"),
-				),
-				b.binary(
-					b.property(
-						b.thisProperty("senders"),
-						"size",
-					),
-					tsgo.BinaryOperatorGreaterThanToken,
-					b.number("0"),
-				),
+			b.binary(
+				b.liveLength("buffer", "bufferHead"),
+				tsgo.BinaryOperatorGreaterThanToken,
+				b.number("0"),
 			),
 			b.thisProperty("closed"),
 		)),

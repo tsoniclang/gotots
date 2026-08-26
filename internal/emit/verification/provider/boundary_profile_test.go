@@ -95,7 +95,6 @@ func NilConstructed() bool { return bufio.NewReader(nil) != nil }
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -130,25 +129,32 @@ func NilConstructed() bool { return bufio.NewReader(nil) != nil }
 		assemblyPath,
 		[]string{"NilConstructed", "NoProgress", "Run"},
 		`for (const input of ["alpha\nrest", "tail"]) {
-  const [line, failure] = await Run(input);
-  console.log(JSON.stringify(line) + " " + JSON.stringify(failure));
-}
-console.log(await NoProgress());
-console.log(await NilConstructed());
-`,
+	  const [line, failure] = Run(input);
+	  console.log(JSON.stringify(line) + " " + JSON.stringify(failure));
+	}
+	console.log(NoProgress());
+	console.log(NilConstructed());
+	`,
 	)
 	for _, required := range []string{
-		"CanonicalBufioReader",
-		"await",
+		"DirectBufioReader",
 		"ReadBytes",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("stateful profile output lacks %q:\n%s", required, artifacts.printed)
 		}
 	}
-	if strings.Contains(artifacts.printed, "CanonicalReaderSync") ||
-		strings.Contains(artifacts.printed, "CanonicalReaderAsync") {
-		t.Fatalf("cooperative profile retained a reader permutation:\n%s", artifacts.printed)
+	for _, forbidden := range []string{
+		"CanonicalReaderSync",
+		"CanonicalReaderAsync",
+		"async ",
+		"await ",
+		"Promise<",
+		"Awaitable<",
+	} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("synchronous reader output contains %q", forbidden)
+		}
 	}
 	if strings.Contains(artifacts.printed, "BufioReaderRead") {
 		t.Fatal("stateful reader adapter retained the ordinary recovery target")
@@ -273,7 +279,6 @@ func Visit(fileSystem fs.FS, callback fs.WalkDirFunc) error {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -311,15 +316,15 @@ func Visit(fileSystem fs.FS, callback fs.WalkDirFunc) error {
 			artifacts.printed,
 		)
 	}
-	if !strings.Contains(artifacts.printed, "IoFsReadFileCanonical") {
-		t.Fatalf("canonical fs.ReadFile boundary is absent:\n%s", artifacts.printed)
+	if !strings.Contains(artifacts.printed, "IoFsReadFileDirect") {
+		t.Fatalf("direct fs.ReadFile boundary is absent:\n%s", artifacts.printed)
 	}
-	if !strings.Contains(artifacts.printed, "IoFsStatCanonical") {
-		t.Fatalf("canonical fs.Stat boundary is absent:\n%s", artifacts.printed)
+	if !strings.Contains(artifacts.printed, "IoFsStatDirect") {
+		t.Fatalf("direct fs.Stat boundary is absent:\n%s", artifacts.printed)
 	}
-	if !strings.Contains(artifacts.printed, "IoFsWalkDirCanonical") ||
+	if !strings.Contains(artifacts.printed, "IoFsWalkDirDirect") ||
 		strings.Contains(artifacts.printed, "fs__from_gostdlib.WalkDirFunc") {
-		t.Fatalf("canonical fs.WalkDir callable boundary is absent:\n%s", artifacts.printed)
+		t.Fatalf("direct fs.WalkDir callable boundary is absent:\n%s", artifacts.printed)
 	}
 	if !strings.Contains(artifacts.printed, "new RuntimeSliceProjection<") ||
 		!strings.Contains(artifacts.printed, "this.$go$value.ReadDir(") {
@@ -330,7 +335,7 @@ func Visit(fileSystem fs.FS, callback fs.WalkDirFunc) error {
 	}
 }
 
-func TestDisabledRequiredProviderProfileSelectsDirectCarrier(t *testing.T) {
+func TestRequiredProviderProfileSelectsDirectCarrier(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
@@ -365,7 +370,6 @@ func Cause() error {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsDisabled
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -389,7 +393,7 @@ func Cause() error {
 	}
 }
 
-func TestProviderCallableProfileWithoutInterfaceContract(t *testing.T) {
+func TestDirectProviderCallbackNeedsNoCallableProfile(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
@@ -421,7 +425,6 @@ func Transform(input string) string {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -453,12 +456,22 @@ func Transform(input string) string {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Transform"},
-		`console.log(JSON.stringify(await Transform("ab")));
-`,
+		`console.log(JSON.stringify(Transform("ab")));
+	`,
 	)
-	if !strings.Contains(artifacts.printed, "StringsMapCanonical") ||
-		!strings.Contains(artifacts.printed, "await") {
-		t.Fatalf("callable-only provider profile was not selected:\n%s", artifacts.printed)
+	if !strings.Contains(artifacts.printed, "strings__from_gostdlib.Map(") {
+		t.Fatalf("direct provider callback binding is absent:\n%s", artifacts.printed)
+	}
+	for _, forbidden := range []string{
+		"StringsMapCanonical",
+		"async ",
+		"await ",
+		"Promise<",
+		"Awaitable<",
+	} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("direct provider callback output contains %q", forbidden)
+		}
 	}
 }
 
@@ -498,7 +511,6 @@ func FirstInt64() int64 {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -540,7 +552,7 @@ func FirstInt64() int64 {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"FirstInt", "FirstInt64"},
-		`console.log((await FirstInt()) + "|" + (await FirstInt64()));
+		`console.log(FirstInt() + "|" + FirstInt64());
 `,
 	)
 	for _, required := range []string{

@@ -1,113 +1,12 @@
-import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { bool, gostring } from "@gotots/gostdlib/internal/scalars.js";
 
-import type {
-  CanonicalReader,
-  ProviderReaderInterface,
-} from "./provider-io-contract.js";
+import { ScannerState } from "../portable/io/scanner.js";
+import type { ProviderReaderInterface } from "./provider-io-contract.js";
 import type { ProviderErrorInterface } from "./provider-error.js";
-import {
-  ScannerState,
-  scannerReadBuffer,
-} from "../portable/io/scanner.js";
 
-export type {
-  CanonicalError,
-  CanonicalReader,
-  ProviderReaderInterface,
-} from "./provider-io-contract.js";
+export type { ProviderReaderInterface } from "./provider-io-contract.js";
 export type { ProviderErrorInterface } from "./provider-error.js";
-
-export class CanonicalBufioScanner<
-  Failure extends GoInterfaceValue,
-  Source extends CanonicalReader<Failure>,
-> {
-  #badReadCount: Failure;
-  #eof: Failure;
-  #noProgress: Failure;
-  #source: Source | undefined;
-  #state: ScannerState<Failure>;
-  #tooLong: Failure;
-
-  constructor(
-    source: Source | undefined,
-    badReadCount: Failure,
-    tooLong: Failure,
-    eof: Failure,
-    noProgress: Failure,
-  ) {
-    this.#badReadCount = badReadCount;
-    this.#tooLong = tooLong;
-    this.#eof = eof;
-    this.#noProgress = noProgress;
-    this.#source = source;
-    this.#state = new ScannerState(badReadCount, tooLong, eof, noProgress);
-  }
-
-  static $copy<Failure extends GoInterfaceValue, Source extends CanonicalReader<Failure>>(
-    source: CanonicalBufioScanner<Failure, Source>,
-  ): CanonicalBufioScanner<Failure, Source> {
-    const target = new CanonicalBufioScanner(
-      source.#source,
-      source.#badReadCount,
-      source.#tooLong,
-      source.#eof,
-      source.#noProgress,
-    );
-    target.#state = source.#state.copy();
-    return target;
-  }
-
-  static $assign<Failure extends GoInterfaceValue, Source extends CanonicalReader<Failure>>(
-    target: CanonicalBufioScanner<Failure, Source>,
-    source: CanonicalBufioScanner<Failure, Source>,
-  ): void {
-    target.#badReadCount = source.#badReadCount;
-    target.#tooLong = source.#tooLong;
-    target.#eof = source.#eof;
-    target.#noProgress = source.#noProgress;
-    target.#source = source.#source;
-    target.#state = source.#state.copy();
-  }
-
-  static Err<Failure extends GoInterfaceValue, Source extends CanonicalReader<Failure>>(
-    receiver: CanonicalBufioScanner<Failure, Source> | undefined,
-  ): Failure | undefined {
-    return requireScanner(receiver).Err();
-  }
-
-  static Scan<Failure extends GoInterfaceValue, Source extends CanonicalReader<Failure>>(
-    receiver: CanonicalBufioScanner<Failure, Source> | undefined,
-  ): Promise<bool> {
-    return requireScanner(receiver).Scan();
-  }
-
-  static Text<Failure extends GoInterfaceValue, Source extends CanonicalReader<Failure>>(
-    receiver: CanonicalBufioScanner<Failure, Source> | undefined,
-  ): gostring {
-    return requireScanner(receiver).Text();
-  }
-
-  Err(): Failure | undefined {
-    return this.#state.Err();
-  }
-
-  async Scan(): Promise<bool> {
-    for (;;) {
-      const step = this.#state.Next();
-      if (step.kind === "result") {
-        return step.value;
-      }
-      const [count, failure] = await requireSource(this.#source).Read(step.target);
-      this.#state.AcceptRead(step.target, count, failure);
-    }
-  }
-
-  Text(): gostring {
-    return this.#state.Text();
-  }
-}
 
 export class DirectBufioScanner<
   Failure extends ProviderErrorInterface,
@@ -173,7 +72,7 @@ export class DirectBufioScanner<
   >(
     receiver: DirectBufioScanner<Failure, Source> | undefined,
   ): Failure | undefined {
-    return requireDirectScanner(receiver).Err();
+    return requireScanner(receiver).Err();
   }
 
   static Scan<
@@ -182,7 +81,7 @@ export class DirectBufioScanner<
   >(
     receiver: DirectBufioScanner<Failure, Source> | undefined,
   ): bool {
-    return requireDirectScanner(receiver).Scan();
+    return requireScanner(receiver).Scan();
   }
 
   static Text<
@@ -191,7 +90,7 @@ export class DirectBufioScanner<
   >(
     receiver: DirectBufioScanner<Failure, Source> | undefined,
   ): gostring {
-    return requireDirectScanner(receiver).Text();
+    return requireScanner(receiver).Text();
   }
 
   Err(): Failure | undefined {
@@ -216,42 +115,23 @@ export class DirectBufioScanner<
 
 export class BufioScannerOperations {
   static $copy<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReader<Failure>,
+    Failure extends ProviderErrorInterface,
+    Source extends ProviderReaderInterface<Failure>,
   >(
-    source: CanonicalBufioScanner<Failure, Source>,
-  ): CanonicalBufioScanner<Failure, Source> {
-    return CanonicalBufioScanner.$copy(source);
+    source: DirectBufioScanner<Failure, Source>,
+  ): DirectBufioScanner<Failure, Source> {
+    return DirectBufioScanner.$copy(source);
   }
 
   static $assign<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReader<Failure>,
+    Failure extends ProviderErrorInterface,
+    Source extends ProviderReaderInterface<Failure>,
   >(
-    target: CanonicalBufioScanner<Failure, Source>,
-    source: CanonicalBufioScanner<Failure, Source>,
+    target: DirectBufioScanner<Failure, Source>,
+    source: DirectBufioScanner<Failure, Source>,
   ): void {
-    CanonicalBufioScanner.$assign(target, source);
+    DirectBufioScanner.$assign(target, source);
   }
-}
-
-export function NewScannerCanonical<
-  Failure extends GoInterfaceValue,
-  Source extends CanonicalReader<Failure>,
->(
-  source: Source | undefined,
-  badReadCount: Failure | undefined,
-  tooLong: Failure | undefined,
-  eof: Failure | undefined,
-  noProgress: Failure | undefined,
-): CanonicalBufioScanner<Failure, Source> {
-  return new CanonicalBufioScanner(
-    source,
-    requireFailure(badReadCount),
-    requireFailure(tooLong),
-    requireFailure(eof),
-    requireFailure(noProgress),
-  );
 }
 
 export function NewScannerDirect<
@@ -288,18 +168,6 @@ function requireSource<Source>(source: Source | undefined): Source {
 }
 
 function requireScanner<
-  Failure extends GoInterfaceValue,
-  Source extends CanonicalReader<Failure>,
->(
-  receiver: CanonicalBufioScanner<Failure, Source> | undefined,
-): CanonicalBufioScanner<Failure, Source> {
-  if (receiver === undefined) {
-    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
-  }
-  return receiver;
-}
-
-function requireDirectScanner<
   Failure extends ProviderErrorInterface,
   Source extends ProviderReaderInterface<Failure>,
 >(

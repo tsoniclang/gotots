@@ -1,8 +1,6 @@
 package api
 
 import (
-	"fmt"
-	"go/ast"
 	"go/types"
 	"slices"
 
@@ -153,19 +151,6 @@ func (r GenericOperationReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
 }
 
-type CooperativeCallableResolver interface {
-	ObserveCooperativeCallable(
-		Context,
-		CallableFacet,
-	) (CooperativeCallableObservation, error)
-	ExactCallableFieldAssignments(*types.Var) ([]ast.Expr, bool)
-}
-
-type CooperativeCallableObservation struct {
-	cooperative bool
-	requests    []RootRequest
-}
-
 type ExternalFunctionTargetKind uint8
 
 const (
@@ -250,127 +235,10 @@ func (c Context) ResolveExternalFunction(
 	return c.externalFunctionResolver.ResolveExternalFunction(function)
 }
 
-func NewCooperativeCallableObservation(
-	cooperative bool,
-	requests ...RootRequest,
-) (CooperativeCallableObservation, error) {
-	if err := validateReferenceRequests(requests); err != nil {
-		return CooperativeCallableObservation{}, &RootRequestError{
-			Reason: "cooperative callable observation has an invalid request",
-		}
-	}
-	return CooperativeCallableObservation{
-		cooperative: cooperative,
-		requests:    slices.Clone(requests),
-	}, nil
-}
-
-func (o CooperativeCallableObservation) Cooperative() bool {
-	return o.cooperative
-}
-
-func (o CooperativeCallableObservation) Requests() []RootRequest {
-	return slices.Clone(o.requests)
-}
-
 func validateReferenceRequests(requests []RootRequest) error {
 	return WalkUniqueRootRequestPayloads(requests, func(RootRequest) error {
 		return nil
 	})
-}
-
-func (c Context) WithCooperativeCallableResolver(
-	resolver CooperativeCallableResolver,
-) Context {
-	if resolver == nil {
-		panic("cooperative callable resolver is nil")
-	}
-	c.cooperativeResolver = resolver
-	return c
-}
-
-func (c Context) WithCooperativeCallable(
-	facet CallableFacet,
-	cooperative bool,
-) Context {
-	if !facet.Valid() || facet.Owner() != c.artifactOwner {
-		panic("cooperative callable facet is inconsistent")
-	}
-	c.callableFacet = facet
-	c.cooperative = cooperative
-	return c
-}
-
-func (c Context) WithCooperativeCallableABI(
-	facet CallableFacet,
-	cooperative bool,
-) Context {
-	if !c.artifactOwner.Valid() ||
-		!facet.Valid() ||
-		facet.Kind() != CallableFacetABI {
-		panic("cooperative callable ABI boundary is invalid")
-	}
-	c.callableFacet = facet
-	c.cooperative = cooperative
-	return c
-}
-
-func (c Context) CallableABIFacet(
-	reference CallableABIReference,
-) (CallableFacet, error) {
-	return NewCallableABIFacet(reference.Artifact())
-}
-
-func (c Context) IsCooperative() bool {
-	return c.cooperative
-}
-
-func (c Context) ObserveCooperativeCallable(
-	facet CallableFacet,
-) (CooperativeCallableObservation, error) {
-	if c.cooperativeResolver == nil {
-		return CooperativeCallableObservation{}, &ContextError{
-			Reason: "cooperative callable resolver is unavailable",
-		}
-	}
-	if !facet.Valid() {
-		return CooperativeCallableObservation{}, &ContextError{
-			Reason: "cooperative callable facet is invalid",
-		}
-	}
-	if !c.artifactOwner.Valid() {
-		return CooperativeCallableObservation{}, &ContextError{
-			Reason: "cooperative callable consumer has no artifact owner",
-		}
-	}
-	return c.cooperativeResolver.ObserveCooperativeCallable(
-		c,
-		facet,
-	)
-}
-
-func (c Context) ExactCallableFieldAssignments(
-	field *types.Var,
-) ([]ast.Expr, bool) {
-	if c.cooperativeResolver == nil || field == nil {
-		return nil, false
-	}
-	assignments, exact :=
-		c.cooperativeResolver.ExactCallableFieldAssignments(field)
-	return slices.Clone(assignments), exact
-}
-
-func (c Context) CooperativeRequest() (RootRequest, error) {
-	if !c.callableFacet.Valid() {
-		return RootRequest{}, &ContextError{
-			Reason: fmt.Sprintf(
-				"cooperative operation in %s (%s) has no callable facet",
-				c.artifactOwner.Name(),
-				c.role,
-			),
-		}
-	}
-	return NewCooperativeCallableRequest(c.callableFacet)
 }
 
 func (c Context) WithStaticallySelectedCallable() Context {

@@ -1,5 +1,3 @@
-export type Awaitable<T> = T | Promise<T>;
-
 export type bool = boolean;
 export type int8 = number;
 export type int16 = number;

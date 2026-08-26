@@ -87,10 +87,8 @@ hash or package suffixes to every ordinary generated reference.
 Target host intrinsics have one closed identity owner. Value references use
 `globalThis.<name>`, so a valid Go declaration such as
 `func String(string) Token` keeps its source-shaped name without shadowing the
-target `String.fromCharCode` used by an unrelated conversion. Host type names
-remain idiomatic when TypeScript defines an unambiguous global type: generated
-async signatures use `Promise<T>`, and a conflicting Go type declaration is
-deterministically target-renamed. TypeScript's forbidden target class name
+target `String.fromCharCode` used by an unrelated conversion. Source callables
+never emit the host `Promise` type. TypeScript's forbidden target class name
 `Object` is reserved by the same closed owner. Bare host value intrinsics are
 forbidden in source-facing generated modules. A structurally isolated support
 or runtime module that admits no Go declaration may use the direct host
@@ -731,8 +729,8 @@ constant-size member calls; implementer switches are forbidden.
 Every generated root class, including the canonical interface-value contract,
 declares the erased nominal member
 `declare private readonly then?: never`. JavaScript therefore cannot mistake a
-generated Go value for a Promise-like value when it crosses an `async` return
-boundary, while structural TypeScript values cannot claim the guarantee. The
+generated Go value for a Promise-like value when a host Promise resolves it,
+while structural TypeScript values cannot claim the guarantee. The
 declaration emits no JavaScript field. Generated derived classes inherit the
 one root declaration and never redeclare its private member. A source Go method
 named `then` is unexported and keeps its package-qualified target member
@@ -1114,53 +1112,28 @@ entry, while absence uses the ordinary provider callable.
 
 ### Channels, Goroutines, And Select
 
-Under `disabled`, channel types retain the same typed runtime identity, but
-execution is serial. A goroutine call is emitted as a direct call; ready
-buffered send/receive and ready/default select complete synchronously. A nil,
-unbuffered, full, empty, or otherwise unready operation that would suspend
-raises the exact synchronous-blocking boundary instead of fabricating progress.
-That language-concurrency path emits no `Promise`, `async`, `await`, scheduler,
-or host task. Explicit event-based provider APIs such as timers retain their
-separately certified host behavior without changing the source call's direct
+Channel types use one typed runtime identity under fixed serial execution. A
+goroutine call is emitted as a direct call; ready buffered send/receive and
+ready/default select complete synchronously. A nil, unbuffered, full, empty, or
+otherwise unready operation that would suspend raises the typed
+serial-blocking panic instead of fabricating progress. The language path emits
+no `Promise`, `async`, `await`, scheduler, waiter queue, or host task.
+Explicit event-based provider APIs such as timers retain their separately
+certified host callback behavior without changing the source call's direct
 signature.
 
-The same profile decision owns the complete callable surface. Source functions,
-methods, literals, callable values, interface methods, generated callable
-contracts, package initializers, provider facades, and selected generic kernels
-all have direct synchronous signatures at construction. Provider bindings and
-stateful profiles are selected by exact certified identity and must report a
-synchronous effect. A suspending provider path fails before publication; no
-consumer repairs a Promise-bearing declaration or call afterward.
+Source functions, methods, literals, callable values, interface methods,
+generated callable contracts, package initializers, provider facades, and
+selected generic kernels all have direct synchronous signatures at
+construction. Provider bindings and stateful profiles are selected by exact
+certified identity and must report a synchronous effect. A suspending provider
+path fails before publication; no consumer repairs its declaration or call.
 
-When a stateful provider type retains interface-typed state, each execution
-profile has its own certified target class and constructor profile. For
-example, disabled `bufio.NewWriter(w)` selects a class whose `Write` and
-`Flush` methods and retained `io.Writer`/`error` contracts are synchronous;
-cooperative compilation selects the awaitable class. Both may share private
-state algorithms, but neither exposes a union effect and neither is selected
-by target spelling.
-
-Under `cooperative`, channel send/receive and blocking select lower to typed
-Promise operations. Direct call effects propagate through revisable callable
-facets. Function values and interface methods use canonical
-`Awaitable<R>` results and are unconditionally awaited.
-
-```go
-func Consume(next func() int) int { return next() }
-```
-
-maps in the cooperative profile to:
-
-```ts
-export async function Consume(
-  next: () => Awaitable<int>,
-): Promise<int> {
-  return await next();
-}
-```
-
-The source still has one parameter. No synchronous/cooperative public variants,
-hidden effect parameters, or runtime Promise tests exist.
+When a stateful provider type retains interface-typed state, it has one
+certified synchronous target class and constructor profile. For example,
+`bufio.NewWriter(w)` selects a class whose `Write` and `Flush` methods and
+retained `io.Writer`/`error` contracts are synchronous. It has no awaitable
+sibling and is never selected by target spelling.
 
 Every possibly nil function value is evaluated once, its arguments are then
 evaluated in source order, and one generic runtime check returns the identical
@@ -1181,10 +1154,10 @@ dispatch, or result adaptation. Statically non-nil declarations and literals
 call directly. A conditional, assertion, or alternate nil-call path is
 forbidden.
 
-`go f(args)` captures/copies immediately and schedules one closure. `select`
-evaluates operands once, chooses a ready case fairly, commits once, and
-cancels every other registration. Receive assignment targets are evaluated
-only after their case wins.
+`go f(args)` evaluates/copies its callee and arguments immediately, then invokes
+the call on the current stack. `select` evaluates operands once, chooses one
+ready case fairly, and commits it once. It installs no registrations. Receive
+assignment targets are evaluated only after their case wins.
 
 ## Packages, Standard Library, And Externals
 
@@ -1202,18 +1175,14 @@ const failure = io_fs.WalkDir(fileSystem, ".", visit);
 ```
 
 The generated `io_fs.WalkDir` facade may statically import provider bridges
-or a private provider kernel, but no call site supplies a policy object. A
-cooperative product has a separately certified Promise-bearing provider
-contract and emits the corresponding `await`; it is not a fallback for the
-disabled profile.
+or a private provider kernel, but no call site supplies a policy object. Its
+provider contract and visitor callback are certified synchronous.
 
-A provider-defined callable type is joined by identity to the certified effect
-of its target carrier. For example, a direct `iter.Seq[int]` carrier accepts a
-direct generated sequence under the disabled profile. A cooperative generated
-sequence cannot be passed to that carrier: compilation stops before constructing
-the call AST unless the provider exposes a separately certified `Awaitable`
-carrier. The compiler never inserts a cast, tests for `Promise`, or infers this
-contract from `Seq` spelling.
+A provider-defined callable type is joined by identity to the certified
+synchronous effect of its target carrier. For example, an `iter.Seq[int]`
+carrier accepts a direct generated sequence. A Promise-bearing carrier fails
+before the call AST is constructed. The compiler never inserts a cast, tests a
+result, or infers this contract from `Seq` spelling.
 
 Every standard-library or toolchain reference selects exactly one
 implementation route—provider binding, compiler intrinsic, generated runtime

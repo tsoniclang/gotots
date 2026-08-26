@@ -9,7 +9,6 @@ import (
 
 type builder struct {
 	factory           tsgo.Factory
-	concurrency       api.ConcurrencySemantics
 	channelName       string
 	receiveName       string
 	sendName          string
@@ -20,14 +19,7 @@ type builder struct {
 	panicName         string
 }
 
-func (b builder) cooperative() bool {
-	return b.concurrency == api.ConcurrencySemanticsCooperative
-}
-
 func (b builder) blockingResultType(result tsgo.TypeNode) tsgo.TypeNode {
-	if b.cooperative() {
-		return b.promiseType(result)
-	}
 	return result
 }
 
@@ -73,10 +65,6 @@ func (b builder) voidType() tsgo.TypeNode {
 
 func (b builder) undefinedType() tsgo.TypeNode {
 	return b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword)
-}
-
-func (b builder) promiseType(result tsgo.TypeNode) tsgo.TypeNode {
-	return b.typeReference("Promise", result)
 }
 
 func (b builder) arrayType(element tsgo.TypeNode) tsgo.TypeNode {
@@ -391,25 +379,6 @@ func (b builder) logicalNot(value tsgo.Expression) tsgo.Expression {
 		tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
 		value,
 	)
-}
-
-func (b builder) newPromise(
-	result tsgo.TypeNode,
-	executor tsgo.Expression,
-) tsgo.NewExpression {
-	return b.factory.NewExpression(
-		b.id("Promise"),
-		[]tsgo.TypeNode{result},
-		[]tsgo.Expression{executor},
-	)
-}
-
-func (b builder) promiseResolve(value tsgo.Expression) tsgo.CallExpression {
-	arguments := []tsgo.Expression{}
-	if value != nil {
-		arguments = append(arguments, value)
-	}
-	return b.staticCall("Promise", "resolve", arguments...)
 }
 
 func (b builder) arrayLiteral(values ...tsgo.Expression) tsgo.ArrayLiteralExpression {

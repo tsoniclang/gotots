@@ -74,16 +74,16 @@ func TestProviderProfileIncludesTransitiveInterfaceClosure(t *testing.T) {
 		{Identity: parentIdentity, ProviderInterface: &ordinaryParent},
 		{Identity: childIdentity, ProviderInterface: &ordinaryChild},
 	}}}
-	cooperativeParent := providerInterfaceForClosureTest(
+	profileParent := providerInterfaceForClosureTest(
 		"example.com/provider.Parent.Child",
 		"func() example.com/provider.Child",
-		gostdlib.EffectAwaitable,
+		gostdlib.EffectSynchronous,
 	)
 	profile := gostdlib.ProviderCallableProfileDocument{
 		SourceIdentity: "example.com/provider|kind=4|receiver=|name=Use",
 		Interfaces: []gostdlib.ProviderCallableProfileInterfaceDocument{{
 			SourceIdentity:    parentIdentity,
-			ProviderInterface: cooperativeParent,
+			ProviderInterface: profileParent,
 		}},
 	}
 	facets := []gostdlib.FacetModuleDocument{{
@@ -100,7 +100,7 @@ func TestProviderProfileIncludesTransitiveInterfaceClosure(t *testing.T) {
 			ProviderInterface: providerInterfaceForClosureTest(
 				"example.com/provider.Child.Value",
 				"func() bool",
-				gostdlib.EffectAwaitable,
+				gostdlib.EffectSynchronous,
 			),
 		},
 	)

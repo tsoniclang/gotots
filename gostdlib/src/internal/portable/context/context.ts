@@ -295,12 +295,12 @@ export function AfterFunc(
       started = true;
       selected.commit();
     } else {
-      unsubscribe = selected.subscribe((): boolean => {
+      unsubscribe = done.$observeClose((): void => {
         if (stopped || started) {
-          return false;
+          return;
         }
         started = true;
-        return true;
+        run();
       });
     }
   }

@@ -31,20 +31,20 @@ func TestCanonicalValueSlotsFollowProviderParameterOrder(t *testing.T) {
 	}
 	exports, err := project.Exports(filepath.Join(
 		provider,
-		"src/internal/facets/provider-compress-gzip.ts",
+		"src/internal/facets/provider-compress-gzip-direct.ts",
 	))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var target tsgo.ProjectExport
 	for _, selected := range exports {
-		if selected.Name() == "GzipNewReaderCanonical" {
+		if selected.Name() == "GzipNewReaderDirect" {
 			target = selected
 			break
 		}
 	}
 	if target.Name() == "" {
-		t.Fatal("GzipNewReaderCanonical is absent")
+		t.Fatal("GzipNewReaderDirect is absent")
 	}
 	values := []gostdlib.ProviderCallableProfileCanonicalValueDocument{
 		{SourceIdentity: "io.EOF", TargetParameter: "eof"},

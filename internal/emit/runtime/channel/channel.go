@@ -33,44 +33,31 @@ func (b builder) channelClass() tsgo.ClassDeclaration {
 		),
 		b.propertyDeclaration(
 			[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
-			"senders",
-			b.typeReference("Set", b.sendOfferType()),
-			b.factory.NewExpression(
-				b.id("Set"),
-				[]tsgo.TypeNode{b.sendOfferType()},
-				nil,
-			),
-		),
-		b.propertyDeclaration(
-			[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
-			"receivers",
-			b.typeReference("Set", b.receiveResolverType()),
-			b.factory.NewExpression(
-				b.id("Set"),
-				[]tsgo.TypeNode{b.receiveResolverType()},
-				nil,
-			),
-		),
-		b.propertyDeclaration(
-			[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
 			"closed",
 			b.booleanType(),
 			b.factory.FalseLiteral(),
+		),
+		b.propertyDeclaration(
+			[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
+			"closeObservers",
+			b.typeReference("Set", b.closeObserverType()),
+			b.factory.NewExpression(
+				b.id("Set"),
+				[]tsgo.TypeNode{b.closeObserverType()},
+				nil,
+			),
 		),
 		b.sendReadyMethod(),
 		b.receiveReadyMethod(),
 		b.lengthMethod(),
 		b.capacityMethod(),
-		b.commitReceiverMethod(),
 		b.commitPreparedSendMethod(),
-		b.takeSenderMethod(),
 		b.takeReceiveMethod(),
 		b.sendMethod(),
 		b.receiveMethod(),
 		b.closeMethod(),
+		b.observeCloseMethod(),
 		b.commitSelectSendMethod(),
-		b.subscribeSelectSendMethod(),
-		b.subscribeSelectReceiveMethod(),
 		b.selectSendMethod(),
 		b.selectReceiveMethod(),
 		b.compactBufferMethod(),
@@ -238,29 +225,8 @@ func (b builder) capacityMethod() tsgo.MethodDeclaration {
 	)
 }
 
-func (b builder) sendResolverType() tsgo.TypeNode {
-	return b.functionType(
-		[]tsgo.ParameterDeclaration{
-			b.parameter(
-				"failure",
-				b.unionType(b.objectType(), b.undefinedType()),
-			),
-		},
-		b.voidType(),
-	)
-}
-
 func (b builder) receiveResultType() tsgo.TypeNode {
 	return b.tupleType(b.typeT(), b.booleanType())
-}
-
-func (b builder) receiveResolverType() tsgo.TypeNode {
-	return b.functionType(
-		[]tsgo.ParameterDeclaration{
-			b.parameter("result", b.receiveResultType()),
-		},
-		b.booleanType(),
-	)
 }
 
 func (b builder) acceptType() tsgo.TypeNode {
@@ -273,45 +239,14 @@ func (b builder) acceptType() tsgo.TypeNode {
 	)
 }
 
-func (b builder) selectClaimType() tsgo.TypeNode {
-	return b.functionType(
-		[]tsgo.ParameterDeclaration{
-			b.parameter(
-				"failure",
-				b.unionType(b.objectType(), b.undefinedType()),
-			),
-		},
-		b.booleanType(),
-	)
+func (b builder) closeObserverType() tsgo.TypeNode {
+	return b.functionType(nil, b.voidType())
+}
+
+func (b builder) closeUnsubscribeType() tsgo.TypeNode {
+	return b.functionType(nil, b.voidType())
 }
 
 func (b builder) selectCommitType() tsgo.TypeNode {
 	return b.unionType(b.booleanType(), b.objectType())
-}
-
-func (b builder) selectSendResultType() tsgo.TypeNode {
-	return b.unionType(
-		b.tupleType(b.typeT()),
-		b.undefinedType(),
-	)
-}
-
-func (b builder) sendTakeType() tsgo.TypeNode {
-	return b.functionType(nil, b.selectSendResultType())
-}
-
-func (b builder) sendFailureType() tsgo.TypeNode {
-	return b.functionType(
-		[]tsgo.ParameterDeclaration{
-			b.parameter("failure", b.objectType()),
-		},
-		b.booleanType(),
-	)
-}
-
-func (b builder) sendOfferType() tsgo.TypeNode {
-	return b.tupleType(
-		b.sendTakeType(),
-		b.sendFailureType(),
-	)
 }

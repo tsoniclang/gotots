@@ -22,7 +22,6 @@ func (p Project) CanonicalJSON() ([]byte, error) {
 		Semantics struct {
 			Integers        string `json:"integers"`
 			EvaluationOrder string `json:"evaluationOrder"`
-			Concurrency     string `json:"concurrency"`
 		} `json:"semantics"`
 		Providers struct {
 			StandardLibrary bool `json:"standardLibrary"`
@@ -50,7 +49,6 @@ func (p Project) CanonicalJSON() ([]byte, error) {
 	document.Go.Tags = p.buildProfile.Tags()
 	document.Semantics.Integers = p.integer.String()
 	document.Semantics.EvaluationOrder = p.evaluation.String()
-	document.Semantics.Concurrency = p.concurrency.String()
 	document.Providers.StandardLibrary = p.standardLibrary
 	document.Providers.Externals = p.externals
 	document.Implementations.Bundles = p.ImplementationBundles()

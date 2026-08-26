@@ -19,26 +19,24 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
 	root := t.TempDir()
 	configDirectory := filepath.Join(root, "project")
 	writeProjectConfig(t, filepath.Join(configDirectory, "gotots.json"), `{
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "distribution": {"root": "../distribution"},
   "source": {"root": "../source", "package": "./cmd/app", "mode": "main"},
   "go": {"goos": "linux", "goarch": "amd64", "cgo": false, "tags": ["noasm"]},
   "tools": `+testToolsDocument(t)+`,
-  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": true, "externals": false},
   "implementations": {"bundles": ["implementations/fast/contract.json"]},
   "output": {"directory": "generated"}
 }
 `)
 	integer := "fixed64-bigint"
-	concurrency := "cooperative"
 	output := "alternate"
 	toolCache := filepath.Join(".temp", "cache", "selected-tools")
 	project, err := Load(Request{
 		ConfigPath: filepath.Join(configDirectory, "gotots.json"),
 		Overrides: Overrides{
 			IntegerRepresentation: &integer,
-			ConcurrencySemantics:  &concurrency,
 			OutputDirectory:       &output,
 			ToolCacheRoot:         &toolCache,
 		},
@@ -52,8 +50,7 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
 		t.Fatalf("resolved paths = %q, %q, %q", project.SourceRoot(), project.DistributionRoot(), project.OutputDirectory())
 	}
 	if project.PackagePattern() != "./cmd/app" || project.RootMode() != RootModeMain ||
-		project.IntegerRepresentation().String() != integer ||
-		project.ConcurrencySemantics().String() != concurrency {
+		project.IntegerRepresentation().String() != integer {
 		t.Fatalf("resolved semantics are incorrect: %#v", project)
 	}
 	if got := project.BuildProfile().Tags(); !slices.Equal(got, []string{"noasm"}) {
@@ -83,11 +80,11 @@ func TestLoadDefaultsToolsAndBuildProfileFromSelectedGo(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "distribution": {"root": `+quoteJSON(t, repository)+`},
   "source": {"root": ".", "package": ".", "mode": "main"},
   "go": {"cgo": false, "tags": []},
-  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
   "implementations": {"bundles": []},
   "output": {"directory": "generated"}
@@ -114,11 +111,11 @@ func TestLoadRejectsCgoWithoutSelectedExternalToolContract(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "distribution": {"root": `+quoteJSON(t, repository)+`},
   "source": {"root": ".", "package": ".", "mode": "main"},
   "go": {"cgo": true, "tags": []},
-  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
   "implementations": {"bundles": []},
   "output": {"directory": "generated"}
@@ -135,12 +132,12 @@ func TestLoadSelectsExternalImplementationBundlesFromCLI(t *testing.T) {
 	externalBundle := filepath.Join(t.TempDir(), "fast", "contract.json")
 	path := filepath.Join(projectDirectory, "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
   "tools": `+testToolsDocument(t)+`,
-  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
   "implementations": {"bundles": ["local/contract.json"]},
   "output": {"directory": "output"}
@@ -163,8 +160,8 @@ func TestLoadSelectsExternalImplementationBundlesFromCLI(t *testing.T) {
 
 func TestLoadRejectsUnknownFieldAndVersion(t *testing.T) {
 	for name, source := range map[string]string{
-		"unknown": `{"schemaVersion":1,"surprise":true}`,
-		"version": `{"schemaVersion":2}`,
+		"unknown": `{"schemaVersion":2,"surprise":true}`,
+		"version": `{"schemaVersion":1}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "gotots.json")
@@ -327,12 +324,12 @@ func loadMinimalProject(t *testing.T, directory string, output string) Project {
 	t.Helper()
 	path := filepath.Join(directory, "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
   "tools": `+testToolsDocument(t)+`,
-  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
   "implementations": {"bundles": ["implementation.json"]},
   "output": {"directory": "`+output+`"}
@@ -349,12 +346,12 @@ func loadProjectWithTools(t *testing.T, directory, goPath, tsgoPath string) Proj
 	t.Helper()
 	path := filepath.Join(directory, "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
   "tools": {"go": `+quoteJSON(t, goPath)+`, "tsgo": `+quoteJSON(t, tsgoPath)+`},
-  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
   "implementations": {"bundles": []},
   "output": {"directory": "generated"}

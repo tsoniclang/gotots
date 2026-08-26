@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -76,15 +75,6 @@ func EmitDeferred(
 			context.Names().RecoveryCallable(directOwner)
 		if err != nil {
 			return api.ExpressionEmission{}, err
-		}
-		if providerRecoverySelected {
-			if err := providerboundary.RequireSynchronousSuspension(
-				context,
-				directOwner.FullName()+" recovery",
-				providerRecovery.Cooperative(),
-			); err != nil {
-				return api.ExpressionEmission{}, err
-			}
 		}
 		if !providerRecoverySelected {
 			facet, facetErr := api.NewSourceCallableFacet(directOwner)
@@ -172,24 +162,12 @@ func EmitDeferred(
 	targetCallee := callee.Value()
 	before := callee.Before()
 	requests := recoveryRequests
-	var contractRequests []api.RootRequest
-	cooperative := false
 	switch {
 	case static:
-		owner := directOwner
-		if !direct || owner == nil {
+		if !direct || directOwner == nil {
 			return api.ExpressionEmission{}, &api.InvariantError{
 				Role:   api.RoleCallCallee,
 				Reason: "static deferred callee has no exact function owner",
-			}
-		}
-		if providerRecoverySelected {
-			cooperative = providerRecovery.Cooperative()
-		} else {
-			cooperative, contractRequests, err =
-				cooperativecall.SourceContract(context, owner)
-			if err != nil {
-				return api.ExpressionEmission{}, err
 			}
 		}
 	case directLiteral:
@@ -207,47 +185,16 @@ func EmitDeferred(
 			),
 		)
 		targetCallee = context.Factory().Identifier(name)
-		cooperative, contractRequests, err =
-			cooperativecall.LiteralContract(context, literal)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
 	default:
-		exactSynchronous, exactRequests, selectionErr :=
-			cooperativecall.ExactSynchronousValue(context, source.Fun)
-		if selectionErr != nil {
-			return api.ExpressionEmission{}, selectionErr
-		}
-		var targetType api.TypeEmission
-		if exactSynchronous {
-			targetType, err = callable.EmitSynchronousType(
-				context.WithRole(api.RoleCallCallee),
-				children,
-				source.Fun,
-				signature,
-			)
-		} else {
-			targetType, err = children.RepresentedType(
-				context.WithRole(api.RoleCallCallee),
-				source.Fun,
-				sourceType,
-			)
-		}
+		targetType, typeErr := callable.EmitProviderCallableType(
+			context.WithRole(api.RoleCallCallee),
+			children,
+			source.Fun,
+			signature,
+		)
+		err = typeErr
 		if err != nil {
 			return api.ExpressionEmission{}, err
-		}
-		if _, defined := definedtype.ResolveCallable(sourceType); !exactSynchronous &&
-			defined &&
-			!providerBoundary {
-			targetType, err = callable.EmitType(
-				context.WithRole(api.RoleCallCallee),
-				children,
-				source.Fun,
-				signature,
-			)
-			if err != nil {
-				return api.ExpressionEmission{}, err
-			}
 		}
 		name, err := context.Names().Temporary(api.TemporaryCallCallee)
 		if err != nil {
@@ -264,18 +211,7 @@ func EmitDeferred(
 		)
 		targetCallee = context.Factory().Identifier(name)
 		requests = append(requests, targetType.Requests()...)
-		var valueRequests []api.RootRequest
-		cooperative, valueRequests, err =
-			cooperativecall.ValueContract(context, signature)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		contractRequests = api.CombineRequests(
-			exactRequests,
-			valueRequests,
-		)
 	}
-	requests = append(requests, contractRequests...)
 	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
 		children,
@@ -436,7 +372,6 @@ func EmitDeferred(
 		before,
 		nil,
 		call,
-		cooperative,
 		api.CombineRequests(
 			callee.Requests(),
 			argumentRequests,
@@ -465,7 +400,6 @@ func emitDeferredBuiltin(
 			target.Before(),
 			nil,
 			target.Value(),
-			false,
 			target.Requests(),
 		)
 	}
@@ -484,7 +418,6 @@ func deferredInvocation(
 	before []tsgo.Statement,
 	invocationBefore []tsgo.Statement,
 	call tsgo.Expression,
-	targetCooperative bool,
 	requests []api.RootRequest,
 ) (api.ExpressionEmission, error) {
 	recovery, recoveryRequests, err :=
@@ -492,27 +425,14 @@ func deferredInvocation(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if targetCooperative {
-		request, requestErr := context.CooperativeRequest()
-		if requestErr != nil {
-			return api.ExpressionEmission{}, requestErr
-		}
-		requests = append(requests, request)
-		call = context.Factory().AwaitExpression(call)
-	}
 	body := append(invocationBefore, context.Factory().ExpressionStatement(call))
-	var modifiers []tsgo.ModifierLike
 	var resultType tsgo.TypeNode = context.Factory().KeywordTypeNode(
 		tsgo.KeywordTypeSyntaxKindVoidKeyword,
 	)
-	if targetCooperative {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	return api.NewExpressionEmission(
 		before,
 		context.Factory().ArrowFunction(
-			modifiers,
+			nil,
 			nil,
 			[]tsgo.ParameterDeclaration{recovery},
 			resultType,

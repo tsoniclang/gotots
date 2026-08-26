@@ -80,9 +80,17 @@ func providerEffect(source tsgo.CallableEffect) (gostdlib.EffectKind, error) {
 	case tsgo.CallableEffectSynchronous:
 		return gostdlib.EffectSynchronous, nil
 	case tsgo.CallableEffectAsynchronous:
-		return gostdlib.EffectAsynchronous, nil
+		return gostdlib.EffectInvalid, certifyError(
+			"inspect callable effect",
+			"target",
+			"Promise-only callable is not valid in the fixed synchronous execution contract",
+		)
 	case tsgo.CallableEffectAwaitable:
-		return gostdlib.EffectAwaitable, nil
+		return gostdlib.EffectInvalid, certifyError(
+			"inspect callable effect",
+			"target",
+			"T | Promise<T> callable is not valid in the fixed synchronous execution contract",
+		)
 	default:
 		return gostdlib.EffectInvalid, certifyError(
 			"inspect callable effect",
@@ -284,10 +292,9 @@ func callableParameterBindingMismatches(
 	}
 	for _, selected := range actual {
 		if sourceCallableTypeParameterCount(signature) == 0 &&
-			selected.Effect != gostdlib.EffectSynchronous &&
-			selected.Effect != gostdlib.EffectAwaitable {
+			selected.Effect != gostdlib.EffectSynchronous {
 			mismatches = append(mismatches, fmt.Sprintf(
-				"%s parameter %d: ordinary provider effect is %s, want sync or awaitable",
+				"%s parameter %d: provider effect is %s, want sync",
 				identity,
 				selected.Parameter,
 				selected.Effect,

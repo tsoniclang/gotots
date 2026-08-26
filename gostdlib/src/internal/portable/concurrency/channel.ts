@@ -1,18 +1,16 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
+import { GoPanic } from "@gotots/runtime/panic.js";
 
 type ReceiveResult<T> = [T, boolean];
-type Receiver<T> = (result: ReceiveResult<T>) => boolean;
-type Claim = (failure: object | undefined) => boolean;
 
 interface ReceiveSelectCase {
   ready(): boolean;
   commit(): boolean | object;
-  subscribe(claim: Claim): () => void;
 }
 
 export class ProviderChannel<T> implements GoReceiveChannel<T> {
   readonly #values: Array<{ readonly value: T }> = [];
-  readonly #receivers: Array<Receiver<T>> = [];
+  readonly #closeObservers = new Set<() => void>();
   #closed = false;
 
   constructor(
@@ -29,17 +27,12 @@ export class ProviderChannel<T> implements GoReceiveChannel<T> {
     return this.capacity;
   }
 
-  receive(): Promise<ReceiveResult<T>> {
+  receive(): ReceiveResult<T> {
     const immediate = this.#take();
-    if (immediate !== undefined) {
-      return Promise.resolve(immediate);
+    if (immediate === undefined) {
+      GoPanic.raiseRuntime("serial channel receive would block");
     }
-    return new Promise<ReceiveResult<T>>((resolve) => {
-      this.#receivers.push((result) => {
-        resolve(result);
-        return true;
-      });
-    });
+    return immediate;
   }
 
   offer(value: T): boolean {
@@ -47,12 +40,6 @@ export class ProviderChannel<T> implements GoReceiveChannel<T> {
       return false;
     }
     const prepared = this.copy(value);
-    while (this.#receivers.length !== 0) {
-      const receiver = this.#receivers.shift();
-      if (receiver !== undefined && receiver([prepared, true])) {
-        return true;
-      }
-    }
     if (this.#values.length >= this.capacity) {
       return false;
     }
@@ -65,9 +52,10 @@ export class ProviderChannel<T> implements GoReceiveChannel<T> {
       return;
     }
     this.#closed = true;
-    for (const receiver of this.#receivers.splice(0)) {
-      receiver([this.zero(), false]);
+    for (const observer of this.#closeObservers) {
+      observer();
     }
+    this.#closeObservers.clear();
   }
 
   discard(): void {
@@ -76,6 +64,17 @@ export class ProviderChannel<T> implements GoReceiveChannel<T> {
 
   get closed(): boolean {
     return this.#closed;
+  }
+
+  $observeClose(observer: () => void): () => void {
+    if (this.#closed) {
+      observer();
+      return (): void => undefined;
+    }
+    this.#closeObservers.add(observer);
+    return (): void => {
+      this.#closeObservers.delete(observer);
+    };
   }
 
   $selectReceive(accept: (value: T, ok: boolean) => void): ReceiveSelectCase {
@@ -88,22 +87,6 @@ export class ProviderChannel<T> implements GoReceiveChannel<T> {
         }
         accept(result[0], result[1]);
         return true;
-      },
-      subscribe: (claim: Claim): (() => void) => {
-        const receive: Receiver<T> = (result): boolean => {
-          if (!claim(undefined)) {
-            return false;
-          }
-          accept(result[0], result[1]);
-          return true;
-        };
-        this.#receivers.push(receive);
-        return (): void => {
-          const index = this.#receivers.indexOf(receive);
-          if (index >= 0) {
-            this.#receivers.splice(index, 1);
-          }
-        };
       },
     };
   }

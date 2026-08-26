@@ -7,7 +7,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	channelmodel "github.com/tsoniclang/gotots/internal/emit/concurrency/channel"
-	concurrencyprofile "github.com/tsoniclang/gotots/internal/emit/concurrency/profile"
 	runtimechannel "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -20,13 +19,6 @@ func emitChannel(
 	model channelmodel.Model,
 	targetLabel string,
 ) (api.StatementEmission, error) {
-	if err := concurrencyprofile.Admit(
-		context,
-		api.CategoryStatement,
-		source,
-	); err != nil {
-		return api.StatementEmission{}, err
-	}
 	if model.Direction() == types.SendOnly ||
 		source.Value != nil ||
 		(source.Tok == token.ILLEGAL && source.Key != nil) {

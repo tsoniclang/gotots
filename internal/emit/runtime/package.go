@@ -33,7 +33,6 @@ type Package struct {
 	manifest    []byte
 	fingerprint string
 	scalar      api.ScalarABI
-	concurrency api.ConcurrencySemantics
 	valid       bool
 }
 
@@ -77,10 +76,6 @@ func (p Package) NativeIntegerWidth() api.NativeIntegerWidth {
 	return p.scalar.NativeIntegerWidth()
 }
 
-func (p Package) Concurrency() api.ConcurrencySemantics {
-	return p.concurrency
-}
-
 func (p Package) Files() []PackageFile {
 	return slices.Clone(p.files)
 }
@@ -96,23 +91,12 @@ func (p Package) Fingerprint() string {
 func AssemblePackage(
 	factory tsgo.Factory,
 	scalar api.ScalarABI,
-	concurrency api.ConcurrencySemantics,
 	requested map[api.RuntimeSymbol]struct{},
 	aliases []api.PrimitiveAlias,
 ) (Package, error) {
-	if !concurrency.Valid() {
-		return Package{}, &AssemblyError{
-			Reason: "runtime package concurrency profile is invalid",
-		}
-	}
 	return assemblePackage(
 		factory,
 		scalar,
-		concurrency,
-		concurrency.String(),
-		func(api.RuntimeModule) api.ConcurrencySemantics {
-			return concurrency
-		},
 		requested,
 		aliases,
 	)
@@ -127,16 +111,6 @@ func AssembleProviderCertificationPackage(
 	return assemblePackage(
 		factory,
 		scalar,
-		api.ConcurrencySemanticsInvalid,
-		"provider-certification",
-		func(module api.RuntimeModule) api.ConcurrencySemantics {
-			switch module {
-			case api.RuntimeModuleScalar, api.RuntimeModuleChannel:
-				return api.ConcurrencySemanticsCooperative
-			default:
-				return api.ConcurrencySemanticsDisabled
-			}
-		},
 		requested,
 		aliases,
 	)
@@ -145,20 +119,12 @@ func AssembleProviderCertificationPackage(
 func assemblePackage(
 	factory tsgo.Factory,
 	scalar api.ScalarABI,
-	packageConcurrency api.ConcurrencySemantics,
-	semantics string,
-	moduleConcurrency func(api.RuntimeModule) api.ConcurrencySemantics,
 	requested map[api.RuntimeSymbol]struct{},
 	aliases []api.PrimitiveAlias,
 ) (Package, error) {
 	if !scalar.Valid() {
 		return Package{}, &AssemblyError{
 			Reason: "runtime package scalar ABI is invalid",
-		}
-	}
-	if semantics == "" || moduleConcurrency == nil {
-		return Package{}, &AssemblyError{
-			Reason: "runtime package assembly semantics are invalid",
 		}
 	}
 	aliases = slices.Clone(aliases)
@@ -173,7 +139,7 @@ func assemblePackage(
 			}
 		}
 	}
-	closed, err := dependencyClosure(requested, moduleConcurrency)
+	closed, err := dependencyClosure(requested)
 	if err != nil {
 		return Package{}, err
 	}
@@ -208,30 +174,6 @@ func assemblePackage(
 	})
 	files := make([]PackageFile, 0, len(modules)+1)
 	statements := make([]tsgo.Statement, 0, len(aliases)+1)
-	if symbols := byModule[api.RuntimeModuleScalar]; len(symbols) != 0 {
-		symbols, err = orderModuleSymbols(api.RuntimeModuleScalar, symbols)
-		if err != nil {
-			return Package{}, err
-		}
-		definitions, err := Build(
-			factory,
-			api.RuntimeModuleScalar,
-			symbols,
-			moduleConcurrency(api.RuntimeModuleScalar),
-		)
-		if err != nil {
-			return Package{}, err
-		}
-		statements, err = exactDefinitions(
-			api.RuntimeModuleScalar,
-			symbols,
-			definitions,
-		)
-		if err != nil {
-			return Package{}, err
-		}
-		delete(byModule, api.RuntimeModuleScalar)
-	}
 	for _, alias := range aliases {
 		name, keyword, err := api.PrimitiveAliasRepresentation(alias, scalar)
 		if err != nil {
@@ -256,9 +198,6 @@ func assemblePackage(
 		files = append(files, file)
 	}
 	for _, module := range modules {
-		if module == api.RuntimeModuleScalar {
-			continue
-		}
 		symbols := byModule[module]
 		symbols, err = orderModuleSymbols(module, symbols)
 		if err != nil {
@@ -268,7 +207,6 @@ func assemblePackage(
 			factory,
 			module,
 			symbols,
-			moduleConcurrency(module),
 		)
 		if err != nil {
 			return Package{}, err
@@ -282,7 +220,6 @@ func assemblePackage(
 			paths[module],
 			module,
 			symbols,
-			moduleConcurrency(module),
 		)
 		if err != nil {
 			return Package{}, err
@@ -300,7 +237,7 @@ func assemblePackage(
 	sort.Slice(files, func(left, right int) bool {
 		return files[left].outputPath < files[right].outputPath
 	})
-	manifest, fingerprint, err := packageManifest(scalar, semantics, files)
+	manifest, fingerprint, err := packageManifest(scalar, files)
 	if err != nil {
 		return Package{}, err
 	}
@@ -309,31 +246,8 @@ func assemblePackage(
 		manifest:    manifest,
 		fingerprint: fingerprint,
 		scalar:      scalar,
-		concurrency: packageConcurrency,
 		valid:       true,
 	}, nil
-}
-
-func awaitableType(
-	factory tsgo.Factory,
-) tsgo.Statement {
-	parameter := factory.Identifier("T")
-	value := factory.TypeReferenceNode(parameter, nil)
-	result := factory.UnionTypeNode([]tsgo.TypeNode{
-		value,
-		factory.TypeReferenceNode(
-			api.TargetIntrinsicPromise.TypeName(factory),
-			[]tsgo.TypeNode{value},
-		),
-	})
-	return factory.TypeAliasDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.Identifier("Awaitable"),
-		[]tsgo.TypeParameterDeclaration{
-			factory.TypeParameterDeclaration(nil, parameter, nil, nil, nil),
-		},
-		result,
-	)
 }
 
 func packageSourceFile(
@@ -362,7 +276,6 @@ func packageSourceFile(
 type packageMetadata struct {
 	IntegerRepresentation string `json:"integerRepresentation"`
 	NativeIntegerBits     uint8  `json:"nativeIntegerBits"`
-	ConcurrencySemantics  string `json:"concurrencySemantics"`
 }
 
 type packageDocument struct {
@@ -376,7 +289,6 @@ type packageDocument struct {
 
 func packageManifest(
 	scalar api.ScalarABI,
-	semantics string,
 	files []PackageFile,
 ) ([]byte, string, error) {
 	exports := make(map[string]string, len(files))
@@ -413,7 +325,6 @@ func packageManifest(
 		GoToTS: packageMetadata{
 			IntegerRepresentation: scalar.IntegerRepresentation().String(),
 			NativeIntegerBits:     uint8(scalar.NativeIntegerWidth()),
-			ConcurrencySemantics:  semantics,
 		},
 		Exports: exports,
 	}

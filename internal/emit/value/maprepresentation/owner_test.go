@@ -33,7 +33,6 @@ func TestNilRejectsOpenGenericMapOutsideGenericOperationOwner(
 		},
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderPreserveGo,
-		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)

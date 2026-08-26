@@ -45,7 +45,6 @@ func Build(ctx context.Context, project config.Project) (Report, error) {
 	options := emit.DefaultOptions()
 	options.IntegerRepresentation = project.IntegerRepresentation()
 	options.EvaluationOrder = project.EvaluationOrder()
-	options.ConcurrencySemantics = project.ConcurrencySemantics()
 
 	standardLibrary, externalProvider, err := certifyProviders(project)
 	if err != nil {
@@ -107,7 +106,6 @@ func certifySourceImplementations(
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers:        project.IntegerRepresentation().String(),
 			EvaluationOrder: project.EvaluationOrder().String(),
-			Concurrency:     project.ConcurrencySemantics().String(),
 		},
 		ScratchRoot: filepath.Join(
 			project.DistributionRoot(),

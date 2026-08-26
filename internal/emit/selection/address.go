@@ -105,15 +105,6 @@ func FieldStoreTarget(
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	receiver, err = joinNominalFieldCallableABI(
-		context,
-		receiverType,
-		field,
-		receiver,
-	)
-	if err != nil {
-		return api.StoreTargetEmission{}, err
-	}
 	target, providerOwned, err := providerboundary.StructFieldStoreTarget(
 		context.WithRole(api.RoleAssignmentTarget),
 		children,
@@ -231,15 +222,6 @@ func addressField(
 	receiver api.ExpressionEmission,
 	field *types.Var,
 ) (api.ExpressionEmission, error) {
-	receiver, err := joinNominalFieldCallableABI(
-		context,
-		receiverType,
-		field,
-		receiver,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	providerAddress, providerOwned, err := providerboundary.AddressStructField(
 		context.WithRole(api.RoleUnaryOperand),
 		children,

@@ -16,7 +16,7 @@ import {
   type ToContainerStorage,
   type Zero,
 } from "./capabilities.js";
-import { sortValuesSynchronous } from "./sort.js";
+import { sortValues } from "./sort.js";
 
 export function AppendSeq<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
@@ -145,7 +145,7 @@ export function SortedFunc<E, EStorage>(
   compare: ((left: E, right: E) => int64) | undefined,
 ): RuntimeSlice<EStorage> {
   const result = Collect(copyElement, toStorage, sequence);
-  const values = sortValuesSynchronous(
+  const values = sortValues(
     logicalValues(result, copyElement, fromStorage),
     compare,
   );

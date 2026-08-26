@@ -96,10 +96,7 @@ func TestRequirementsRejectsMissingDefinitionAndDivergentDuplicate(t *testing.T)
 }
 
 func TestProfileRequirementsExactJoinNamedCapabilityTargets(t *testing.T) {
-	for _, profileExport := range []string{
-		"IoFsReadFileCanonical",
-		"IoFsReadFileDirect",
-	} {
+	for _, profileExport := range []string{"IoFsReadFileDirect"} {
 		t.Run(profileExport, func(t *testing.T) {
 			artifact, target := profileRequirementFixture(t, profileExport)
 			definition, err := api.NewProviderInterfaceBridgeRequirement(artifact)
@@ -190,8 +187,8 @@ func profileRequirementFixture(
 	profiles := manifest.ProviderCallableProfiles(
 		"io/fs|kind=4|receiver=|name=ReadFile",
 	)
-	if len(profiles) != 2 {
-		t.Fatalf("ReadFile profiles = %d, want 2", len(profiles))
+	if len(profiles) != 1 {
+		t.Fatalf("ReadFile profiles = %d, want 1", len(profiles))
 	}
 	var profile gostdlib.ProviderCallableProfile
 	for _, candidate := range profiles {

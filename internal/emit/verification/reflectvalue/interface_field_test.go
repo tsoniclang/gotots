@@ -90,7 +90,7 @@ func InterfaceFieldFacts() string {
 	return before + " | " + after + " | " + final + " | " + genericResult
 }
 `
-	typescriptRunner := `const facts = await InterfaceFieldFacts();
+	typescriptRunner := `const facts = InterfaceFieldFacts();
 console.log(facts);
 `
 	goRunner := `package main
@@ -147,7 +147,7 @@ func ProviderInterfaceFieldFacts() string {
 	return fmt.Sprintf("%s %s", before, holder.Value.String())
 }
 `
-	typescriptRunner := `const facts = await ProviderInterfaceFieldFacts();
+	typescriptRunner := `const facts = ProviderInterfaceFieldFacts();
 console.log(facts);
 `
 	goRunner := `package main

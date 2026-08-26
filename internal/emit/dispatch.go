@@ -81,11 +81,9 @@ type emitter struct {
 	scalar                 api.ScalarABI
 	providerScalar         api.ScalarABI
 	order                  api.EvaluationOrder
-	concurrency            api.ConcurrencySemantics
 	observer               emitnaming.EnvironmentObserver
 	generic                api.GenericCallableResolver
 	declarationDemands     api.DeclarationDemandResolver
-	cooperative            api.CooperativeCallableResolver
 	recovery               api.RecoveryCallableResolver
 	external               api.ExternalFunctionResolver
 	goRuntime              api.GoRuntimeContract
@@ -99,11 +97,9 @@ func newEmitter(
 	scalar api.ScalarABI,
 	providerScalar api.ScalarABI,
 	order api.EvaluationOrder,
-	concurrency api.ConcurrencySemantics,
 	observer emitnaming.EnvironmentObserver,
 	generic api.GenericCallableResolver,
 	declarationDemands api.DeclarationDemandResolver,
-	cooperative api.CooperativeCallableResolver,
 	recovery api.RecoveryCallableResolver,
 	external api.ExternalFunctionResolver,
 	goRuntime api.GoRuntimeContract,
@@ -122,11 +118,9 @@ func newEmitter(
 		scalar:                 scalar,
 		providerScalar:         providerScalar,
 		order:                  order,
-		concurrency:            concurrency,
 		observer:               observer,
 		generic:                generic,
 		declarationDemands:     declarationDemands,
-		cooperative:            cooperative,
 		recovery:               recovery,
 		external:               external,
 		goRuntime:              goRuntime,

@@ -48,7 +48,7 @@ func Build() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await Build();
+	typescriptRunner := `const facts = Build();
 console.log(facts);
 `
 	goRunner := `package main

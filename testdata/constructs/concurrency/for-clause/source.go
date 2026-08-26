@@ -6,15 +6,15 @@ type Predicate interface {
 
 type counterPredicate struct {
 	closed    chan int32
-	remaining *int32
+	remaining []int32
 }
 
-func (predicate *counterPredicate) More() bool {
+func (predicate counterPredicate) More() bool {
 	<-predicate.closed
-	if *predicate.remaining == 0 {
+	if predicate.remaining[0] == 0 {
 		return false
 	}
-	*predicate.remaining--
+	predicate.remaining[0]--
 	return true
 }
 
@@ -30,10 +30,9 @@ func next(closed chan int32, value int32) (int32, bool) {
 func CooperativeCondition() int32 {
 	closed := make(chan int32)
 	close(closed)
-	remaining := int32(3)
-	predicate := &counterPredicate{
+	predicate := counterPredicate{
 		closed:    closed,
-		remaining: &remaining,
+		remaining: []int32{3},
 	}
 	var count int32
 	for selectPredicate(predicate).More() {

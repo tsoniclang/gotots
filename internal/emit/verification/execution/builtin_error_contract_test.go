@@ -10,14 +10,14 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestBuiltinErrorUsesSelectedCooperativeContract(t *testing.T) {
+func TestBuiltinErrorUsesSynchronousContract(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
 		filepath.Join(project, "go.mod"),
-		"module example.com/cooperativeerror\n\ngo 1.26.4\n",
+		"module example.com/synchronouserror\n\ngo 1.26.4\n",
 	)
-	writeProgramFile(t, filepath.Join(project, "source.go"), `package cooperativeerror
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package synchronouserror
 
 import "errors"
 
@@ -71,7 +71,6 @@ func Message(failure error) string {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {
 		t.Fatal(err)
@@ -80,19 +79,19 @@ func Message(failure error) string {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	if !strings.Contains(
 		artifacts.printed,
-		"Error(): Awaitable<gostring>;",
+		"Error(): gostring;",
 	) {
 		t.Fatalf(
-			"canonical error contract is not source-shaped and awaitable:\n%s",
+			"error contract is not source-shaped and synchronous:\n%s",
 			artifacts.printed,
 		)
 	}
 	if count := strings.Count(
 		artifacts.printed,
-		"async Error(): Promise<gostring>",
+		"Error(): gostring",
 	); count < 2 {
 		t.Fatalf(
-			"source error adapters did not converge on one Go-shaped cooperative contract: count=%d\n%s",
+			"source error adapters did not converge on one Go-shaped synchronous contract: count=%d\n%s",
 			count,
 			artifacts.printed,
 		)
@@ -114,6 +113,11 @@ func Message(failure error) string {
 			"source-declared lookalike interface lost its declaration identity:\n%s",
 			artifacts.printed,
 		)
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("builtin error artifacts contain %q", forbidden)
+		}
 	}
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }

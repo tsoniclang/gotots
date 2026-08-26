@@ -33,7 +33,7 @@ func FromProviderProfileResults(
 	context api.Context,
 	children api.ChildEmitter,
 	results *types.Tuple,
-	profile gostdlib.ProviderCallableProfile,
+	selection CallableProfileSelection,
 	emission api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	target, _, err := fromProviderResultsSelected(
@@ -41,8 +41,8 @@ func FromProviderProfileResults(
 		children,
 		nil,
 		"",
-		profile.CanonicalResults(),
-		profile.Interfaces(),
+		selection.canonicalResults,
+		selection.interfaces,
 		results,
 		emission,
 	)

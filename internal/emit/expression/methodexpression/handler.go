@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
@@ -126,15 +125,6 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	providerCooperative, _, sourceRequests, err :=
-		cooperativecall.SourceValueContract(
-			context,
-			method,
-			targetSignatureSource,
-		)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	sourceArguments := parameters[1:]
 	call, err := invocation.Invoke(
 		context,
@@ -153,15 +143,6 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	call, err = cooperativecall.SourceInterfaceProviderCall(
-		context,
-		source,
-		call,
-		providerCooperative,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	call, err = invocation.FromProviderResults(context, children, call)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -172,17 +153,11 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	var modifiers []tsgo.ModifierLike
-	resultType := targetSignature.Result()
-	if providerCooperative {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	ordinary := context.Factory().ArrowFunction(
-		modifiers,
+		nil,
 		nil,
 		targetSignature.Parameters(),
-		resultType,
+		targetSignature.Result(),
 		context.Factory().EqualsGreaterThanToken(),
 		methodExpressionBody(context, targetSignatureSource, call),
 	)
@@ -192,7 +167,6 @@ func Emit(
 			api.CombineRequests(
 				targetSignature.Requests(),
 				call.Requests(),
-				sourceRequests,
 				recoveryObservation.Requests(),
 			)...,
 		), nil
@@ -238,13 +212,13 @@ func Emit(
 		return api.ExpressionEmission{}, err
 	}
 	deferred := context.Factory().ArrowFunction(
-		modifiers,
+		nil,
 		nil,
 		append(
 			[]tsgo.ParameterDeclaration{recovery},
 			targetSignature.Parameters()...,
 		),
-		resultType,
+		targetSignature.Result(),
 		context.Factory().EqualsGreaterThanToken(),
 		methodExpressionBody(context, targetSignatureSource, deferredCall),
 	)
@@ -269,7 +243,6 @@ func Emit(
 			deferredCall.Requests(),
 			recoveryRequests,
 			registry.Requests(),
-			sourceRequests,
 			recoveryObservation.Requests(),
 		)...,
 	)
@@ -328,20 +301,6 @@ func emitInterface(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	callableReference, err :=
-		context.Names().InterfaceMethodCallable(method)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	_, cooperative, contractRequests, err :=
-		cooperativecall.InterfaceMethodValueContract(
-			context,
-			callableReference,
-			signature,
-		)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	member, err := context.Names().InterfaceMethodName(method)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -398,24 +357,17 @@ func emitInterface(
 		api.DirectExpression(arguments[0]),
 		method,
 		valueSignature,
-		cooperative,
 		arguments[1:],
 		context.Factory().Identifier(callable.RecoveryAuthorityName),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	var modifiers []tsgo.ModifierLike
-	resultType := target.Result()
-	if cooperative {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	ordinary := context.Factory().ArrowFunction(
-		modifiers,
+		nil,
 		nil,
 		target.Parameters(),
-		resultType,
+		target.Result(),
 		context.Factory().EqualsGreaterThanToken(),
 		call,
 	)
@@ -432,13 +384,13 @@ func emitInterface(
 		)
 	}
 	deferred := context.Factory().ArrowFunction(
-		modifiers,
+		nil,
 		nil,
 		append(
 			[]tsgo.ParameterDeclaration{recovery},
 			target.Parameters()...,
 		),
-		resultType,
+		target.Result(),
 		context.Factory().EqualsGreaterThanToken(),
 		context.Factory().Block(deferredStatements, true),
 	)
@@ -464,7 +416,6 @@ func emitInterface(
 		api.CombineRequests(
 			target.Requests(),
 			nonNil.Requests(),
-			contractRequests,
 			deferredCall.Requests(),
 			recoveryRequests,
 			registry.Requests(),

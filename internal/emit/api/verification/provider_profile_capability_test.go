@@ -176,8 +176,7 @@ func readFileCapabilityProfiles(
 		"io/fs|kind=4|receiver=|name=ReadFile",
 	)
 	expected := map[string]bool{
-		"IoFsReadFileCanonical": false,
-		"IoFsReadFileDirect":    false,
+		"IoFsReadFileDirect": false,
 	}
 	if len(profiles) != len(expected) {
 		t.Fatalf("ReadFile profiles = %d, want %d", len(profiles), len(expected))

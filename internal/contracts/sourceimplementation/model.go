@@ -52,11 +52,10 @@ type BuildDocument struct {
 type CompilationDocument struct {
 	Integers        string `json:"integers"`
 	EvaluationOrder string `json:"evaluationOrder"`
-	Concurrency     string `json:"concurrency"`
 }
 
 func (d CompilationDocument) valid() bool {
-	return d.Integers != "" && d.EvaluationOrder != "" && d.Concurrency != ""
+	return d.Integers != "" && d.EvaluationOrder != ""
 }
 
 type PrivateModuleDocument struct {
@@ -139,10 +138,9 @@ func (c *Certificate) Valid() bool {
 func (c *Certificate) SupportsCompilation(
 	integers string,
 	evaluationOrder string,
-	concurrency string,
 ) bool {
 	return c != nil && c.compilation == (CompilationDocument{
-		Integers: integers, EvaluationOrder: evaluationOrder, Concurrency: concurrency,
+		Integers: integers, EvaluationOrder: evaluationOrder,
 	})
 }
 

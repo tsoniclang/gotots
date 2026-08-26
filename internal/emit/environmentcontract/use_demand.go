@@ -18,7 +18,6 @@ func RequirementUseDemand(
 		return environmentidentity.UseDemandValue
 	case api.DeclarationRequirementCallableControl,
 		api.DeclarationRequirementCallableABI,
-		api.DeclarationRequirementCooperativeCallable,
 		api.DeclarationRequirementDeferredCallableRegistry,
 		api.DeclarationRequirementClassMethod,
 		api.DeclarationRequirementInterfaceMethodCallable,

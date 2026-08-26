@@ -109,7 +109,6 @@ func (n *File) RecoveryCallable(
 	}
 	result, err := api.NewRecoveryCallableReference(
 		reference,
-		selected.Effect().MaySuspend(),
 	)
 	return result, true, err
 }
@@ -188,22 +187,6 @@ func (n *File) allocateProviderImportName(preferred string) string {
 func (r *Registry) ProviderGenericKernel(
 	owner *types.Func,
 ) (gostdlib.Facet, bool, error) {
-	return r.providerGenericKernel(owner, gostdlib.FacetCapabilityKernel)
-}
-
-func (r *Registry) ProviderSynchronousGenericKernel(
-	owner *types.Func,
-) (gostdlib.Facet, bool, error) {
-	return r.providerGenericKernel(
-		owner,
-		gostdlib.FacetCapabilitySynchronousKernel,
-	)
-}
-
-func (r *Registry) providerGenericKernel(
-	owner *types.Func,
-	capability gostdlib.FacetCapability,
-) (gostdlib.Facet, bool, error) {
 	if r == nil || owner == nil || owner.Origin() != owner {
 		return gostdlib.Facet{}, false, &api.NameError{
 			Reason: "provider generic-kernel owner is invalid",
@@ -226,7 +209,7 @@ func (r *Registry) providerGenericKernel(
 	selected, ok := r.provider.Facet(
 		contract.Identity(),
 		gostdlib.FacetGenericCallableKernel,
-		capability,
+		gostdlib.FacetCapabilityKernel,
 	)
 	if !ok {
 		return gostdlib.Facet{}, false, nil
@@ -235,7 +218,7 @@ func (r *Registry) providerGenericKernel(
 	if selected.SourceIdentity() != contract.Identity() ||
 		selected.Kind() != gostdlib.FacetGenericCallableKernel ||
 		len(capabilities) != 1 ||
-		capabilities[0] != capability ||
+		capabilities[0] != gostdlib.FacetCapabilityKernel ||
 		selected.ModuleSpecifier() == "" || selected.Export() == "" ||
 		len(selected.GenericTypeArguments()) == 0 {
 		return gostdlib.Facet{}, false, &api.NameError{
@@ -243,19 +226,18 @@ func (r *Registry) providerGenericKernel(
 			Reason: "provider generic-kernel certificate is inconsistent",
 		}
 	}
-	if capability == gostdlib.FacetCapabilitySynchronousKernel &&
-		!synchronousGenericKernelContract(selected) {
+	if !genericKernelContract(selected) {
 		return gostdlib.Facet{}, false, &api.NameError{
 			Name:   contract.Identity(),
-			Reason: "provider synchronous generic-kernel certificate is inconsistent",
+			Reason: "provider generic-kernel certificate is inconsistent",
 		}
 	}
 	return selected, true, nil
 }
 
-func synchronousGenericKernelContract(selected gostdlib.Facet) bool {
+func genericKernelContract(selected gostdlib.Facet) bool {
 	parameters := selected.CallableParameters()
-	if selected.Effect() != gostdlib.EffectSynchronous || len(parameters) == 0 {
+	if selected.Effect() != gostdlib.EffectSynchronous {
 		return false
 	}
 	for _, parameter := range parameters {

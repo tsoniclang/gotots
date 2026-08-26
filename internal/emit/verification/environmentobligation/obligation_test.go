@@ -59,7 +59,6 @@ func Values(values []int32, input <-chan int32) int32 {
 		roots = append(roots, root)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	emission, err := emit.CompileWithOptions(
 		program,
 		roots,

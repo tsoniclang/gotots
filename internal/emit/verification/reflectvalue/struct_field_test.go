@@ -52,7 +52,7 @@ func Merge() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await Merge();
+	typescriptRunner := `const facts = Merge();
 console.log(facts);
 `
 	goRunner := `package main

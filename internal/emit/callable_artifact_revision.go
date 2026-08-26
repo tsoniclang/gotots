@@ -1,185 +1,14 @@
 package emit
 
 import (
-	"go/ast"
 	"go/types"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
-	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
-
-func (s *programSession) ObserveCooperativeCallable(
-	context api.Context,
-	facet api.CallableFacet,
-) (api.CooperativeCallableObservation, error) {
-	return s.observeCooperativeCallable(
-		context.ArtifactOwner(),
-		&context,
-		facet,
-	)
-}
-
-func (s *programSession) ExactCallableFieldAssignments(
-	field *types.Var,
-) ([]ast.Expr, bool) {
-	if s == nil || s.callableFields == nil {
-		return nil, false
-	}
-	return s.callableFields.Assignments(field)
-}
-
-func (s *programSession) observeCooperativeCallable(
-	consumer api.ArtifactOwner,
-	context *api.Context,
-	facet api.CallableFacet,
-) (api.CooperativeCallableObservation, error) {
-	if !consumer.Valid() || !facet.Valid() {
-		return api.CooperativeCallableObservation{}, &ScheduleError{
-			Reason: "cooperative callable facet is invalid",
-		}
-	}
-	if context != nil && context.ConcurrencySemantics() != s.concurrency {
-		return api.CooperativeCallableObservation{}, &ScheduleError{
-			Reason: "callable observation execution profile is inconsistent",
-		}
-	}
-	if s.concurrency == api.ConcurrencySemanticsDisabled {
-		if context == nil {
-			return api.NewCooperativeCallableObservation(false)
-		}
-		return s.observeDisabledCallable(*context, facet)
-	}
-	if observation, selected, err :=
-		s.observeProviderCallable(context, facet); err != nil || selected {
-		return observation, err
-	}
-	cooperative := false
-	for _, requirement := range s.requirements.SelectedFor(facet.Owner()) {
-		selected, selectedCooperative := requirement.CooperativeCallable()
-		if !selectedCooperative {
-			continue
-		}
-		if selected.Owner() != facet.Owner() {
-			return api.CooperativeCallableObservation{}, &ScheduleError{
-				Object: facet.Owner().Name(),
-				Reason: "cooperative callable has inconsistent ownership",
-			}
-		}
-		if selected == facet {
-			cooperative = true
-			break
-		}
-	}
-	requests, err := callableEffectDependency(consumer, facet)
-	if err != nil {
-		return api.CooperativeCallableObservation{}, err
-	}
-	return api.NewCooperativeCallableObservation(cooperative, requests...)
-}
-
-func (s *programSession) observeDisabledCallable(
-	context api.Context,
-	facet api.CallableFacet,
-) (api.CooperativeCallableObservation, error) {
-	observation, selected, err := s.observeProviderCallable(&context, facet)
-	if err != nil {
-		return api.CooperativeCallableObservation{}, err
-	}
-	if selected {
-		if err := providerboundary.RequireSynchronousSuspension(
-			context,
-			facet.Owner().Name(),
-			observation.Cooperative(),
-		); err != nil {
-			return api.CooperativeCallableObservation{}, err
-		}
-		return api.NewCooperativeCallableObservation(
-			false,
-			observation.Requests()...,
-		)
-	}
-	return api.NewCooperativeCallableObservation(false)
-}
-
-func (s *programSession) observeProviderCallable(
-	context *api.Context,
-	facet api.CallableFacet,
-) (api.CooperativeCallableObservation, bool, error) {
-	source, ok := facet.Owner().Source()
-	if !ok || source == nil ||
-		s.source.EnvironmentForTypes(source.Pkg()) == nil {
-		return api.CooperativeCallableObservation{}, false, nil
-	}
-	function, callable := source.(*types.Func)
-	if !callable {
-		return api.CooperativeCallableObservation{}, false, nil
-	}
-	var profileRequests []api.RootRequest
-	if context != nil && function.Signature().Recv() != nil {
-		effect, selected, requests, err :=
-			providerboundary.ResolveStatefulMethodEffect(*context, function)
-		if err != nil {
-			return api.CooperativeCallableObservation{}, false, err
-		}
-		profileRequests = requests
-		if selected {
-			observation, err := api.NewCooperativeCallableObservation(
-				effect.MaySuspend(),
-				profileRequests...,
-			)
-			return observation, true, err
-		}
-	}
-	effect, providerOwned, err := s.registry.ProviderCallableEffect(function)
-	if err != nil || !providerOwned {
-		return api.CooperativeCallableObservation{}, false, err
-	}
-	observation, err := api.NewCooperativeCallableObservation(
-		effect.MaySuspend(),
-		profileRequests...,
-	)
-	return observation, true, err
-}
-
-func callableEffectDependency(
-	consumer api.ArtifactOwner,
-	facet api.CallableFacet,
-) ([]api.RootRequest, error) {
-	if consumer == facet.Owner() {
-		return nil, nil
-	}
-	switch facet.Kind() {
-	case api.CallableFacetSource,
-		api.CallableFacetABI,
-		api.CallableFacetInterfaceMethod,
-		api.CallableFacetGenericCapability,
-		api.CallableFacetGenericOperation:
-		request, err := api.NewOwnedArtifactDependencyRequest(
-			facet.Owner(),
-			api.ArtifactFacetCallableSignature,
-		)
-		if err != nil {
-			return nil, err
-		}
-		return []api.RootRequest{request}, nil
-	case api.CallableFacetFunctionLiteral,
-		api.CallableFacetPackageInitializer:
-		return nil, &ScheduleError{
-			Object: facet.Owner().Name(),
-			Reason: "lexical callable facet escaped its source artifact",
-		}
-	default:
-		return nil, &ScheduleError{
-			Object: facet.Owner().Name(),
-			Reason: "cooperative callable facet kind is invalid",
-		}
-	}
-}
 
 func (s *programSession) validateCallableContractArtifact(
 	artifact *api.GeneratedArtifact,
@@ -219,7 +48,7 @@ func (s *programSession) reconstructCallableContractArtifact(
 	owner := api.MustGeneratedArtifactOwner(artifact)
 	selected := s.requirements.SelectedFor(owner)
 	if len(selected) == 0 && s.requirementRemovalOwner == owner {
-		contract, err := s.callableContract(false)
+		contract, err := s.callableContract()
 		if err != nil {
 			return err
 		}
@@ -229,14 +58,10 @@ func (s *programSession) reconstructCallableContractArtifact(
 		s.artifacts.DiscardDirty(owner)
 		return nil
 	}
-	cooperative, err := callableContractRequirements(
-		selected,
-		artifact,
-	)
-	if err != nil {
+	if err := callableContractRequirements(selected, artifact); err != nil {
 		return err
 	}
-	contract, err := s.callableContract(cooperative)
+	contract, err := s.callableContract()
 	if err != nil {
 		return err
 	}
@@ -260,17 +85,15 @@ func (s *programSession) ensureCallableContractBaseline(
 	if err := s.validateCallableContractArtifact(artifact); err != nil {
 		return err
 	}
-	contract, err := s.callableContract(false)
+	contract, err := s.callableContract()
 	if err != nil {
 		return err
 	}
 	return s.commitArtifactContract(owner, contract, nil)
 }
 
-func (s *programSession) callableContract(
-	cooperative bool,
-) (artifactstate.Contract, error) {
-	encoded, err := s.callableSignatureFacet(cooperative)
+func (s *programSession) callableContract() (artifactstate.Contract, error) {
+	encoded, err := s.callableSignatureFacet()
 	if err != nil {
 		return artifactstate.Contract{}, err
 	}
@@ -280,15 +103,10 @@ func (s *programSession) callableContract(
 	)
 }
 
-func (s *programSession) callableSignatureFacet(
-	cooperative bool,
-) ([]byte, error) {
-	var result tsgo.TypeNode = s.factory.KeywordTypeNode(
+func (s *programSession) callableSignatureFacet() ([]byte, error) {
+	result := s.factory.KeywordTypeNode(
 		tsgo.KeywordTypeSyntaxKindVoidKeyword,
 	)
-	if cooperative {
-		result = callable.PromiseResult(s.factory, result)
-	}
 	return tsgo.EncodeNode(
 		s.factory.FunctionTypeNode(nil, nil, result),
 	)
@@ -297,16 +115,15 @@ func (s *programSession) callableSignatureFacet(
 func callableContractRequirements(
 	requirements []api.DeclarationRequirement,
 	artifact *api.GeneratedArtifact,
-) (bool, error) {
+) error {
 	definitions := 0
-	cooperative := false
 	for _, requirement := range requirements {
 		if selected, ok := callableContractDefinition(
 			requirement,
 			artifact.Kind(),
 		); ok {
 			if selected != artifact {
-				return false, &ScheduleError{
+				return &ScheduleError{
 					Object: artifact.TargetName(),
 					Reason: "callable contract received a foreign definition",
 				}
@@ -314,23 +131,18 @@ func callableContractRequirements(
 			definitions++
 			continue
 		}
-		facet, ok := requirement.CooperativeCallable()
-		selected, callable := callableContractFacet(facet)
-		if !ok || !callable || selected != artifact || cooperative {
-			return false, &ScheduleError{
-				Object: artifact.TargetName(),
-				Reason: "callable contract received a foreign requirement",
-			}
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "callable contract received a foreign requirement",
 		}
-		cooperative = true
 	}
 	if definitions != 1 {
-		return false, &ScheduleError{
+		return &ScheduleError{
 			Object: artifact.TargetName(),
 			Reason: "callable contract requires exactly one definition request",
 		}
 	}
-	return cooperative, nil
+	return nil
 }
 
 func callableContractSignature(
@@ -363,14 +175,6 @@ func callableContractDefinition(
 	}
 }
 
-func callableContractFacet(
-	facet api.CallableFacet,
-) (*api.GeneratedArtifact, bool) {
-	if artifact, ok := facet.ABI(); ok {
-		return artifact, true
-	}
-	return facet.InterfaceMethod()
-}
 func (s *programSession) commitArtifactRevision(
 	owner api.ArtifactOwner,
 	contract artifactstate.Contract,

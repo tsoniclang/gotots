@@ -372,18 +372,6 @@ func emitLexicalGenericCapability(
 	); err != nil {
 		return api.DeclarationEmission{}, err
 	}
-	facet, err := api.NewGenericCapabilityCallableFacet(artifact)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	observation, err := context.ObserveCooperativeCallable(facet)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	context = context.WithCooperativeCallable(
-		facet,
-		observation.Cooperative(),
-	)
 	statement, requests, err := genericcapability.Build(
 		context,
 		children,
@@ -395,10 +383,7 @@ func emitLexicalGenericCapability(
 	}
 	return api.DirectDeclaration(
 		statement,
-		api.CombineRequests(
-			requests,
-			observation.Requests(),
-		)...,
+		requests...,
 	), nil
 }
 

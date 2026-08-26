@@ -8,7 +8,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 )
 
 type capabilitySelection struct {
@@ -184,15 +183,10 @@ func capabilityBaseSelected(
 		if referenceErr != nil {
 			return false, nil, referenceErr
 		}
-		cooperative, methodRequests, contractErr :=
-			cooperativecall.InterfaceMethodContract(context, reference)
-		if contractErr != nil {
-			return false, nil, contractErr
-		}
-		if method.Certificate.Effect().MaySuspend() != cooperative {
+		if method.Certificate.Effect() != gostdlib.EffectSynchronous {
 			return false, nil, nil
 		}
-		requests = append(requests, methodRequests...)
+		requests = append(requests, reference.Requests()...)
 	}
 	return true, api.CombineRequests(requests), nil
 }

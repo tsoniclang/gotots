@@ -356,15 +356,7 @@ func (r DeclarationRequirement) LexicalGeneratedArtifact() (
 			artifact.Placement() == GeneratedArtifactPlacementLexical &&
 				r.Owner() == artifact.ReconstructionOwner()
 	}
-	facet, ok := r.CooperativeCallable()
-	if !ok {
-		return nil, false
-	}
-	artifact, ok := facet.GenericCapability()
-	return artifact,
-		ok &&
-			artifact.Placement() == GeneratedArtifactPlacementLexical &&
-			r.Owner() == artifact.ReconstructionOwner()
+	return nil, false
 }
 
 type InterfaceMethodCallableCorrespondence struct {

@@ -5,8 +5,6 @@ import (
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
-	concurrencyprofile "github.com/tsoniclang/gotots/internal/emit/concurrency/profile"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -21,13 +19,6 @@ func Emit(
 	if source == nil || source.Body == nil {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	if err := concurrencyprofile.Admit(
-		context,
-		api.CategoryStatement,
-		source,
-	); err != nil {
-		return api.StatementEmission{}, err
 	}
 	target, requests, err := prepareClauses(context, children, source)
 	if err != nil {
@@ -59,17 +50,6 @@ func Emit(
 		),
 		selectReference.Requests()...,
 	)
-	if !target.hasDefault &&
-		context.ConcurrencySemantics() == api.ConcurrencySemanticsCooperative {
-		selected, err = cooperative.Operation(
-			context.WithRole(api.RoleSelectClause),
-			source,
-			selected,
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
-	}
 	selectedName, err := context.Names().Temporary(
 		api.TemporarySwitchSelection,
 	)

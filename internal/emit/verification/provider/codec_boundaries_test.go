@@ -10,7 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestBase64EncoderPreservesCanonicalWriterAndErrorBehavior(t *testing.T) {
+func TestBase64EncoderPreservesDirectWriterAndErrorBehavior(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
@@ -83,7 +83,6 @@ func Result(failAt int) (int, int, int, int, int, int, int, string, string) {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -116,15 +115,15 @@ func Result(failAt int) (int, int, int, int, int, int, int, string, string) {
 		assemblyPath,
 		[]string{"Result"},
 		`for (const failAt of [0, 2]) {
-  console.log(JSON.stringify(await Result(failAt)));
+	  console.log(JSON.stringify(Result(failAt)));
 }
 `,
 	)
 	if !strings.Contains(
 		artifacts.printed,
-		"Base64NewEncoderCanonical<",
+		"Base64NewEncoderDirect<",
 	) {
-		t.Fatalf("base64 output lacks canonical boundary:\n%s", artifacts.printed)
+		t.Fatalf("base64 output lacks direct boundary:\n%s", artifacts.printed)
 	}
 	for _, obsolete := range []string{
 		"Base64NewEncoderCanonicalSync",
@@ -132,6 +131,11 @@ func Result(failAt int) (int, int, int, int, int, int, int, string, string) {
 	} {
 		if strings.Contains(artifacts.printed, obsolete) {
 			t.Fatalf("base64 output retained profile variant %q:\n%s", obsolete, artifacts.printed)
+		}
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("base64 output contains %q", forbidden)
 		}
 	}
 }
@@ -185,7 +189,6 @@ func Decode(mutex *sync.Mutex) error {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	// encoding/binary.Read is implemented over the reflection value model:
 	// the compilation passes the used-provider closure and preserves the
@@ -283,7 +286,6 @@ func Encode(mutex *sync.Mutex) error {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	// Both callables are implemented over the reflection value model: the
 	// combined order, stream, and error profile ABI compiles through the
@@ -304,7 +306,7 @@ func Encode(mutex *sync.Mutex) error {
 	}
 }
 
-func TestGzipStatefulProfilePreservesFieldsAndCooperativeReader(t *testing.T) {
+func TestGzipStatefulProfilePreservesFieldsAndDirectReader(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
@@ -395,7 +397,6 @@ func Result() string {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -427,18 +428,23 @@ func Result() string {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Result"},
-		`console.log(JSON.stringify(await Result()));
+		`console.log(JSON.stringify(Result()));
 `,
 	)
 	for _, required := range []string{
-		"GzipNewReaderCanonical",
-		"CanonicalGzipReader",
+		"GzipNewReaderDirect",
+		"DirectGzipReader",
 		"bindPointer<",
 		".Header.Name",
 		".Header.Comment",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("gzip profile output lacks %q:\n%s", required, artifacts.printed)
+		}
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("gzip profile output contains %q", forbidden)
 		}
 	}
 }

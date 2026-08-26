@@ -282,7 +282,7 @@ test("named-struct facets expose only selected static operations", (): void => {
   assert.equal(poolCopy.New, poolNew);
 });
 
-test("provider assignment facets preserve selected Go representations", async (): Promise<void> => {
+test("provider assignment facets preserve selected Go representations", (): void => {
   const parseSource = new ParseError(
     "layout",
     "value",
@@ -359,7 +359,7 @@ test("provider assignment facets preserve selected Go representations", async ()
   assert.equal(Timer.Stop(timerSource), true);
 });
 
-test("sync value facets preserve comparable state", async (): Promise<void> => {
+test("sync value facets preserve comparable state", (): void => {
   const mutex = new Mutex();
   const otherMutex = new Mutex();
   assert.equal(SyncMutexOperations.$equal(mutex, otherMutex), true);

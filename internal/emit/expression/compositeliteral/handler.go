@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapliteral"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
@@ -521,22 +520,6 @@ func emitElements(
 			fieldType,
 			api.ValueTransferCopy,
 			value,
-		)
-		if err != nil {
-			return nil, err
-		}
-		requests, err := cooperative.JoinNominalFieldCallableABIs(
-			context.WithRole(api.RoleCompositeElement),
-			named,
-			selectedField,
-		)
-		if err != nil {
-			return nil, err
-		}
-		value, err = api.NewExpressionEmission(
-			value.Before(),
-			value.Value(),
-			api.CombineRequests(value.Requests(), requests),
 		)
 		if err != nil {
 			return nil, err

@@ -40,17 +40,17 @@ func TestCallableParameterEvidenceAndProfileCoverageAreExact(t *testing.T) {
 	); len(mismatches) != 0 {
 		t.Fatalf("direct provider mismatches = %v", mismatches)
 	}
-	asynchronous := []gostdlib.ProviderCallableParameterDocument{{
+	nonSynchronous := []gostdlib.ProviderCallableParameterDocument{{
 		Parameter: 1,
-		Effect:    gostdlib.EffectAsynchronous,
+		Effect:    gostdlib.EffectKind("async"),
 	}}
 	mismatches := callableParameterBindingMismatches(
 		"example.Search",
 		signature,
-		asynchronous,
+		nonSynchronous,
 	)
-	if len(mismatches) != 1 || !strings.Contains(mismatches[0], "want sync or awaitable") {
-		t.Fatalf("asynchronous provider mismatches = %v", mismatches)
+	if len(mismatches) != 1 || !strings.Contains(mismatches[0], "want sync") {
+		t.Fatalf("non-synchronous provider mismatches = %v", mismatches)
 	}
 	if mismatches := callableParameterBindingMismatches(
 		"example.Search",

@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	concurrencyprofile "github.com/tsoniclang/gotots/internal/emit/concurrency/profile"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -28,13 +27,6 @@ func EmitSyntax(
 		return api.TypeEmission{},
 			api.Unsupported(context, api.CategoryType, source)
 	}
-	if err := concurrencyprofile.Admit(
-		context,
-		api.CategoryType,
-		source,
-	); err != nil {
-		return api.TypeEmission{}, err
-	}
 	return emit(context, children, source.Value, channel)
 }
 
@@ -48,13 +40,6 @@ func EmitRepresented(
 	if !ok {
 		return api.TypeEmission{},
 			api.Unsupported(context, api.CategoryType, source)
-	}
-	if err := concurrencyprofile.Admit(
-		context,
-		api.CategoryType,
-		source,
-	); err != nil {
-		return api.TypeEmission{}, err
 	}
 	return emit(context, children, source, channel)
 }

@@ -17,7 +17,6 @@ func ApplyDeferred(
 	receiver api.ExpressionEmission,
 	method *types.Func,
 	signature *types.Signature,
-	cooperative bool,
 	arguments []tsgo.Expression,
 	recovery tsgo.Expression,
 ) (api.ExpressionEmission, error) {

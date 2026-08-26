@@ -523,8 +523,8 @@ func TestStatefulNamedStructProfileRejectsAbsentCapabilityMember(t *testing.T) {
 			mutations++
 		}
 	}
-	if mutations != 3 {
-		t.Fatalf("named-struct capability mutation count = %d, want 3", mutations)
+	if mutations != 2 {
+		t.Fatalf("named-struct capability mutation count = %d, want 2", mutations)
 	}
 	mutated, err := json.Marshal(document)
 	if err != nil {
@@ -551,7 +551,7 @@ func TestStatefulNamedStructProfileRejectsAbsentCapabilityMember(t *testing.T) {
 		MaximumGoVersion:    "go1.26.4",
 	})
 	if err == nil ||
-		!strings.Contains(err.Error(), "CanonicalPathError.$zero") ||
+		!strings.Contains(err.Error(), "DirectPathError.$zero") ||
 		!strings.Contains(err.Error(), "absent") {
 		t.Fatalf("wrong absent capability error = %v", err)
 	}

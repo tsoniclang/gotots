@@ -109,38 +109,6 @@ func TestGenericCallableKernelRejectsMalformedProjection(t *testing.T) {
 	}
 }
 
-func TestSynchronousGenericCallableKernelRoundTrip(t *testing.T) {
-	document := genericKernelDocument()
-	synchronous := document.FacetModules[0].Facets[0]
-	synchronous.Capabilities = []gostdlib.FacetCapability{
-		gostdlib.FacetCapabilitySynchronousKernel,
-	}
-	synchronous.Export = "SlicesEqualSynchronousKernel"
-	synchronous.CallableParameters = []gostdlib.ProviderCallableParameterDocument{{
-		Parameter: 1,
-		Effect:    gostdlib.EffectSynchronous,
-	}}
-	document.FacetModules[0].Facets = append(
-		document.FacetModules[0].Facets,
-		synchronous,
-	)
-	payload, err := gostdlib.Seal(document)
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest, err := gostdlib.Parse(payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	kernel, ok := manifest.SynchronousGenericCallableKernel(
-		genericKernelIdentity,
-	)
-	if !ok || kernel.Export() != "SlicesEqualSynchronousKernel" ||
-		kernel.Effect() != gostdlib.EffectSynchronous {
-		t.Fatalf("synchronous generic callable kernel = %#v, %t", kernel, ok)
-	}
-}
-
 func genericKernelDocument() gostdlib.Document {
 	document := validDocument()
 	document.FacetModules = []gostdlib.FacetModuleDocument{{

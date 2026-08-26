@@ -56,7 +56,6 @@ func TestCertifiedExternalModuleLinksBodylessFunctionExactly(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			options := emit.DefaultOptions()
 			options.IntegerRepresentation = test.integer
-			options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 			options.StandardLibrary = standardLibrary
 			options.ExternalProvider = externalProvider
 			linked, err := emit.CompileWithOptions(program, []emit.Root{run}, options)
@@ -108,7 +107,6 @@ func TestCertifiedExternalProviderProfileFailsClosed(t *testing.T) {
 	}
 	program, sourcePackage := loadExternalLinkageProgram(t, mutatedProfile)
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = standardLibrary
 	options.ExternalProvider = externalProvider
 	_, err = emit.CompileWithOptions(

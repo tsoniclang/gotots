@@ -233,13 +233,7 @@ func EmitCapabilities(
 			reference         tsgo.Expression
 			referenceName     string
 			referenceRequests []api.RootRequest
-			providerFacet     api.CallableFacet
 		)
-		cooperativeCapability :=
-			operation.Consumer() ==
-				api.GenericFunctionOperationConsumer() &&
-				operation.Operation() ==
-					api.GenericOperationConstraintMethod
 		if operation.Operation() ==
 			api.GenericOperationDeferredCallableRegistry &&
 			!api.ContainsGenericTypeParameter(signature) {
@@ -263,12 +257,6 @@ func EmitCapabilities(
 			if err == nil {
 				referenceName = reference.Name()
 				referenceRequests = reference.Requests()
-				if cooperativeCapability {
-					providerFacet, err =
-						api.NewGenericOperationCallableFacet(
-							reference.Contract(),
-						)
-				}
 			}
 		} else {
 			inline, handled, inlineErr := children.ConcreteGenericOperation(
@@ -288,48 +276,16 @@ func EmitCapabilities(
 				referenceRequests = inline.Requests()
 			}
 			if err == nil && !handled {
-				referenceName, referenceRequests, providerFacet, err =
+				referenceName, referenceRequests, err =
 					emitNamedConcreteCapability(
 						context,
 						operation,
 						signature,
-						cooperativeCapability,
 					)
 			}
 		}
 		if err != nil {
 			return nil, nil, err
-		}
-		contractRequests := referenceRequests
-		if cooperativeCapability {
-			consumerFacet, facetErr :=
-				api.NewGenericOperationCallableFacet(operation)
-			if facetErr != nil {
-				return nil, nil, facetErr
-			}
-			providerObservation, observationErr :=
-				context.ObserveCooperativeCallable(providerFacet)
-			if observationErr != nil {
-				return nil, nil, observationErr
-			}
-			consumerObservation, observationErr :=
-				context.ObserveCooperativeCallable(consumerFacet)
-			if observationErr != nil {
-				return nil, nil, observationErr
-			}
-			contractRequests = api.CombineRequests(
-				referenceRequests,
-				providerObservation.Requests(),
-				consumerObservation.Requests(),
-			)
-			if providerObservation.Cooperative() {
-				request, requestErr :=
-					api.NewCooperativeCallableRequest(consumerFacet)
-				if requestErr != nil {
-					return nil, nil, requestErr
-				}
-				contractRequests = append(contractRequests, request)
-			}
 		}
 		if reference == nil {
 			reference = context.Factory().Identifier(referenceName)
@@ -342,7 +298,7 @@ func EmitCapabilities(
 			return nil, nil, err
 		}
 		targets = append(targets, binding)
-		requests = append(requests, contractRequests...)
+		requests = append(requests, referenceRequests...)
 	}
 	return targets, requests, nil
 }
@@ -351,10 +307,9 @@ func emitNamedConcreteCapability(
 	context api.Context,
 	operation *api.GenericOperationContract,
 	signature *types.Signature,
-	cooperative bool,
-) (string, []api.RootRequest, api.CallableFacet, error) {
+) (string, []api.RootRequest, error) {
 	if operation.Operation() != api.GenericOperationConstraintMethod {
-		return "", nil, api.CallableFacet{}, &api.InvariantError{
+		return "", nil, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "ordinary concrete generic operation has no inline emitter",
 		}
@@ -364,13 +319,7 @@ func emitNamedConcreteCapability(
 		signature,
 	)
 	if err != nil {
-		return "", nil, api.CallableFacet{}, err
+		return "", nil, err
 	}
-	var facet api.CallableFacet
-	if cooperative {
-		facet, err = api.NewGenericCapabilityCallableFacet(
-			reference.Artifact(),
-		)
-	}
-	return reference.Name(), reference.Requests(), facet, err
+	return reference.Name(), reference.Requests(), nil
 }

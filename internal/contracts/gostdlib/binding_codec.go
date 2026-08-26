@@ -89,7 +89,6 @@ func validateBinding(binding BindingDocument, field string) error {
 	if err := validateCallableParameters(
 		binding.CallableParameters,
 		field+".callableParameters",
-		true,
 	); err != nil {
 		return err
 	}

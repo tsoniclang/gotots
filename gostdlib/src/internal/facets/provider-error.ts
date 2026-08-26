@@ -1,7 +1,7 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   MessageWrappedErrors,
@@ -9,10 +9,7 @@ import {
 } from "../portable/errors/tree.js";
 import { ErrnoError } from "../portable/syscall/errno.js";
 import { sliceValues } from "../runtime/slice.js";
-import type { CanonicalError } from "./provider-io-contract.js";
 import type { InterfaceGuard } from "./provider-support.js";
-
-export type { CanonicalError } from "./provider-io-contract.js";
 
 export interface ProviderErrorInterface extends GoInterfaceValue {
   Error(): string;
@@ -35,23 +32,6 @@ export interface ProviderErrorUnwrapManyDirect extends GoInterfaceValue {
   ): RuntimeSlice<ProviderErrorInterface | undefined>;
 }
 
-export interface ProviderErrorIs extends GoInterfaceValue {
-  Is(
-    target: CanonicalError | undefined,
-    recovery?: GoRecovery,
-  ): Awaitable<bool>;
-}
-
-export interface ProviderErrorUnwrap extends GoInterfaceValue {
-  Unwrap(recovery?: GoRecovery): Awaitable<CanonicalError | undefined>;
-}
-
-export interface ProviderErrorUnwrapMany extends GoInterfaceValue {
-  Unwrap(
-    recovery?: GoRecovery,
-  ): Awaitable<RuntimeSlice<CanonicalError | undefined>>;
-}
-
 export function AsProviderErrorIsDirect(
   value: ProviderErrorInterface,
 ): ProviderErrorIsDirect | undefined {
@@ -67,24 +47,6 @@ export function AsProviderErrorUnwrapDirect(
 export function AsProviderErrorUnwrapManyDirect(
   value: ProviderErrorInterface,
 ): ProviderErrorUnwrapManyDirect | undefined {
-  return value instanceof MessageWrappedErrors ? value : undefined;
-}
-
-export function AsProviderErrorIs(
-  value: CanonicalError,
-): ProviderErrorIs | undefined {
-  return value instanceof ErrnoError ? value : undefined;
-}
-
-export function AsProviderErrorUnwrap(
-  value: CanonicalError,
-): ProviderErrorUnwrap | undefined {
-  return value instanceof WrappedProviderError ? value : undefined;
-}
-
-export function AsProviderErrorUnwrapMany(
-  value: CanonicalError,
-): ProviderErrorUnwrapMany | undefined {
   return value instanceof MessageWrappedErrors ? value : undefined;
 }
 
@@ -153,77 +115,4 @@ export function ErrorsUnwrapDirect(
   return direct !== undefined
     ? direct.Unwrap()
     : isUnwrap(failure) ? failure.Unwrap() : undefined;
-}
-
-export async function ErrorsIsCanonical(
-  failure: CanonicalError | undefined,
-  target: CanonicalError | undefined,
-  isCustom: InterfaceGuard<ProviderErrorIs>,
-  isUnwrap: InterfaceGuard<ProviderErrorUnwrap>,
-  isUnwrapMany: InterfaceGuard<ProviderErrorUnwrapMany>,
-): Promise<bool> {
-  if (failure === undefined || target === undefined) {
-    return failure === target;
-  }
-  let current: CanonicalError | undefined = failure;
-  while (current !== undefined) {
-    if (target.$go$type.comparable && current.$go$equal(target)) {
-      return true;
-    }
-    const directCustom = AsProviderErrorIs(current);
-    if (directCustom !== undefined && await directCustom.Is(target)) {
-      return true;
-    }
-    if (isCustom(current) && await current.Is(target)) {
-      return true;
-    }
-    const directUnwrap = AsProviderErrorUnwrap(current);
-    if (directUnwrap !== undefined) {
-      current = await directUnwrap.Unwrap();
-      continue;
-    }
-    const generatedUnwrap = isUnwrap(current) ? current : undefined;
-    if (generatedUnwrap !== undefined) {
-      current = await generatedUnwrap.Unwrap();
-      continue;
-    }
-    const directUnwrapMany = AsProviderErrorUnwrapMany(current);
-    if (directUnwrapMany !== undefined) {
-      for (const cause of sliceValues(await directUnwrapMany.Unwrap())) {
-        if (await ErrorsIsCanonical(
-          cause,
-          target,
-          isCustom,
-          isUnwrap,
-          isUnwrapMany,
-        )) {
-          return true;
-        }
-      }
-      return false;
-    }
-    const generatedUnwrapMany = isUnwrapMany(current) ? current : undefined;
-    if (generatedUnwrapMany !== undefined) {
-      for (const cause of sliceValues(await generatedUnwrapMany.Unwrap())) {
-        if (await ErrorsIsCanonical(
-          cause,
-          target,
-          isCustom,
-          isUnwrap,
-          isUnwrapMany,
-        )) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-  return false;
-}
-
-export async function ErrorsUnwrapCanonical(
-  failure: CanonicalError | undefined,
-  isUnwrap: InterfaceGuard<ProviderErrorUnwrap>,
-): Promise<CanonicalError | undefined> {
-  return isUnwrap(failure) ? failure.Unwrap() : undefined;
 }

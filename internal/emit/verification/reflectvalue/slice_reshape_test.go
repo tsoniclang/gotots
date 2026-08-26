@@ -36,7 +36,7 @@ func Reshape() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await Reshape();
+	typescriptRunner := `const facts = Reshape();
 console.log(facts);
 `
 	goRunner := `package main

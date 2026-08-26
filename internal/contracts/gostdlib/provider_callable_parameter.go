@@ -10,7 +10,6 @@ type ProviderCallableParameterDocument struct {
 func validateCallableParameters(
 	parameters []ProviderCallableParameterDocument,
 	field string,
-	allowAsynchronous bool,
 ) error {
 	previous := -1
 	for index, selected := range parameters {
@@ -20,10 +19,7 @@ func validateCallableParameters(
 				"parameters are negative, duplicated, or not strictly ordered",
 			)
 		}
-		validEffect := selected.Effect == EffectSynchronous ||
-			selected.Effect == EffectAwaitable ||
-			allowAsynchronous && selected.Effect == EffectAsynchronous
-		if !validEffect {
+		if !selected.Effect.Valid() {
 			return manifestError(
 				fmt.Sprintf("%s[%d].effect", field, index),
 				"value is invalid",

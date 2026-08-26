@@ -37,7 +37,7 @@ func TestProviderCapabilityViewExactJoinsGoAndTypeScriptContracts(t *testing.T) 
 	}
 	exports, err := project.Exports(filepath.Join(
 		provider,
-		"src/internal/facets/provider-io-fs.ts",
+		"src/internal/facets/provider-io-fs-direct.ts",
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -46,9 +46,9 @@ func TestProviderCapabilityViewExactJoinsGoAndTypeScriptContracts(t *testing.T) 
 	for _, selected := range exports {
 		targets[selected.Name()] = selected
 	}
-	profileTarget := targets["IoFsReadFileCanonical"]
+	profileTarget := targets["IoFsReadFileDirect"]
 	if profileTarget.Name() == "" {
-		t.Fatal("IoFsReadFileCanonical is absent")
+		t.Fatal("IoFsReadFileDirect is absent")
 	}
 	goPackage, err := importer.Default().Import("io/fs")
 	if err != nil {
@@ -64,8 +64,8 @@ func TestProviderCapabilityViewExactJoinsGoAndTypeScriptContracts(t *testing.T) 
 		targetIdentity: {object: targetObject},
 	}}
 	interfaces := []gostdlib.ProviderCallableProfileInterfaceDocument{
-		{SourceIdentity: baseIdentity, Export: "CanonicalFS"},
-		{SourceIdentity: targetIdentity, Export: "CanonicalReadFileFS"},
+		{SourceIdentity: baseIdentity, Export: "ProviderFS"},
+		{SourceIdentity: targetIdentity, Export: "ProviderReadFileFS"},
 	}
 	views := []gostdlib.ProviderCallableProfileCapabilityViewDocument{{
 		BaseSourceIdentity:   baseIdentity,

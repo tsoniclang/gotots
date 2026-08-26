@@ -169,7 +169,6 @@ func LocalBuilder() string {
 	}
 	certificate := linkedProviderCertificate(t)
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = certificate
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -478,13 +477,20 @@ func assertProviderRepresentationABI(
 	}
 	for _, module := range []string{
 		"@gotots/gostdlib/encoding/binary.js",
+		"@gotots/gostdlib/io/fs.js",
 		"@gotots/gostdlib/internal/facets/named-encoding-binary.js",
-		"@gotots/gostdlib/internal/facets/named-io-fs.js",
 		"@gotots/gostdlib/internal/facets/recovery-sync.js",
 	} {
 		if !imports[module] {
-			t.Fatalf("provider representation import %q is absent", module)
+			t.Fatalf(
+				"provider representation import %q is absent; imports: %v",
+				module,
+				imports,
+			)
 		}
+	}
+	if imports["@gotots/gostdlib/internal/facets/named-io-fs.js"] {
+		t.Fatal("direct PathError construction retained the superseded private facade")
 	}
 }
 

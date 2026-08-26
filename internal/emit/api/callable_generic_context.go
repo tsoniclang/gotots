@@ -11,12 +11,11 @@ type GenericCallableResolver interface {
 		*types.Func,
 		TypeArgumentList,
 		*types.Signature,
-		GenericConcretizationEffect,
 		GeneratedArtifactPlacement,
 		ArtifactOwner,
 		*types.TypeName,
 	) (*GenericConcretization, error)
-	GenericCallableSynchronousParameters(*types.Func) ([]int, bool, error)
+	GenericCallableParameters(*types.Func) ([]int, bool, error)
 	GenericCallableRequiresConcretization(*types.Func) (bool, error)
 	ResolveGenericOperationSet(
 		types.Object,
@@ -48,7 +47,6 @@ func (c Context) ResolveGenericConcretization(
 	owner *types.Func,
 	arguments TypeArgumentList,
 	signature *types.Signature,
-	effect GenericConcretizationEffect,
 ) (GenericConcretizationReference, error) {
 	if c.genericResolver == nil {
 		return GenericConcretizationReference{}, &ContextError{
@@ -70,7 +68,6 @@ func (c Context) ResolveGenericConcretization(
 		owner,
 		arguments,
 		signature,
-		effect,
 		placement,
 		lexicalOwner,
 		anchor,
@@ -81,7 +78,7 @@ func (c Context) ResolveGenericConcretization(
 	return names.GenericConcretization(concretization)
 }
 
-func (c Context) GenericCallableSynchronousParameters(
+func (c Context) GenericCallableParameters(
 	owner *types.Func,
 ) ([]int, bool, error) {
 	if c.genericResolver == nil {
@@ -89,7 +86,7 @@ func (c Context) GenericCallableSynchronousParameters(
 			Reason: "generic concretization resolver is unavailable",
 		}
 	}
-	return c.genericResolver.GenericCallableSynchronousParameters(owner)
+	return c.genericResolver.GenericCallableParameters(owner)
 }
 
 func (c Context) WithGenericCallableResolver(

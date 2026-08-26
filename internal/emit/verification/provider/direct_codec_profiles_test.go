@@ -105,34 +105,55 @@ func Result(value *uint32) error {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
-	options.StandardLibrary = linkedProviderCertificate(t)
-	emission, err := emit.CompileWithOptions(
-		program,
-		[]emit.Root{mustProviderRoot(
-			t,
-			program.Roots()[0].Types().Scope().Lookup("Result"),
-		)},
-		options,
-	)
-	if err != nil {
-		t.Fatal(err)
+	profiles := []struct {
+		name           string
+		representation emit.IntegerRepresentation
+		read           string
+		write          string
+	}{
+		{
+			name:           "number",
+			representation: emit.IntegerRepresentationNumber,
+			read:           "EncodingBinaryReadDirect",
+			write:          "EncodingBinaryWriteDirect",
+		},
+		{
+			name:           "fixed64-bigint",
+			representation: emit.IntegerRepresentationFixed64BigInt,
+			read:           "EncodingBinaryReadDirect",
+			write:          "EncodingBinaryWriteDirect",
+		},
 	}
-	workingDirectory := t.TempDir()
-	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
-	for _, expected := range []string{
-		"EncodingBinaryReadDirect",
-		"EncodingBinaryWriteDirect",
-	} {
-		if !strings.Contains(artifacts.printed, expected) {
-			t.Fatalf("disabled encoding/binary profile omits %s:\n%s", expected, artifacts.printed)
-		}
-	}
-	if strings.Contains(artifacts.printed, "Canonical") ||
-		strings.Contains(artifacts.printed, "async ") ||
-		strings.Contains(artifacts.printed, "await ") {
-		t.Fatalf("disabled encoding/binary profiles are not direct:\n%s", artifacts.printed)
+	for _, profile := range profiles {
+		t.Run(profile.name, func(t *testing.T) {
+			options := emit.DefaultOptions()
+			options.IntegerRepresentation = profile.representation
+			options.StandardLibrary = linkedProviderCertificate(t)
+			emission, err := emit.CompileWithOptions(
+				program,
+				[]emit.Root{mustProviderRoot(
+					t,
+					program.Roots()[0].Types().Scope().Lookup("Result"),
+				)},
+				options,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			workingDirectory := t.TempDir()
+			artifacts := materializeArtifacts(t, emission, workingDirectory)
+			waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+			for _, expected := range []string{profile.read, profile.write} {
+				if !strings.Contains(artifacts.printed, expected) {
+					t.Fatalf("disabled encoding/binary profile omits %s:\n%s", expected, artifacts.printed)
+				}
+			}
+			if strings.Contains(artifacts.printed, "Canonical") ||
+				strings.Contains(artifacts.printed, "async ") ||
+				strings.Contains(artifacts.printed, "await ") {
+				t.Fatalf("disabled encoding/binary profiles are not direct:\n%s", artifacts.printed)
+			}
+		})
 	}
 }
 

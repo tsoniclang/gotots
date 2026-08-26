@@ -15,7 +15,7 @@ func emitArguments(
 	signature *types.Signature,
 	captureAll bool,
 ) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	return emitArgumentsWithSynchronousParameters(
+	return emitArgumentsWithProviderCallableParameters(
 		context,
 		children,
 		source,
@@ -25,30 +25,30 @@ func emitArguments(
 	)
 }
 
-func emitArgumentsWithSynchronousParameters(
+func emitArgumentsWithProviderCallableParameters(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CallExpr,
 	signature *types.Signature,
 	captureAll bool,
-	synchronousParameters []int,
+	providerCallableParameters []int,
 ) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	selectedSynchronous := make(map[int]struct{}, len(synchronousParameters))
-	for _, index := range synchronousParameters {
+	selectedProviderCallables := make(map[int]struct{}, len(providerCallableParameters))
+	for _, index := range providerCallableParameters {
 		if index < 0 || index >= signature.Params().Len() {
 			return nil, nil, nil, &api.InvariantError{
 				Role:   context.Role(),
-				Reason: "synchronous call parameter index is invalid",
+				Reason: "provider callable parameter index is invalid",
 			}
 		}
-		selectedSynchronous[index] = struct{}{}
+		selectedProviderCallables[index] = struct{}{}
 	}
 	if len(source.Args) == 1 {
 		if results, ok := context.TypesInfo().TypeOf(source.Args[0]).(*types.Tuple); ok {
-			if len(selectedSynchronous) != 0 {
+			if len(selectedProviderCallables) != 0 {
 				return nil, nil, nil, &api.InvariantError{
 					Role:   context.Role(),
-					Reason: "synchronous call parameter came from multiple results",
+					Reason: "provider callable parameter came from multiple results",
 				}
 			}
 			if signature.Variadic() {
@@ -80,10 +80,10 @@ func emitArgumentsWithSynchronousParameters(
 		}
 	}
 	if signature.Variadic() {
-		if len(selectedSynchronous) != 0 {
+		if len(selectedProviderCallables) != 0 {
 			return nil, nil, nil, &api.InvariantError{
 				Role:   context.Role(),
-				Reason: "synchronous call parameter belongs to a variadic call",
+				Reason: "provider callable parameter belongs to a variadic call",
 			}
 		}
 		return emitVariadicArguments(
@@ -110,8 +110,8 @@ func emitArgumentsWithSynchronousParameters(
 		argumentContext := context.
 			WithRole(api.RoleCallArgument).
 			WithExpectedType(signature.Params().At(index).Type())
-		if _, synchronous := selectedSynchronous[index]; synchronous {
-			argumentContext = argumentContext.WithSynchronousCallableBoundary()
+		if _, selected := selectedProviderCallables[index]; selected {
+			argumentContext = argumentContext.WithProviderCallableBoundary()
 		}
 		target, err := children.Expression(argumentContext, argument)
 		if err != nil {

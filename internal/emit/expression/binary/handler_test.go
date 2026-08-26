@@ -48,7 +48,6 @@ func TestParentOperatorOwnerDoesNotCreateAnIntegerFallback(t *testing.T) {
 				unusedValues{},
 				api.IntegerRepresentationNumber,
 				api.EvaluationOrderDirect,
-				api.ConcurrencySemanticsDisabled,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -86,7 +85,6 @@ func TestLogicalOperationAcceptsUntypedBooleanConditionEvidence(t *testing.T) {
 		unusedValues{},
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderDirect,
-		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -114,7 +112,6 @@ func TestLogicalRightPrerequisitesStayInsideTheSelectedBranch(t *testing.T) {
 		unusedValues{},
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderDirect,
-		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -208,39 +208,6 @@
       "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
       "sourcePath": "src/internal/facets/provider-error.ts",
       "viewExport": "AsProviderErrorUnwrapManyDirect"
-    },
-    {
-      "usage": "generated-bridge",
-      "baseSourceIdentity": "go:universe|error",
-      "baseExport": "CanonicalError",
-      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
-      "profileExport": "ErrorsIsCanonical",
-      "targetExport": "ProviderErrorIs",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
-      "sourcePath": "src/internal/facets/provider-error.ts",
-      "viewExport": "AsProviderErrorIs"
-    },
-    {
-      "usage": "generated-bridge",
-      "baseSourceIdentity": "go:universe|error",
-      "baseExport": "CanonicalError",
-      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
-      "profileExport": "ErrorsIsCanonical",
-      "targetExport": "ProviderErrorUnwrap",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
-      "sourcePath": "src/internal/facets/provider-error.ts",
-      "viewExport": "AsProviderErrorUnwrap"
-    },
-    {
-      "usage": "generated-bridge",
-      "baseSourceIdentity": "go:universe|error",
-      "baseExport": "CanonicalError",
-      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
-      "profileExport": "ErrorsIsCanonical",
-      "targetExport": "ProviderErrorUnwrapMany",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
-      "sourcePath": "src/internal/facets/provider-error.ts",
-      "viewExport": "AsProviderErrorUnwrapMany"
     }
   ],
   "providerProtocols": [
@@ -339,40 +306,6 @@
       ]
     },
     {
-      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
-      "sourcePath": "src/internal/facets/provider-error.ts",
-      "export": "ErrorsIsCanonical",
-      "required": true,
-      "canonicalParameters": [
-        0,
-        1
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        }
-      ],
-      "protocols": [
-        {
-          "protocol": "error-is",
-          "export": "ProviderErrorIs",
-          "valueParameter": 0
-        },
-        {
-          "protocol": "error-unwrap",
-          "export": "ProviderErrorUnwrap",
-          "valueParameter": 0
-        },
-        {
-          "protocol": "error-unwrap-many",
-          "export": "ProviderErrorUnwrapMany",
-          "valueParameter": 0
-        }
-      ]
-    },
-    {
       "sourceIdentity": "errors|kind=4|receiver=|name=Unwrap",
       "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
       "sourcePath": "src/internal/facets/provider-error.ts",
@@ -394,32 +327,6 @@
         {
           "protocol": "error-unwrap",
           "export": "ProviderErrorUnwrapDirect",
-          "valueParameter": 0
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "errors|kind=4|receiver=|name=Unwrap",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
-      "sourcePath": "src/internal/facets/provider-error.ts",
-      "export": "ErrorsUnwrapCanonical",
-      "required": true,
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        }
-      ],
-      "protocols": [
-        {
-          "protocol": "error-unwrap",
-          "export": "ProviderErrorUnwrap",
           "valueParameter": 0
         }
       ]
@@ -447,41 +354,6 @@
       ]
     },
     {
-      "sourceIdentity": "context|kind=4|receiver=|name=WithCancel",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
-      "sourcePath": "src/internal/facets/provider-context.ts",
-      "export": "ContextWithCancelCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
-          "targetParameter": "canceled"
-        }
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "contractInterfaces": [
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "context|kind=2|receiver=|name=Context",
-          "export": "CanonicalContext"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "context|kind=4|receiver=|name=WithCancelCause",
       "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
       "sourcePath": "src/internal/facets/provider-context.ts",
@@ -500,42 +372,6 @@
         {
           "sourceIdentity": "go:universe|error",
           "export": "ProviderErrorInterface"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "context|kind=4|receiver=|name=WithCancelCause",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
-      "sourcePath": "src/internal/facets/provider-context.ts",
-      "export": "ContextWithCancelCauseCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0,
-        1
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
-          "targetParameter": "canceled"
-        }
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "contractInterfaces": [
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "context|kind=2|receiver=|name=Context",
-          "export": "CanonicalContext"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
         }
       ]
     },
@@ -562,45 +398,6 @@
       ]
     },
     {
-      "sourceIdentity": "context|kind=4|receiver=|name=WithTimeout",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
-      "sourcePath": "src/internal/facets/provider-context.ts",
-      "export": "ContextWithTimeoutCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
-          "targetParameter": "canceled"
-        },
-        {
-          "sourceIdentity": "context|kind=3|receiver=|name=DeadlineExceeded",
-          "targetParameter": "deadlineExceeded"
-        }
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "contractInterfaces": [
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "context|kind=2|receiver=|name=Context",
-          "export": "CanonicalContext"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "context|kind=4|receiver=|name=AfterFunc",
       "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
       "sourcePath": "src/internal/facets/provider-context.ts",
@@ -620,29 +417,6 @@
       ]
     },
     {
-      "sourceIdentity": "context|kind=4|receiver=|name=AfterFunc",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
-      "sourcePath": "src/internal/facets/provider-context.ts",
-      "export": "ContextAfterFuncCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "context|kind=2|receiver=|name=Context",
-          "export": "CanonicalContext"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "context|kind=4|receiver=|name=Cause",
       "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
       "sourcePath": "src/internal/facets/provider-context.ts",
@@ -658,32 +432,6 @@
         {
           "sourceIdentity": "go:universe|error",
           "export": "ProviderErrorInterface"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "context|kind=4|receiver=|name=Cause",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
-      "sourcePath": "src/internal/facets/provider-context.ts",
-      "export": "ContextCauseCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "context|kind=2|receiver=|name=Context",
-          "export": "CanonicalContext"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
         }
       ]
     },
@@ -710,35 +458,6 @@
       ]
     },
     {
-      "sourceIdentity": "context|kind=4|receiver=|name=WithValue",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
-      "sourcePath": "src/internal/facets/provider-context.ts",
-      "export": "ContextWithValueCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "contractInterfaces": [
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "context|kind=2|receiver=|name=Context",
-          "export": "CanonicalContext"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
       "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
       "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
@@ -754,31 +473,6 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Writer",
           "export": "ProviderWriterInterface"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
-      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
-      "export": "PprofStartCPUProfileCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "contractInterfaces": [
-        "go:universe|error"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
-          "export": "CanonicalWriter"
         }
       ]
     },
@@ -799,32 +493,6 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Writer",
           "export": "ProviderWriterInterface"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
-      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
-      "export": "PprofProfileWriteToCanonical",
-      "receiver": true,
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "contractInterfaces": [
-        "go:universe|error"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
-          "export": "CanonicalWriter"
         }
       ]
     },
@@ -852,32 +520,6 @@
       ]
     },
     {
-      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprint",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
-      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
-      "export": "FprintCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        1
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Writer"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
-          "export": "CanonicalWriter"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintf",
       "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
       "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
@@ -901,32 +543,6 @@
       ]
     },
     {
-      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintf",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
-      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
-      "export": "FprintfCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        1
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Writer"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
-          "export": "CanonicalWriter"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintln",
       "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
       "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
@@ -946,32 +562,6 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Writer",
           "export": "ProviderWriterInterface"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintln",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
-      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
-      "export": "FprintlnCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        1
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Writer"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
-          "export": "CanonicalWriter"
         }
       ]
     },
@@ -1004,38 +594,6 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Reader",
           "export": "ProviderReaderInterface"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "bufio|kind=4|receiver=|name=NewReader",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
-      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
-      "export": "NewReaderCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
-          "targetParameter": "noProgress"
-        }
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Reader"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
-          "export": "CanonicalReader"
         }
       ]
     },
@@ -1084,50 +642,6 @@
       ]
     },
     {
-      "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
-      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
-      "export": "NewScannerCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "bufio|kind=3|receiver=|name=ErrBadReadCount",
-          "targetParameter": "badReadCount"
-        },
-        {
-          "sourceIdentity": "bufio|kind=3|receiver=|name=ErrTooLong",
-          "targetParameter": "tooLong"
-        },
-        {
-          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
-          "targetParameter": "eof"
-        },
-        {
-          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
-          "targetParameter": "noProgress"
-        }
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Reader"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
-          "export": "CanonicalReader"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "bufio|kind=4|receiver=|name=NewWriter",
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
       "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
@@ -1156,38 +670,6 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Writer",
           "export": "ProviderWriterInterface"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "bufio|kind=4|receiver=|name=NewWriter",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
-      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
-      "export": "NewWriterCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "io|kind=3|receiver=|name=ErrShortWrite",
-          "targetParameter": "shortWrite"
-        }
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Writer"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
-          "export": "CanonicalWriter"
         }
       ]
     },
@@ -1244,59 +726,6 @@
       ]
     },
     {
-      "sourceIdentity": "compress/gzip|kind=4|receiver=|name=NewReader",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
-      "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
-      "export": "GzipNewReaderCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0,
-        1
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
-          "targetParameter": "eof"
-        },
-        {
-          "sourceIdentity": "io|kind=3|receiver=|name=ErrUnexpectedEOF",
-          "targetParameter": "unexpectedEOF"
-        },
-        {
-          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
-          "targetParameter": "noProgress"
-        }
-      ],
-      "canonicalTypeArguments": [
-        "compress/flate|kind=2|receiver=|name=Reader",
-        "go:universe|error",
-        "io|kind=2|receiver=|name=ReadCloser"
-      ],
-      "contractInterfaces": [
-        "go:universe|error"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "compress/flate|kind=2|receiver=|name=Reader",
-          "export": "CanonicalFlateReader"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=ReadCloser",
-          "export": "CanonicalReadCloser"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
-          "export": "CanonicalReader"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "os|kind=4|receiver=|name=IsNotExist",
       "specifier": "@gotots/gostdlib/internal/facets/provider-os-error.js",
       "sourcePath": "src/internal/facets/provider-os-error.ts",
@@ -1330,45 +759,6 @@
       ]
     },
     {
-      "sourceIdentity": "os|kind=4|receiver=|name=IsNotExist",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-os-error.js",
-      "sourcePath": "src/internal/facets/provider-os-error.ts",
-      "export": "OsIsNotExistCanonical",
-      "required": true,
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "io/fs|kind=3|receiver=|name=ErrNotExist",
-          "targetParameter": "target"
-        }
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        }
-      ],
-      "protocols": [
-        {
-          "protocol": "error-is-source",
-          "export": "ProviderOsErrorIs",
-          "valueParameter": 0
-        },
-        {
-          "protocol": "error-unwrap",
-          "export": "ProviderErrorUnwrap",
-          "valueParameter": 0
-        },
-        {
-          "protocol": "error-unwrap-many",
-          "export": "ProviderErrorUnwrapMany",
-          "valueParameter": 0
-        }
-      ]
-    },
-    {
       "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
       "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
       "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
@@ -1389,36 +779,6 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Reader",
           "export": "ProviderReaderInterface"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
-      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
-      "export": "EncodingBinaryReadCanonical",
-      "canonicalParameters": [
-        0,
-        1
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "contractInterfaces": [
-        "go:universe|error"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
-          "export": "CanonicalByteOrder"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
-          "export": "CanonicalReader"
         }
       ]
     },
@@ -1456,42 +816,6 @@
       ]
     },
     {
-      "sourceIdentity": "io|kind=4|receiver=|name=ReadFull",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-io-read.js",
-      "sourcePath": "src/internal/facets/provider-io-read.ts",
-      "export": "IoReadFullCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        1
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
-          "targetParameter": "eof"
-        },
-        {
-          "sourceIdentity": "io|kind=3|receiver=|name=ErrUnexpectedEOF",
-          "targetParameter": "unexpectedEOF"
-        }
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Reader"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
-          "export": "CanonicalReader"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
       "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
       "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
@@ -1512,36 +836,6 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Writer",
           "export": "ProviderWriterInterface"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
-      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
-      "export": "EncodingBinaryWriteCanonical",
-      "canonicalParameters": [
-        0,
-        1
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "contractInterfaces": [
-        "go:universe|error"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
-          "export": "CanonicalByteOrder"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
-          "export": "CanonicalWriter"
         }
       ]
     },
@@ -1600,64 +894,6 @@
       ]
     },
     {
-      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
-      "sourcePath": "src/internal/facets/provider-io-fs.ts",
-      "export": "IoFsReadDirCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0,
-        1
-      ],
-      "capabilityViews": [
-        {
-          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
-          "targetParameter": "asReadDirFS"
-        },
-        {
-          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=File",
-          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
-          "targetParameter": "asReadDirFile"
-        }
-      ],
-      "fromProviderInterfaces": [
-        "go:universe|error"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
-          "export": "CanonicalDirEntry"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "export": "CanonicalFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
-          "export": "CanonicalFile"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
-          "export": "CanonicalFileInfo"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
-          "export": "CanonicalReadDirFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
-          "export": "CanonicalReadDirFile"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadFile",
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs-direct.js",
       "sourcePath": "src/internal/facets/provider-io-fs-direct.ts",
@@ -1702,53 +938,6 @@
       ]
     },
     {
-      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadFile",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
-      "sourcePath": "src/internal/facets/provider-io-fs.ts",
-      "export": "IoFsReadFileCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        1
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
-          "targetParameter": "eof"
-        }
-      ],
-      "capabilityViews": [
-        {
-          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
-          "targetParameter": "asReadFileFS"
-        }
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "export": "CanonicalFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
-          "export": "CanonicalFile"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
-          "export": "CanonicalFileInfo"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
-          "export": "CanonicalReadFileFS"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs-direct.js",
       "sourcePath": "src/internal/facets/provider-io-fs-direct.ts",
@@ -1786,48 +975,6 @@
         {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
           "export": "ProviderStatFS"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
-      "sourcePath": "src/internal/facets/provider-io-fs.ts",
-      "export": "IoFsStatCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0,
-        1
-      ],
-      "capabilityViews": [
-        {
-          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
-          "targetParameter": "asStatFS"
-        }
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "export": "CanonicalFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
-          "export": "CanonicalFile"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
-          "export": "CanonicalFileInfo"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
-          "export": "CanonicalStatFS"
         }
       ]
     },
@@ -1906,86 +1053,6 @@
       ]
     },
     {
-      "sourceIdentity": "io/fs|kind=4|receiver=|name=WalkDir",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
-      "sourcePath": "src/internal/facets/provider-io-fs.ts",
-      "export": "IoFsWalkDirCanonical",
-      "canonicalParameters": [
-        0,
-        2
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "io/fs|kind=3|receiver=|name=SkipAll",
-          "targetParameter": "skipAll"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=3|receiver=|name=SkipDir",
-          "targetParameter": "skipDir"
-        }
-      ],
-      "capabilityViews": [
-        {
-          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
-          "targetParameter": "asReadDirFS"
-        },
-        {
-          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=File",
-          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
-          "targetParameter": "asReadDirFile"
-        },
-        {
-          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
-          "targetParameter": "asStatFS"
-        }
-      ],
-      "contractInterfaces": [
-        "io/fs|kind=2|receiver=|name=DirEntry"
-      ],
-      "fromProviderInterfaces": [
-        "go:universe|error"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
-          "export": "CanonicalDirEntry"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "export": "CanonicalFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
-          "export": "CanonicalFile"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
-          "export": "CanonicalFileInfo"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
-          "export": "CanonicalReadDirFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
-          "export": "CanonicalReadDirFile"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
-          "export": "CanonicalStatFS"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
       "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
       "sourcePath": "src/internal/facets/provider-os-signal.ts",
@@ -2004,46 +1071,6 @@
         {
           "sourceIdentity": "go:universe|error",
           "export": "ProviderErrorInterface"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
-      "sourcePath": "src/internal/facets/provider-os-signal.ts",
-      "export": "OsSignalNotifyContextCanonical",
-      "canonicalParameters": [
-        0,
-        1
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "canonicalValues": [
-        {
-          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
-          "targetParameter": "canceled"
-        }
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "contractInterfaces": [
-        "context|kind=2|receiver=|name=Context"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "context|kind=2|receiver=|name=Context",
-          "export": "CanonicalContext"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "os|kind=2|receiver=|name=Signal",
-          "export": "CanonicalSignal"
         }
       ]
     },
@@ -2107,42 +1134,6 @@
       ]
     },
     {
-      "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
-      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
-      "export": "Base64NewEncoderCanonical",
-      "canonicalParameters": [
-        1
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "canonicalTypeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Writer"
-      ],
-      "contractInterfaces": [
-        "io|kind=2|receiver=|name=WriteCloser"
-      ],
-      "implementedResultInterfaces": [
-        "io|kind=2|receiver=|name=WriteCloser"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=WriteCloser",
-          "export": "CanonicalWriteCloser"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
-          "export": "CanonicalWriter"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "io/fs|kind=4|receiver=|name=FileInfoToDirEntry",
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs-direct.js",
       "sourcePath": "src/internal/facets/provider-io-fs-direct.ts",
@@ -2168,35 +1159,6 @@
         {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
           "export": "ProviderFileInfo"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "io/fs|kind=4|receiver=|name=FileInfoToDirEntry",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
-      "sourcePath": "src/internal/facets/provider-io-fs.ts",
-      "export": "IoFsFileInfoToDirEntryCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "canonicalResults": [
-        0
-      ],
-      "contractInterfaces": [
-        "io/fs|kind=2|receiver=|name=DirEntry"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
-          "export": "CanonicalDirEntry"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
-          "export": "CanonicalFileInfo"
         }
       ]
     },
@@ -2237,21 +1199,6 @@
       ]
     },
     {
-      "sourceIdentity": "sort|kind=4|receiver=|name=Sort",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
-      "sourcePath": "src/internal/facets/provider-sort.ts",
-      "export": "SortCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
-          "export": "SortInterfaceCanonical"
-        }
-      ]
-    },
-    {
       "sourceIdentity": "sort|kind=4|receiver=|name=Stable",
       "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
       "sourcePath": "src/internal/facets/provider-sort.ts",
@@ -2263,21 +1210,6 @@
         {
           "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
           "export": "SortInterfaceDirect"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "sort|kind=4|receiver=|name=Stable",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
-      "sourcePath": "src/internal/facets/provider-sort.ts",
-      "export": "SortStableCanonical",
-      "canonicalParameters": [
-        0
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
-          "export": "SortInterfaceCanonical"
         }
       ]
     },
@@ -2394,30 +1326,6 @@
       ]
     },
     {
-      "sourceIdentity": "bufio|kind=2|receiver=|name=Reader",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
-      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
-      "export": "CanonicalBufioReader",
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
-          "export": "CanonicalReader"
-        }
-      ],
-      "typeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Reader"
-      ],
-      "operations": [
-        "assign",
-        "copy"
-      ]
-    },
-    {
       "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
       "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
@@ -2442,30 +1350,6 @@
       ]
     },
     {
-      "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
-      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
-      "export": "CanonicalBufioScanner",
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
-          "export": "CanonicalReader"
-        }
-      ],
-      "typeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Reader"
-      ],
-      "operations": [
-        "assign",
-        "copy"
-      ]
-    },
-    {
       "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
       "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
@@ -2478,30 +1362,6 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Writer",
           "export": "ProviderWriterInterface"
-        }
-      ],
-      "typeArguments": [
-        "go:universe|error",
-        "io|kind=2|receiver=|name=Writer"
-      ],
-      "operations": [
-        "assign",
-        "copy"
-      ]
-    },
-    {
-      "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
-      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
-      "export": "CanonicalBufioWriter",
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
-          "export": "CanonicalWriter"
         }
       ],
       "typeArguments": [
@@ -2543,35 +1403,6 @@
       ]
     },
     {
-      "sourceIdentity": "compress/gzip|kind=2|receiver=|name=Reader",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
-      "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
-      "export": "CanonicalGzipReader",
-      "interfaces": [
-        {
-          "sourceIdentity": "compress/flate|kind=2|receiver=|name=Reader",
-          "export": "CanonicalFlateReader"
-        },
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
-        },
-        {
-          "sourceIdentity": "io|kind=2|receiver=|name=ReadCloser",
-          "export": "CanonicalReadCloser"
-        }
-      ],
-      "typeArguments": [
-        "compress/flate|kind=2|receiver=|name=Reader",
-        "go:universe|error",
-        "io|kind=2|receiver=|name=ReadCloser"
-      ],
-      "operations": [
-        "assign",
-        "copy"
-      ]
-    },
-    {
       "sourceIdentity": "io/fs|kind=2|receiver=|name=PathError",
       "specifier": "@gotots/gostdlib/internal/facets/named-io-fs.js",
       "sourcePath": "src/internal/facets/named-io-fs.ts",
@@ -2580,29 +1411,6 @@
         {
           "sourceIdentity": "go:universe|error",
           "export": "ProviderErrorInterface"
-        }
-      ],
-      "typeArguments": [
-        "go:universe|error"
-      ],
-      "operations": [
-        "assign",
-        "copy",
-        "equal",
-        "hash",
-        "make",
-        "storage"
-      ]
-    },
-    {
-      "sourceIdentity": "io/fs|kind=2|receiver=|name=PathError",
-      "specifier": "@gotots/gostdlib/internal/facets/named-io-fs.js",
-      "sourcePath": "src/internal/facets/named-io-fs.ts",
-      "export": "CanonicalPathError",
-      "interfaces": [
-        {
-          "sourceIdentity": "go:universe|error",
-          "export": "CanonicalError"
         }
       ],
       "typeArguments": [
@@ -3944,45 +2752,35 @@
     {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Copy","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsCopyKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Equal","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsEqualKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=EqualFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"},{"typeParameter":4,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsEqualFuncKernel"},
-    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=EqualFunc","capabilities":["synchronous-kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"},{"typeParameter":4,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsEqualFuncSynchronousKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Keys","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsKeysKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Values","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsValuesKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=AppendSeq","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesAppendSeqKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=BinarySearch","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesBinarySearchKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=BinarySearchFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesBinarySearchFuncKernel"},
-    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=BinarySearchFunc","capabilities":["synchronous-kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesBinarySearchFuncSynchronousKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Clip","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesClipKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Clone","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCloneKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Collect","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCollectKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Compact","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompactKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=CompactFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompactFuncKernel"},
-    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=CompactFunc","capabilities":["synchronous-kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompactFuncSynchronousKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Compare","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompareKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=CompareFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":2,"facet":"container-storage"},{"typeParameter":3,"facet":"logical"},{"typeParameter":3,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompareFuncKernel"},
-    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=CompareFunc","capabilities":["synchronous-kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":2,"facet":"container-storage"},{"typeParameter":3,"facet":"logical"},{"typeParameter":3,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompareFuncSynchronousKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesConcatKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Contains","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesContainsKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=ContainsFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesContainsFuncKernel"},
-    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=ContainsFunc","capabilities":["synchronous-kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesContainsFuncSynchronousKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Delete","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesDeleteKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=DeleteFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesDeleteFuncKernel"},
-    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=DeleteFunc","capabilities":["synchronous-kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesDeleteFuncSynchronousKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Equal","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesEqualKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=EqualFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":2,"facet":"container-storage"},{"typeParameter":3,"facet":"logical"},{"typeParameter":3,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesEqualFuncKernel"},
-    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=EqualFunc","capabilities":["synchronous-kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":2,"facet":"container-storage"},{"typeParameter":3,"facet":"logical"},{"typeParameter":3,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesEqualFuncSynchronousKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Grow","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesGrowKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Index","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesIndexKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=IndexFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesIndexFuncKernel"},
-    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=IndexFunc","capabilities":["synchronous-kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesIndexFuncSynchronousKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Insert","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesInsertKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Repeat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesRepeatKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Replace","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesReplaceKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Reverse","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesReverseKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Sort","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortFuncKernel"},
-    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortFunc","capabilities":["synchronous-kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortFuncSynchronousKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortStableFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortStableFuncKernel"},
-    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortStableFunc","capabilities":["synchronous-kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortStableFuncSynchronousKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Sorted","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortedKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortedFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortedFuncKernel"},
     {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Values","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesValuesKernel"}

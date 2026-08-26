@@ -16,7 +16,6 @@ func TestFacetUseSelectionValidatesKindCapabilityCompatibility(t *testing.T) {
 		{FacetDefinedValueOperations, FacetCapabilityWrap},
 		{FacetRecoveryCallable, FacetCapabilityRecovery},
 		{FacetGenericCallableKernel, FacetCapabilityKernel},
-		{FacetGenericCallableKernel, FacetCapabilitySynchronousKernel},
 		{FacetReflectionTypeOperations, FacetCapabilityMetadata},
 	}
 	for _, entry := range valid {

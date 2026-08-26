@@ -1,30 +1,23 @@
 export {
   BinarySearch as SlicesBinarySearchKernel,
   BinarySearchFunc as SlicesBinarySearchFuncKernel,
-  BinarySearchFuncSynchronous as SlicesBinarySearchFuncSynchronousKernel,
   Compare as SlicesCompareKernel,
   CompareFunc as SlicesCompareFuncKernel,
-  CompareFuncSynchronous as SlicesCompareFuncSynchronousKernel,
   Contains as SlicesContainsKernel,
   ContainsFunc as SlicesContainsFuncKernel,
-  ContainsFuncSynchronous as SlicesContainsFuncSynchronousKernel,
   Equal as SlicesEqualKernel,
   EqualFunc as SlicesEqualFuncKernel,
-  EqualFuncSynchronous as SlicesEqualFuncSynchronousKernel,
   Index as SlicesIndexKernel,
   IndexFunc as SlicesIndexFuncKernel,
-  IndexFuncSynchronous as SlicesIndexFuncSynchronousKernel,
 } from "../portable/slices/read.js";
 export {
   Clip as SlicesClipKernel,
   Clone as SlicesCloneKernel,
   Compact as SlicesCompactKernel,
   CompactFunc as SlicesCompactFuncKernel,
-  CompactFuncSynchronous as SlicesCompactFuncSynchronousKernel,
   Concat as SlicesConcatKernel,
   Delete as SlicesDeleteKernel,
   DeleteFunc as SlicesDeleteFuncKernel,
-  DeleteFuncSynchronous as SlicesDeleteFuncSynchronousKernel,
   Grow as SlicesGrowKernel,
   Repeat as SlicesRepeatKernel,
   Reverse as SlicesReverseKernel,
@@ -36,9 +29,7 @@ export {
 export {
   Sort as SlicesSortKernel,
   SortFunc as SlicesSortFuncKernel,
-  SortFuncSynchronous as SlicesSortFuncSynchronousKernel,
   SortStableFunc as SlicesSortStableFuncKernel,
-  SortStableFuncSynchronous as SlicesSortStableFuncSynchronousKernel,
 } from "../portable/slices/sort.js";
 export {
   AppendSeq as SlicesAppendSeqKernel,

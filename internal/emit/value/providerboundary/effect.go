@@ -8,13 +8,10 @@ import (
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 )
 
-func RequireSynchronousCallable(
+func RequireProviderCallable(
 	context api.Context,
 	owner *types.Func,
 ) error {
-	if context.ConcurrencySemantics() != api.ConcurrencySemanticsDisabled {
-		return nil
-	}
 	names, ok := context.Names().(api.ProviderCallableEffectNames)
 	if !ok {
 		return boundaryInvariant(
@@ -26,42 +23,18 @@ func RequireSynchronousCallable(
 	if err != nil || !providerOwned {
 		return err
 	}
-	return RequireSynchronousEffect(context, owner.FullName(), effect)
+	return RequireProviderEffect(context, owner.FullName(), effect)
 }
 
-func RequireSynchronousEffect(
+func RequireProviderEffect(
 	context api.Context,
 	identity string,
 	effect gostdlib.EffectKind,
 ) error {
-	if context.ConcurrencySemantics() != api.ConcurrencySemanticsDisabled {
-		return nil
-	}
 	if !effect.Valid() {
 		return boundaryInvariant(
 			context,
 			"selected provider callable has invalid effect evidence for "+identity,
-		)
-	}
-	return RequireSynchronousSuspension(
-		context,
-		identity,
-		effect.MaySuspend(),
-	)
-}
-
-func RequireSynchronousSuspension(
-	context api.Context,
-	identity string,
-	maySuspend bool,
-) error {
-	if context.ConcurrencySemantics() != api.ConcurrencySemanticsDisabled {
-		return nil
-	}
-	if maySuspend {
-		return boundaryInvariant(
-			context,
-			"disabled concurrency selected a suspending provider callable for "+identity,
 		)
 	}
 	return nil
@@ -70,17 +43,12 @@ func RequireSynchronousSuspension(
 func RequireProviderDefinedCallableInput(
 	context api.Context,
 	model definedtype.Model,
-	synchronous bool,
 ) error {
 	effect, providerOwned, err := providerDefinedCallableEffect(context, model)
 	if err != nil || !providerOwned {
 		return err
 	}
-	expected := gostdlib.EffectAwaitable
-	if synchronous ||
-		context.ConcurrencySemantics() == api.ConcurrencySemanticsDisabled {
-		expected = gostdlib.EffectSynchronous
-	}
+	expected := gostdlib.EffectSynchronous
 	if effect != expected {
 		return boundaryInvariant(
 			context,
@@ -99,11 +67,10 @@ func RequireProviderDefinedCallableOutput(
 	if err != nil || !providerOwned {
 		return err
 	}
-	if context.ConcurrencySemantics() == api.ConcurrencySemanticsDisabled &&
-		effect != gostdlib.EffectSynchronous {
+	if effect != gostdlib.EffectSynchronous {
 		return boundaryInvariant(
 			context,
-			"disabled concurrency selected a suspending provider defined callable for "+
+			"provider defined-callable output has invalid effect evidence for "+
 				model.TypeName().Name(),
 		)
 	}

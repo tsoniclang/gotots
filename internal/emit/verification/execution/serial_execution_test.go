@@ -10,14 +10,14 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestWaveNineDisabledProfileIsSynchronous(t *testing.T) {
+func TestSerialExecutionRunsImmediatelyAndRejectsBlocking(t *testing.T) {
 	directory := t.TempDir()
 	writeProgramFile(
 		t,
 		filepath.Join(directory, "go.mod"),
-		"module example.com/concurrencyprofile\n\ngo 1.26.4\n",
+		"module example.com/serialexecution\n\ngo 1.26.4\n",
 	)
-	writeProgramFile(t, filepath.Join(directory, "source.go"), `package concurrencyprofile
+	writeProgramFile(t, filepath.Join(directory, "source.go"), `package serialexecution
 
 func Run() int32 {
 	values := make(chan int32, 1)
@@ -68,7 +68,7 @@ func Block() {
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf(
-				"disabled concurrency emitted %q:\n%s",
+				"serial execution emitted %q:\n%s",
 				forbidden,
 				artifacts.printed,
 			)
@@ -100,7 +100,7 @@ console.log(String(Run()) + "|" + boundary);
 		workingDirectory,
 		"node",
 		filepath.Join(workingDirectory, "out", "runner.js"),
-	); output != "1|synchronous channel send would block\n" {
-		t.Fatalf("disabled concurrency output = %q", output)
+	); output != "1|serial channel send would block\n" {
+		t.Fatalf("serial execution output = %q", output)
 	}
 }

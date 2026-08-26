@@ -58,7 +58,7 @@ export class WaitGroup {
     }
     if (receiver.#count !== 0n) {
       GoPanic.raiseRuntime(
-        "sync: WaitGroup.Wait would block under disabled concurrency",
+        "sync: WaitGroup.Wait would block under serial execution",
       );
     }
   }

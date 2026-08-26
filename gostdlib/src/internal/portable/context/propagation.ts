@@ -1,7 +1,6 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoEmptyStruct } from "@gotots/runtime/struct.js";
-import type { Awaitable } from "@gotots/gostdlib/internal/scalars.js";
 
 export function propagateCancel<Failure>(
   parentDone: GoReceiveChannel<GoEmptyStruct> | undefined,
@@ -19,38 +18,7 @@ export function propagateCancel<Failure>(
   });
 }
 
-export async function propagateCancelAwaitable<Failure>(
-  parentDone: GoReceiveChannel<GoEmptyStruct> | undefined,
-  childDone: GoReceiveChannel<GoEmptyStruct>,
-  parentFailure: () => Awaitable<Failure | undefined>,
-  parentCause: () => Awaitable<Failure | undefined>,
-  cancel: (failure: Failure, cause: Failure) => void,
-): Promise<void> {
-  let application: Promise<void> | undefined;
-  const disposition = subscribeCancel(parentDone, childDone, () => {
-    application = applyAwaitableParent(parentFailure, parentCause, cancel);
-  });
-  if (disposition === "parent") {
-    if (application === undefined) {
-      GoPanic.raiseRuntime("context: internal error: parent cancellation was not applied");
-    }
-    await application;
-  }
-}
-
-async function applyAwaitableParent<Failure>(
-  parentFailure: () => Awaitable<Failure | undefined>,
-  parentCause: () => Awaitable<Failure | undefined>,
-  cancel: (failure: Failure, cause: Failure) => void,
-): Promise<void> {
-  const failure = await parentFailure();
-  if (failure === undefined) {
-    GoPanic.raiseRuntime("context: internal error: missing cancel error");
-  }
-  cancel(failure, (await parentCause()) ?? failure);
-}
-
-type CancelSubscription = "none" | "parent" | "child" | "subscribed";
+type CancelSubscription = "none" | "parent" | "child" | "observed";
 
 function subscribeCancel(
   parentDone: GoReceiveChannel<GoEmptyStruct> | undefined,
@@ -71,18 +39,18 @@ function subscribeCancel(
     return "child";
   }
   let claimed = false;
-  let unsubscribeParent = (): void => undefined;
-  let unsubscribeChild = (): void => undefined;
-  const claim = (): boolean => {
+  let unobserveParent = (): void => undefined;
+  let unobserveChild = (): void => undefined;
+  const claim = (apply: () => void): void => {
     if (claimed) {
-      return false;
+      return;
     }
     claimed = true;
-    unsubscribeParent();
-    unsubscribeChild();
-    return true;
+    unobserveParent();
+    unobserveChild();
+    apply();
   };
-  unsubscribeParent = parentCase.subscribe(claim);
-  unsubscribeChild = childCase.subscribe(claim);
-  return "subscribed";
+  unobserveParent = parentDone.$observeClose((): void => claim(applyParent));
+  unobserveChild = childDone.$observeClose((): void => claim(() => undefined));
+  return "observed";
 }

@@ -31,23 +31,23 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 	stateful := manifest.ProviderStatefulProfiles(
 		"compress/gzip|kind=2|receiver=|name=Reader",
 	)
-	if len(callable) != 2 || len(stateful) != 2 {
+	if len(callable) != 1 || len(stateful) != 1 {
 		t.Fatalf("gzip profiles = callable %d, stateful %d", len(callable), len(stateful))
 	}
-	var callableCanonical gostdlib.ProviderCallableProfile
+	var callableDirect gostdlib.ProviderCallableProfile
 	for _, profile := range callable {
-		if profile.Export() == "GzipNewReaderCanonical" {
-			callableCanonical = profile
+		if profile.Export() == "GzipNewReaderDirect" {
+			callableDirect = profile
 		}
 	}
-	var statefulCanonical gostdlib.ProviderStatefulProfile
+	var statefulDirect gostdlib.ProviderStatefulProfile
 	for _, profile := range stateful {
-		if profile.Export() == "CanonicalGzipReader" {
-			statefulCanonical = profile
+		if profile.Export() == "DirectGzipReader" {
+			statefulDirect = profile
 		}
 	}
-	if !callableCanonical.Valid() || !statefulCanonical.Valid() {
-		t.Fatal("canonical gzip profile pair is absent")
+	if !callableDirect.Valid() || !statefulDirect.Valid() {
+		t.Fatal("direct gzip profile pair is absent")
 	}
 	errorName, ok := types.Universe.Lookup("error").(*types.TypeName)
 	if !ok {
@@ -63,7 +63,7 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 		"go:universe|error",
 		errorType,
 		"$goProviderProfileBridge$Named_error",
-		callableCanonical.Interfaces(),
+		callableDirect.Interfaces(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +72,7 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 		"go:universe|error",
 		errorType,
 		"$goProviderProfileBridge$Named_error",
-		statefulCanonical.Interfaces(),
+		statefulDirect.Interfaces(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -104,17 +104,17 @@ func TestProviderProfileBridgeIdentityIncludesReachableInterfaceABI(
 	profiles := manifest.ProviderCallableProfiles(
 		"compress/gzip|kind=4|receiver=|name=NewReader",
 	)
-	if len(profiles) != 2 {
+	if len(profiles) != 1 {
 		t.Fatalf("gzip NewReader profiles = %d", len(profiles))
 	}
-	var canonical gostdlib.ProviderCallableProfile
+	var direct gostdlib.ProviderCallableProfile
 	for _, profile := range profiles {
-		if profile.Export() == "GzipNewReaderCanonical" {
-			canonical = profile
+		if profile.Export() == "GzipNewReaderDirect" {
+			direct = profile
 		}
 	}
-	if !canonical.Valid() {
-		t.Fatal("canonical gzip NewReader profile is absent")
+	if !direct.Valid() {
+		t.Fatal("direct gzip NewReader profile is absent")
 	}
 	ioPackage, err := importer.Default().Import("io")
 	if err != nil {
@@ -130,7 +130,7 @@ func TestProviderProfileBridgeIdentityIncludesReachableInterfaceABI(
 	}
 	closure, err := providerProfileBridgeClosure(
 		reader,
-		canonical.Interfaces(),
+		direct.Interfaces(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -167,7 +167,7 @@ func TestProviderProfileBridgeIdentityIgnoresEquivalentProviderReexports(
 	signalProfiles := manifest.ProviderCallableProfiles(
 		"os/signal|kind=4|receiver=|name=NotifyContext",
 	)
-	if len(contextProfiles) != 2 || len(signalProfiles) != 2 {
+	if len(contextProfiles) != 1 || len(signalProfiles) != 1 {
 		t.Fatalf(
 			"profiles = context %d, os/signal %d",
 			len(contextProfiles),
@@ -193,13 +193,6 @@ func TestProviderProfileBridgeIdentityIgnoresEquivalentProviderReexports(
 		signalExport  string
 		want          string
 	}{
-		{
-			name:          "cooperative",
-			contextExport: "ContextWithCancelCanonical",
-			signalExport:  "OsSignalNotifyContextCanonical",
-			want: "$goProviderProfileBridge$Named_context_Context$Using$" +
-				"context_Context$Awaitable$And$Error$Awaitable",
-		},
 		{
 			name:          "direct",
 			contextExport: "ContextWithCancelDirect",
@@ -259,108 +252,6 @@ func TestProviderProfileBridgeIdentityIgnoresEquivalentProviderReexports(
 	}
 }
 
-func TestProviderProfileBridgeIdentityDistinguishesMethodEffects(t *testing.T) {
-	payload, err := os.ReadFile(filepath.Join(
-		"..", "..", "..", "gostdlib", "contract", "manifest.json",
-	))
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest, err := gostdlib.Parse(payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	readerProfiles := manifest.ProviderCallableProfiles(
-		"bufio|kind=4|receiver=|name=NewReader",
-	)
-	synchronousProfiles := manifest.ProviderCallableProfiles(
-		"errors|kind=4|receiver=|name=Unwrap",
-	)
-	if len(readerProfiles) != 2 || len(synchronousProfiles) != 2 {
-		t.Fatalf(
-			"profiles = reader %d, errors %d",
-			len(readerProfiles),
-			len(synchronousProfiles),
-		)
-	}
-	var awaitableProfile gostdlib.ProviderCallableProfile
-	for _, profile := range readerProfiles {
-		selected, ok := profile.Interface(gostdlib.LanguageErrorInterfaceIdentity)
-		if !ok {
-			continue
-		}
-		methods := selected.ProviderInterface().Methods()
-		if len(methods) == 1 && methods[0].Effect() == gostdlib.EffectAwaitable {
-			awaitableProfile = profile
-			break
-		}
-	}
-	if !awaitableProfile.Valid() {
-		t.Fatal("awaitable reader profile is absent")
-	}
-	var synchronous gostdlib.ProviderCallableProfile
-	for _, profile := range synchronousProfiles {
-		selected, ok := profile.Interface(gostdlib.LanguageErrorInterfaceIdentity)
-		if !ok {
-			continue
-		}
-		methods := selected.ProviderInterface().Methods()
-		if len(methods) == 1 && methods[0].Effect() == gostdlib.EffectSynchronous {
-			synchronous = profile
-			break
-		}
-	}
-	if !synchronous.Valid() {
-		t.Fatal("synchronous error profile is absent")
-	}
-	errorName, ok := types.Universe.Lookup("error").(*types.TypeName)
-	if !ok {
-		t.Fatal("predeclared error type is absent")
-	}
-	errorType, ok := types.Unalias(errorName.Type()).(*types.Named)
-	if !ok {
-		t.Fatal("predeclared error type is not named")
-	}
-
-	registry := NewRegistry()
-	awaitable, err := registry.internProviderProfileInterfaceBridge(
-		"go:universe|error",
-		errorType,
-		"$goProviderProfileBridge$Named_error",
-		awaitableProfile.Interfaces(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	direct, err := registry.internProviderProfileInterfaceBridge(
-		"go:universe|error",
-		errorType,
-		"$goProviderProfileBridge$Named_error",
-		synchronous.Interfaces(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if awaitable.owner == direct.owner || awaitable.name == direct.name ||
-		awaitable.key == direct.key {
-		t.Fatalf(
-			"different error effects shared a bridge: %q/%q and %q/%q",
-			awaitable.key,
-			awaitable.name,
-			direct.key,
-			direct.name,
-		)
-	}
-	if !strings.HasSuffix(awaitable.name, "$Error$Awaitable") ||
-		!strings.HasSuffix(direct.name, "$Error$Direct") {
-		t.Fatalf(
-			"effect names are not readable: awaitable=%q direct=%q",
-			awaitable.name,
-			direct.name,
-		)
-	}
-}
-
 func TestProviderProfileBridgeNameIsBoundedBySemanticShape(t *testing.T) {
 	payload, err := os.ReadFile(filepath.Join(
 		"..", "..", "..", "gostdlib", "contract", "manifest.json",
@@ -375,8 +266,8 @@ func TestProviderProfileBridgeNameIsBoundedBySemanticShape(t *testing.T) {
 	profiles := manifest.ProviderCallableProfiles(
 		"io/fs|kind=4|receiver=|name=ReadDir",
 	)
-	if len(profiles) != 2 {
-		t.Fatalf("io/fs.ReadDir profiles = %d, want 2", len(profiles))
+	if len(profiles) != 1 {
+		t.Fatalf("io/fs.ReadDir profiles = %d, want 1", len(profiles))
 	}
 	fileSystemPackage, err := importer.Default().Import("io/fs")
 	if err != nil {
@@ -391,10 +282,7 @@ func TestProviderProfileBridgeNameIsBoundedBySemanticShape(t *testing.T) {
 		t.Fatal("io/fs.ReadDirFS type is not named")
 	}
 
-	expected := map[string]bool{
-		"IoFsReadDirCanonical": false,
-		"IoFsReadDirDirect":    false,
-	}
+	expected := map[string]bool{"IoFsReadDirDirect": false}
 	for _, profile := range profiles {
 		if _, ok := expected[profile.Export()]; !ok {
 			t.Fatalf("unexpected io/fs.ReadDir profile %q", profile.Export())

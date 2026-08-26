@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
@@ -50,7 +49,7 @@ func emitGeneric(
 	}
 	openConcretization := requiresConcretization &&
 		instance.TypeArgs.ContainsGenericTypeParameter()
-	effectSelection, err := selectGenericConcretizationEffect(
+	parameterSelection, err := selectGenericCallableParameters(
 		context,
 		source,
 		owner,
@@ -60,38 +59,29 @@ func emitGeneric(
 		return api.ExpressionEmission{}, true, err
 	}
 	arguments, before, argumentRequests, err :=
-		emitArgumentsWithSynchronousParameters(
+		emitArgumentsWithProviderCallableParameters(
 			context,
 			children,
 			source,
 			signature,
 			detached,
-			effectSelection.synchronousParameters,
+			parameterSelection.parameters,
 		)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	var (
 		reference     api.NameReference
-		callableFacet api.CallableFacet
 		typeArguments []tsgo.TypeNode
 		typeRequests  []api.RootRequest
 		mechanicArgs  []tsgo.Expression
 		mechanicReqs  []api.RootRequest
 	)
 	if requiresConcretization && !openConcretization {
-		facet, selectionErr := cooperativecall.SelectGenericClassMethod(
-			context,
-			owner,
-		)
-		if selectionErr != nil {
-			return api.ExpressionEmission{}, true, selectionErr
-		}
 		concrete, concreteErr := context.ResolveGenericConcretization(
 			owner,
 			instance.TypeArgs,
 			signature,
-			effectSelection.effect,
 		)
 		if concreteErr != nil {
 			return api.ExpressionEmission{}, true, concreteErr
@@ -103,27 +93,14 @@ func emitGeneric(
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
-		callableFacet = facet
 	} else if openConcretization {
-		facet, selectionErr := cooperativecall.SelectGenericClassMethod(
-			context,
-			owner,
-		)
-		if selectionErr != nil {
-			return api.ExpressionEmission{}, true, selectionErr
-		}
 		kernelNames, available := context.Names().(api.GenericKernelNames)
 		if !available {
 			return api.ExpressionEmission{}, true, &api.ContextError{
 				Reason: "generic kernel names are unavailable",
 			}
 		}
-		if effectSelection.effect.Synchronous() {
-			reference, err = kernelNames.SynchronousGenericKernel(owner)
-		} else {
-			reference, err = kernelNames.GenericKernel(owner)
-		}
-		callableFacet = facet
+		reference, err = kernelNames.GenericKernel(owner)
 		if err == nil {
 			typeArguments, typeRequests, err =
 				genericinstance.EmitFunctionTypeArguments(
@@ -163,25 +140,16 @@ func emitGeneric(
 				Reason: "generic mechanics reached a source-facing callable",
 			}
 		}
-		if effectSelection.effect.Synchronous() {
+		if parameterSelection.providerKernel {
 			kernelNames, available := context.Names().(api.GenericKernelNames)
 			if !available {
 				return api.ExpressionEmission{}, true, &api.ContextError{
 					Reason: "generic kernel names are unavailable",
 				}
 			}
-			reference, err = kernelNames.SynchronousGenericKernel(owner)
-			if err == nil {
-				callableFacet, err = api.NewSourceCallableFacet(owner)
-			}
+			reference, err = kernelNames.GenericKernel(owner)
 		} else {
-			selected, facet, selectionErr :=
-				cooperativecall.SelectGenericCallable(context, owner)
-			if selectionErr != nil {
-				return api.ExpressionEmission{}, true, selectionErr
-			}
-			reference = selected
-			callableFacet = facet
+			reference, err = context.Names().Reference(owner.Origin())
 		}
 		if err == nil {
 			typeArguments, typeRequests, err =
@@ -207,26 +175,15 @@ func emitGeneric(
 	if reference.ProviderBoundary() {
 		var providerBefore []tsgo.Statement
 		var providerRequests []api.RootRequest
-		if effectSelection.effect.Synchronous() {
-			arguments, providerBefore, providerRequests, err =
-				providerboundary.ToProviderGenericArgumentsWithSynchronousParameters(
-					context,
-					children,
-					contract.Params(),
-					signature.Params(),
-					arguments,
-					effectSelection.synchronousParameters,
-				)
-		} else {
-			arguments, providerBefore, providerRequests, err =
-				providerboundary.ToProviderGenericArguments(
-					context,
-					children,
-					contract.Params(),
-					signature.Params(),
-					arguments,
-				)
-		}
+		arguments, providerBefore, providerRequests, err =
+			providerboundary.ToProviderGenericArgumentsWithCallableParameters(
+				context,
+				children,
+				contract.Params(),
+				signature.Params(),
+				arguments,
+				parameterSelection.parameters,
+			)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
@@ -251,40 +208,12 @@ func emitGeneric(
 			typeRequests,
 			mechanicReqs,
 			argumentRequests,
-			effectSelection.requests,
 		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	if effectSelection.effect.Synchronous() {
-		if reference.ProviderBoundary() && !detached && !discarded {
-			result, err = providerboundary.FromProviderGenericResults(
-				context,
-				children,
-				contract.Results(),
-				signature.Results(),
-				result,
-			)
-		}
-		return result, true, nil
-	}
-	if detached {
-		result, err = cooperativecall.DetachedGenericCall(
-			context,
-			source,
-			callableFacet,
-			result,
-		)
-	} else {
-		result, err = cooperativecall.GenericCall(
-			context,
-			source,
-			callableFacet,
-			result,
-		)
-	}
-	if err == nil && reference.ProviderBoundary() && !detached && !discarded {
+	if reference.ProviderBoundary() && !detached && !discarded {
 		result, err = providerboundary.FromProviderGenericResults(
 			context,
 			children,

@@ -6,23 +6,6 @@ import (
 	"slices"
 )
 
-type GenericConcretizationEffect uint8
-
-const (
-	GenericConcretizationEffectInvalid     GenericConcretizationEffect = 0
-	GenericConcretizationEffectCanonical   GenericConcretizationEffect = 1
-	GenericConcretizationEffectSynchronous GenericConcretizationEffect = 2
-)
-
-func (e GenericConcretizationEffect) Valid() bool {
-	return e == GenericConcretizationEffectCanonical ||
-		e == GenericConcretizationEffectSynchronous
-}
-
-func (e GenericConcretizationEffect) Synchronous() bool {
-	return e == GenericConcretizationEffectSynchronous
-}
-
 type CallableFacetKind uint8
 
 const (
@@ -328,7 +311,6 @@ type GenericConcretization struct {
 	owner        *types.Func
 	arguments    []types.Type
 	signature    *types.Signature
-	effect       GenericConcretizationEffect
 	key          string
 	placement    GeneratedArtifactPlacement
 	lexicalOwner ArtifactOwner
@@ -339,7 +321,6 @@ func NewGenericConcretization(
 	owner *types.Func,
 	arguments []types.Type,
 	signature *types.Signature,
-	effect GenericConcretizationEffect,
 	key string,
 	placement GeneratedArtifactPlacement,
 	lexicalOwner ArtifactOwner,
@@ -349,7 +330,6 @@ func NewGenericConcretization(
 		owner:        owner,
 		arguments:    slices.Clone(arguments),
 		signature:    signature,
-		effect:       effect,
 		key:          key,
 		placement:    placement,
 		lexicalOwner: lexicalOwner,
@@ -366,8 +346,7 @@ func NewGenericConcretization(
 
 func (c *GenericConcretization) Valid() bool {
 	if c == nil || c.owner == nil || c.owner.Origin() != c.owner ||
-		c.key == "" || c.signature == nil ||
-		!c.effect.Valid() {
+		c.key == "" || c.signature == nil {
 		return false
 	}
 	source, ok := c.owner.Type().(*types.Signature)
@@ -424,7 +403,6 @@ func (c *GenericConcretization) Identical(
 	if !c.Valid() || !other.Valid() ||
 		c.owner != other.owner ||
 		c.key != other.key ||
-		c.effect != other.effect ||
 		c.placement != other.placement ||
 		c.lexicalOwner != other.lexicalOwner ||
 		c.anchor != other.anchor ||
@@ -459,13 +437,6 @@ func (c *GenericConcretization) Signature() *types.Signature {
 		return nil
 	}
 	return c.signature
-}
-
-func (c *GenericConcretization) Effect() GenericConcretizationEffect {
-	if !c.Valid() {
-		return GenericConcretizationEffectInvalid
-	}
-	return c.effect
 }
 
 func (c *GenericConcretization) Key() string {

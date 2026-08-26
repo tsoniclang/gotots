@@ -43,7 +43,7 @@ func DynamicPointerFacts() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await DynamicPointerFacts();
+	typescriptRunner := `const facts = DynamicPointerFacts();
 console.log(facts);
 `
 	goRunner := `package main

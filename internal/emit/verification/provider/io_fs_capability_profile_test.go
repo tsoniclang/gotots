@@ -105,7 +105,6 @@ func ReadProviderDir(root string) (string, int64, error) {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -138,17 +137,17 @@ func ReadProviderDir(root string) (string, int64, error) {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"ReadGenerated", "ReadProvider", "ReadProviderDir"},
-		`const [fallback, fast, generatedFailure] = await ReadGenerated();
+		`const [fallback, fast, generatedFailure] = ReadGenerated();
 console.log(fallback + "|" + fast + "|" + (generatedFailure === undefined));
-const [raw, rawFailure] = await ReadProvider(`+strconv.Quote(project)+`);
+const [raw, rawFailure] = ReadProvider(`+strconv.Quote(project)+`);
 console.log(raw + "|" + (rawFailure === undefined));
-const [name, size, dirFailure] = await ReadProviderDir(`+strconv.Quote(project)+`);
+const [name, size, dirFailure] = ReadProviderDir(`+strconv.Quote(project)+`);
 console.log(name + "|" + size + "|" + (dirFailure === undefined));
 `,
 	)
 	for _, required := range []string{
-		"IoFsReadFileCanonical",
-		"IoFsReadDirCanonical",
+		"IoFsReadFileDirect",
+		"IoFsReadDirDirect",
 		"RuntimeSliceProjection",
 		"$Capability$",
 		"$raw",
@@ -157,6 +156,11 @@ console.log(name + "|" + size + "|" + (dirFailure === undefined));
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("io/fs capability output lacks %q:\n%s", required, artifacts.printed)
+		}
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("io/fs capability output contains %q", forbidden)
 		}
 	}
 	assertIoFsProfileCapabilityHeritage(t, artifacts.printed)

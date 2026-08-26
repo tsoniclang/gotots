@@ -13,7 +13,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
-	callablefield "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative/fieldvalue"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	externalfunction "github.com/tsoniclang/gotots/internal/emit/externalfunction"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
@@ -51,7 +50,6 @@ type programSession struct {
 	scalar                        api.ScalarABI
 	providerScalar                api.ScalarABI
 	evaluationOrder               api.EvaluationOrder
-	concurrency                   api.ConcurrencySemantics
 	registry                      *emitnaming.Registry
 	scheduler                     *scheduler
 	requirements                  *declarationRequirementScheduler
@@ -66,7 +64,6 @@ type programSession struct {
 	genericOperations             map[genericOperationIdentity]*api.GenericOperationContract
 	genericConcretizations        map[genericConcretizationIdentity]*api.GenericConcretization
 	classMembers                  map[*types.Func]classMemberContribution
-	callableFields                *callablefield.Index
 	goRuntime                     *gocontract.Contract
 	runtimePackage                RuntimePackage
 	compareArtifactOwners         func(api.ArtifactOwner, api.ArtifactOwner) int
@@ -296,14 +293,12 @@ func newProgramSessionWithRegistry(
 		return nil, err
 	}
 	compareArtifactOwners := sourceArtifactOwnerOrder(sites)
-	callableFields := callablefield.New(source)
 	session := &programSession{
 		source:          source,
 		factory:         tsgo.NewFactory(),
 		scalar:          scalar,
 		providerScalar:  providerScalar,
 		evaluationOrder: options.EvaluationOrder,
-		concurrency:     options.ConcurrencySemantics,
 		registry:        registry,
 		scheduler:       newScheduler(),
 		requirements: newDeclarationRequirementScheduler(
@@ -322,7 +317,6 @@ func newProgramSessionWithRegistry(
 		genericOperations:           make(map[genericOperationIdentity]*api.GenericOperationContract),
 		genericConcretizations:      make(map[genericConcretizationIdentity]*api.GenericConcretization),
 		classMembers:                make(map[*types.Func]classMemberContribution),
-		callableFields:              callableFields,
 		goRuntime:                   goRuntime,
 		compareArtifactOwners:       compareArtifactOwners,
 		standardLibrary:             options.StandardLibrary,
@@ -346,8 +340,6 @@ func newProgramSessionWithRegistry(
 			scalar,
 			providerScalar,
 			options.EvaluationOrder,
-			options.ConcurrencySemantics,
-			session,
 			session,
 			session,
 			session,

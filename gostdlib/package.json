@@ -224,10 +224,6 @@
       "types": "./dist/src/internal/facets/provider-fmt-writer.d.ts",
       "default": "./dist/src/internal/facets/provider-fmt-writer.js"
     },
-    "./internal/facets/provider-io-fs.js": {
-      "types": "./dist/src/internal/facets/provider-io-fs.d.ts",
-      "default": "./dist/src/internal/facets/provider-io-fs.js"
-    },
     "./internal/facets/provider-io-fs-direct.js": {
       "types": "./dist/src/internal/facets/provider-io-fs-direct.d.ts",
       "default": "./dist/src/internal/facets/provider-io-fs-direct.js"

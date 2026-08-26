@@ -185,13 +185,6 @@ func deferStackDeclaration(
 	resultType := api.DirectType(context.Factory().KeywordTypeNode(
 		tsgo.KeywordTypeSyntaxKindVoidKeyword,
 	))
-	if context.IsCooperative() {
-		var err error
-		resultType, err = IndirectResult(context, resultType.Value())
-		if err != nil {
-			return nil, nil, err
-		}
-	}
 	callableType := context.Factory().FunctionTypeNode(
 		nil,
 		[]tsgo.ParameterDeclaration{
@@ -492,16 +485,13 @@ func deferredCallStatement(
 	deferred tsgo.Expression,
 	recovery tsgo.Expression,
 ) tsgo.Statement {
-	var call tsgo.Expression = context.Factory().CallExpression(
+	call := context.Factory().CallExpression(
 		deferred,
 		nil,
 		nil,
 		[]tsgo.Expression{recovery},
 		tsgo.NodeFlagsNone,
 	)
-	if context.IsCooperative() {
-		call = context.Factory().AwaitExpression(call)
-	}
 	return context.Factory().ExpressionStatement(call)
 }
 

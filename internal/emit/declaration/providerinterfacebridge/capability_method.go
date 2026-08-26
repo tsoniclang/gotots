@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -106,8 +105,7 @@ func capabilityMethodGroup(
 	}
 	first := methods[0].emission
 	for _, selected := range methods[1:] {
-		if !sameMethodInputs(first.signature, selected.emission.signature) ||
-			first.cooperative != selected.emission.cooperative {
+		if !sameMethodInputs(first.signature, selected.emission.signature) {
 			return nil, shapeError(
 				bridgeName,
 				"same-name capability methods have incompatible call inputs",
@@ -186,7 +184,6 @@ func capabilityMethodGroup(
 	implementation.result = capabilityMethodResult(
 		context.Factory(),
 		unique,
-		first.cooperative,
 	)
 	members = append(members, implementation.declaration(context.Factory()))
 	return members, nil
@@ -195,7 +192,6 @@ func capabilityMethodGroup(
 func capabilityMethodResult(
 	factory tsgo.Factory,
 	methods []methodEmission,
-	cooperative bool,
 ) tsgo.TypeNode {
 	if len(methods) == 1 {
 		return methods[0].result
@@ -204,11 +200,7 @@ func capabilityMethodResult(
 	for _, method := range methods {
 		values = append(values, method.resultValue)
 	}
-	result := factory.UnionTypeNode(values)
-	if cooperative {
-		return callable.PromiseResult(factory, result)
-	}
-	return result
+	return factory.UnionTypeNode(values)
 }
 
 func sameMethodInputs(left *types.Signature, right *types.Signature) bool {

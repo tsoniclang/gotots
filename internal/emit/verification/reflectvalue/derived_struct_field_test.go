@@ -24,7 +24,7 @@ func DerivedFieldFacts() string {
 	return fmt.Sprintf("%s %d %t", field.Kind().String(), field.Int(), field.CanSet())
 }
 `
-	typescriptRunner := `const facts = await DerivedFieldFacts();
+	typescriptRunner := `const facts = DerivedFieldFacts();
 console.log(facts);
 `
 	goRunner := `package main

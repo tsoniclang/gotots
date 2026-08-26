@@ -1,17 +1,12 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type {
-  Awaitable,
-  gostring,
-  int,
-  uint8,
-} from "@gotots/gostdlib/internal/scalars.js";
+import type { gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderInterfaceValue } from "../portable/io/value.js";
 
 export interface CanonicalError extends GoInterfaceValue {
-  Error(recovery?: GoRecovery): Awaitable<gostring>;
+  Error(recovery?: GoRecovery): gostring;
 }
 
 const canonicalBoundaryErrorType = Object.freeze({ comparable: true });
@@ -46,7 +41,7 @@ export interface CanonicalReader<Failure extends GoInterfaceValue>
   Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Awaitable<[int, Failure | undefined]>;
+  ): [int, Failure | undefined];
 }
 
 export interface ProviderReaderInterface<Failure extends GoInterfaceValue>
@@ -62,7 +57,7 @@ export interface CanonicalWriter<Failure extends GoInterfaceValue>
   Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Awaitable<[int, Failure | undefined]>;
+  ): [int, Failure | undefined];
 }
 
 export interface ProviderWriterInterface<Failure extends GoInterfaceValue>

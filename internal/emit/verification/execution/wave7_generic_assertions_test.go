@@ -128,9 +128,6 @@ func sourceModuleForExport(
 		if !strings.Contains(
 			printed,
 			"export function "+name+"(",
-		) && !strings.Contains(
-			printed,
-			"export async function "+name+"(",
 		) {
 			continue
 		}

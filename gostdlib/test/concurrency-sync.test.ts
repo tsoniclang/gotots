@@ -43,7 +43,7 @@ test("Mutex rejects serial blocking and unmatched unlock", () => {
   Mutex.Lock(mutex);
   assert.throws(
     () => Mutex.Lock(mutex),
-    panicWith(/would block under disabled concurrency/u),
+    panicWith(/would block under serial execution/u),
   );
   Mutex.Unlock(mutex);
   Mutex.Lock(mutex);
@@ -57,7 +57,7 @@ test("Cond rejects a wait that would block", () => {
   locker.Lock();
   assert.throws(
     () => Cond.Wait(condition),
-    panicWith(/would block under disabled concurrency/u),
+    panicWith(/would block under serial execution/u),
   );
   Cond.Signal(condition);
   Cond.Broadcast(condition);
@@ -70,7 +70,7 @@ test("RWMutex allows readers and rejects a serially blocked writer", () => {
   RWMutex.RLock(mutex);
   assert.throws(
     () => RWMutex.Lock(mutex),
-    panicWith(/would block under disabled concurrency/u),
+    panicWith(/would block under serial execution/u),
   );
   RWMutex.RUnlock(mutex);
   RWMutex.RUnlock(mutex);
@@ -130,7 +130,7 @@ test("WaitGroup completes inline work and rejects a blocking wait", () => {
   WaitGroup.Add(group, 1n);
   assert.throws(
     () => WaitGroup.Wait(group),
-    panicWith(/would block under disabled concurrency/u),
+    panicWith(/would block under serial execution/u),
   );
   WaitGroup.Done(group);
   WaitGroup.Go(group, () => undefined);

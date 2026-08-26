@@ -100,7 +100,6 @@ func TestWaveTenSupportedBuiltinsCloseSelectedUniverse(t *testing.T) {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {
 		t.Fatal(err)

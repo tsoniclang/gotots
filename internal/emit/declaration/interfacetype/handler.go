@@ -199,10 +199,6 @@ func build(
 		if err != nil {
 			return nil, nil, err
 		}
-		resultType, err := callable.IndirectResult(context, target.Result())
-		if err != nil {
-			return nil, nil, err
-		}
 		members = append(
 			members,
 			context.Factory().MethodSignatureDeclaration(
@@ -211,14 +207,13 @@ func build(
 				nil,
 				nil,
 				target.Parameters(),
-				resultType.Value(),
+				target.Result(),
 			),
 		)
 		requests = append(
 			requests,
 			target.Requests()...,
 		)
-		requests = append(requests, resultType.Requests()...)
 		requests = append(requests, callableReference.Requests()...)
 		if emitRuntimeContract {
 			token, tokenErr :=

@@ -1,13 +1,9 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool, int64 } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool, int64 } from "@gotots/gostdlib/internal/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import { hostInteger } from "../../host-integer.js";
 
-import {
-  callPredicate,
-  callPredicateSynchronous,
-} from "./read.js";
 import {
   type Convert,
   type CopyValue,
@@ -26,10 +22,8 @@ import {
   validateRange,
 } from "./storage.js";
 
-type Predicate<T> = ((value: T) => Awaitable<bool>) | undefined;
-type Equality<T> = ((left: T, right: T) => Awaitable<bool>) | undefined;
-type SynchronousPredicate<T> = ((value: T) => bool) | undefined;
-type SynchronousEquality<T> = ((left: T, right: T) => bool) | undefined;
+type Predicate<T> = ((value: T) => bool) | undefined;
+type Equality<T> = ((left: T, right: T) => bool) | undefined;
 
 export function Clip<T>(source: RuntimeSlice<T>): RuntimeSlice<T> {
   return source.slice(0, source.length, source.length);
@@ -65,7 +59,7 @@ export function Compact<S, E, EStorage>(
   source: S,
 ): S {
   const values = toSlice(source);
-  return compactSynchronous(
+  return compact(
     fromSlice,
     copyElement,
     equal,
@@ -77,7 +71,7 @@ export function Compact<S, E, EStorage>(
   );
 }
 
-export async function CompactFunc<S, E, EStorage>(
+export function CompactFunc<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   fromSlice: Convert<RuntimeSlice<EStorage>, S>,
   copyElement: CopyValue<E>,
@@ -86,51 +80,6 @@ export async function CompactFunc<S, E, EStorage>(
   zeroElement: Zero<E>,
   source: S,
   equal: Equality<E>,
-): Promise<S> {
-  const values = toSlice(source);
-  if (values.length < 2) {
-    return source;
-  }
-  if (equal === undefined) {
-    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
-  }
-  for (let duplicate = 1; duplicate < values.length; duplicate += 1) {
-    if (await equal(
-      readElement(values, duplicate, copyElement, fromStorage),
-      readElement(values, duplicate - 1, copyElement, fromStorage),
-    )) {
-      let write = duplicate;
-      for (let read = duplicate + 1; read < values.length; read += 1) {
-        if (!await equal(
-          readElement(values, read, copyElement, fromStorage),
-          readElement(values, read - 1, copyElement, fromStorage),
-        )) {
-          storeElement(
-            values,
-            write,
-            readElement(values, read, copyElement, fromStorage),
-            copyElement,
-            toStorage,
-          );
-          write += 1;
-        }
-      }
-      clearTail(values, write, copyElement, toStorage, zeroElement);
-      return fromSlice(values.slice(0, write, null));
-    }
-  }
-  return source;
-}
-
-export function CompactFuncSynchronous<S, E, EStorage>(
-  toSlice: Convert<S, RuntimeSlice<EStorage>>,
-  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
-  copyElement: CopyValue<E>,
-  fromStorage: FromContainerStorage<E, EStorage>,
-  toStorage: ToContainerStorage<E, EStorage>,
-  zeroElement: Zero<E>,
-  source: S,
-  equal: SynchronousEquality<E>,
 ): S {
   const values = toSlice(source);
   if (values.length < 2) {
@@ -139,7 +88,7 @@ export function CompactFuncSynchronous<S, E, EStorage>(
   if (equal === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
-  return compactSynchronous(
+  return compact(
     fromSlice,
     copyElement,
     equal,
@@ -226,7 +175,7 @@ export function Delete<S, E, EStorage>(
   return fromSlice(values.slice(0, nextLength, null));
 }
 
-export async function DeleteFunc<S, E, EStorage>(
+export function DeleteFunc<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   fromSlice: Convert<RuntimeSlice<EStorage>, S>,
   copyElement: CopyValue<E>,
@@ -235,49 +184,15 @@ export async function DeleteFunc<S, E, EStorage>(
   zeroElement: Zero<E>,
   source: S,
   predicate: Predicate<E>,
-): Promise<S> {
-  const values = toSlice(source);
-  let write = 0;
-  for (let read = 0; read < values.length; read += 1) {
-    const value = fromStorage(values.get(read));
-    if (!await callPredicate(predicate, value)) {
-      storeElement(
-        values,
-        write,
-        value,
-        copyElement,
-        toStorage,
-      );
-      write += 1;
-    }
-  }
-  for (let index = write; index < values.length; index += 1) {
-    storeElement(
-      values,
-      index,
-      zeroElement(),
-      copyElement,
-      toStorage,
-    );
-  }
-  return fromSlice(values.slice(0, write, null));
-}
-
-export function DeleteFuncSynchronous<S, E, EStorage>(
-  toSlice: Convert<S, RuntimeSlice<EStorage>>,
-  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
-  copyElement: CopyValue<E>,
-  fromStorage: FromContainerStorage<E, EStorage>,
-  toStorage: ToContainerStorage<E, EStorage>,
-  zeroElement: Zero<E>,
-  source: S,
-  predicate: SynchronousPredicate<E>,
 ): S {
+  if (predicate === undefined) {
+    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
+  }
   const values = toSlice(source);
   let write = 0;
   for (let read = 0; read < values.length; read += 1) {
     const value = fromStorage(values.get(read));
-    if (!callPredicateSynchronous(predicate, value)) {
+    if (!predicate(value)) {
       storeElement(
         values,
         write,
@@ -399,7 +314,7 @@ export function Reverse<S, E, EStorage>(
   }
 }
 
-function compactSynchronous<S, E, EStorage>(
+function compact<S, E, EStorage>(
   fromSlice: Convert<RuntimeSlice<EStorage>, S>,
   copyElement: CopyValue<E>,
   equal: EqualValue<E>,

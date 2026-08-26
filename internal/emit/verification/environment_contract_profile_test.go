@@ -159,7 +159,6 @@ func NativeUint16(value []byte) uint16 {
 		roots = append(roots, root)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	emission, err := emit.CompileWithOptions(
 		program,
 		roots,
@@ -221,12 +220,11 @@ func NativeUint16(value []byte) uint16 {
 		"export declare const RuneSelf$uint8",
 		"littleEndian: littleEndian;",
 		".littleEndian",
-		"static async String(",
-		"async String(",
+		"static String(",
+		"String(): gostring;",
 		"export interface Signal",
-		"String(): Awaitable<gostring>;",
-		"WaitGroup_Go__from_sync",
-		"async (): Promise<void> =>",
+		"WaitGroup_Go",
+		"() => void",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf(
@@ -241,9 +239,9 @@ func NativeUint16(value []byte) uint16 {
 		artifacts.printed,
 		"export declare function WaitGroup_Go(",
 	)
-	if !strings.Contains(waitGroupGo, "=> Awaitable<void>") {
+	if !strings.Contains(waitGroupGo, "=> void") {
 		t.Fatalf(
-			"cooperative environment callback stayed synchronous:\n%s",
+			"environment callback is not synchronous:\n%s",
 			waitGroupGo,
 		)
 	}
@@ -252,6 +250,11 @@ func NativeUint16(value []byte) uint16 {
 		"resolveMethod(",
 		"registerCooperativeMethod(",
 		"resolveCooperativeMethod(",
+		"async ",
+		"await ",
+		"Promise<",
+		"Awaitable<",
+		"export declare function WaitGroup_Go__from_sync(",
 		"export declare function String(",
 		"export declare function Slice(",
 		"export declare function StringData(",

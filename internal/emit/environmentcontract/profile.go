@@ -34,7 +34,6 @@ type Profile struct {
 	buildFingerprint       string
 	integerRepresentation  api.IntegerRepresentation
 	evaluationOrder        api.EvaluationOrder
-	concurrencySemantics   api.ConcurrencySemantics
 	providerLinked         bool
 	providerManifestDigest string
 	externalLinked         bool
@@ -53,7 +52,6 @@ func NewProfile(
 	source *load.Program,
 	integer api.IntegerRepresentation,
 	order api.EvaluationOrder,
-	concurrency api.ConcurrencySemantics,
 	standardLibrary *gostdlibcertify.Certificate,
 	externalProvider *externalcertify.Certificate,
 ) (Profile, error) {
@@ -109,7 +107,6 @@ func NewProfile(
 		buildFingerprint:       buildFingerprint,
 		integerRepresentation:  integer,
 		evaluationOrder:        order,
-		concurrencySemantics:   concurrency,
 		providerLinked:         providerLinked,
 		providerManifestDigest: providerManifestDigest,
 		externalLinked:         externalLinked,
@@ -152,10 +149,6 @@ func (p Profile) IntegerRepresentation() api.IntegerRepresentation {
 
 func (p Profile) EvaluationOrder() api.EvaluationOrder {
 	return p.evaluationOrder
-}
-
-func (p Profile) ConcurrencySemantics() api.ConcurrencySemantics {
-	return p.concurrencySemantics
 }
 
 // ProviderManifestDigest is the certified gostdlib manifest digest. The

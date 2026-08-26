@@ -39,7 +39,7 @@ export class Cond {
     condition.#check();
     requireLocker(condition.L);
     GoPanic.raiseRuntime(
-      "sync: Cond.Wait would block under disabled concurrency",
+      "sync: Cond.Wait would block under serial execution",
     );
   }
 

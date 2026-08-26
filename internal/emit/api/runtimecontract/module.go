@@ -112,14 +112,6 @@ func concurrencyRuntimeContract(
 			RuntimeSelectReady,
 			RuntimeSelectAttempt,
 		), nil
-	case RuntimeScheduler:
-		return runtimeContract(
-			RuntimeModuleChannel,
-			"runtime/channel.ts",
-			"GoScheduler",
-			true,
-			RuntimePanic,
-		), nil
 	case RuntimeSelectReady:
 		return runtimeContract(
 			RuntimeModuleChannel,
@@ -233,7 +225,6 @@ func interfaceRuntimeContract(
 			true,
 			RuntimeInterfaceValue,
 			RuntimeErrorMethodToken,
-			RuntimeAwaitable,
 		)
 	case RuntimeBuiltinErrorContract:
 		contract = runtimeContract(
@@ -261,7 +252,6 @@ func interfaceRuntimeContract(
 			RuntimeInterfaceValue,
 			RuntimeErrorMethodToken,
 			RuntimeRuntimeErrorToken,
-			RuntimeAwaitable,
 		)
 	case RuntimeErrorContract:
 		contract = runtimeContract(

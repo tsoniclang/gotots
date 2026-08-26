@@ -197,7 +197,7 @@ func ProviderReflectionClosure() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await ProviderReflectionClosure();
+	typescriptRunner := `const facts = ProviderReflectionClosure();
 console.log(facts);
 `
 	goRunner := `package main
@@ -223,28 +223,28 @@ func main() {
 			requireProviderStateOperations(
 				t,
 				artifacts.printed,
-				"provider_bufio_reader.CanonicalBufioReader",
+				"provider_bufio_reader.DirectBufioReader",
 				"assign",
 				"copy",
 			)
 			requireProviderStateOperations(
 				t,
 				artifacts.printed,
-				"provider_bufio_writer.CanonicalBufioWriter",
+				"provider_bufio_writer.DirectBufioWriter",
 				"assign",
 				"copy",
 			)
 			requireProviderStateOperations(
 				t,
 				artifacts.printed,
-				"provider_compress_gzip.CanonicalGzipReader",
+				"provider_compress_gzip_direct.DirectGzipReader",
 				"assign",
 				"copy",
 			)
 			requireProviderStateOperations(
 				t,
 				artifacts.printed,
-				"named_io_fs.CanonicalPathError",
+				"fs.PathError",
 				"copy",
 				"equal",
 				"hash",
@@ -265,7 +265,17 @@ func main() {
 				"named_io_fs.IoFsFileModeValueOperations.$wrap(420).String()",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
-					t.Fatalf("provider closure artifact lacks %q", required)
+					relevant := make([]string, 0)
+					for _, line := range strings.Split(artifacts.printed, "\n") {
+						if strings.Contains(line, "PathError") {
+							relevant = append(relevant, line)
+						}
+					}
+					t.Fatalf(
+						"provider closure artifact lacks %q:\n%s",
+						required,
+						strings.Join(relevant, "\n"),
+					)
 				}
 			}
 		},

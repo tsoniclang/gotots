@@ -6,10 +6,9 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
-	genericeffect "github.com/tsoniclang/gotots/internal/emit/generic/effect"
+	genericparameters "github.com/tsoniclang/gotots/internal/emit/generic/callableparameters"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -49,11 +48,12 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	effectSelection, err := genericeffect.ForExecutionProfile(context, owner)
+	parameterSelection, err := genericparameters.ForCallable(context, owner)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	synchronousParameters := effectSelection.SynchronousParameters()
+	providerParameters := parameterSelection.Parameters()
+	providerKernel := parameterSelection.ProviderKernel()
 	var (
 		reference              api.NameReference
 		deferredReference      api.NameReference
@@ -68,7 +68,7 @@ func Emit(
 	openConcretization := requiresConcretization &&
 		instance.TypeArgs.ContainsGenericTypeParameter()
 	if requiresConcretization && !openConcretization {
-		facet, selectionErr := cooperativecall.SelectGenericClassMethod(
+		facet, selectionErr := callable.SelectGenericMethod(
 			context,
 			owner,
 		)
@@ -79,7 +79,6 @@ func Emit(
 			owner,
 			instance.TypeArgs,
 			signature,
-			effectSelection.Effect(),
 		)
 		if concreteErr != nil {
 			return api.ExpressionEmission{}, true, concreteErr
@@ -88,7 +87,7 @@ func Emit(
 			concrete.Name(),
 			concrete.Requests()...,
 		)
-		if err == nil && !effectSelection.Effect().Synchronous() {
+		if err == nil {
 			concretizationNames, available :=
 				context.Names().(api.GenericConcretizationNames)
 			if !available {
@@ -103,7 +102,7 @@ func Emit(
 		}
 		callableFacet = facet
 	} else if openConcretization {
-		facet, selectionErr := cooperativecall.SelectGenericClassMethod(
+		facet, selectionErr := callable.SelectGenericMethod(
 			context,
 			owner,
 		)
@@ -116,12 +115,8 @@ func Emit(
 				Reason: "generic kernel names are unavailable",
 			}
 		}
-		if effectSelection.Effect().Synchronous() {
-			reference, err = kernelNames.SynchronousGenericKernel(owner)
-		} else {
-			reference, err = kernelNames.GenericKernel(owner)
-		}
-		if err == nil && !effectSelection.Effect().Synchronous() {
+		reference, err = kernelNames.GenericKernel(owner)
+		if err == nil {
 			deferredTarget, err =
 				kernelNames.DeferredGenericKernel(owner)
 			if err == nil {
@@ -167,20 +162,26 @@ func Emit(
 				Reason: "generic mechanics reached a source-facing function value",
 			}
 		}
-		if effectSelection.Effect().Synchronous() {
+		if providerKernel {
 			kernelNames, available := context.Names().(api.GenericKernelNames)
 			if !available {
 				return api.ExpressionEmission{}, true, &api.ContextError{
 					Reason: "generic kernel names are unavailable",
 				}
 			}
-			reference, err = kernelNames.SynchronousGenericKernel(owner)
+			reference, err = kernelNames.GenericKernel(owner)
 			if err == nil {
 				callableFacet, err = api.NewSourceCallableFacet(owner)
 			}
+			if err == nil {
+				deferredTarget, err = kernelNames.DeferredGenericKernel(owner)
+			}
+			if err == nil {
+				deferredReference = deferredTarget.Reference()
+				deferredTargetSelected = true
+			}
 		} else {
-			reference, callableFacet, err =
-				cooperativecall.SelectGenericCallable(context, owner)
+			reference, callableFacet, err = callable.SelectGeneric(context, owner)
 			if err == nil {
 				kernelNames, available := context.Names().(api.GenericKernelNames)
 				if !available {
@@ -210,10 +211,10 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	synchronousBoundary := context.SynchronousCallableBoundary()
+	providerBoundary := context.ProviderCallableBoundary()
 	recoverySelected := false
 	var recoveryObservationRequests []api.RootRequest
-	if !synchronousBoundary {
+	if !providerBoundary {
 		recoveryObservation, recoveryErr :=
 			context.ObserveRecoveryCallable(callableFacet)
 		if recoveryErr != nil {
@@ -222,46 +223,14 @@ func Emit(
 		recoverySelected = recoveryObservation.Recovery()
 		recoveryObservationRequests = recoveryObservation.Requests()
 	}
-	providerCooperative := false
-	var contractRequests []api.RootRequest
-	if effectSelection.Effect().Synchronous() {
-		providerCooperative = false
-	} else if synchronousBoundary {
-		sourceFacet, facetErr := api.NewSourceCallableFacet(owner)
-		if facetErr != nil {
-			return api.ExpressionEmission{}, true, facetErr
-		}
-		observation, observationErr :=
-			context.ObserveCooperativeCallable(sourceFacet)
-		if observationErr != nil {
-			return api.ExpressionEmission{}, true, observationErr
-		}
-		if observation.Cooperative() {
-			return api.ExpressionEmission{}, true, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "synchronous generic function value may suspend",
-			}
-		}
-		contractRequests = observation.Requests()
-	} else {
-		providerCooperative, _, contractRequests, err =
-			cooperativecall.GenericValueContract(
-				context,
-				callableFacet,
-				signature,
-			)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
-	}
 	var target callable.SignatureEmission
-	if effectSelection.Effect().Synchronous() {
-		target, err = callable.EmitAdapterWithSynchronousParameters(
+	if providerKernel {
+		target, err = callable.EmitAdapterWithProviderCallableParameters(
 			context,
 			children,
 			source,
 			signature,
-			synchronousParameters,
+			providerParameters,
 		)
 	} else {
 		target, err = callable.EmitABIAdapter(
@@ -275,17 +244,6 @@ func Emit(
 		return api.ExpressionEmission{}, true, err
 	}
 	sourceArguments := target.SourceParameterReferences(context.Factory())
-	var modifiers []tsgo.ModifierLike
-	resultType := target.Result()
-	if providerCooperative {
-		modifiers = []tsgo.ModifierLike{
-			context.Factory().AsyncKeyword(),
-		}
-		resultType = callable.PromiseResult(
-			context.Factory(),
-			resultType,
-		)
-	}
 	contract, ok := owner.Type().(*types.Signature)
 	if !ok {
 		return api.ExpressionEmission{}, true, &api.InvariantError{
@@ -302,8 +260,7 @@ func Emit(
 		sourceArguments,
 		contract,
 		signature,
-		synchronousParameters,
-		providerCooperative,
+		providerParameters,
 		nil,
 		api.DeferredGenericRecoveryInvalid,
 	)
@@ -311,10 +268,10 @@ func Emit(
 		return api.ExpressionEmission{}, true, err
 	}
 	ordinary := context.Factory().ArrowFunction(
-		modifiers,
+		nil,
 		nil,
 		target.Parameters(),
-		resultType,
+		target.Result(),
 		context.Factory().EqualsGreaterThanToken(),
 		callableBody(context.Factory(), signature.Results(), ordinaryCall),
 	)
@@ -326,16 +283,9 @@ func Emit(
 				typeRequests,
 				mechanicReqs,
 				ordinaryCall.Requests(),
-				contractRequests,
 				recoveryObservationRequests,
 			)...,
 		), true, nil
-	}
-	if effectSelection.Effect().Synchronous() {
-		return api.ExpressionEmission{}, true, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "synchronous provider generic function value requires recovery transport",
-		}
 	}
 	recovery, recoveryRequests, err :=
 		callable.RecoveryAuthorityParameter(context)
@@ -362,8 +312,7 @@ func Emit(
 		sourceArguments,
 		contract,
 		signature,
-		nil,
-		providerCooperative,
+		providerParameters,
 		recoveryValue,
 		recoveryPlacement,
 	)
@@ -371,13 +320,13 @@ func Emit(
 		return api.ExpressionEmission{}, true, err
 	}
 	deferred := context.Factory().ArrowFunction(
-		modifiers,
+		nil,
 		nil,
 		append(
 			[]tsgo.ParameterDeclaration{recovery},
 			target.Parameters()...,
 		),
-		resultType,
+		target.Result(),
 		context.Factory().EqualsGreaterThanToken(),
 		callableBody(context.Factory(), signature.Results(), deferredCall),
 	)
@@ -408,7 +357,6 @@ func Emit(
 			deferredCall.Requests(),
 			recoveryRequests,
 			registry.Requests(),
-			contractRequests,
 			recoveryObservationRequests,
 		)...,
 	), true, nil
@@ -423,8 +371,7 @@ func kernelValueInvocation(
 	sourceArguments []tsgo.Expression,
 	contract *types.Signature,
 	signature *types.Signature,
-	synchronousParameters []int,
-	cooperative bool,
+	providerCallableParameters []int,
 	recovery tsgo.Expression,
 	recoveryPlacement api.DeferredGenericRecoveryPlacement,
 ) (api.ExpressionEmission, error) {
@@ -433,15 +380,15 @@ func kernelValueInvocation(
 	var requests []api.RootRequest
 	var err error
 	if reference.ProviderBoundary() {
-		if len(synchronousParameters) != 0 {
+		if len(providerCallableParameters) != 0 {
 			arguments, before, requests, err =
-				providerboundary.ToProviderGenericArgumentsWithSynchronousParameters(
+				providerboundary.ToProviderGenericArgumentsWithCallableParameters(
 					context,
 					children,
 					contract.Params(),
 					signature.Params(),
 					sourceArguments,
-					synchronousParameters,
+					providerCallableParameters,
 				)
 		} else {
 			arguments, before, requests, err =
@@ -484,16 +431,6 @@ func kernelValueInvocation(
 	)
 	if err != nil || !reference.ProviderBoundary() {
 		return target, err
-	}
-	if cooperative {
-		target, err = api.NewExpressionEmission(
-			target.Before(),
-			context.Factory().AwaitExpression(target.Value()),
-			target.Requests(),
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
 	}
 	return providerboundary.FromProviderGenericResults(
 		context,

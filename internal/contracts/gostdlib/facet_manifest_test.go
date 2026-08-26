@@ -18,10 +18,10 @@ func TestGenericKernelFacetOwnsCallableContract(t *testing.T) {
 				gostdlib.FacetCapabilityKernel,
 			},
 			Export: "ContainsKernel",
-			Effect: gostdlib.EffectAsynchronous,
+			Effect: gostdlib.EffectSynchronous,
 			CallableParameters: []gostdlib.ProviderCallableParameterDocument{{
 				Parameter: 1,
-				Effect:    gostdlib.EffectAwaitable,
+				Effect:    gostdlib.EffectSynchronous,
 			}},
 			GenericTypeArguments: []gostdlib.GenericTypeArgumentDocument{{
 				TypeParameter: 0,
@@ -44,12 +44,12 @@ func TestGenericKernelFacetOwnsCallableContract(t *testing.T) {
 		gostdlib.FacetGenericCallableKernel,
 		gostdlib.FacetCapabilityKernel,
 	)
-	if !ok || facet.Effect() != gostdlib.EffectAsynchronous {
+	if !ok || facet.Effect() != gostdlib.EffectSynchronous {
 		t.Fatalf("generic facet = %#v, %t", facet, ok)
 	}
 	parameters := facet.CallableParameters()
 	parameters[0].Effect = gostdlib.EffectSynchronous
-	if facet.CallableParameters()[0].Effect != gostdlib.EffectAwaitable {
+	if facet.CallableParameters()[0].Effect != gostdlib.EffectSynchronous {
 		t.Fatal("generic facet exposed mutable callable-parameter storage")
 	}
 

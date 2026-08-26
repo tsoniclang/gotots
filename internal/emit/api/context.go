@@ -95,7 +95,6 @@ type Context struct {
 	providerProfile              []gostdlib.ProviderCallableProfileInterface
 	evaluationOrder              EvaluationOrder
 	goRuntime                    GoRuntimeContract
-	concurrency                  ConcurrencySemantics
 	expectedType                 types.Type
 	expectedResults              *types.Tuple
 	functionResults              *types.Tuple
@@ -121,13 +120,10 @@ type Context struct {
 	genericResolver              GenericCallableResolver
 	declarationDemandResolver    DeclarationDemandResolver
 	genericConsumer              GenericOperationConsumer
-	cooperativeResolver          CooperativeCallableResolver
 	recoveryResolver             RecoveryCallableResolver
 	externalFunctionResolver     ExternalFunctionResolver
-	callableFacet                CallableFacet
-	cooperative                  bool
 	staticallySelectedCallable   bool
-	synchronousCallableBoundary  bool
+	providerCallableBoundary     bool
 	deferredCallableSelection    bool
 	detachedInvocation           bool
 	environmentContract          bool
@@ -236,7 +232,6 @@ func NewContext(
 	values Values,
 	integer IntegerRepresentation,
 	evaluationOrder EvaluationOrder,
-	concurrency ConcurrencySemantics,
 ) (Context, error) {
 	switch {
 	case role == "":
@@ -259,8 +254,6 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "integer representation is invalid"}
 	case !evaluationOrder.Valid():
 		return Context{}, &ContextError{Reason: "evaluation order is invalid"}
-	case !concurrency.Valid():
-		return Context{}, &ContextError{Reason: "concurrency semantics are invalid"}
 	}
 	stableAssignments, _ := values.(StableAssignmentValues)
 	containerStorage, _ := values.(ContainerStorageValues)
@@ -282,7 +275,6 @@ func NewContext(
 		containerStorage:  containerStorage,
 		scalar:            scalar,
 		evaluationOrder:   evaluationOrder,
-		concurrency:       concurrency,
 	}, nil
 }
 
@@ -306,13 +298,13 @@ func (c Context) WithExpectedType(expectedType types.Type) Context {
 	return c
 }
 
-func (c Context) WithSynchronousCallableBoundary() Context {
-	c.synchronousCallableBoundary = true
+func (c Context) WithProviderCallableBoundary() Context {
+	c.providerCallableBoundary = true
 	return c
 }
 
-func (c Context) SynchronousCallableBoundary() bool {
-	return c.synchronousCallableBoundary
+func (c Context) ProviderCallableBoundary() bool {
+	return c.providerCallableBoundary
 }
 
 func (c Context) WithExpectedResults(expectedResults *types.Tuple) Context {
@@ -328,7 +320,7 @@ func (c Context) EnterFunction(results *types.Tuple) Context {
 	c.functionResults = results
 	c.expectedType = nil
 	c.expectedResults = nil
-	c.synchronousCallableBoundary = false
+	c.providerCallableBoundary = false
 	c.breakDepth = 0
 	c.continueDepth = 0
 	c.breakTarget = ""
@@ -541,10 +533,6 @@ func (c Context) WithoutIteratorRangeControl() Context {
 		c.iteratorRangeControls[:len(c.iteratorRangeControls)-1],
 	)
 	return c
-}
-
-func (c Context) ConcurrencySemantics() ConcurrencySemantics {
-	return c.concurrency
 }
 
 func (c Context) LocalConstantProjections(

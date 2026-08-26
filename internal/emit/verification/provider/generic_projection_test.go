@@ -123,7 +123,7 @@ func SortOpen(source []string, compare func(string, string) int) {
 	slices.SortFunc(source, compare)
 }
 
-func SortCooperative(source []string, ready <-chan struct{}) {
+func SortChannelBacked(source []string, ready <-chan struct{}) {
 	slices.SortFunc(source, func(left, right string) int {
 		<-ready
 		return strings.Compare(left, right)
@@ -229,7 +229,6 @@ func TimeAddress() time.Time {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -250,7 +249,7 @@ func TimeAddress() time.Time {
 			mustProviderRoot(t, scope.Lookup("SortMethod")),
 			mustProviderRoot(t, scope.Lookup("SortVariable")),
 			mustProviderRoot(t, scope.Lookup("SortOpen")),
-			mustProviderRoot(t, scope.Lookup("SortCooperative")),
+			mustProviderRoot(t, scope.Lookup("SortChannelBacked")),
 			mustProviderRoot(t, scope.Lookup("SortRecovering")),
 			mustProviderRoot(t, scope.Lookup("BinarySearchDirect")),
 			mustProviderRoot(t, scope.Lookup("CompareDirect")),
@@ -288,19 +287,20 @@ func TimeAddress() time.Time {
 		"record__from_providerprojection.$fromStorage($argument0)",
 		"record__from_providerprojection.$storageOf($argument0)",
 		"CmpCompareKernel<gostring>(",
+		"CmpCompare<gostring>(",
 		"SlicesValuesKernel<RuntimeSlice<gostring>, gostring, gostring>(",
 		"ErrorsAsTypeKernel<code__from_providerprojection>(($argument0: GoInterfaceValue | undefined)",
 		"GenericAddress$kernel<T>",
-		"SlicesSortFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
-		"SlicesSortStableFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
-		"SlicesBinarySearchFuncSynchronousKernel<",
-		"SlicesCompareFuncSynchronousKernel<",
-		"SlicesContainsFuncSynchronousKernel<",
-		"SlicesEqualFuncSynchronousKernel<",
-		"SlicesIndexFuncSynchronousKernel<",
-		"SlicesCompactFuncSynchronousKernel<",
-		"SlicesDeleteFuncSynchronousKernel<",
-		"MapsEqualFuncSynchronousKernel<",
+		"SlicesSortFuncKernel<RuntimeSlice<gostring>, gostring, gostring>(",
+		"SlicesSortStableFuncKernel<RuntimeSlice<gostring>, gostring, gostring>(",
+		"SlicesBinarySearchFuncKernel<",
+		"SlicesCompareFuncKernel<",
+		"SlicesContainsFuncKernel<",
+		"SlicesEqualFuncKernel<",
+		"SlicesIndexFuncKernel<",
+		"SlicesCompactFuncKernel<",
+		"SlicesDeleteFuncKernel<",
+		"MapsEqualFuncKernel<",
 		"SlicesContainsFuncKernel<",
 		"export function SortDirect(source: RuntimeSlice<gostring>): void",
 		"export function SortStableDirect(source: RuntimeSlice<gostring>): void",
@@ -308,9 +308,9 @@ func TimeAddress() time.Time {
 		"export function SortLocal(source: RuntimeSlice<gostring>): void",
 		"export function SortGenericNamed(source: RuntimeSlice<gostring>): void",
 		"export function SortMethod(source: RuntimeSlice<gostring>): void",
-		"export async function SortVariable(",
-		"export async function SortOpen(",
-		"export async function SortCooperative(",
+		"export function SortVariable(",
+		"export function SortOpen(",
+		"export function SortChannelBacked(",
 		"export function SortRecovering(source: RuntimeSlice<gostring>): void",
 		"export function BinarySearchDirect(",
 		"export function CompareDirect(",
@@ -320,7 +320,7 @@ func TimeAddress() time.Time {
 		"export function CompactDirect(",
 		"export function DeleteDirect(",
 		"export function MapsEqualDirect(",
-		"export async function ContainsOpen(",
+		"export function ContainsOpen(",
 		"Pointer<T>",
 		"addressOf<GoArray<GoContainerStorage<T>, 1>>(values)",
 		"BigInt.asIntN(64, goNumberToBigInt(count))",
@@ -334,6 +334,10 @@ func TimeAddress() time.Time {
 	for _, forbidden := range []string{
 		"$goCapability_",
 		"support/generics/capabilities/",
+		"async ",
+		"await ",
+		"Promise<",
+		"Awaitable<",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("provider generic projection retains %q:\n%s", forbidden, printed)
@@ -344,6 +348,7 @@ func TimeAddress() time.Time {
 		"Clone<gostring, int64>(",
 		"SlicesValuesCooperative<",
 		"SlicesValuesFullyCooperative<",
+		"SynchronousKernel<",
 		"export async function SortDirect(",
 		"export async function SortStableDirect(",
 		"export async function SortNamed(",
@@ -358,13 +363,6 @@ func TimeAddress() time.Time {
 		"export async function CompactDirect(",
 		"export async function DeleteDirect(",
 		"export async function MapsEqualDirect(",
-		"SlicesBinarySearchFuncKernel<RuntimeSlice<gostring>",
-		"SlicesCompareFuncKernel<RuntimeSlice<gostring>",
-		"SlicesEqualFuncKernel<RuntimeSlice<gostring>",
-		"SlicesIndexFuncKernel<RuntimeSlice<gostring>",
-		"SlicesCompactFuncKernel<RuntimeSlice<gostring>",
-		"SlicesDeleteFuncKernel<RuntimeSlice<gostring>",
-		"MapsEqualFuncKernel<GoMapValue<gostring, gostring>",
 	} {
 		if strings.Contains(printed, superseded) {
 			t.Fatalf("provider generic projection retained %q:\n%s", superseded, printed)

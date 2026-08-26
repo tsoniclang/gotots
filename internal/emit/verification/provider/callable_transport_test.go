@@ -61,7 +61,6 @@ func Run(key string, value string) (string, bool, string) {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	// The context formatting family is implemented with exact chain
 	// spellings: the constructor chain compiles through the used-provider
@@ -167,7 +166,6 @@ func SortNamedField(source []string) {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	var roots []emit.Root
 	for _, name := range []string{
@@ -187,11 +185,11 @@ func SortNamedField(source []string) {
 	printed := artifacts.printed
 	for _, required := range []string{
 		"export function SortClosed(",
-		"SlicesSortFuncSynchronousKernel<",
+		"SlicesSortFuncKernel<",
 		"public compare: (($0: gostring, $1: gostring) => int) | undefined",
-		"export async function SortGenericOpen(",
-		"compare: (($0: T, $1: T) => Awaitable<int>) | undefined",
-		"export async function SortNamedField(",
+		"export function SortGenericOpen(",
+		"compare: (($0: T, $1: T) => int) | undefined",
+		"export function SortNamedField(",
 		"public compare: namedCompare",
 		"export class namedCompare",
 		"public readonly $value:",
@@ -199,7 +197,12 @@ func SortNamedField(source []string) {
 		"reflect: Value.Set using unaddressable value",
 	} {
 		if !strings.Contains(printed, required) {
-			t.Fatalf("callable-field transport lacks %q", required)
+			t.Fatalf("callable-field transport lacks %q:\n%s", required, printed)
+		}
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(printed, forbidden) {
+			t.Fatalf("callable-field transport contains %q", forbidden)
 		}
 	}
 	if strings.Contains(printed, "instance.compare =") {
@@ -208,7 +211,7 @@ func SortNamedField(source []string) {
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }
 
-func TestGenericSynchronousCallbackSelectionUsesExactFieldEvidence(t *testing.T) {
+func TestGenericCallbackSelectionUsesExactFieldEvidence(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
@@ -289,11 +292,11 @@ func CallOpen(
 	return value.compare(left, right)
 }
 
-type cooperativeComparer struct {
+type blockingComparer struct {
 	compare func(string, string) int
 }
 
-func (value *cooperativeComparer) compareMethod(
+func (value *blockingComparer) compareMethod(
 	left, right string,
 ) int {
 	ready := make(chan struct{})
@@ -301,7 +304,7 @@ func (value *cooperativeComparer) compareMethod(
 	return 0
 }
 
-func SortCooperative(source []string, value *cooperativeComparer) {
+func SortBlocking(source []string, value *blockingComparer) {
 	value.compare = value.compareMethod
 	slices.SortFunc(source, value.compare)
 }
@@ -362,7 +365,6 @@ func SortInterface(source []string, provider comparer) {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	var roots []emit.Root
 	for _, name := range []string{
@@ -374,7 +376,7 @@ func SortInterface(source []string, provider comparer) {
 		"SortExported",
 		"SortOpen",
 		"CallOpen",
-		"SortCooperative",
+		"SortBlocking",
 		"SortLiteral",
 		"SortAddressed",
 		"SortInterface",
@@ -397,20 +399,20 @@ func SortInterface(source []string, provider comparer) {
 		}
 	}
 	for _, canonical := range []string{
-		"export async function SortExported(",
-		"export async function SortOpen(",
-		"export async function CallOpen(",
-		"export async function SortCooperative(",
-		"export async function SortLiteral(",
-		"export async function SortAddressed(",
-		"export async function SortInterface(",
+		"export function SortExported(",
+		"export function SortOpen(",
+		"export function CallOpen(",
+		"export function SortBlocking(",
+		"export function SortLiteral(",
+		"export function SortAddressed(",
+		"export function SortInterface(",
 	} {
 		if !strings.Contains(printed, canonical) {
-			t.Fatalf("open callback lacks %q:\n%s", canonical, printed)
+			t.Fatalf("synchronous callback lacks %q:\n%s", canonical, printed)
 		}
 	}
-	if !strings.Contains(printed, "SlicesSortFuncSynchronousKernel<") {
-		t.Fatalf("closed callback lacks synchronous provider kernel:\n%s", printed)
+	if !strings.Contains(printed, "SlicesSortFuncKernel<") {
+		t.Fatalf("callback lacks synchronous provider kernel:\n%s", printed)
 	}
 	if !strings.Contains(
 		printed,
@@ -418,30 +420,29 @@ func SortInterface(source []string, provider comparer) {
 	) {
 		t.Fatalf("closed callback field lacks synchronous transport:\n%s", printed)
 	}
-	if !strings.Contains(
-		printed,
-		"public compare: (($0: gostring, $1: gostring) => Awaitable<int>) | undefined",
-	) {
-		t.Fatalf("open callback field lost canonical transport:\n%s", printed)
-	}
 	for _, synchronous := range []string{"CallClosed", "GoClosed"} {
 		if !strings.Contains(printed, "export function "+synchronous+"(") ||
 			strings.Contains(printed, "export async function "+synchronous+"(") {
 			t.Fatalf(
-				"closed callback invocation retained cooperative transport in %s:\n%s",
+				"callback invocation retained asynchronous transport in %s:\n%s",
 				synchronous,
 				printed,
 			)
 		}
 	}
-	if !strings.Contains(printed, "export async function DeferClosed(") {
-		t.Fatalf("deferred recovery transport lost its canonical effect:\n%s", printed)
+	if !strings.Contains(printed, "export function DeferClosed(") {
+		t.Fatalf("deferred recovery transport is not synchronous:\n%s", printed)
 	}
 	if !strings.Contains(
 		printed,
 		"=> int) | undefined = loadPointer<closedComparer>",
 	) {
 		t.Fatalf("deferred callback capture lost synchronous transport:\n%s", printed)
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(printed, forbidden) {
+			t.Fatalf("callback transport contains %q", forbidden)
+		}
 	}
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }

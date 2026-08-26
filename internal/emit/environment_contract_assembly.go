@@ -253,7 +253,6 @@ func (s *programSession) environmentProfile(
 		s.source,
 		options.IntegerRepresentation,
 		options.EvaluationOrder,
-		options.ConcurrencySemantics,
 		options.StandardLibrary,
 		options.ExternalProvider,
 	)
@@ -363,8 +362,6 @@ func (s *programSession) requireEnvironmentPackage(
 		s.scalar,
 		s.providerScalar,
 		s.evaluationOrder,
-		s.concurrency,
-		s,
 		s,
 		s,
 		s,

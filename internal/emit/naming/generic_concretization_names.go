@@ -119,32 +119,6 @@ func (n *File) GenericKernel(
 	)
 }
 
-func (n *File) SynchronousGenericKernel(
-	owner *types.Func,
-) (api.NameReference, error) {
-	if !validGenericKernelOwner(owner) {
-		return api.NameReference{}, &api.NameError{
-			Reason: "synchronous generic kernel owner is invalid",
-		}
-	}
-	selected, providerOwned, err :=
-		n.owner.registry.ProviderSynchronousGenericKernel(owner)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	if !providerOwned {
-		return api.NameReference{}, &api.NameError{
-			Name:   owner.Name(),
-			Reason: "synchronous generic kernel is not certified",
-		}
-	}
-	return n.providerGenericKernelReference(
-		owner,
-		selected,
-		gostdlib.FacetCapabilitySynchronousKernel,
-	)
-}
-
 func (n *File) DeferredGenericKernel(
 	owner *types.Func,
 ) (api.DeferredGenericCallableReference, error) {
@@ -159,6 +133,41 @@ func (n *File) DeferredGenericKernel(
 		return api.DeferredGenericCallableReference{}, err
 	}
 	if providerOwned {
+		contract, contractOwned, contractErr := n.providerFacetOwner(owner)
+		if contractErr != nil {
+			return api.DeferredGenericCallableReference{}, contractErr
+		}
+		if !contractOwned {
+			return api.DeferredGenericCallableReference{}, &api.NameError{
+				Name:   owner.Name(),
+				Reason: "provider generic kernel lost its certified owner",
+			}
+		}
+		if _, recoveryOwned := n.owner.registry.provider.Facet(
+			contract.Identity(),
+			gostdlib.FacetRecoveryCallable,
+			gostdlib.FacetCapabilityRecovery,
+		); recoveryOwned {
+			reference, selectedOwner, referenceErr := n.providerFacetReference(
+				owner,
+				gostdlib.FacetRecoveryCallable,
+				gostdlib.FacetCapabilityRecovery,
+				api.ImportPhaseValue,
+			)
+			if referenceErr != nil {
+				return api.DeferredGenericCallableReference{}, referenceErr
+			}
+			if !selectedOwner {
+				return api.DeferredGenericCallableReference{}, &api.NameError{
+					Name:   contract.Identity(),
+					Reason: "provider generic recovery facet lost its certified owner",
+				}
+			}
+			return api.NewDeferredGenericCallableReference(
+				reference,
+				api.DeferredGenericRecoveryLast,
+			)
+		}
 		reference, referenceErr :=
 			n.providerGenericKernelReference(
 				owner,
@@ -507,7 +516,6 @@ func (n *File) genericConcretizationSuffix(
 	}
 	return semanticname.ConcretizationSuffixWithIdentityTokens(
 		concretization.Arguments(),
-		concretization.Effect().Synchronous(),
 		n.generatedNamedObjectToken,
 		n.generatedPackageToken,
 	)

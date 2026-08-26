@@ -32,7 +32,7 @@ export class Mutex {
     }
     if (receiver.#locked) {
       GoPanic.raiseRuntime(
-        "sync: Mutex.Lock would block under disabled concurrency",
+        "sync: Mutex.Lock would block under serial execution",
       );
     }
     receiver.#locked = true;
@@ -82,7 +82,7 @@ export class RWMutex {
     }
     if (receiver.#writer || receiver.#readers !== 0) {
       GoPanic.raiseRuntime(
-        "sync: RWMutex.Lock would block under disabled concurrency",
+        "sync: RWMutex.Lock would block under serial execution",
       );
     }
     receiver.#writer = true;
@@ -104,7 +104,7 @@ export class RWMutex {
     }
     if (receiver.#writer) {
       GoPanic.raiseRuntime(
-        "sync: RWMutex.RLock would block under disabled concurrency",
+        "sync: RWMutex.RLock would block under serial execution",
       );
     }
     receiver.#readers += 1;

@@ -44,7 +44,6 @@ type goDocument struct {
 type semanticsDocument struct {
 	Integers        *string `json:"integers"`
 	EvaluationOrder *string `json:"evaluationOrder"`
-	Concurrency     *string `json:"concurrency"`
 }
 type providersDocument struct {
 	StandardLibrary *bool `json:"standardLibrary"`
@@ -150,10 +149,6 @@ func resolve(path string, selected document, overrides Overrides) (Project, erro
 	if err != nil {
 		return Project{}, err
 	}
-	concurrency, err := parseConcurrency(*selected.Semantics.Concurrency)
-	if err != nil {
-		return Project{}, err
-	}
 	sourceRoot, err := resolvePath(base, *selected.Source.Root)
 	if err != nil {
 		return Project{}, err
@@ -188,7 +183,6 @@ func resolve(path string, selected document, overrides Overrides) (Project, erro
 		toolCacheRoot:         toolCacheRoot,
 		integer:               integer,
 		evaluation:            evaluation,
-		concurrency:           concurrency,
 		standardLibrary:       *selected.Providers.StandardLibrary,
 		externals:             *selected.Providers.Externals,
 		implementationBundles: bundles,
@@ -206,7 +200,6 @@ func applyDefaults(selected *document) {
 	}
 	defaultString(&selected.Semantics.Integers, "number")
 	defaultString(&selected.Semantics.EvaluationOrder, "direct")
-	defaultString(&selected.Semantics.Concurrency, "disabled")
 	if selected.Providers.StandardLibrary == nil {
 		selected.Providers.StandardLibrary = boolPointer(false)
 	}
@@ -237,7 +230,6 @@ func applyOverrides(selected *document, overrides Overrides) {
 	}
 	applyString(overrides.IntegerRepresentation, &selected.Semantics.Integers)
 	applyString(overrides.EvaluationOrder, &selected.Semantics.EvaluationOrder)
-	applyString(overrides.ConcurrencySemantics, &selected.Semantics.Concurrency)
 	if overrides.StandardLibrary != nil {
 		selected.Providers.StandardLibrary = overrides.StandardLibrary
 	}
@@ -276,7 +268,6 @@ func (p Project) SemanticDigest(evidence EvidenceDigests) (string, error) {
 		Tags            []string `json:"tags"`
 		Integer         string   `json:"integer"`
 		Evaluation      string   `json:"evaluation"`
-		Concurrency     string   `json:"concurrency"`
 		Source          string   `json:"source"`
 		Implementations string   `json:"implementations,omitempty"`
 		StandardLibrary string   `json:"standardLibrary,omitempty"`
@@ -286,7 +277,7 @@ func (p Project) SemanticDigest(evidence EvidenceDigests) (string, error) {
 		Toolchain: p.buildProfile.ToolchainVersion(), GOOS: p.buildProfile.GOOS(),
 		GoTool: p.goTool.Identity().String(), TSGoTool: p.tsgoTool.Identity().String(),
 		GOARCH: p.buildProfile.GOARCH(), CGO: p.buildProfile.CgoEnabled(), Tags: p.buildProfile.Tags(),
-		Integer: p.integer.String(), Evaluation: p.evaluation.String(), Concurrency: p.concurrency.String(),
+		Integer: p.integer.String(), Evaluation: p.evaluation.String(),
 		Source: evidence.Source, Implementations: evidence.SourceImplementations,
 		StandardLibrary: evidence.StandardLibrary, Externals: evidence.Externals,
 	}

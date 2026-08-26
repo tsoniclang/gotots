@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	methodexpression "github.com/tsoniclang/gotots/internal/emit/expression/methodexpression"
 	methodvalue "github.com/tsoniclang/gotots/internal/emit/expression/methodvalue"
@@ -109,12 +108,7 @@ func Emit(
 				target,
 			)
 		}
-		return cooperativecall.TransportSourceValue(
-			context,
-			source,
-			function,
-			target,
-		)
+		return target, nil
 	}
 	return target, nil
 }

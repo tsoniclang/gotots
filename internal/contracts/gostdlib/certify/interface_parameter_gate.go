@@ -58,11 +58,6 @@ func verifyProviderProfileInterfaceClosure(
 	)
 }
 
-type providerProfileInterfaceVisit struct {
-	identity    string
-	cooperative bool
-}
-
 func verifyOneProviderProfileInterfaceClosure(
 	owner string,
 	profileInterfaces []gostdlib.ProviderCallableProfileInterfaceDocument,
@@ -72,18 +67,15 @@ func verifyOneProviderProfileInterfaceClosure(
 	differences *[]string,
 ) error {
 	selected := make(map[string]gostdlib.ProviderInterfaceDocument)
-	queue := make([]providerProfileInterfaceVisit, 0, len(profileInterfaces))
+	queue := make([]string, 0, len(profileInterfaces))
 	for _, candidate := range profileInterfaces {
 		selected[candidate.SourceIdentity] = candidate.ProviderInterface
 		if candidate.Protocol != nil {
 			continue
 		}
-		queue = append(queue, providerProfileInterfaceVisit{
-			identity:    candidate.SourceIdentity,
-			cooperative: providerInterfaceMaySuspend(candidate.ProviderInterface),
-		})
+		queue = append(queue, candidate.SourceIdentity)
 	}
-	visited := make(map[providerProfileInterfaceVisit]struct{})
+	visited := make(map[string]struct{})
 	for len(queue) != 0 {
 		visit := queue[0]
 		queue = queue[1:]
@@ -91,7 +83,7 @@ func verifyOneProviderProfileInterfaceClosure(
 			continue
 		}
 		visited[visit] = struct{}{}
-		contract := interfaces[visit.identity]
+		contract := interfaces[visit]
 		if contract == nil {
 			continue
 		}
@@ -106,54 +98,31 @@ func verifyOneProviderProfileInterfaceClosure(
 			)
 		}
 		for _, child := range sortedIdentityKeys(children) {
-			if child == visit.identity {
+			if child == visit {
 				continue
 			}
 			ordinary := providers[child]
-			required, err := providerInterfaceNeedsCooperative(child, ordinary)
+			required, err := providerInterfaceRequiresProfile(child, ordinary)
 			if err != nil {
 				return err
 			}
 			candidate, ok := selected[child]
 			matches := !required && !ok
 			if ok {
-				if visit.cooperative {
-					matches = providerInterfaceIsCooperative(ordinary, candidate)
-				} else {
-					matches = providerInterfaceIsDirect(ordinary, candidate)
-				}
+				matches = providerInterfaceIsDirect(ordinary, candidate)
 			}
 			if !matches {
-				mode := "direct"
-				if visit.cooperative {
-					mode = "cooperative"
-				}
 				*differences = append(*differences, fmt.Sprintf(
-					"%s interface %s transitively requires %s %s",
+					"%s interface %s transitively requires direct %s",
 					owner,
-					visit.identity,
-					mode,
+					visit,
 					child,
 				))
 			}
-			queue = append(queue, providerProfileInterfaceVisit{
-				identity:    child,
-				cooperative: visit.cooperative,
-			})
+			queue = append(queue, child)
 		}
 	}
 	return nil
-}
-
-func providerInterfaceMaySuspend(
-	provider gostdlib.ProviderInterfaceDocument,
-) bool {
-	for _, method := range provider.Methods {
-		if method.Effect.MaySuspend() {
-			return true
-		}
-	}
-	return false
 }
 
 func sourceProviderInterfaceTypes(
@@ -303,7 +272,7 @@ func collectBoundProviderInterfaces(
 	}
 }
 
-func providerInterfaceNeedsCooperative(
+func providerInterfaceRequiresProfile(
 	identity string,
 	provider gostdlib.ProviderInterfaceDocument,
 ) (bool, error) {
@@ -315,56 +284,16 @@ func providerInterfaceNeedsCooperative(
 		if method.Kind != gostdlib.ProviderInterfaceMethodCallable {
 			continue
 		}
-		switch method.Effect {
-		case gostdlib.EffectSynchronous:
-			required = true
-		case gostdlib.EffectAwaitable:
-		case gostdlib.EffectAsynchronous:
+		if method.Effect != gostdlib.EffectSynchronous {
 			return false, certifyError(
 				"verify interface parameter profile coverage",
 				identity,
-				"ordinary provider interface method is Promise-only",
-			)
-		default:
-			return false, certifyError(
-				"verify interface parameter profile coverage",
-				identity,
-				"ordinary provider interface method effect is invalid",
+				"provider interface method is not synchronous",
 			)
 		}
+		required = true
 	}
 	return required, nil
-}
-
-func providerInterfaceIsCooperative(
-	ordinary gostdlib.ProviderInterfaceDocument,
-	cooperative gostdlib.ProviderInterfaceDocument,
-) bool {
-	if ordinary.Mode != gostdlib.ProviderInterfaceModeBridge ||
-		cooperative.Mode != gostdlib.ProviderInterfaceModeBridge ||
-		len(ordinary.Methods) != len(cooperative.Methods) {
-		return false
-	}
-	cooperativeMethods := make(
-		map[string]gostdlib.ProviderInterfaceMethodDocument,
-		len(cooperative.Methods),
-	)
-	for _, method := range cooperative.Methods {
-		cooperativeMethods[method.SourceIdentity] = method
-	}
-	for _, method := range ordinary.Methods {
-		selected, ok := cooperativeMethods[method.SourceIdentity]
-		if !ok || selected.Kind != method.Kind ||
-			selected.SourceSignature != method.SourceSignature ||
-			selected.ContractSignature != method.ContractSignature {
-			return false
-		}
-		if method.Kind == gostdlib.ProviderInterfaceMethodCallable &&
-			selected.Effect != gostdlib.EffectAwaitable {
-			return false
-		}
-	}
-	return true
 }
 
 func providerInterfaceIsDirect(

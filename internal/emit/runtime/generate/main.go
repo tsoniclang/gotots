@@ -25,11 +25,6 @@ func main() {
 	toolCache := flag.String("tool-cache", "", "selected .temp/cache root for sealed tools")
 	outputDirectory := flag.String("output", "", "runtime package output directory")
 	profileName := flag.String("profile", "number", "integer representation")
-	concurrencyName := flag.String(
-		"concurrency",
-		"disabled",
-		"concurrency semantics",
-	)
 	assembly := flag.String(
 		"assembly",
 		"product",
@@ -41,10 +36,6 @@ func main() {
 		fail("contract and output are required")
 	}
 	profile, err := integerProfile(*profileName)
-	if err != nil {
-		fail(err.Error())
-	}
-	concurrency, err := concurrencyProfile(*concurrencyName)
 	if err != nil {
 		fail(err.Error())
 	}
@@ -75,15 +66,10 @@ func main() {
 	var assembled runtimeemission.Package
 	switch *assembly {
 	case "product":
-		productSymbols, selectionErr := requirements.RuntimeSymbolsFor(concurrency)
-		if selectionErr != nil {
-			fail(selectionErr.Error())
-		}
 		assembled, err = runtimeemission.AssemblePackage(
 			tsgo.NewFactory(),
 			scalar,
-			concurrency,
-			productSymbols,
+			requirements.RuntimeSymbols(),
 			requirements.PrimitiveAliases(),
 		)
 	case "provider-certification":
@@ -151,20 +137,6 @@ func main() {
 	expected["package.json"] = assembled.Manifest()
 	if err := synchronize(*outputDirectory, expected, *check); err != nil {
 		fail(err.Error())
-	}
-}
-
-func concurrencyProfile(value string) (api.ConcurrencySemantics, error) {
-	switch value {
-	case api.ConcurrencySemanticsDisabled.String():
-		return api.ConcurrencySemanticsDisabled, nil
-	case api.ConcurrencySemanticsCooperative.String():
-		return api.ConcurrencySemanticsCooperative, nil
-	default:
-		return api.ConcurrencySemanticsInvalid, fmt.Errorf(
-			"concurrency profile %q is invalid",
-			value,
-		)
 	}
 }
 

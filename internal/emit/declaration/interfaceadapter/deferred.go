@@ -18,7 +18,6 @@ func methodDeferredSupport(
 	signature *types.Signature,
 	target callable.SignatureEmission,
 	resultType tsgo.TypeNode,
-	cooperative bool,
 	contracts []*types.Func,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	if adapterName == "" || dynamicTypeName == "" || memberName == "" ||
@@ -119,15 +118,12 @@ func methodDeferredSupport(
 		}, true),
 		nil,
 	)}
-	if signature.Results().Len() == 0 && !cooperative {
+	if signature.Results().Len() == 0 {
 		body = append(body, context.Factory().ExpressionStatement(call))
 	} else {
 		body = append(body, context.Factory().ReturnStatement(call))
 	}
 	modifiers := []tsgo.ModifierLike{context.Factory().ExportKeyword()}
-	if cooperative {
-		modifiers = append(modifiers, context.Factory().AsyncKeyword())
-	}
 	statements := []tsgo.Statement{context.Factory().FunctionDeclaration(
 		modifiers,
 		nil,

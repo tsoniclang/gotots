@@ -303,16 +303,10 @@ func (s *programSession) applyDeclarationRequirements(
 	if generatedOwner, ok := owner.Generated(); ok {
 		for _, requirement := range requirements {
 			selectedOwner, generated := requirement.GeneratedArtifact()
-			facet, cooperative := requirement.CooperativeCallable()
 			if !requirement.Valid() ||
 				requirement.Owner() != owner ||
-				(!generated && !cooperative) ||
-				(generated && selectedOwner != generatedOwner) ||
-				(cooperative &&
-					!generatedCallableFacetMatches(
-						facet,
-						generatedOwner,
-					)) {
+				!generated ||
+				selectedOwner != generatedOwner {
 				return &ScheduleError{
 					Object: owner.Name(),
 					Reason: "generated-artifact requirement batch has mixed or invalid ownership",
@@ -376,22 +370,6 @@ func (s *programSession) applyDeclarationRequirements(
 		}
 	}
 	return s.reconstructScheduledArtifact(owner)
-}
-
-func generatedCallableFacetMatches(
-	facet api.CallableFacet,
-	artifact *api.GeneratedArtifact,
-) bool {
-	if selected, ok := facet.ABI(); ok {
-		return selected == artifact
-	}
-	if selected, ok := facet.GenericCapability(); ok {
-		return selected == artifact
-	}
-	if selected, ok := facet.InterfaceMethod(); ok {
-		return selected == artifact
-	}
-	return false
 }
 
 func requirementOwnerName(requirement api.DeclarationRequirement) string {

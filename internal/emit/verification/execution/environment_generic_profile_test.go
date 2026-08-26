@@ -13,7 +13,7 @@ import (
 	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
-func TestEnvironmentGenericCallableContractIsCanonicalAndBodyless(
+func TestEnvironmentGenericCallableContractIsSynchronousAndBodyless(
 	t *testing.T,
 ) {
 	project := t.TempDir()
@@ -48,7 +48,6 @@ func Sum(values []int32, input <-chan int32) int32 {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	emission, err := emit.CompileWithOptions(
 		program,
 		[]emit.Root{root},
@@ -85,14 +84,16 @@ func Sum(values []int32, input <-chan int32) int32 {
 			artifacts.printed,
 		)
 	}
-	if strings.Contains(artifacts.printed, "Values$cooperative_") {
-		t.Fatalf("environment callable profile survived:\n%s", artifacts.printed)
-	}
-	if !strings.Contains(artifacts.printed, "Awaitable<bool>") {
-		t.Fatalf(
-			"environment contract lacks canonical cooperative yield ABI:\n%s",
-			artifacts.printed,
-		)
+	for _, forbidden := range []string{
+		"Values$cooperative_",
+		"Awaitable<",
+		"Promise<",
+		"async ",
+		"await ",
+	} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("synchronous environment contract contains %q", forbidden)
+		}
 	}
 	contract := environmentDeclarationLine(
 		t,
@@ -149,7 +150,7 @@ func environmentDeclarationLine(
 	return printed[start : start+end]
 }
 
-func TestInterfaceMethodAwaitableABIIsStableAcrossUnrelatedValues(t *testing.T) {
+func TestInterfaceMethodSynchronousABIIsStableAcrossUnrelatedValues(t *testing.T) {
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: waveNineConcurrencyDirectory(),
 		Pattern:   ".",
@@ -239,18 +240,21 @@ func TestInterfaceMethodAwaitableABIIsStableAcrossUnrelatedValues(t *testing.T) 
 		)
 	}
 	for _, required := range []string{
-		"export async function DirectSynchronousInterface(): Promise<int32>",
-		"return await goInterfaceNonNil<Reader>",
+		"export function DirectSynchronousInterface(): int32",
+		"return goInterfaceNonNil<Reader>",
 	} {
 		if !strings.Contains(baselineCall, required) {
 			t.Fatalf("interface call lacks %q:\n%s", required, baselineCall)
 		}
 	}
-	if !strings.Contains(baselineContract, "Next(): Awaitable<int32>;") {
-		t.Fatalf("interface contract lacks canonical Awaitable ABI:\n%s", baselineContract)
+	if !strings.Contains(baselineContract, "Next(): int32;") {
+		t.Fatalf("interface contract lacks synchronous ABI:\n%s", baselineContract)
 	}
-	if strings.Contains(baselineContract, "Next(): Promise<int32>;") {
-		t.Fatal("interface contract retained a blocking-only method profile")
+	for _, forbidden := range []string{"Awaitable<", "Promise<", "async ", "await "} {
+		if strings.Contains(baselineContract, forbidden) ||
+			strings.Contains(baselineCall, forbidden) {
+			t.Fatalf("interface artifacts contain %q", forbidden)
+		}
 	}
 }
 

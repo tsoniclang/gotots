@@ -68,71 +68,6 @@ func TestPackageAssemblyArtifactOwnerIsExact(t *testing.T) {
 	}
 }
 
-func TestGeneratedCallableABIBoundaryOwnsNestedCooperativeDemand(
-	t *testing.T,
-) {
-	sourcePackage := types.NewPackage("example.com/callback", "callback")
-	sourceOwner := types.NewFunc(
-		token.Pos(1),
-		sourcePackage,
-		"Consume",
-		types.NewSignatureType(nil, nil, nil, nil, nil, false),
-	)
-	signature := types.NewSignatureType(
-		nil,
-		nil,
-		nil,
-		types.NewTuple(
-			types.NewVar(token.NoPos, nil, "value", types.Typ[types.Int32]),
-		),
-		types.NewTuple(
-			types.NewVar(token.NoPos, nil, "", types.Typ[types.Bool]),
-		),
-		false,
-	)
-	artifact, err := NewContractGeneratedArtifact(
-		GeneratedArtifactCallableABI,
-		signature,
-		"callback-boundary",
-		"$goCallable$callback_boundary",
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	facet, err := NewCallableABIFacet(artifact)
-	if err != nil {
-		t.Fatal(err)
-	}
-	context := (Context{}).
-		WithArtifactOwner(MustSourceArtifactOwner(sourceOwner)).
-		WithCooperativeCallableABI(facet, true)
-	if !context.IsCooperative() {
-		t.Fatal("generated callable ABI boundary lost cooperative state")
-	}
-	request, err := context.CooperativeRequest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	requirement, ok := request.DeclarationRequirement()
-	selected, cooperative := requirement.CooperativeCallable()
-	if !ok ||
-		!cooperative ||
-		selected != facet ||
-		requirement.Owner() != MustGeneratedArtifactOwner(artifact) {
-		t.Fatalf("nested cooperative request = %#v", request)
-	}
-	sourceFacet, err := NewSourceCallableFacet(sourceOwner)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if recover() == nil {
-			t.Fatal("generated callable ABI boundary accepted a source facet")
-		}
-	}()
-	_ = context.WithCooperativeCallableABI(sourceFacet, false)
-}
-
 func TestLexicalGenericCapabilityFacetUsesItsReconstructionOwner(
 	t *testing.T,
 ) {
@@ -199,22 +134,13 @@ func TestLexicalGenericCapabilityFacetUsesItsReconstructionOwner(
 	if err != nil {
 		t.Fatal(err)
 	}
-	requirement, err := NewCooperativeCallableRequirement(facet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if facet.Owner() != artifact.ReconstructionOwner() ||
-		requirement.Owner() != artifact.ReconstructionOwner() {
+	selected, ok := facet.GenericCapability()
+	if facet.Owner() != artifact.ReconstructionOwner() || !ok || selected != artifact {
 		t.Fatalf(
-			"lexical capability owners = facet %#v, requirement %#v, want reconstruction %#v",
+			"lexical capability owner = facet %#v, want reconstruction %#v",
 			facet.Owner(),
-			requirement.Owner(),
 			artifact.ReconstructionOwner(),
 		)
-	}
-	selected, ok := requirement.LexicalGeneratedArtifact()
-	if !ok || selected != artifact {
-		t.Fatalf("lexical cooperative requirement = %#v", requirement)
 	}
 }
 
@@ -451,15 +377,6 @@ func TestPackageInitializerOwnerAcceptsCheckerBlankTarget(t *testing.T) {
 		facet.Kind() != CallableFacetPackageInitializer ||
 		facet.Owner() != owner {
 		t.Fatalf("package initializer callable facet = %#v", facet)
-	}
-	request, err := NewCooperativeCallableRequest(facet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	requirement, ok := request.DeclarationRequirement()
-	selectedFacet, cooperative := requirement.CooperativeCallable()
-	if !ok || !cooperative || selectedFacet != facet {
-		t.Fatalf("package initializer cooperative request = %#v", request)
 	}
 }
 

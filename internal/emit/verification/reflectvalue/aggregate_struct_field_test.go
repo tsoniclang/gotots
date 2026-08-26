@@ -72,7 +72,7 @@ func MergeAggregate() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await MergeAggregate();
+	typescriptRunner := `const facts = MergeAggregate();
 console.log(facts);
 `
 	goRunner := `package main

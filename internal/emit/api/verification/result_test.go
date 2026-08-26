@@ -59,7 +59,6 @@ func TestAccessorReadPreservesReceiverPrerequisitesAndRequests(t *testing.T) {
 		services,
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderDirect,
-		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -161,14 +161,15 @@ func waveThreeTypecheck(
 }
 
 type waveFourArtifacts struct {
-	paths         []string
-	sourceModule  string
-	bytes         int
-	nodes         int
-	largest       int
-	sizes         []artifactSize
-	printed       string
-	printedByKind map[emit.TargetFileKind][]string
+	paths          []string
+	sourceModule   string
+	packageModules map[string]string
+	bytes          int
+	nodes          int
+	largest        int
+	sizes          []artifactSize
+	printed        string
+	printedByKind  map[emit.TargetFileKind][]string
 }
 
 type artifactSize struct {
@@ -196,7 +197,8 @@ func materializeArtifacts(
 		}
 	})
 	result := waveFourArtifacts{
-		printedByKind: make(map[emit.TargetFileKind][]string),
+		packageModules: make(map[string]string),
+		printedByKind:  make(map[emit.TargetFileKind][]string),
 	}
 	for _, file := range emission.Files() {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
@@ -247,6 +249,11 @@ func materializeArtifacts(
 		})
 		if file.Kind() == emit.TargetFileSource {
 			result.sourceModule = "./" +
+				strings.TrimSuffix(file.OutputPath(), ".ts") +
+				".js"
+		}
+		if file.Kind() == emit.TargetFilePackageAssembly {
+			result.packageModules[file.PackageName()] = "./" +
 				strings.TrimSuffix(file.OutputPath(), ".ts") +
 				".js"
 		}

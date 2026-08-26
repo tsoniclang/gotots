@@ -5,8 +5,7 @@
   "type": "module",
   "gotots": {
     "integerRepresentation": "number",
-    "nativeIntegerBits": 64,
-    "concurrencySemantics": "provider-certification"
+    "nativeIntegerBits": 64
   },
   "exports": {
     "./array.js": "./array.js",

@@ -50,7 +50,7 @@ func Checksum() string {
 }
 
 `
-	typescriptRunner := `const facts = await Checksum();
+	typescriptRunner := `const facts = Checksum();
 console.log(facts);
 `
 	goRunner := `package main
@@ -142,7 +142,7 @@ func ContainerFacts() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await ContainerFacts();
+	typescriptRunner := `const facts = ContainerFacts();
 console.log(facts);
 `
 	goRunner := `package main

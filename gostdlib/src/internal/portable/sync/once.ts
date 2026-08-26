@@ -30,7 +30,7 @@ export class Once {
     }
     if (receiver.#state === "running") {
       GoPanic.raiseRuntime(
-        "sync: Once.Do would block under disabled concurrency",
+        "sync: Once.Do would block under serial execution",
       );
     }
     receiver.#state = "running";
@@ -59,7 +59,7 @@ export function OnceFunc(
     }
     if (state === "running") {
       GoPanic.raiseRuntime(
-        "sync: OnceFunc would block under disabled concurrency",
+        "sync: OnceFunc would block under serial execution",
       );
     }
     state = "running";
@@ -95,7 +95,7 @@ export function OnceValue<T>(
     }
     if (outcome.kind === "running") {
       GoPanic.raiseRuntime(
-        "sync: OnceValue would block under disabled concurrency",
+        "sync: OnceValue would block under serial execution",
       );
     }
     outcome = { kind: "running" };

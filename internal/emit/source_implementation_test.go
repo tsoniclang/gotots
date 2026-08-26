@@ -110,7 +110,7 @@ export function Sum(value: string): number { return value.length; }
 			GOARCH:    runtime.GOARCH,
 		},
 		Compilation: sourceimplementation.CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+			Integers: "number", EvaluationOrder: "direct",
 		},
 		Source:   "package.ts",
 		TSConfig: "tsconfig.json",
@@ -150,7 +150,7 @@ export function Sum(value: string): number { return value.length; }
 		ScratchRoot:    filepath.Join(root, ".scratch"),
 		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation: sourceimplementation.CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+			Integers: "number", EvaluationOrder: "direct",
 		},
 	})
 	if err != nil {
@@ -432,7 +432,7 @@ export function Sum(value: string): number { return value.length; }
 		ScratchRoot:    filepath.Join(root, ".mutated-scratch"),
 		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation: sourceimplementation.CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+			Integers: "number", EvaluationOrder: "direct",
 		},
 	})
 	if err != nil {
@@ -512,7 +512,7 @@ export function Sum(value: string): number { return value.length; }
 			GOARCH:    runtime.GOARCH,
 		},
 		Compilation: sourceimplementation.CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+			Integers: "number", EvaluationOrder: "direct",
 		},
 		Source:   "package.ts",
 		TSConfig: "tsconfig.json",
@@ -545,7 +545,7 @@ export function Sum(value: string): number { return value.length; }
 		ScratchRoot:    filepath.Join(root, ".scratch"),
 		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation: sourceimplementation.CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+			Integers: "number", EvaluationOrder: "direct",
 		},
 	})
 	if err != nil {

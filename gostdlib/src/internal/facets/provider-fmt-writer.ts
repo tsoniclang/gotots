@@ -5,17 +5,10 @@ import type { gostring, int } from "@gotots/gostdlib/internal/scalars.js";
 
 import { formatOperands, formatText } from "../portable/fmt/format.js";
 import { byteSlice } from "../runtime/slice.js";
-import type {
-  CanonicalWriter,
-  ProviderWriterInterface,
-} from "./provider-io-contract.js";
+import type { ProviderWriterInterface } from "./provider-io-contract.js";
 import type { ProviderErrorInterface } from "./provider-error.js";
 
-export type {
-  CanonicalError,
-  CanonicalWriter,
-  ProviderWriterInterface,
-} from "./provider-io-contract.js";
+export type { ProviderWriterInterface } from "./provider-io-contract.js";
 export type { ProviderErrorInterface } from "./provider-error.js";
 
 export function FprintDirect<
@@ -25,7 +18,7 @@ export function FprintDirect<
   writer: Target | undefined,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
 ): [int, Failure | undefined] {
-  return writeDirect(writer, formatOperands(arguments_, false));
+  return write(writer, formatOperands(arguments_, false));
 }
 
 export function FprintfDirect<
@@ -36,7 +29,7 @@ export function FprintfDirect<
   format: gostring,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
 ): [int, Failure | undefined] {
-  return writeDirect(writer, formatText(format, arguments_).text);
+  return write(writer, formatText(format, arguments_).text);
 }
 
 export function FprintlnDirect<
@@ -46,53 +39,10 @@ export function FprintlnDirect<
   writer: Target | undefined,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
 ): [int, Failure | undefined] {
-  return writeDirect(writer, formatOperands(arguments_, true));
-}
-
-export async function FprintCanonical<
-  Failure extends GoInterfaceValue,
-  Target extends CanonicalWriter<Failure>,
->(
-  writer: Target | undefined,
-  arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
-): Promise<[int, Failure | undefined]> {
-  return write(writer, formatOperands(arguments_, false));
-}
-
-export async function FprintfCanonical<
-  Failure extends GoInterfaceValue,
-  Target extends CanonicalWriter<Failure>,
->(
-  writer: Target | undefined,
-  format: gostring,
-  arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
-): Promise<[int, Failure | undefined]> {
-  return write(writer, formatText(format, arguments_).text);
-}
-
-export async function FprintlnCanonical<
-  Failure extends GoInterfaceValue,
-  Target extends CanonicalWriter<Failure>,
->(
-  writer: Target | undefined,
-  arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
-): Promise<[int, Failure | undefined]> {
   return write(writer, formatOperands(arguments_, true));
 }
 
-async function write<
-  Failure extends GoInterfaceValue,
-  Target extends CanonicalWriter<Failure>,
->(
-  writer: Target | undefined,
-  text: string,
-): Promise<[int, Failure | undefined]> {
-  return requireWriter(writer).Write(
-    byteSlice(new TextEncoder().encode(text)),
-  );
-}
-
-function writeDirect<
+function write<
   Failure extends ProviderErrorInterface,
   Target extends ProviderWriterInterface<Failure>,
 >(

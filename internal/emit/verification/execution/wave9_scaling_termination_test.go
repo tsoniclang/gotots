@@ -2,83 +2,17 @@ package emit_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func waveNineFunctionText(t *testing.T, printed, name string) string {
-	t.Helper()
-	start := strings.Index(printed, "export function "+name)
-	if start < 0 {
-		start = strings.Index(printed, "export async function "+name)
-	}
-	if start < 0 {
-		t.Fatalf("Wave 9 artifacts lack function %s", name)
-	}
-	end := len(printed) - start
-	for _, marker := range []string{"\nexport ", "\n// "} {
-		candidate := strings.Index(printed[start:], marker)
-		if candidate >= 0 && candidate < end {
-			end = candidate
-		}
-	}
-	if end == len(printed)-start {
-		return printed[start:]
-	}
-	return printed[start : start+end]
-}
-
-func assertWaveNineGenericArtifactBudget(
-	t *testing.T,
-	artifacts []artifactSize,
-) {
-	t.Helper()
-	concretizations := 0
-	concretizationBytes := 0
-	capabilities := 0
-	capabilityBytes := 0
-	for _, artifact := range artifacts {
-		switch {
-		case strings.HasPrefix(
-			artifact.path,
-			"support/generics/concretizations/",
-		):
-			concretizations++
-			concretizationBytes += artifact.bytes
-		case strings.HasPrefix(
-			artifact.path,
-			"support/generics/capabilities/",
-		):
-			capabilities++
-			capabilityBytes += artifact.bytes
-		}
-	}
-	// Exact concrete operations are inline. Only the one shared deferred-
-	// callable registry remains a standalone capability in this fixture.
-	if concretizations != 6 || concretizationBytes > 6_200 ||
-		capabilities != 1 || capabilityBytes > 2_700 {
-		t.Fatalf(
-			"Wave 9 generic artifact bounds exceeded: concretizations=%d/%d capabilities=%d/%d",
-			concretizations,
-			concretizationBytes,
-			capabilities,
-			capabilityBytes,
-		)
-	}
-}
-
-func TestWaveNineTerminationMatchesGo(t *testing.T) {
+func TestWaveNineSerialTerminationBoundariesAreExplicit(t *testing.T) {
 	testCases := []struct {
 		name     string
 		function string
@@ -88,19 +22,19 @@ func TestWaveNineTerminationMatchesGo(t *testing.T) {
 		{"close-nil", "PanicCloseNil", "panic:close of nil channel"},
 		{"close-closed", "PanicCloseClosed", "panic:close of closed channel"},
 		{
-			"nil-receive-deadlock",
+			"nil-receive",
 			"DeadlockNilReceive",
-			"panic:all goroutines are asleep - deadlock!",
+			"panic:serial channel receive would block",
 		},
 		{
-			"uncaught-goroutine-panic",
+			"goroutine-panic",
 			"PanicGoroutine",
 			"panic:send on closed channel",
 		},
 		{
-			"main-return",
+			"blocked-goroutine",
 			"ReturnWithBlockedGoroutine",
-			"return",
+			"panic:serial channel receive would block",
 		},
 	}
 	program, err := load.Load(context.Background(), load.Request{
@@ -113,9 +47,9 @@ func TestWaveNineTerminationMatchesGo(t *testing.T) {
 	scope := program.Roots()[0].Types().Scope()
 	roots := make([]emit.Root, 0, len(testCases))
 	for _, testCase := range testCases {
-		root, rootErr := emit.NewRoot(scope.Lookup(testCase.function))
-		if rootErr != nil {
-			t.Fatal(rootErr)
+		root, rootError := emit.NewRoot(scope.Lookup(testCase.function))
+		if rootError != nil {
+			t.Fatal(rootError)
 		}
 		roots = append(roots, root)
 	}
@@ -134,26 +68,24 @@ func TestWaveNineTerminationMatchesGo(t *testing.T) {
 		filepath.Join(workingDirectory, "package.json"),
 		"{\"type\":\"module\"}\n",
 	)
-	targetRunners := make([]string, 0, len(testCases))
+	runners := make([]string, 0, len(testCases))
 	for _, testCase := range testCases {
-		runner := filepath.Join(
-			workingDirectory,
-			"runner-"+testCase.name+".ts",
-		)
-		writeProgramFile(t, runner, waveNineTargetRunner(
+		runner := filepath.Join(workingDirectory, "runner-"+testCase.name+".ts")
+		writeProgramFile(t, runner, waveNineSerialTargetRunner(
 			artifacts.sourceModule,
 			testCase.function,
 		))
-		targetRunners = append(targetRunners, runner)
+		runners = append(runners, runner)
 	}
 	waveThreeTypecheck(
 		t,
 		workingDirectory,
-		append(artifacts.paths, targetRunners...),
+		append(artifacts.paths, runners...),
 	)
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			targetOutput, targetErr := runWaveNineCommand(
+			output := runProgram(
+				t,
 				workingDirectory,
 				"node",
 				filepath.Join(
@@ -162,39 +94,20 @@ func TestWaveNineTerminationMatchesGo(t *testing.T) {
 					"runner-"+testCase.name+".js",
 				),
 			)
-			targetOutcome := waveNineOutcome(targetOutput, targetErr)
-			goOutput, goErr := executeWaveNineFailureGo(
-				t,
-				testCase.name,
-				testCase.function,
-			)
-			goOutcome := waveNineOutcome(goOutput, goErr)
-			if targetOutcome != testCase.want ||
-				goOutcome != testCase.want {
-				t.Fatalf(
-					"termination differs: target=%q Go=%q want=%q\n"+
-						"target output:\n%s\nGo output:\n%s",
-					targetOutcome,
-					goOutcome,
-					testCase.want,
-					targetOutput,
-					goOutput,
-				)
+			if strings.TrimSpace(output) != testCase.want {
+				t.Fatalf("serial outcome = %q, want %q", output, testCase.want)
 			}
 		})
 	}
 }
 
-func waveNineTargetRunner(module, function string) string {
+func waveNineSerialTargetRunner(module, function string) string {
 	return `import "./program.js";
 import { ` + function + ` } from "` + module + `";
-import { GoScheduler } from "./runtime/channel.js";
 import { GoPanic, GoRuntimePanicValue } from "./runtime/panic.js";
 
 try {
-    await GoScheduler.run(async () => {
-        await ` + function + `();
-    });
+    ` + function + `();
     console.log("return");
 } catch (failure) {
     console.log(
@@ -207,115 +120,11 @@ try {
 `
 }
 
-func executeWaveNineFailureGo(
-	t *testing.T,
-	name string,
-	function string,
-) (string, error) {
-	t.Helper()
-	modulePath, err := filepath.Abs(waveNineConcurrencyDirectory())
-	if err != nil {
-		t.Fatal(err)
-	}
-	runnerDirectory := filepath.Join(t.TempDir(), "go-runner-"+name)
-	writeProgramFile(t, filepath.Join(runnerDirectory, "go.mod"), fmt.Sprintf(
-		`module example.com/runner
-
-go 1.26.4
-
-require example.com/wave9concurrency v0.0.0
-
-replace example.com/wave9concurrency => %s
-`,
-		filepath.ToSlash(modulePath),
-	))
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	values "example.com/wave9concurrency"
-)
-
-func main() {
-	values.`+function+`()
-	fmt.Println("return")
-}
-`)
-	return runWaveNineCommand(
-		runnerDirectory,
-		filepath.Join(runtime.GOROOT(), "bin", "go"),
-		"run",
-		".",
-	)
-}
-
-func runWaveNineCommand(
-	directory string,
-	name string,
-	arguments ...string,
-) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	command := exec.CommandContext(ctx, name, arguments...)
-	command.Dir = directory
-	command.Env = append(os.Environ(), "GOMEMLIMIT=1GiB")
-	output, err := command.CombinedOutput()
-	return string(output), err
-}
-
-func waveNineOutcome(output string, runError error) string {
-	for _, failure := range []string{
-		"all goroutines are asleep - deadlock!",
-		"send on closed channel",
-		"close of nil channel",
-		"close of closed channel",
-	} {
-		if strings.Contains(output, failure) {
-			return "panic:" + failure
-		}
-	}
-	if runError == nil && strings.Contains(output, "return") {
-		return "return"
-	}
-	return "unclassified"
-}
-
 func waveNineOptions() emit.Options {
-	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
-	return options
+	return emit.DefaultOptions()
 }
 
-func TestConcurrencySemanticsSelectionIsClosed(t *testing.T) {
-	if emit.DefaultOptions().ConcurrencySemantics !=
-		emit.ConcurrencySemanticsDisabled {
-		t.Fatal("default options silently select cooperative concurrency")
-	}
-	for source, want := range map[string]emit.ConcurrencySemantics{
-		"disabled":    emit.ConcurrencySemanticsDisabled,
-		"cooperative": emit.ConcurrencySemanticsCooperative,
-	} {
-		got, err := emit.ParseConcurrencySemantics(source)
-		if err != nil || got != want {
-			t.Fatalf("parse %q = %s, %v; want %s", source, got, err, want)
-		}
-	}
-	got, err := emit.ParseConcurrencySemantics("preemptive")
-	if err == nil || got != emit.ConcurrencySemanticsInvalid {
-		t.Fatalf("parse preemptive = %s, %v; want typed rejection", got, err)
-	}
-	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsInvalid
-	_, err = emit.CompileWithOptions(nil, nil, options)
-	var optionsError *emit.OptionsError
-	if !errors.As(err, &optionsError) ||
-		optionsError.Field != "concurrency semantics" {
-		t.Fatalf("invalid concurrency option error = %#v", err)
-	}
-}
-
-func TestWaveNinePreemptionBoundaryAddsNoYieldHeuristic(t *testing.T) {
+func TestWaveNineSerialPreemptionBoundaryAddsNoYieldHeuristic(t *testing.T) {
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: waveNineConcurrencyDirectory(),
 		Pattern:   ".",
@@ -339,29 +148,26 @@ func TestWaveNinePreemptionBoundaryAddsNoYieldHeuristic(t *testing.T) {
 	}
 	artifacts := materializeArtifacts(t, emission, t.TempDir())
 	target := waveNineFunctionText(t, artifacts.printed, "RequiresPreemption")
-	if !strings.Contains(target, "GoScheduler.spawn") ||
-		!strings.Contains(target, "for (;;)") {
-		t.Fatalf("preemption boundary shape changed:\n%s", target)
+	if !strings.Contains(target, "for (;;)") {
+		t.Fatalf("serial preemption boundary lost its source loop:\n%s", target)
 	}
 	for _, forbidden := range []string{
+		"async",
+		"await",
+		"Promise",
+		"GoScheduler",
 		"setTimeout",
 		"queueMicrotask",
 		"setImmediate",
 		"yield",
 	} {
 		if strings.Contains(target, forbidden) {
-			t.Fatalf(
-				"preemption boundary acquired %q heuristic:\n%s",
-				forbidden,
-				target,
-			)
+			t.Fatalf("serial preemption boundary acquired %q:\n%s", forbidden, target)
 		}
 	}
 }
 
-func TestWaveNineChannelCallsAreConstantAndSelectIsLinear(
-	t *testing.T,
-) {
+func TestWaveNineChannelCallsAreConstantAndSelectIsLinear(t *testing.T) {
 	client, err := tsgo.StartClient(repositoryRoot(), t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -400,16 +206,10 @@ func TestWaveNineChannelCallsAreConstantAndSelectIsLinear(
 		}
 		if measurement.callText != constantCallSite ||
 			measurement.callNodes != constantCallNodes {
-			t.Fatalf(
-				"one send/receive site changed at %d unrelated select cases",
-				count,
-			)
+			t.Fatalf("one send/receive site changed at %d select cases", count)
 		}
 		if measurement.runtimeText != constantRuntime {
-			t.Fatalf(
-				"channel/scheduler runtime changed at %d select cases",
-				count,
-			)
+			t.Fatalf("channel runtime changed at %d select cases", count)
 		}
 	}
 	if strings.Count(constantCallSite, "GoChannel.send") != 1 ||
@@ -418,15 +218,6 @@ func TestWaveNineChannelCallsAreConstantAndSelectIsLinear(
 	}
 	assertWaveFourLinearDoubling(t, "Wave 9 select bytes", selectBytes)
 	assertWaveFourLinearDoubling(t, "Wave 9 select AST nodes", selectNodes)
-	t.Logf(
-		"Wave 9 scaling cases=%v select-bytes=%v select-nodes=%v call-bytes/nodes=%d/%d runtime-bytes=%d",
-		counts,
-		selectBytes,
-		selectNodes,
-		len(constantCallSite),
-		constantCallNodes,
-		len(constantRuntime),
-	)
 }
 
 type waveNineScalingMeasurement struct {
@@ -473,11 +264,7 @@ func SelectScale(
 		)
 	}
 	source.WriteString("\tdefault:\n\t\treturn -1\n\t}\n}\n")
-	writeProgramFile(
-		t,
-		filepath.Join(directory, "source.go"),
-		source.String(),
-	)
+	writeProgramFile(t, filepath.Join(directory, "source.go"), source.String())
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: directory,
 		Pattern:   ".",
@@ -499,12 +286,12 @@ func SelectScale(
 	}
 	var measurement waveNineScalingMeasurement
 	for _, file := range emission.Files() {
-		printed, err := client.PrintNode(
+		printed, printError := client.PrintNode(
 			file.SourceFile(),
 			tsgo.PrintOptions{},
 		)
-		if err != nil {
-			t.Fatal(err)
+		if printError != nil {
+			t.Fatal(printError)
 		}
 		switch file.OutputPath() {
 		case "runtime/channel.ts":
@@ -518,9 +305,9 @@ func SelectScale(
 				if !ok {
 					continue
 				}
-				encoded, err := tsgo.EncodeNode(function)
-				if err != nil {
-					t.Fatal(err)
+				encoded, encodeError := tsgo.EncodeNode(function)
+				if encodeError != nil {
+					t.Fatal(encodeError)
 				}
 				switch function.Name().Text() {
 				case "ChannelCall":
@@ -529,16 +316,14 @@ func SelectScale(
 						printed,
 						"ChannelCall",
 					)
-					measurement.callNodes =
-						waveFourEncodedNodes(t, encoded)
+					measurement.callNodes = waveFourEncodedNodes(t, encoded)
 				case "SelectScale":
 					measurement.selectText = waveNineFunctionText(
 						t,
 						printed,
 						"SelectScale",
 					)
-					measurement.selectNodes =
-						waveFourEncodedNodes(t, encoded)
+					measurement.selectNodes = waveFourEncodedNodes(t, encoded)
 				}
 			}
 		}

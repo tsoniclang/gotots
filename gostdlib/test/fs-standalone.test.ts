@@ -186,7 +186,7 @@ class TestFS extends ProviderInterfaceValue implements FS {
   }
 }
 
-test("filesystem functions read, stat, sort, and walk", async () => {
+test("filesystem functions read, stat, sort, and walk", () => {
   const fileSystem = new TestFS();
   const [content, readFailure] = ReadFile(fileSystem, "a.txt");
   assert.equal(readFailure, undefined);

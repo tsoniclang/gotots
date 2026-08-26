@@ -3,7 +3,7 @@ import type {
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { Reader } from "../../../../io.js";
 import { state as ioState } from "../../../../io.js";
@@ -283,20 +283,6 @@ export function runGzipSourceSync<Result, Failure>(
   let current = initial;
   while (current.kind === "read") {
     const [count, failure] = readSource(current.destination);
-    current = current.resume(count, failure);
-  }
-  return current.result;
-}
-
-export async function runGzipSourceAsync<Result, Failure>(
-  initial: GzipSourceStep<Result, Failure>,
-  readSource: (
-    destination: RuntimeSlice<uint8>,
-  ) => Awaitable<[int, Failure | undefined]>,
-): Promise<Result> {
-  let current = initial;
-  while (current.kind === "read") {
-    const [count, failure] = await readSource(current.destination);
     current = current.resume(count, failure);
   }
   return current.result;

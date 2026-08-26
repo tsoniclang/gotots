@@ -11,7 +11,7 @@
     "noasm"
   ],
   "providerIntegerRepresentation": "bigint",
-  "standardLibraryDigest": "448ee75f06e80b26e45481f48f36cf865b556b76572b9205ac27e440e063e674",
+  "standardLibraryDigest": "95cdc4b9c1b2b71b366ef3574044b78a9c47db685dfd69dc9947a6da5bef03c0",
   "providerDigest": "9a8511faed04a2a82ff1173a3a3bd99a5fbdc5c8c8bed8ce8a9c07ab2614c3a0",
   "bindings": [
     {
@@ -117,5 +117,5 @@
       "targetFingerprint": "dfec101630ff03e42ce6deb72c0d47799ac2632e41e233881997134d617d1204"
     }
   ],
-  "manifestDigest": "5984226b8f0cc065bba1700c5250e176fedd52778f1df76b2694d9598b7085d0"
+  "manifestDigest": "f14f2a9f05f7f1f02f009ef49169d11d11ed11423661defdadc61ae4d4c1ddc5"
 }

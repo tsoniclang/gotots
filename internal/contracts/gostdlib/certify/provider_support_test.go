@@ -37,20 +37,20 @@ func TestProviderSupportParameterOrderIsCertified(t *testing.T) {
 	}
 	exports, err := project.Exports(filepath.Join(
 		provider,
-		"src/internal/facets/provider-io-fs.ts",
+		"src/internal/facets/provider-io-fs-direct.ts",
 	))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var target tsgo.ProjectExport
 	for _, selected := range exports {
-		if selected.Name() == "IoFsWalkDirCanonical" {
+		if selected.Name() == "IoFsWalkDirDirect" {
 			target = selected
 			break
 		}
 	}
 	if target.Name() == "" {
-		t.Fatal("IoFsWalkDirCanonical is absent")
+		t.Fatal("IoFsWalkDirDirect is absent")
 	}
 	if err := verifyProviderSupportParameters(
 		project,
@@ -59,7 +59,7 @@ func TestProviderSupportParameterOrderIsCertified(t *testing.T) {
 		3,
 		0,
 		1,
-		1,
+		0,
 		markers,
 	); err != nil {
 		t.Fatal(err)
@@ -74,7 +74,7 @@ func TestProviderSupportParameterOrderIsCertified(t *testing.T) {
 		3,
 		0,
 		1,
-		1,
+		0,
 		mutated,
 	)
 	if err == nil || !strings.Contains(err.Error(), "parameter 8") {

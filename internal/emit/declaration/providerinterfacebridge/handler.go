@@ -3,7 +3,6 @@ package providerinterfacebridge
 import (
 	"go/types"
 
-	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
@@ -225,8 +224,4 @@ func shapeError(artifact string, reason string) error {
 		Artifact: artifact,
 		Reason:   reason,
 	}
-}
-
-func providerCooperative(method gostdlib.ProviderInterfaceMethod) bool {
-	return method.Effect().MaySuspend()
 }

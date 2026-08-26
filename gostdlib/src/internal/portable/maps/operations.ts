@@ -1,13 +1,12 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoMapValue } from "@gotots/runtime/map.js";
-import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool } from "@gotots/gostdlib/internal/scalars.js";
 
 import { Seq } from "../iter/sequence.js";
 
 type Convert<Source, Target> = (value: Source) => Target;
 type CopyValue<T> = (value: T) => T;
-type Equality<L, R> = ((left: L, right: R) => Awaitable<bool>) | undefined;
-type SynchronousEquality<L, R> = ((left: L, right: R) => bool) | undefined;
+type Equality<L, R> = ((left: L, right: R) => bool) | undefined;
 type MakeMap<K, V> = (zero: V) => GoMapValue<K, V>;
 type Zero<T> = () => T;
 
@@ -67,7 +66,7 @@ export function Equal<M1, M2, K, V>(
   return true;
 }
 
-export async function EqualFunc<M1, M2, K, L, R>(
+export function EqualFunc<M1, M2, K, L, R>(
   leftMap: Convert<M1, GoMapValue<K, L>>,
   rightMap: Convert<M2, GoMapValue<K, R>>,
   copyLeft: CopyValue<L>,
@@ -75,37 +74,10 @@ export async function EqualFunc<M1, M2, K, L, R>(
   left: M1,
   right: M2,
   equal: Equality<L, R>,
-): Promise<bool> {
-  const leftValue = leftMap(left);
-  const rightValue = rightMap(right);
-  if (leftValue.length() !== rightValue.length()) {
-    return false;
-  }
-  for (const key of leftValue.keys()) {
-    const [candidate, present] = rightValue.lookupOk(key);
-    if (
-      !present
-      || !await callEquality(
-        equal,
-        copyLeft(leftValue.lookup(key)),
-        copyRight(candidate),
-      )
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
-export function EqualFuncSynchronous<M1, M2, K, L, R>(
-  leftMap: Convert<M1, GoMapValue<K, L>>,
-  rightMap: Convert<M2, GoMapValue<K, R>>,
-  copyLeft: CopyValue<L>,
-  copyRight: CopyValue<R>,
-  left: M1,
-  right: M2,
-  equal: SynchronousEquality<L, R>,
 ): bool {
+  if (equal === undefined) {
+    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
+  }
   const leftValue = leftMap(left);
   const rightValue = rightMap(right);
   if (leftValue.length() !== rightValue.length()) {
@@ -115,8 +87,7 @@ export function EqualFuncSynchronous<M1, M2, K, L, R>(
     const [candidate, present] = rightValue.lookupOk(key);
     if (
       !present
-      || !callEqualitySynchronous(
-        equal,
+      || !equal(
         copyLeft(leftValue.lookup(key)),
         copyRight(candidate),
       )
@@ -161,26 +132,4 @@ export function Values<M, K, V>(
       }
     }
   });
-}
-
-async function callEquality<L, R>(
-  equal: Equality<L, R>,
-  left: L,
-  right: R,
-): Promise<bool> {
-  if (equal === undefined) {
-    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
-  }
-  return await equal(left, right);
-}
-
-function callEqualitySynchronous<L, R>(
-  equal: SynchronousEquality<L, R>,
-  left: L,
-  right: R,
-): bool {
-  if (equal === undefined) {
-    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
-  }
-  return equal(left, right);
 }

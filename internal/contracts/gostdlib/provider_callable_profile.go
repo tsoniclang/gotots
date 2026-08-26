@@ -318,7 +318,7 @@ func BuildProviderCallableProfileKey(
 	previousParameter := -1
 	for _, selected := range callables {
 		if selected.Parameter < 0 || selected.Parameter <= previousParameter ||
-			(selected.Effect != EffectSynchronous && selected.Effect != EffectAwaitable) {
+			!selected.Effect.Valid() {
 			return "", &ManifestError{
 				Field:  "providerCallableProfileKey.callableParameters",
 				Reason: "parameters are negative, duplicated, or have invalid effects",

@@ -43,7 +43,6 @@ func TestParseArgumentsBindsSemanticAndRepeatedOverrides(t *testing.T) {
 	invocation, err := ParseArguments(t.TempDir(), []string{
 		"build",
 		"--integer", "fixed64-bigint",
-		"--concurrency", "cooperative",
 		"--tag", "noasm",
 		"--tag", "purego",
 		"--implementation-bundle", "one.json",
@@ -61,8 +60,6 @@ func TestParseArgumentsBindsSemanticAndRepeatedOverrides(t *testing.T) {
 	overrides := invocation.Overrides()
 	if overrides.IntegerRepresentation == nil ||
 		*overrides.IntegerRepresentation != "fixed64-bigint" ||
-		overrides.ConcurrencySemantics == nil ||
-		*overrides.ConcurrencySemantics != "cooperative" ||
 		!overrides.BuildTagsSet || len(overrides.BuildTags) != 2 ||
 		!overrides.ImplementationSet || len(overrides.ImplementationBundles) != 2 ||
 		overrides.StandardLibrary == nil || *overrides.StandardLibrary ||

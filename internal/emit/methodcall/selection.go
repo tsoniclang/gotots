@@ -8,7 +8,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
@@ -99,7 +98,7 @@ func Resolve(
 			"generic selected-method representation is unresolved",
 		)
 	}
-	facet, err := cooperativecall.SelectGenericClassMethod(context, owner)
+	facet, err := callable.SelectGenericMethod(context, owner)
 	if err != nil {
 		return Selection{}, err
 	}
@@ -115,7 +114,6 @@ func Resolve(
 			owner,
 			typeArgumentList,
 			selected,
-			api.GenericConcretizationEffectCanonical,
 		)
 		if concreteErr != nil {
 			return Selection{}, concreteErr
@@ -197,7 +195,7 @@ func resolveStatefulBoundary(
 		if err != nil {
 			return selection, err
 		}
-		if err := providerboundary.RequireSynchronousCallable(
+		if err := providerboundary.RequireProviderCallable(
 			context,
 			selection.owner,
 		); err != nil {
@@ -250,7 +248,7 @@ func (s Selection) Invoke(
 func (s Selection) InvokeDeferred(
 	context api.Context,
 	children api.ChildEmitter,
-	source ast.Node,
+	_ ast.Node,
 	receiver tsgo.Expression,
 	sourceArguments []tsgo.Expression,
 	recovery tsgo.Expression,
@@ -261,7 +259,7 @@ func (s Selection) InvokeDeferred(
 			"selected-method deferred invocation has no authority",
 		)
 	}
-	call, provider, cooperative, err := s.RecoveryCall(
+	call, err := s.RecoveryCall(
 		context,
 		children,
 		receiver,
@@ -271,22 +269,7 @@ func (s Selection) InvokeDeferred(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if !provider {
-		return call, nil
-	}
-	if source == nil {
-		return cooperativecall.GeneratedInterfaceProviderCall(
-			context,
-			call,
-			cooperative,
-		)
-	}
-	return cooperativecall.SourceInterfaceProviderCall(
-		context,
-		source,
-		call,
-		cooperative,
-	)
+	return call, nil
 }
 
 func (s Selection) FromProviderResults(
@@ -508,25 +491,23 @@ func (s Selection) RecoveryCall(
 	recovery tsgo.Expression,
 ) (
 	api.ExpressionEmission,
-	bool,
-	bool,
 	error,
 ) {
 	invocation, err := s.ResolveRecovery(context)
 	if err != nil {
-		return api.ExpressionEmission{}, false, false, err
+		return api.ExpressionEmission{}, err
 	}
 	arguments := slices.Clone(sourceArguments)
 	var before []tsgo.Statement
 	var argumentRequests []api.RootRequest
-	if invocation.Provider() {
+	if invocation.provider {
 		arguments, before, argumentRequests, err = s.providerArguments(
 			context,
 			children,
 			sourceArguments,
 		)
 		if err != nil {
-			return api.ExpressionEmission{}, false, false, err
+			return api.ExpressionEmission{}, err
 		}
 	}
 	call, requests, err := invocation.Call(
@@ -536,14 +517,14 @@ func (s Selection) RecoveryCall(
 		recovery,
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, false, false, err
+		return api.ExpressionEmission{}, err
 	}
 	target, err := api.NewExpressionEmission(
 		before,
 		call,
 		api.CombineRequests(argumentRequests, requests),
 	)
-	return target, invocation.Provider(), invocation.Cooperative(), err
+	return target, err
 }
 
 func invariant(context api.Context, reason string) error {

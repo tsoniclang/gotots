@@ -10,7 +10,6 @@ func ValidateRequirements(
 	requirements []api.DeclarationRequirement,
 ) error {
 	definitions := 0
-	cooperative := false
 	for _, requirement := range requirements {
 		if selected, ok := requirement.GenericCapability(); ok {
 			if selected != artifact {
@@ -22,18 +21,10 @@ func ValidateRequirements(
 			definitions++
 			continue
 		}
-		facet, ok := requirement.CooperativeCallable()
-		selected, capability := facet.GenericCapability()
-		if !ok ||
-			!capability ||
-			selected != artifact ||
-			cooperative {
-			return requirementError(
-				role,
-				"generic capability received a foreign requirement",
-			)
-		}
-		cooperative = true
+		return requirementError(
+			role,
+			"generic capability received a foreign requirement",
+		)
 	}
 	if definitions != 1 {
 		return requirementError(

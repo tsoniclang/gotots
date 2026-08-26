@@ -36,7 +36,6 @@ func Result(path string) (bool, string) {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -52,25 +51,30 @@ func Result(path string) (bool, string) {
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, view := range []string{
+		"provider_error.AsProviderErrorIsDirect(value)",
+		"provider_error.AsProviderErrorUnwrapDirect(value)",
+		"provider_error.AsProviderErrorUnwrapManyDirect(value)",
+	} {
+		if count := strings.Count(artifacts.printed, view); count != 1 {
+			t.Fatalf("certified provider capability view %q calls = %d, want 1:\n%s", view, count, artifacts.printed)
+		}
+	}
+	for _, superseded := range []string{
 		"provider_error.AsProviderErrorIs(value)",
 		"provider_error.AsProviderErrorUnwrap(value)",
 		"provider_error.AsProviderErrorUnwrapMany(value)",
 	} {
-		if count := strings.Count(artifacts.printed, view); count != 2 {
-			t.Fatalf("canonical provider capability view %q calls = %d, want 2:\n%s", view, count, artifacts.printed)
+		if strings.Contains(artifacts.printed, superseded) {
+			t.Fatalf("superseded provider capability %q escaped into generated output:\n%s", superseded, artifacts.printed)
 		}
 	}
-	for _, providerInternal := range []string{
-		"AsProviderErrorIsDirect",
-		"AsProviderErrorUnwrapDirect",
-		"AsProviderErrorUnwrapManyDirect",
-	} {
-		if strings.Contains(artifacts.printed, providerInternal) {
-			t.Fatalf("provider-internal capability %q escaped into generated output:\n%s", providerInternal, artifacts.printed)
-		}
+	if count := strings.Count(artifacts.printed, "Unwrap():"); count != 5 {
+		t.Fatalf("Unwrap overload/implementation declarations = %d, want 5:\n%s", count, artifacts.printed)
 	}
-	if count := strings.Count(artifacts.printed, "Unwrap(): Promise<"); count != 9 {
-		t.Fatalf("Unwrap overload/implementation declarations = %d, want 9:\n%s", count, artifacts.printed)
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("provider error output contains %q", forbidden)
+		}
 	}
 	for _, dynamicProbe := range []string{
 		`["Is"]`,
@@ -100,7 +104,7 @@ func Result(path string) (bool, string) {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Result"},
-		"const [missing, message] = await Result("+
+		"const [missing, message] = Result("+
 			strconv.Quote(missing)+
 			");\nconsole.log(missing + \" \" + message);\n",
 	)
@@ -168,7 +172,6 @@ func Result(wrapped bool) (string, bool) {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -201,16 +204,16 @@ func Result(wrapped bool) (string, bool) {
 		assemblyPath,
 		[]string{"Result"},
 		`for (const wrapped of [true, false]) {
-  const [message, ok] = await Result(wrapped);
+	  const [message, ok] = Result(wrapped);
   console.log(JSON.stringify(message) + " " + ok);
 }
 `,
 	)
 	if !strings.Contains(
 		artifacts.printed,
-		"ErrorsUnwrapCanonical",
+		"ErrorsUnwrapDirect",
 	) {
-		t.Fatalf("errors.Unwrap output lacks canonical boundary:\n%s", artifacts.printed)
+		t.Fatalf("errors.Unwrap output lacks direct boundary:\n%s", artifacts.printed)
 	}
 	for _, rejected := range []string{
 		"ErrorsUnwrapCanonicalSync",

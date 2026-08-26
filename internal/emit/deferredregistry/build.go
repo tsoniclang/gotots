@@ -78,24 +78,16 @@ func callableTypes(
 	context api.Context,
 	children api.ChildEmitter,
 	signature *types.Signature,
-	cooperative bool,
 ) (callableContract, error) {
 	target, err := callable.EmitAdapter(context, children, nil, signature)
 	if err != nil {
 		return callableContract{}, err
 	}
 	result := target.Result()
-	sourceResult := api.DirectType(result)
-	if cooperative {
-		sourceResult, err = callable.IndirectResult(context, result)
-		if err != nil {
-			return callableContract{}, err
-		}
-	}
 	source := context.Factory().FunctionTypeNode(
 		nil,
 		target.Parameters(),
-		sourceResult.Value(),
+		result,
 	)
 	recovery, recoveryRequests, err :=
 		callable.RecoveryAuthorityParameter(context)
@@ -108,7 +100,7 @@ func callableTypes(
 			[]tsgo.ParameterDeclaration{recovery},
 			target.Parameters()...,
 		),
-		sourceResult.Value(),
+		result,
 	)
 	runtimeValue, err := context.Names().Runtime(
 		api.RuntimeInterfaceValue,
@@ -121,10 +113,6 @@ func callableTypes(
 		runtimeValue.EntityName(context.Factory()),
 		nil,
 	)
-	methodResult, err := callable.IndirectResult(context, result)
-	if err != nil {
-		return callableContract{}, err
-	}
 	methodDeferred := context.Factory().FunctionTypeNode(
 		nil,
 		append(
@@ -138,7 +126,7 @@ func callableTypes(
 			},
 			target.Parameters()...,
 		),
-		methodResult.Value(),
+		result,
 	)
 	return callableContract{
 		source:         source,
@@ -147,8 +135,6 @@ func callableTypes(
 		interfaceValue: interfaceValue,
 		requests: api.CombineRequests(
 			target.Requests(),
-			sourceResult.Requests(),
-			methodResult.Requests(),
 			recoveryRequests,
 			runtimeValue.Requests(),
 		),

@@ -6,7 +6,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -143,18 +142,7 @@ func call(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if reference.Contract().Consumer() !=
-		api.GenericFunctionOperationConsumer() ||
-		reference.Contract().Operation() !=
-			api.GenericOperationConstraintMethod {
-		return target, nil
-	}
-	return cooperativecall.GenericOperationCall(
-		context,
-		source,
-		reference.Contract(),
-		target,
-	)
+	return target, nil
 }
 
 func operationSignature(

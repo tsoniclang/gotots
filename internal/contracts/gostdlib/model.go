@@ -279,17 +279,6 @@ func (m Manifest) GenericCallableKernel(
 	return selected, ok
 }
 
-func (m Manifest) SynchronousGenericCallableKernel(
-	sourceIdentity string,
-) (Facet, bool) {
-	selected, ok := m.facets[facetLookup{
-		sourceIdentity: sourceIdentity,
-		kind:           FacetGenericCallableKernel,
-		capability:     string(FacetCapabilitySynchronousKernel),
-	}]
-	return selected, ok
-}
-
 func (m Manifest) ProviderRepresentation(
 	module string,
 	export string,

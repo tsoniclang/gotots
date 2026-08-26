@@ -30,27 +30,6 @@ func (r PackageRequirements) RuntimeSymbols() map[api.RuntimeSymbol]struct{} {
 	return result
 }
 
-func (r PackageRequirements) RuntimeSymbolsFor(
-	concurrency api.ConcurrencySemantics,
-) (map[api.RuntimeSymbol]struct{}, error) {
-	if !concurrency.Valid() {
-		return nil, &AssemblyError{
-			Reason: "runtime package concurrency profile is invalid",
-		}
-	}
-	result := make(map[api.RuntimeSymbol]struct{}, len(r.symbols))
-	for symbol := range r.symbols {
-		available, err := runtimeSymbolAvailable(symbol, concurrency)
-		if err != nil {
-			return nil, err
-		}
-		if available {
-			result[symbol] = struct{}{}
-		}
-	}
-	return result, nil
-}
-
 func (r PackageRequirements) PrimitiveAliases() []api.PrimitiveAlias {
 	return slices.Clone(r.aliases)
 }

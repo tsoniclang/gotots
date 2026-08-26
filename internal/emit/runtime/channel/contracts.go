@@ -13,6 +13,7 @@ const (
 	MemberCapacity        = "capacity"
 	MemberSelectSend      = "$selectSend"
 	MemberSelectReceive   = "$selectReceive"
+	MemberObserveClose    = "$observeClose"
 	channelLengthMember   = "$length"
 	channelCapacityMember = "$capacity"
 )
@@ -20,7 +21,6 @@ const (
 func Build(
 	factory tsgo.Factory,
 	symbol api.RuntimeSymbol,
-	concurrency api.ConcurrencySemantics,
 	channelName string,
 	receiveName string,
 	sendName string,
@@ -32,7 +32,6 @@ func Build(
 ) (tsgo.Statement, error) {
 	target := builder{
 		factory:           factory,
-		concurrency:       concurrency,
 		channelName:       channelName,
 		receiveName:       receiveName,
 		sendName:          sendName,
@@ -63,7 +62,6 @@ func Build(
 }
 
 func (b builder) selectCaseContract() tsgo.InterfaceDeclaration {
-	cancelType := b.functionType(nil, b.voidType())
 	return b.factory.InterfaceDeclaration(
 		[]tsgo.ModifierLike{b.factory.ExportKeyword()},
 		b.id(b.caseName),
@@ -85,16 +83,6 @@ func (b builder) selectCaseContract() tsgo.InterfaceDeclaration {
 				nil,
 				nil,
 				b.selectCommitType(),
-			),
-			b.factory.MethodSignatureDeclaration(
-				nil,
-				b.id("subscribe"),
-				nil,
-				nil,
-				[]tsgo.ParameterDeclaration{
-					b.parameter("claim", b.selectClaimType()),
-				},
-				cancelType,
 			),
 		},
 	)
@@ -148,6 +136,16 @@ func (b builder) receiveContract() tsgo.InterfaceDeclaration {
 					b.parameter("accept", accept),
 				},
 				b.typeReference(b.caseName),
+			),
+			b.factory.MethodSignatureDeclaration(
+				nil,
+				b.id(MemberObserveClose),
+				nil,
+				nil,
+				[]tsgo.ParameterDeclaration{
+					b.parameter("observer", b.closeObserverType()),
+				},
+				b.closeUnsubscribeType(),
 			),
 		},
 	)

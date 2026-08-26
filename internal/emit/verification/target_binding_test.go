@@ -15,22 +15,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func cooperativeFunctionName(function string) string {
-	start := strings.Index(function, "function ")
-	if start < 0 {
-		return ""
-	}
-	start += len("function ")
-	end := strings.IndexByte(function[start:], '<')
-	if end < 0 {
-		end = strings.IndexByte(function[start:], '(')
-	}
-	if end < 0 {
-		return ""
-	}
-	return function[start : start+end]
-}
-
 func packageAssemblyExports(
 	files []emit.TargetFile,
 	packageName string,

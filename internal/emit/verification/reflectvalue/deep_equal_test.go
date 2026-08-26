@@ -52,7 +52,7 @@ func Compare() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await Compare();
+	typescriptRunner := `const facts = Compare();
 console.log(facts);
 `
 	goRunner := `package main

@@ -58,7 +58,7 @@ func Value() int { return beta.Twice(alpha.Add(20, 1)) }
 		t.Fatal(err)
 	}
 	compilation := sourceimplementation.CompilationDocument{
-		Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+		Integers: "number", EvaluationOrder: "direct",
 	}
 	certificate, err := sourceimplementation.VerifyAll(sourceimplementation.Config{
 		RepositoryRoot: repository,
@@ -156,7 +156,7 @@ func writeBatchSourceImplementation(
 			GOARCH:    runtime.GOARCH,
 		},
 		Compilation: sourceimplementation.CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+			Integers: "number", EvaluationOrder: "direct",
 		},
 		Source:   "package.ts",
 		TSConfig: "tsconfig.json",

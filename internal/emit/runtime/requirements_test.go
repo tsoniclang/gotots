@@ -58,56 +58,27 @@ func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 	}
 }
 
-func TestPackageRequirementsProjectExactConcurrencySurface(t *testing.T) {
-	contract, err := runtimecontract.Decode([]byte(`{
-	  "schemaVersion": 3,
-	  "integerRepresentations": ["number"],
-	  "providerIntegerRepresentation": "number",
-	  "providerScalarModule": "./internal/scalars.js",
-	  "providerPointerModule": "./internal/runtime/pointer.js",
-	  "nativeIntegerBits": 64,
-	  "primitiveAliases": [],
-	  "runtimeSymbols": [
-	    {"id": 300, "export": "RuntimeSlice"},
-	    {"id": 1105, "export": "GoScheduler"},
-	    {"id": 1300, "export": "Awaitable"}
-	  ]
-	}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	requirements, err := ResolvePackageRequirements(contract)
-	if err != nil {
-		t.Fatal(err)
-	}
-	disabled, err := requirements.RuntimeSymbolsFor(
-		api.ConcurrencySemanticsDisabled,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(disabled) != 1 {
-		t.Fatalf("disabled runtime symbols = %v, want only RuntimeSlice", disabled)
-	}
-	if _, ok := disabled[api.RuntimeSlice]; !ok {
-		t.Fatal("disabled runtime projection lost RuntimeSlice")
-	}
-	cooperative, err := requirements.RuntimeSymbolsFor(
-		api.ConcurrencySemanticsCooperative,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(cooperative) != 3 {
-		t.Fatalf("cooperative runtime symbols = %v, want all three", cooperative)
-	}
-	if len(requirements.RuntimeSymbols()) != 3 {
-		t.Fatal("runtime projection mutated the certified source requirements")
-	}
-	if _, err := requirements.RuntimeSymbolsFor(
-		api.ConcurrencySemanticsInvalid,
-	); err == nil {
-		t.Fatal("invalid concurrency projected a runtime surface")
+func TestPackageRequirementsRejectRetiredExecutionSymbols(t *testing.T) {
+	for _, symbol := range []string{
+		`{"id": 1105, "export": "GoScheduler"}`,
+		`{"id": 1300, "export": "Awaitable"}`,
+	} {
+		contract, err := runtimecontract.Decode([]byte(`{
+		  "schemaVersion": 3,
+		  "integerRepresentations": ["number"],
+		  "providerIntegerRepresentation": "number",
+		  "providerScalarModule": "./internal/scalars.js",
+		  "providerPointerModule": "./internal/runtime/pointer.js",
+		  "nativeIntegerBits": 64,
+		  "primitiveAliases": [],
+		  "runtimeSymbols": [` + symbol + `]
+		}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ResolvePackageRequirements(contract); err == nil {
+			t.Fatalf("retired execution symbol %s was accepted", symbol)
+		}
 	}
 }
 

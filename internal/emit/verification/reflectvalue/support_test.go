@@ -110,7 +110,7 @@ func linkedProviderCertificate(t *testing.T) *certify.Certificate {
 }
 
 // compileReflectFixture loads one reflection fixture package, compiles it
-// with the verified provider certificate under the cooperative profile, and
+// with the verified provider certificate under the serial profile, and
 // returns the emission.
 func compileReflectFixture(
 	t *testing.T,
@@ -139,7 +139,6 @@ func compileReflectFixture(
 		selected = append(selected, mustRoot(t, scope.Lookup(name)))
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, selected, options)
 	if err != nil {

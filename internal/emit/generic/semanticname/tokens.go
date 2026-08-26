@@ -17,7 +17,6 @@ type typeIdentityResolver struct {
 
 func ConcretizationSuffixWithIdentityTokens(
 	arguments []types.Type,
-	synchronous bool,
 	namedToken NamedTypeToken,
 	packageToken PackageToken,
 ) (string, error) {
@@ -26,7 +25,6 @@ func ConcretizationSuffixWithIdentityTokens(
 	}
 	return concretizationSuffix(
 		arguments,
-		synchronous,
 		typeIdentityResolver{
 			namedToken:   namedToken,
 			packageToken: packageToken,
@@ -36,22 +34,18 @@ func ConcretizationSuffixWithIdentityTokens(
 
 func concretizationSuffix(
 	arguments []types.Type,
-	synchronous bool,
 	identity typeIdentityResolver,
 ) (string, error) {
 	if len(arguments) == 0 {
 		return "", invalid("generic concretization has no type arguments")
 	}
-	parts := make([]string, 0, len(arguments)+1)
+	parts := make([]string, 0, len(arguments))
 	for _, argument := range arguments {
 		part, err := typeWithIdentity(argument, identity)
 		if err != nil {
 			return "", err
 		}
 		parts = append(parts, part)
-	}
-	if synchronous {
-		parts = append(parts, "synchronous")
 	}
 	return "$" + strings.Join(parts, "$"), nil
 }

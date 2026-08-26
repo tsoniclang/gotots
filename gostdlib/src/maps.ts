@@ -1,5 +1,5 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { Seq } from "./internal/portable/iter/sequence.js";
 
@@ -21,11 +21,11 @@ export function Equal<LeftMap, RightMap, Key, Value>(
   return specializationRequired("maps.Equal");
 }
 
-export async function EqualFunc<LeftMap, RightMap, Key, Left, Right>(
+export function EqualFunc<LeftMap, RightMap, Key, Left, Right>(
   left: LeftMap,
   right: RightMap,
-  equal: ((left: Left, right: Right) => Awaitable<bool>) | undefined,
-): Promise<bool> {
+  equal: ((left: Left, right: Right) => bool) | undefined,
+): bool {
   return specializationRequired("maps.EqualFunc");
 }
 

@@ -214,7 +214,7 @@ func ResolveStatefulMethodBoundary(
 			"selected provider stateful profile omits method "+identity,
 		)
 	}
-	if err := RequireSynchronousEffect(
+	if err := RequireProviderEffect(
 		context,
 		identity,
 		profileMethod.Effect(),

@@ -36,10 +36,6 @@ func (r DeclarationRequirement) Valid() bool {
 		r.concretizationDeferred {
 		return false
 	}
-	if r.kind != DeclarationRequirementCooperativeCallable &&
-		!r.callableFacet.empty() {
-		return false
-	}
 	if r.kind != DeclarationRequirementInterfaceAdapter &&
 		r.kind != DeclarationRequirementProviderInterfaceCapability &&
 		(r.interfaceContractType != nil ||
@@ -293,8 +289,6 @@ func (r DeclarationRequirement) Valid() bool {
 			!r.controlPosition.IsValid() &&
 			r.controlRange == nil &&
 			r.controlDefer == nil
-	case DeclarationRequirementCooperativeCallable:
-		return r.validCooperativeCallable()
 	case DeclarationRequirementCallableABI:
 		return r.validGeneratedDefinition(
 			GeneratedArtifactCallableABI,

@@ -32,7 +32,7 @@ func Assert() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await Assert();
+	typescriptRunner := `const facts = Assert();
 console.log(facts);
 `
 	goRunner := `package main

@@ -1,5 +1,4 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
@@ -9,15 +8,10 @@ import {
 } from "../host-integer.js";
 
 import { byteSlice, writeBytes } from "../runtime/slice.js";
-import type {
-  CanonicalReader,
-  ProviderReaderInterface,
-} from "./provider-io-contract.js";
+import type { ProviderReaderInterface } from "./provider-io-contract.js";
 import type { ProviderErrorInterface } from "./provider-error.js";
 
 export type {
-  CanonicalError,
-  CanonicalReader,
   ProviderReaderInterface,
 } from "./provider-io-contract.js";
 export type { ProviderErrorInterface } from "./provider-error.js";
@@ -96,132 +90,6 @@ class ReaderBuffer<Failure> {
     const failure = this.#pendingFailure;
     this.#pendingFailure = undefined;
     return failure;
-  }
-}
-
-export class CanonicalBufioReader<
-  Failure extends GoInterfaceValue,
-  Source extends CanonicalReader<Failure>,
-> {
-  #state = new ReaderBuffer<Failure>();
-  #source: Source | undefined;
-  #noProgress: Failure;
-
-  constructor(
-    source: Source | undefined,
-    noProgress: Failure,
-  ) {
-    this.#source = source;
-    this.#noProgress = noProgress;
-  }
-
-  static $copy<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReader<Failure>,
-  >(
-    source: CanonicalBufioReader<Failure, Source>,
-  ): CanonicalBufioReader<Failure, Source> {
-    const target = new CanonicalBufioReader(source.#source, source.#noProgress);
-    target.#state = source.#state.copy();
-    return target;
-  }
-
-  static $assign<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReader<Failure>,
-  >(
-    target: CanonicalBufioReader<Failure, Source>,
-    source: CanonicalBufioReader<Failure, Source>,
-  ): void {
-    const state = source.#state.copy();
-    const providerSource = source.#source;
-    const noProgress = source.#noProgress;
-    target.#state = state;
-    target.#source = providerSource;
-    target.#noProgress = noProgress;
-  }
-
-  static Read<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReader<Failure>,
-  >(
-    receiver: CanonicalBufioReader<Failure, Source> | undefined,
-    destination: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): Promise<[int, Failure | undefined]> {
-    return requireReader(receiver).Read(destination, recovery);
-  }
-
-  static ReadByte<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReader<Failure>,
-  >(
-    receiver: CanonicalBufioReader<Failure, Source> | undefined,
-    recovery?: GoRecovery,
-  ): Promise<[uint8, Failure | undefined]> {
-    return requireReader(receiver).ReadByte(recovery);
-  }
-
-  static ReadBytes<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReader<Failure>,
-  >(
-    receiver: CanonicalBufioReader<Failure, Source> | undefined,
-    delimiter: uint8,
-    recovery?: GoRecovery,
-  ): Promise<[RuntimeSlice<uint8>, Failure | undefined]> {
-    return requireReader(receiver).ReadBytes(delimiter, recovery);
-  }
-
-  async Read(
-    destination: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): Promise<[int, Failure | undefined]> {
-    if (destination.length === 0) {
-      return [0n, undefined];
-    }
-    await this.#fill(recovery);
-    return this.#state.read(destination);
-  }
-
-  async ReadByte(
-    recovery?: GoRecovery,
-  ): Promise<[uint8, Failure | undefined]> {
-    await this.#fill(recovery);
-    return this.#state.readByte();
-  }
-
-  async ReadBytes(
-    delimiter: uint8,
-    recovery?: GoRecovery,
-  ): Promise<[RuntimeSlice<uint8>, Failure | undefined]> {
-    const values: number[] = [];
-    for (;;) {
-      const [value, failure] = await this.ReadByte(recovery);
-      if (failure !== undefined) {
-        return [byteSlice(values), failure];
-      }
-      values.push(value);
-      if (value === delimiter) {
-        return [byteSlice(values), undefined];
-      }
-    }
-  }
-
-  async #fill(recovery?: GoRecovery): Promise<void> {
-    if (!this.#state.shouldFill()) {
-      return;
-    }
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      const target = readBuffer();
-      const source = requireSource(this.#source);
-      const [count, failure] = await source.Read(target, recovery);
-      this.#state.accept(target, count, failure);
-      if (count > 0n || failure !== undefined) {
-        return;
-      }
-    }
-    this.#state.setFailure(this.#noProgress);
   }
 }
 
@@ -345,33 +213,23 @@ export class DirectBufioReader<
 
 export class BufioReaderOperations {
   static $copy<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReader<Failure>,
+    Failure extends ProviderErrorInterface,
+    Source extends ProviderReaderInterface<Failure>,
   >(
-    source: CanonicalBufioReader<Failure, Source>,
-  ): CanonicalBufioReader<Failure, Source> {
-    return CanonicalBufioReader.$copy(source);
+    source: DirectBufioReader<Failure, Source>,
+  ): DirectBufioReader<Failure, Source> {
+    return DirectBufioReader.$copy(source);
   }
 
   static $assign<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReader<Failure>,
+    Failure extends ProviderErrorInterface,
+    Source extends ProviderReaderInterface<Failure>,
   >(
-    target: CanonicalBufioReader<Failure, Source>,
-    source: CanonicalBufioReader<Failure, Source>,
+    target: DirectBufioReader<Failure, Source>,
+    source: DirectBufioReader<Failure, Source>,
   ): void {
-    CanonicalBufioReader.$assign(target, source);
+    DirectBufioReader.$assign(target, source);
   }
-}
-
-export function NewReaderCanonical<
-  Failure extends GoInterfaceValue,
-  Source extends CanonicalReader<Failure>,
->(
-  source: Source | undefined,
-  noProgress: Failure | undefined,
-): CanonicalBufioReader<Failure, Source> {
-  return new CanonicalBufioReader(source, requireNoProgress(noProgress));
 }
 
 export function NewReaderDirect<
@@ -400,18 +258,6 @@ function requireNoProgress<Failure>(failure: Failure | undefined): Failure {
     GoPanic.raiseRuntime("gostdlib provider supplied a nil io.ErrNoProgress");
   }
   return failure;
-}
-
-function requireReader<
-  Failure extends GoInterfaceValue,
-  Source extends CanonicalReader<Failure>,
->(
-  receiver: CanonicalBufioReader<Failure, Source> | undefined,
-): CanonicalBufioReader<Failure, Source> {
-  if (receiver === undefined) {
-    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
-  }
-  return receiver;
 }
 
 function requireDirectReader<

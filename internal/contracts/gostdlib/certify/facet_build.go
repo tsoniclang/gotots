@@ -143,23 +143,12 @@ func buildFacet(
 				"public binding is absent",
 			)
 		}
-		var contractErr error
-		if seed.Capabilities[0] ==
-			gostdlib.FacetCapabilitySynchronousKernel {
-			contractErr = verifySynchronousGenericKernelCallableContract(
-				seed.SourceIdentity,
-				binding,
-				effect,
-				callableParameters,
-			)
-		} else {
-			contractErr = verifyGenericKernelCallableContract(
-				seed.SourceIdentity,
-				binding,
-				effect,
-				callableParameters,
-			)
-		}
+		contractErr := verifyGenericKernelCallableContract(
+			seed.SourceIdentity,
+			binding,
+			effect,
+			callableParameters,
+		)
 		if contractErr != nil {
 			return gostdlib.FacetDocument{}, contractErr
 		}

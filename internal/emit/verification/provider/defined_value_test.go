@@ -167,7 +167,6 @@ func RewindMapIterator(value reflect.Value) bool {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {
@@ -196,12 +195,12 @@ func RewindMapIterator(value reflect.Value) bool {
 		"named_time.TimeDurationValueOperations.$wrap(BigInt.asIntN(64, goNumberToBigInt(value)))",
 		"IterSeqValueOperations.$project",
 		"ReflectMapIterOperations.$assign",
-		"cancel: (() => Awaitable<void>) | undefined",
+		"cancel: (() => void) | undefined",
 		"callback: (($0: gostring, $1:",
 		"const __gotots_callee_0 = cancel;",
 		"const __gotots_callee_1 = callback;",
-		"await (__gotots_callee_0 ?? GoPanic.raiseRuntime(\"call of nil function\"))();",
-		"return await (__gotots_callee_1 ?? GoPanic.raiseRuntime(\"call of nil function\"))(",
+		"(__gotots_callee_0 ?? GoPanic.raiseRuntime(\"call of nil function\"))();",
+		"return (__gotots_callee_1 ?? GoPanic.raiseRuntime(\"call of nil function\"))(",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("provider defined-value artifact lacks %q:\n%s", required, printed)
@@ -216,6 +215,10 @@ func RewindMapIterator(value reflect.Value) bool {
 		"fs__from_gostdlib.WalkDirFunc",
 		"new Duration(",
 		"GoMapHash.number(named_time.TimeDurationValueOperations.$project",
+		"async ",
+		"await ",
+		"Promise<",
+		"Awaitable<",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("provider defined-value artifact contains %q:\n%s", forbidden, printed)
@@ -233,7 +236,7 @@ func RewindMapIterator(value reflect.Value) bool {
 	}
 }
 
-func TestProviderSequenceRequiresExactCallableEffect(t *testing.T) {
+func TestProviderSequenceUsesExactSynchronousCallable(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
@@ -261,9 +264,8 @@ func Collect() []int {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
-	_, err = emit.CompileWithOptions(
+	emission, err := emit.CompileWithOptions(
 		program,
 		[]emit.Root{mustProviderRoot(
 			t,
@@ -271,23 +273,20 @@ func Collect() []int {
 		)},
 		options,
 	)
-	if err == nil || !strings.Contains(
-		err.Error(),
-		"provider defined-callable input effect is sync, want awaitable for Seq",
-	) {
-		t.Fatalf("cooperative direct-sequence error = %v", err)
+	if err != nil {
+		t.Fatalf("synchronous sequence compile: %v", err)
 	}
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsDisabled
-	if _, err := emit.CompileWithOptions(
-		program,
-		[]emit.Root{mustProviderRoot(
-			t,
-			program.Roots()[0].Types().Scope().Lookup("Collect"),
-		)},
-		options,
-	); err != nil {
-		t.Fatalf("disabled direct-sequence compile: %v", err)
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	if !strings.Contains(artifacts.printed, "SlicesCollectKernel") {
+		t.Fatalf("synchronous sequence kernel is absent:\n%s", artifacts.printed)
 	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("synchronous sequence output contains %q", forbidden)
+		}
+	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }
 
 func TestAtomicComparableFacetsMatchGo(t *testing.T) {
@@ -331,7 +330,6 @@ func Facts() string {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -375,7 +373,7 @@ func Facts() string {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Facts"},
-		"console.log(await Facts());\n",
+		"console.log(Facts());\n",
 	)
 }
 
@@ -465,7 +463,6 @@ func Facts() string {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsDisabled
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -511,6 +508,6 @@ func Facts() string {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Facts"},
-		"console.log(await Facts());\n",
+		"console.log(Facts());\n",
 	)
 }

@@ -95,11 +95,9 @@ const (
 	RuntimeSendChannel                = runtimecontract.RuntimeSendChannel
 	RuntimeSelectCase                 = runtimecontract.RuntimeSelectCase
 	RuntimeSelect                     = runtimecontract.RuntimeSelect
-	RuntimeScheduler                  = runtimecontract.RuntimeScheduler
 	RuntimeSelectReady                = runtimecontract.RuntimeSelectReady
 	RuntimeSelectAttempt              = runtimecontract.RuntimeSelectAttempt
 	RuntimeUnsafeString               = runtimecontract.RuntimeUnsafeString
-	RuntimeAwaitable                  = runtimecontract.RuntimeAwaitable
 )
 
 type RuntimeModule = runtimecontract.RuntimeModule
@@ -159,14 +157,6 @@ const (
 	MethodReceiverABIInvalid              = representationcontract.MethodReceiverABIInvalid
 	MethodReceiverABISourceRepresentation = representationcontract.MethodReceiverABISourceRepresentation
 	MethodReceiverABIContractDirect       = representationcontract.MethodReceiverABIContractDirect
-)
-
-type ConcurrencySemantics = representationcontract.ConcurrencySemantics
-
-const (
-	ConcurrencySemanticsDisabled    = representationcontract.ConcurrencySemanticsDisabled
-	ConcurrencySemanticsCooperative = representationcontract.ConcurrencySemanticsCooperative
-	ConcurrencySemanticsInvalid     = representationcontract.ConcurrencySemanticsInvalid
 )
 
 type PrimitiveAlias = representationcontract.PrimitiveAlias

@@ -1,6 +1,6 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, bool, int } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool, int } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { Seq } from "./internal/portable/iter/sequence.js";
 
@@ -18,11 +18,11 @@ export function BinarySearch<Slice, Element>(
   return specializationRequired("slices.BinarySearch");
 }
 
-export async function BinarySearchFunc<Slice, Element, Target>(
+export function BinarySearchFunc<Slice, Element, Target>(
   source: Slice,
   target: Target,
-  compare: ((left: Element, right: Target) => Awaitable<int>) | undefined,
-): Promise<[int, bool]> {
+  compare: ((left: Element, right: Target) => int) | undefined,
+): [int, bool] {
   return specializationRequired("slices.BinarySearchFunc");
 }
 
@@ -44,10 +44,10 @@ export function Compact<Slice, Element>(source: Slice): Slice {
   return specializationRequired("slices.Compact");
 }
 
-export async function CompactFunc<Slice, Element>(
+export function CompactFunc<Slice, Element>(
   source: Slice,
-  equal: ((left: Element, right: Element) => Awaitable<bool>) | undefined,
-): Promise<Slice> {
+  equal: ((left: Element, right: Element) => bool) | undefined,
+): Slice {
   return specializationRequired("slices.CompactFunc");
 }
 
@@ -55,11 +55,11 @@ export function Compare<Slice, Element>(left: Slice, right: Slice): int {
   return specializationRequired("slices.Compare");
 }
 
-export async function CompareFunc<LeftSlice, RightSlice, Left, Right>(
+export function CompareFunc<LeftSlice, RightSlice, Left, Right>(
   left: LeftSlice,
   right: RightSlice,
-  compare: ((left: Left, right: Right) => Awaitable<int>) | undefined,
-): Promise<int> {
+  compare: ((left: Left, right: Right) => int) | undefined,
+): int {
   return specializationRequired("slices.CompareFunc");
 }
 
@@ -74,10 +74,10 @@ export function Contains<Slice, Element>(
   return specializationRequired("slices.Contains");
 }
 
-export async function ContainsFunc<Slice, Element>(
+export function ContainsFunc<Slice, Element>(
   source: Slice,
-  predicate: ((value: Element) => Awaitable<bool>) | undefined,
-): Promise<bool> {
+  predicate: ((value: Element) => bool) | undefined,
+): bool {
   return specializationRequired("slices.ContainsFunc");
 }
 
@@ -89,10 +89,10 @@ export function Delete<Slice, Element>(
   return specializationRequired("slices.Delete");
 }
 
-export async function DeleteFunc<Slice, Element>(
+export function DeleteFunc<Slice, Element>(
   source: Slice,
-  predicate: ((value: Element) => Awaitable<bool>) | undefined,
-): Promise<Slice> {
+  predicate: ((value: Element) => bool) | undefined,
+): Slice {
   return specializationRequired("slices.DeleteFunc");
 }
 
@@ -100,11 +100,11 @@ export function Equal<Slice, Element>(left: Slice, right: Slice): bool {
   return specializationRequired("slices.Equal");
 }
 
-export async function EqualFunc<LeftSlice, RightSlice, Left, Right>(
+export function EqualFunc<LeftSlice, RightSlice, Left, Right>(
   left: LeftSlice,
   right: RightSlice,
-  equal: ((left: Left, right: Right) => Awaitable<bool>) | undefined,
-): Promise<bool> {
+  equal: ((left: Left, right: Right) => bool) | undefined,
+): bool {
   return specializationRequired("slices.EqualFunc");
 }
 
@@ -119,10 +119,10 @@ export function Index<Slice, Element>(
   return specializationRequired("slices.Index");
 }
 
-export async function IndexFunc<Slice, Element>(
+export function IndexFunc<Slice, Element>(
   source: Slice,
-  predicate: ((value: Element) => Awaitable<bool>) | undefined,
-): Promise<int> {
+  predicate: ((value: Element) => bool) | undefined,
+): int {
   return specializationRequired("slices.IndexFunc");
 }
 
@@ -155,17 +155,17 @@ export function Sort<Slice, Element>(source: Slice): void {
   return specializationRequired("slices.Sort");
 }
 
-export async function SortFunc<Slice, Element>(
+export function SortFunc<Slice, Element>(
   source: Slice,
-  compare: ((left: Element, right: Element) => Awaitable<int>) | undefined,
-): Promise<void> {
+  compare: ((left: Element, right: Element) => int) | undefined,
+): void {
   return specializationRequired("slices.SortFunc");
 }
 
-export async function SortStableFunc<Slice, Element>(
+export function SortStableFunc<Slice, Element>(
   source: Slice,
-  compare: ((left: Element, right: Element) => Awaitable<int>) | undefined,
-): Promise<void> {
+  compare: ((left: Element, right: Element) => int) | undefined,
+): void {
   return specializationRequired("slices.SortStableFunc");
 }
 
