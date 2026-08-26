@@ -171,6 +171,7 @@ func main() {
 				".$copy(",
 				"mapIndex:",
 				"mapStore:",
+				"RuntimeSlice.make<",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf("container reflection artifact lacks %q", required)

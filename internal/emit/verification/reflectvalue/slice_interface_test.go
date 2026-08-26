@@ -83,6 +83,7 @@ func main() {
 				"value === undefined",
 				"outside the interface contract",
 				"GoInterfaceValue | undefined",
+				"RuntimeSlice.make<",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf("interface-slice reflection artifact lacks %q", required)

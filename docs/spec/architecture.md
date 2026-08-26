@@ -771,7 +771,9 @@ reflection subset. Slice indexing, append, construction, and growth use the
 canonical container-storage conversion, value-copy, and zero owners. Aggregate
 elements receive fresh Go value copies when append reallocates, while pointer,
 map, slice, function, and interface elements preserve their Go reference-value
-semantics. `Value.Grow` changes capacity without writing into an already
+semantics. Generated generic container constructors receive their explicit
+canonical storage type; they never infer it from a nil or specialized zero.
+`Value.Grow` changes capacity without writing into an already
 available tail. Map lookup, storage, keys, construction, and zero values route
 through the one canonical map representation, including aggregate keys and
 values. A reduced scalar whitelist, raw JavaScript storage movement, or a

@@ -354,13 +354,20 @@ func (e reflectionSliceElement) makeOperation(
 			nil,
 		)
 	} else {
-		made = api.DirectExpression(reflectionSliceCall(
-			factory,
-			runtimeSlice.Expression(factory),
-			runtimeslice.MemberName(runtimeslice.MemberMake),
-			factory.Identifier("length"),
-			factory.Identifier("capacity"),
-			e.zero.Value(),
+		made = api.DirectExpression(factory.CallExpression(
+			reflectionSliceMember(
+				factory,
+				runtimeSlice.Expression(factory),
+				runtimeslice.MemberName(runtimeslice.MemberMake),
+			),
+			nil,
+			[]tsgo.TypeNode{e.storage.Value()},
+			[]tsgo.Expression{
+				factory.Identifier("length"),
+				factory.Identifier("capacity"),
+				e.zero.Value(),
+			},
+			tsgo.NodeFlagsNone,
 		))
 	}
 	if err != nil {
