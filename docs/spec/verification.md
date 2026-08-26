@@ -526,7 +526,10 @@ ESM for:
 - `Addr` over pointer elements, struct fields, and slice elements, including
   exact pointer-interface assertion, repeated-address equality, `Type`/`Elem`
   identity, `ValueOf(Addr().Interface())` type recovery, and mutation of the
-  original storage without eager pointer-reflection closure;
+  original storage without eager pointer-reflection closure; an address-only
+  instantiated generic child whose pointer implements an asserted interface
+  must carry that exact method contract and dispatch against the original
+  location;
 - reflective map/slice/pointer construction and iterator behavior;
 - pointer and aggregate slice index/append/make/grow behavior, including
   capacity reuse versus reallocation, fresh aggregate zeros, value-copy
@@ -541,6 +544,11 @@ ESM for:
   implementation checks;
 - open generic `TypeFor[T]` through exact private capability or
   concretization, with unchanged source value arity.
+
+Mutating an address callback from the canonical empty-interface surface to an
+unsubscribed adapter must remove the address-only interface method and fail the
+artifact assertion before runtime. Mutating the same callback back to eager
+pointer-descriptor demand must fail the bounded-closure gate.
 
 Provider-facet tests independently certify the metadata operation target and
 its concrete result target. The checked return type of `$create` must

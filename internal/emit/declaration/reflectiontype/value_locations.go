@@ -211,7 +211,11 @@ func boxedReflectionAddress(
 	pointer api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	pointerType := types.NewPointer(elementType)
-	adapter, err := context.Names().InterfaceAdapter(pointerType, nil)
+	emptyInterface := types.Universe.Lookup("any").Type()
+	adapter, err := context.Names().InterfaceAdapter(
+		pointerType,
+		emptyInterface,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

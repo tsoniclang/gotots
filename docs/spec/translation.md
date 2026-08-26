@@ -855,7 +855,26 @@ pointer box. The portable `Value.Addr` implementation consumes that callback;
 it never invents a second cell or an unboxed pointer-shaped object. The exact
 box token is registered against the canonical pointer descriptor at that
 boundary, so a later `ValueOf` resolves the same type without eagerly demanding
-reflection artifacts for every addressable child type.
+reflection artifacts for every addressable child type. The pointer adapter is
+also registered at the empty-interface surface through which `Interface` and
+`TypeAssert` expose it. Thus this address-only generic value:
+
+```go
+type Decoder interface { Decode([]byte) error }
+type Cell[T ~string] struct { Value T }
+func (cell *Cell[T]) Decode(text []byte) error {
+    cell.Value = T(text)
+    return nil
+}
+
+field := reflect.ValueOf(&holder).Elem().Field(0)
+decoder, ok := reflect.TypeAssert[Decoder](field.Addr())
+```
+
+causes the canonical `*Cell[string]` adapter to carry `Decoder`'s exact method
+token and implementation. It does not demand a static `*Cell[string]`
+reflection descriptor merely to make the assertion work. No marker spelling,
+method-name lookup, or product-specific adapter list participates.
 
 For an open generic body:
 

@@ -7,8 +7,8 @@ import (
 
 // TestReflectAddressInterfacesCanonicalizeWithNativeEvidence proves that
 // addresses produced from pointer elements, struct fields, and slice elements
-// recover the exact pointer interface, preserve location identity, and mutate
-// the same storage observed by ordinary Go code.
+// recover the exact pointer interface and asserted method contracts. Native Go
+// evidence independently fixes the expected identity and mutation behavior.
 func TestReflectAddressInterfacesCanonicalizeWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
@@ -24,8 +24,30 @@ func (label *Label) UnmarshalText(text []byte) error {
 	return nil
 }
 
+type Decoder interface {
+	Decode([]byte) error
+}
+
+func (label *Label) Decode(text []byte) error {
+	*label = Label(string(text))
+	return nil
+}
+
 type Holder struct {
 	Value Label
+}
+
+type GenericLabel[T ~string] struct {
+	Value T
+}
+
+func (label *GenericLabel[T]) Decode(text []byte) error {
+	label.Value = T(string(text))
+	return nil
+}
+
+type GenericHolder struct {
+	Value GenericLabel[string]
 }
 
 func Addresses() string {
@@ -34,28 +56,40 @@ func Addresses() string {
 	directPointer, directOK := reflect.TypeAssert[*Label](directValue.Addr())
 	directAgain, directAgainOK := reflect.TypeAssert[*Label](directValue.Addr())
 	interfacePointer, interfaceOK := directValue.Addr().Interface().(*Label)
+	directDecoder, directDecoderOK := directValue.Addr().Interface().(Decoder)
+	reflectedDecoder, reflectedDecoderOK := reflect.TypeAssert[Decoder](directValue.Addr())
 	recoveredType := reflect.ValueOf(directValue.Addr().Interface()).Type()
-	_ = directPointer.UnmarshalText([]byte("changed"))
+	_ = directDecoder.Decode([]byte("interface"))
+	_ = reflectedDecoder.Decode([]byte("reflected"))
 
 	holder := Holder{Value: "field"}
 	fieldValue := reflect.ValueOf(&holder).Elem().Field(0)
 	fieldPointer, fieldOK := reflect.TypeAssert[*Label](fieldValue.Addr())
-	_ = fieldPointer.UnmarshalText([]byte("updated"))
+	fieldDecoder, fieldDecoderOK := fieldValue.Addr().Interface().(Decoder)
+	_ = fieldDecoder.Decode([]byte("updated"))
 
 	values := []Label{"slice"}
 	sliceValue := reflect.ValueOf(values).Index(0)
 	slicePointer, sliceOK := reflect.TypeAssert[*Label](sliceValue.Addr())
-	_ = slicePointer.UnmarshalText([]byte("indexed"))
+	sliceDecoder, sliceDecoderOK := reflect.TypeAssert[Decoder](sliceValue.Addr())
+	_ = sliceDecoder.Decode([]byte("indexed"))
+
+	genericHolder := GenericHolder{Value: GenericLabel[string]{Value: "generic"}}
+	genericValue := reflect.ValueOf(&genericHolder).Elem().Field(0)
+	genericDecoder, genericDecoderOK := reflect.TypeAssert[Decoder](genericValue.Addr())
+	_ = genericDecoder.Decode([]byte("instantiated"))
 
 	return fmt.Sprintf(
-		"%t %t %t %t %t %t %s/%s %q %t %q %t %q",
+		"%t %t %t %t %t %t %t %t %s/%s %q %t %t %t %q %t %t %t %q %t %q",
 		directOK, directAgainOK,
 		directPointer == directAgain,
 		interfaceOK, interfacePointer == directPointer,
+		directDecoderOK, reflectedDecoderOK,
 		recoveredType == directValue.Addr().Type(),
 		directValue.Addr().Type().Kind(), directValue.Addr().Elem().Kind(), direct,
-		fieldOK, holder.Value,
-		sliceOK, values[0],
+		fieldOK, fieldPointer != nil, fieldDecoderOK, holder.Value,
+		sliceOK, slicePointer != nil, sliceDecoderOK, values[0],
+		genericDecoderOK, genericHolder.Value.Value,
 	)
 }
 `
@@ -74,13 +108,30 @@ func main() {
 	fmt.Println(fixture.Addresses())
 }
 `
-	verifyReflectCanonical(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"Addresses",
 		"reflectvalue",
 		typescriptRunner,
 		goRunner,
+		func(artifacts renderedArtifacts) {
+			const adapter = "$goInterfaceAdapter$PointerTo_Named_reflectvalue$GenericLabelOf_string"
+			start := strings.Index(artifacts.printed, "export class "+adapter)
+			if start < 0 {
+				start = strings.Index(artifacts.printed, "export const "+adapter)
+			}
+			if start < 0 {
+				t.Fatalf("address-only generic adapter %q is absent", adapter)
+			}
+			end := len(artifacts.printed)
+			if relative := strings.Index(artifacts.printed[start+1:], "\nexport "); relative >= 0 {
+				end = start + 1 + relative
+			}
+			if !strings.Contains(artifacts.printed[start:end], "Decode(") {
+				t.Fatalf("address-only generic adapter %q lacks its asserted interface contract", adapter)
+			}
+		},
 	)
 }
 

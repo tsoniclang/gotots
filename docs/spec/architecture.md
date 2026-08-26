@@ -774,9 +774,14 @@ resolves the canonical `*T` descriptor and consumes that callback, so
 and mutation all observe one location. The runtime-type owner exact-joins the
 pointer box's generated dynamic token to that descriptor, including when the
 descriptor is composed lazily from `T`; addressability does not force static
-reflection closure over every possible `*T`. A source-less synthetic address value,
-detached cell, reconstructed pointer, or provider-side storage inspection is
-forbidden.
+reflection closure over every possible `*T`. Because `Addr().Interface()` and
+`TypeAssert` expose that box through Go's canonical empty-interface boundary,
+the address callback registers its `*T` adapter against that exact contract.
+This interface reachability fact is separate from pointer-descriptor and
+value-operation demand: a later exact assertion to `I` adds `I` only when
+`go/types` proves `*T` implements `I`, without retaining every `*T` reflection
+descriptor. A source-less synthetic address value, detached cell,
+reconstructed pointer, or provider-side storage inspection is forbidden.
 
 Container descriptors are total over every statically representable Go
 element, key, and value type; basic scalars do not define a privileged
