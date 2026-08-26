@@ -26,11 +26,13 @@ export {
   DeleteFunc as SlicesDeleteFuncKernel,
   DeleteFuncSynchronous as SlicesDeleteFuncSynchronousKernel,
   Grow as SlicesGrowKernel,
-  Insert as SlicesInsertKernel,
   Repeat as SlicesRepeatKernel,
-  Replace as SlicesReplaceKernel,
   Reverse as SlicesReverseKernel,
 } from "../portable/slices/transform.js";
+export {
+  Insert as SlicesInsertKernel,
+  Replace as SlicesReplaceKernel,
+} from "../portable/slices/splice.js";
 export {
   Sort as SlicesSortKernel,
   SortFunc as SlicesSortFuncKernel,

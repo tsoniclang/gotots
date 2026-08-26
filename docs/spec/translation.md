@@ -365,6 +365,14 @@ provider's `int64` carrier at the private boundary. Callable parameters are
 adapted recursively rather than treated as opaque merely because they mention
 a type parameter.
 
+Container-transforming kernels also retain Go assignment semantics. A call
+such as `slices.Clone(records)` receives typed conversion, copy, storage, and
+inverse-storage operations for the concrete `Record`; the kernel emits a new
+slice whose elements are copied values rather than shared target storage
+objects. In-place operations use the same operations while preserving the
+original backing descriptor. The compiler never selects behavior from the
+element's TypeScript spelling or assumes that a generic `T` is reference-safe.
+
 Canonical container results are also recursive. For example, provider
 `fs.ReadDir` returns a provider slice of provider `DirEntry` contracts; generated
 code receives a `RuntimeSliceProjection` whose element functions are the
@@ -788,6 +796,25 @@ The interface adapter carries the exact typed `Entry` payload and its canonical
 descriptor. `TypeOf` returns that descriptor and `ValueOf` creates a typed
 reflective value view whose field/index/element operations delegate to
 generated typed accessors. No host object inspection occurs.
+
+Container operations retain the same assignment algebra as ordinary Go:
+
+```go
+type Cell struct { Count int }
+cells := []Cell{{Count: 1}}
+grown := reflect.Append(reflect.ValueOf(cells), reflect.ValueOf(Cell{Count: 2}))
+pointers := reflect.MakeSlice(reflect.TypeOf([]*Cell{}), 2, 4)
+```
+
+The `[]Cell` descriptor copies existing aggregate elements if append allocates
+a new backing array and stores a copied incoming `Cell`; it never aliases the
+same target object as two independent Go struct values. The `[]*Cell`
+descriptor instead stores pointer values directly and initializes new entries
+to the typed nil pointer. `MakeSlice` and `Value.Grow` use the same canonical
+slice-storage constructor and typed zero operation. Reflective maps similarly
+select the compiler's ordinary scalar, native-key, or hashed map
+representation from their exact Go key/value types rather than a basic-type
+whitelist.
 
 Per-type reflection output contains facts, not a copied reflection
 interpreter. For example, an addressable source struct contributes one compact

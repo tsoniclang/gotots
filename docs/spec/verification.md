@@ -525,6 +525,12 @@ ESM for:
 - `ValueOf`, nil/invalid/addressable/settable state, pointer `Elem`, fields,
   indexes, maps, scalar projections, mutation, zero, and interface recovery;
 - reflective map/slice/pointer construction and iterator behavior;
+- pointer and aggregate slice index/append/make/grow behavior, including
+  capacity reuse versus reallocation, fresh aggregate zeros, value-copy
+  isolation, pointer nilness, and no writes when grow reuses capacity;
+- pointer and aggregate map key/value lookup, assignment, deletion,
+  construction, key iteration, and value-copy isolation through each selected
+  canonical map representation;
 - dynamic `PointerTo` composition with no source-level `*T`, canonical repeated
   lookup, repeated pointer depth, and value-versus-pointer method-set
   implementation checks;
@@ -588,6 +594,14 @@ the descriptor-shape, strict-typecheck, native-Go differential, or generated-
 size gate must fail before output is sealed. Broad artifact searches prove
 that each migrated semantic family has one typed registration route and no
 superseded direct `$registerValue` registration.
+
+Container-operation mutations restore the former basic-scalar whitelist,
+reuse one aggregate zero object across slots, move aggregate storage without a
+Go value copy, make every append reallocate, overwrite a latent tail during
+`Value.Grow`, or bypass the canonical map representation. Each must fail at the
+source-ownership wall, generated descriptor inspection, strict typecheck, or
+Go differential. Broad source searches prove the reduced-slice route and
+map/slice-local scalar-zero selection are absent.
 
 Struct, opaque-struct, and pointer registration fixtures prove that adapter
 resolvers are not evaluated at registration, are evaluated exactly once at
@@ -927,6 +941,15 @@ Go. Artifact inspection proves equal-representation slices remain direct and a
 differing element emits one `RuntimeSliceProjection<F,T>` with reciprocal typed
 element conversions. Replacing the projection with an eager copy, omitting the
 reverse conversion, or projecting an equal carrier must fail.
+
+Generic slice-assignment proof uses aggregate elements with mutable fields and
+exercises clone, concatenation, deletion, insertion, repetition, replacement,
+and reversal, including overlapping source/replacement slices and both
+capacity-preserving and reallocating paths. It exact-compares values, nilness,
+length, capacity-envelope behavior, tail zeroing, and backing aliases with Go.
+A mutation that removes logical copy, swaps raw storage references, omits tail
+zeroing, or always reallocates must fail at the provider differential or the
+generated-kernel artifact gate.
 Projected contiguous-region proof verifies that nil stays nil and a non-nil
 request reaches the projection's explicit typed unsupported boundary rather
 than inheriting the direct slice's raw-backing implementation.

@@ -4,15 +4,13 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-// mapValueProperties adds the len, mapIndex, mapStore, mapKeys, and
-// makeMap callbacks of one map whose key and element are plain basic
-// scalars: lookups project through the runtime map with exact key and
-// element adapter guards, an absent key yields no box (the Go zero
-// Value), storing an absent box deletes the key, and construction binds
-// the runtime map factory to the canonical descriptor.
+// mapValueProperties adds the complete map callback family through the
+// canonical map representation. The representation owns key and value copy
+// semantics; reflection owns only guarded boxing and operation topology.
 func mapValueProperties(
 	context api.Context,
 	names api.ReflectionNames,
@@ -32,29 +30,6 @@ func mapValueProperties(
 	}
 	scaffold.requests = append(scaffold.requests, payloadRequests...)
 	scaffold.payload = payload
-	var wrapFailure error
-	wrapMap := func(raw tsgo.Expression) tsgo.Expression {
-		wrapped, wrapRequests, wrapErr := constructedScalarValue(
-			context,
-			sourceType,
-			raw,
-		)
-		if wrapErr != nil {
-			if wrapFailure == nil {
-				wrapFailure = wrapErr
-			}
-			return raw
-		}
-		scaffold.requests = append(scaffold.requests, wrapRequests...)
-		return wrapped
-	}
-	keyBasic, keyOK := types.Unalias(mapType.Key()).(*types.Basic)
-	elementBasic, elementOK := types.Unalias(mapType.Elem()).(*types.Basic)
-	supported := keyOK && elementOK &&
-		keyBasic.Info()&(types.IsBoolean|types.IsString|
-			types.IsInteger|types.IsFloat) != 0 &&
-		elementBasic.Info()&(types.IsBoolean|types.IsString|
-			types.IsInteger|types.IsFloat) != 0
 	provider, providerOK := context.ProviderScalarABI()
 	if !providerOK {
 		return nil, &api.GeneratedArtifactShapeError{
@@ -112,16 +87,6 @@ func mapValueProperties(
 			lengthProjected,
 		)),
 	)
-	if !supported {
-		// Key or element kinds sit outside the location model: the map
-		// keeps exact nil and length evidence while entry navigation
-		// stays a loud typed boundary through operation absence.
-		scaffold.requests = append(scaffold.requests, extentType.Requests()...)
-		return []tsgo.ObjectLiteralElementLike{
-			runtimeNilCallback(scaffold),
-			expressionProperty(factory, "len", length),
-		}, nil
-	}
 	keyAdapter, err := context.Names().InterfaceAdapter(mapType.Key(), nil)
 	if err != nil {
 		return nil, err
@@ -147,22 +112,13 @@ func mapValueProperties(
 	if err != nil {
 		return nil, err
 	}
-	runtimeMap, err := context.Names().Runtime(
-		api.RuntimeMap,
-		api.ImportPhaseValue,
+	elementZero, err := context.Values().Zero(
+		context.WithRole(api.RoleMapValue),
+		nil,
+		mapType.Elem(),
 	)
 	if err != nil {
 		return nil, err
-	}
-	elementZero, err := scalarZeroExpression(context, factory, elementBasic)
-	if err != nil {
-		return nil, err
-	}
-	if elementZero == nil {
-		return nil, &api.GeneratedArtifactShapeError{
-			Artifact: mapType.String(),
-			Reason:   "reflection value map element has no exact zero",
-		}
 	}
 	scaffold.requests = append(scaffold.requests, extentType.Requests()...)
 	scaffold.requests = append(scaffold.requests, keyAdapter.Requests()...)
@@ -178,7 +134,7 @@ func mapValueProperties(
 		scaffold.requests,
 		elementDescriptor.Requests()...,
 	)
-	scaffold.requests = append(scaffold.requests, runtimeMap.Requests()...)
+	scaffold.requests = append(scaffold.requests, elementZero.Requests()...)
 	keyParameter := factory.ParameterDeclaration(
 		nil,
 		nil,
@@ -383,62 +339,30 @@ func mapValueProperties(
 			),
 		)),
 	)
-	makeMap := factory.ArrowFunction(
+	made, err := maprepresentation.Make(
+		context.WithRole(api.RoleDefinedValue),
 		nil,
+		sourceType,
+		elementZero.Value(),
+		factory.NumericLiteral("0", tsgo.TokenFlagsNone),
 		nil,
-		nil,
-		nil,
-		factory.EqualsGreaterThanToken(),
-		factory.ParenthesizedExpression(factory.NewExpression(
-			scaffold.adapter.Expression(factory),
-			nil,
-			[]tsgo.Expression{wrapMap(factory.CallExpression(
-				factory.PropertyAccessExpression(
-					runtimeMap.Expression(factory),
-					nil,
-					factory.Identifier("make"),
-					tsgo.NodeFlagsNone,
-				),
-				nil,
-				nil,
-				[]tsgo.Expression{
-					elementZero,
-					factory.NumericLiteral("0", tsgo.TokenFlagsNone),
-					factory.ArrayLiteralExpression(nil, false),
-				},
-				tsgo.NodeFlagsNone,
-			))},
-		)),
+		elementZero.Requests(),
 	)
-	zero := factory.ArrowFunction(
-		nil,
-		nil,
-		nil,
-		factory.TypeReferenceNode(
-			scaffold.boxType.EntityName(factory),
-			nil,
-		),
-		factory.EqualsGreaterThanToken(),
-		factory.ParenthesizedExpression(factory.NewExpression(
-			scaffold.adapter.Expression(factory),
-			nil,
-			[]tsgo.Expression{wrapMap(factory.CallExpression(
-				factory.PropertyAccessExpression(
-					runtimeMap.Expression(factory),
-					nil,
-					factory.Identifier("nil"),
-					tsgo.NodeFlagsNone,
-				),
-				nil,
-				nil,
-				[]tsgo.Expression{elementZero},
-				tsgo.NodeFlagsNone,
-			))},
-		)),
-	)
-	if wrapFailure != nil {
-		return nil, wrapFailure
+	if err != nil {
+		return nil, err
 	}
+	zeroValue, err := context.Values().Zero(
+		context.WithRole(api.RoleDefinedValue),
+		nil,
+		sourceType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, made.Requests()...)
+	scaffold.requests = append(scaffold.requests, zeroValue.Requests()...)
+	makeMap := reflectionMapBoxArrow(made, scaffold)
+	zero := reflectionMapBoxArrow(zeroValue, scaffold)
 	return []tsgo.ObjectLiteralElementLike{
 		runtimeNilCallback(scaffold),
 		expressionProperty(factory, "zero", zero),
@@ -448,4 +372,25 @@ func mapValueProperties(
 		expressionProperty(factory, "mapKeys", mapKeys),
 		expressionProperty(factory, "makeMap", makeMap),
 	}, nil
+}
+
+func reflectionMapBoxArrow(
+	value api.ExpressionEmission,
+	scaffold *locationScaffold,
+) tsgo.ArrowFunction {
+	factory := scaffold.factory
+	statements := append([]tsgo.Statement(nil), value.Before()...)
+	statements = append(statements, factory.ReturnStatement(factory.NewExpression(
+		scaffold.adapter.Expression(factory),
+		nil,
+		[]tsgo.Expression{value.Value()},
+	)))
+	return factory.ArrowFunction(
+		nil,
+		nil,
+		nil,
+		factory.TypeReferenceNode(scaffold.boxType.EntityName(factory), nil),
+		factory.EqualsGreaterThanToken(),
+		factory.Block(statements, true),
+	)
 }

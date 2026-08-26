@@ -52,6 +52,7 @@ function values<T>(source: RuntimeSlice<T>): T[] {
 
 const copyValue = <T>(value: T): T => value;
 const copyNumber = (value: number): number => value;
+const copyString = (value: string): string => value;
 const equalValue = <T>(left: T, right: T): boolean => left === right;
 const lessValue = <T extends number | string>(left: T, right: T): boolean => (
   left < right
@@ -189,7 +190,17 @@ test("slices transformations preserve order and nilness", async (): Promise<void
     RuntimeSlice.literal(["A", "a", "B"]),
     (left, right): boolean => left.toLowerCase() === right.toLowerCase(),
   )), ["A", "B"]);
-  assert.deepEqual(values(Delete(RuntimeSlice.literal([0, 1, 2, 3]), 1n, 3n)), [0, 3]);
+  assert.deepEqual(values(Delete(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
+    RuntimeSlice.literal([0, 1, 2, 3]),
+    1n,
+    3n,
+  )), [0, 3]);
   assert.deepEqual(values(await DeleteFunc(
     sliceValue,
     sliceValue,
@@ -200,10 +211,46 @@ test("slices transformations preserve order and nilness", async (): Promise<void
     RuntimeSlice.literal([1, 2, 3, 4]),
     (value): boolean => value % 2 === 0,
   )), [1, 3]);
-  assert.deepEqual(values(Insert(RuntimeSlice.literal([1, 4]), 1n, RuntimeSlice.literal([2, 3]))), [1, 2, 3, 4]);
-  assert.deepEqual(values(Repeat(RuntimeSlice.literal(["x", "y"]), 3n)), ["x", "y", "x", "y", "x", "y"]);
-  assert.deepEqual(values(Replace(RuntimeSlice.literal([1, 2, 3, 4]), 1n, 3n, RuntimeSlice.literal([8, 9]))), [1, 8, 9, 4]);
-  assert.equal(Clone(RuntimeSlice.nil<number>()).isNil(), true);
+  assert.deepEqual(values(Insert(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
+    RuntimeSlice.literal([1, 4]),
+    1n,
+    RuntimeSlice.literal([2, 3]),
+  )), [1, 2, 3, 4]);
+  assert.deepEqual(values(Repeat(
+    sliceValue,
+    sliceValue,
+    copyString,
+    copyString,
+    copyString,
+    RuntimeSlice.literal(["x", "y"]),
+    3n,
+  )), ["x", "y", "x", "y", "x", "y"]);
+  assert.deepEqual(values(Replace(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
+    RuntimeSlice.literal([1, 2, 3, 4]),
+    1n,
+    3n,
+    RuntimeSlice.literal([8, 9]),
+  )), [1, 8, 9, 4]);
+  assert.equal(Clone(
+    sliceValue,
+    sliceValue,
+    copyNumber,
+    copyNumber,
+    copyNumber,
+    RuntimeSlice.nil<number>(),
+  ).isNil(), true);
   assert.equal(Clip(RuntimeSlice.literal([1, 2])).capacity, 2);
 });
 
@@ -227,10 +274,18 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
     RuntimeSlice.literal([0]),
     sequence,
   )), [0, 3, 1, 2]);
-  assert.deepEqual(values(Concat(RuntimeSlice.literal([
-    RuntimeSlice.literal([1, 2]),
-    RuntimeSlice.literal([3]),
-  ]))), [1, 2, 3]);
+  assert.deepEqual(values(Concat(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
+    RuntimeSlice.literal([
+      RuntimeSlice.literal([1, 2]),
+      RuntimeSlice.literal([3]),
+    ]),
+  )), [1, 2, 3]);
 
   const ordered = RuntimeSlice.literal([3, Number.NaN, 1, 2]);
   Sort<RuntimeSlice<number>, number, number>(
@@ -400,7 +455,7 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
   });
   assert.deepEqual(yielded, [4, 5]);
   const reversed = RuntimeSlice.literal([1, 2, 3]);
-  Reverse(reversed);
+  Reverse(sliceValue, copyNumber, copyNumber, copyNumber, reversed);
   assert.deepEqual(values(reversed), [3, 2, 1]);
 });
 

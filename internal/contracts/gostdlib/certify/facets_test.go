@@ -356,7 +356,7 @@ func TestGenericCallableKernelRejectsProviderArityDrift(t *testing.T) {
 	}
 	mutated := bytes.Replace(
 		source,
-		[]byte(`"sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}]`),
+		[]byte(`"sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}]`),
 		[]byte(`"sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}]`),
 		1,
 	)

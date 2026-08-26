@@ -80,30 +80,3 @@ func runtimeNilCallback(
 		)),
 	))
 }
-
-// reducedSliceProperties is the exact evidence subset of one slice whose
-// element sits outside the location model: nil, length, and capacity.
-func reducedSliceProperties(
-	scaffold *locationScaffold,
-	carrier api.IntegerCarrier,
-	indexType api.NameReference,
-) []tsgo.ObjectLiteralElementLike {
-	factory := scaffold.factory
-	return []tsgo.ObjectLiteralElementLike{
-		runtimeNilCallback(scaffold),
-		expressionProperty(factory, "len", sliceExtentCallback(
-			scaffold,
-			"length",
-			carrier,
-			indexType,
-			"Value.Len",
-		)),
-		expressionProperty(factory, "cap", sliceExtentCallback(
-			scaffold,
-			"capacity",
-			carrier,
-			indexType,
-			"Value.Cap",
-		)),
-	}
-}

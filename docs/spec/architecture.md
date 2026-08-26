@@ -859,6 +859,18 @@ closures is a source-size and typecheck regression even when behavior remains
 correct. Erasing callback payloads or recovering their types dynamically is
 equally invalid.
 
+Container descriptors are total over every statically representable Go
+element, key, and value type; basic scalars do not define a privileged
+reflection subset. Slice indexing, append, construction, and growth use the
+canonical container-storage conversion, value-copy, and zero owners. Aggregate
+elements receive fresh Go value copies when append reallocates, while pointer,
+map, slice, function, and interface elements preserve their Go reference-value
+semantics. `Value.Grow` changes capacity without writing into an already
+available tail. Map lookup, storage, keys, construction, and zero values route
+through the one canonical map representation, including aggregate keys and
+values. A reduced scalar whitelist, raw JavaScript storage movement, or a
+parallel reflection-only map/slice representation is forbidden.
+
 Every generated value-operation registration carries its concrete adapter as
 a zero-argument typed resolver. Registration stores that resolver without
 evaluating it; the provider resolves it once when the operation record is first
@@ -1426,6 +1438,18 @@ therefore transported opaquely to the kernel, while a callable shell is adapted
 recursively so its concrete non-generic parameter and result leaves still cross
 the provider boundary. Only concrete source leaves outside a generic-owned
 shape use ordinary provider scalar projection.
+
+Every generic provider operation that assigns container elements receives the
+complete caller-owned assignment algebra: logical copy, logical-to-storage,
+storage-to-logical, zero when required, and enclosing-container conversion.
+This applies equally to allocation and in-place movement. For example,
+`slices.Clone([]Record{{Count: 1}})` allocates a new backing store and copies
+each `Record` value; mutating the clone cannot mutate the source record merely
+because both target slots once contained the same JavaScript storage object.
+`slices.Delete`, `Insert`, `Replace`, and `Reverse` preserve backing aliases and
+perform the same value assignments at existing locations. A kernel may not
+move raw storage references as an approximation for Go assignment, and there
+is no scalar-only sibling path.
 
 A canonical provider parameter or result recursively projects containers and
 profile-owned interface/callable leaves. A canonical leaf already expressed in

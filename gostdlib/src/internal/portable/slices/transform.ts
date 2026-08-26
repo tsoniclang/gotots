@@ -4,7 +4,6 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import { hostInteger } from "../../host-integer.js";
 
-import { sliceValues } from "../../runtime/slice.js";
 import {
   callPredicate,
   callPredicateSynchronous,
@@ -15,10 +14,17 @@ import {
   type EqualValue,
   type FromContainerStorage,
   readElement,
+  storedValues,
   storeElement,
   type ToContainerStorage,
   type Zero,
 } from "./capabilities.js";
+import {
+  allocateSlice,
+  clearTail,
+  growthCapacity,
+  validateRange,
+} from "./storage.js";
 
 type Predicate<T> = ((value: T) => Awaitable<bool>) | undefined;
 type Equality<T> = ((left: T, right: T) => Awaitable<bool>) | undefined;
@@ -29,10 +35,23 @@ export function Clip<T>(source: RuntimeSlice<T>): RuntimeSlice<T> {
   return source.slice(0, source.length, source.length);
 }
 
-export function Clone<T>(source: RuntimeSlice<T>): RuntimeSlice<T> {
-  return source.isNil()
-    ? RuntimeSlice.nil<T>()
-    : RuntimeSlice.literal(sliceValues(source));
+export function Clone<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  source: S,
+): S {
+  const values = toSlice(source);
+  return values.isNil()
+    ? source
+    : fromSlice(RuntimeSlice.literal(storedValues(
+      values,
+      copyElement,
+      fromStorage,
+      toStorage,
+    )));
 }
 
 export function Compact<S, E, EStorage>(
@@ -132,35 +151,79 @@ export function CompactFuncSynchronous<S, E, EStorage>(
   );
 }
 
-export function Concat<T>(
-  sources: RuntimeSlice<RuntimeSlice<T>>,
-): RuntimeSlice<T> {
-  const result: T[] = [];
+export function Concat<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  zeroElement: Zero<E>,
+  sources: RuntimeSlice<S>,
+): S {
+  let size = 0;
   for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex += 1) {
-    const source = sources.get(sourceIndex);
-    for (let valueIndex = 0; valueIndex < source.length; valueIndex += 1) {
-      result.push(source.get(valueIndex));
+    size += toSlice(sources.get(sourceIndex)).length;
+    if (!Number.isSafeInteger(size)) {
+      GoPanic.raiseRuntime("len out of range");
     }
   }
-  return result.length === 0
-    ? RuntimeSlice.nil<T>()
-    : RuntimeSlice.literal(result);
+  if (size === 0) {
+    return fromSlice(RuntimeSlice.nil<EStorage>());
+  }
+  const result = allocateSlice(
+    size,
+    growthCapacity(0, size),
+    toStorage,
+    zeroElement,
+  );
+  let write = 0;
+  for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex += 1) {
+    const source = toSlice(sources.get(sourceIndex));
+    for (let read = 0; read < source.length; read += 1) {
+      storeElement(
+        result,
+        write,
+        readElement(source, read, copyElement, fromStorage),
+        copyElement,
+        toStorage,
+      );
+      write += 1;
+    }
+  }
+  return fromSlice(result);
 }
 
-export function Delete<T>(
-  source: RuntimeSlice<T>,
+export function Delete<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  zeroElement: Zero<E>,
+  source: S,
   start: int64,
   end: int64,
-): RuntimeSlice<T> {
+): S {
+  const values = toSlice(source);
   const startIndex = hostInteger(start);
   const endIndex = hostInteger(end);
-  validateRange(source.length, startIndex, endIndex);
+  validateRange(values.length, startIndex, endIndex);
   if (start === end) {
     return source;
   }
-  const values = sliceValues(source);
-  values.splice(startIndex, endIndex - startIndex);
-  return resultLike(source, values);
+  const removed = endIndex - startIndex;
+  for (let read = endIndex; read < values.length; read += 1) {
+    storeElement(
+      values,
+      read - removed,
+      readElement(values, read, copyElement, fromStorage),
+      copyElement,
+      toStorage,
+    );
+  }
+  const nextLength = values.length - removed;
+  clearTail(values, nextLength, copyElement, toStorage, zeroElement);
+  return fromSlice(values.slice(0, nextLength, null));
 }
 
 export async function DeleteFunc<S, E, EStorage>(
@@ -237,21 +300,6 @@ export function DeleteFuncSynchronous<S, E, EStorage>(
   return fromSlice(values.slice(0, write, null));
 }
 
-export function Insert<T>(
-  source: RuntimeSlice<T>,
-  index: int64,
-  values: RuntimeSlice<T>,
-): RuntimeSlice<T> {
-  const hostIndex = hostInteger(index);
-  validateIndex(source.length, hostIndex, true);
-  if (values.length === 0) {
-    return source;
-  }
-  const result = sliceValues(source);
-  result.splice(hostIndex, 0, ...sliceValues(values));
-  return RuntimeSlice.literal(result);
-}
-
 export function Grow<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   fromSlice: Convert<RuntimeSlice<EStorage>, S>,
@@ -301,48 +349,53 @@ export function Grow<S, E, EStorage>(
   return fromSlice(result.slice(0, values.length, null));
 }
 
-export function Repeat<T>(
-  source: RuntimeSlice<T>,
+export function Repeat<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  source: S,
   count: int64,
-): RuntimeSlice<T> {
+): S {
   if (count < 0n) {
-    GoPanic.raiseRuntime("the result of (len(x) * count) overflows");
+    GoPanic.raiseRuntime("cannot be negative");
   }
   const hostCount = hostInteger(count);
-  const resultLength = source.length * hostCount;
+  const values = toSlice(source);
+  const resultLength = values.length * hostCount;
   if (!Number.isSafeInteger(resultLength)) {
     GoPanic.raiseRuntime("the result of (len(x) * count) overflows");
   }
-  const values: T[] = [];
+  const result: EStorage[] = [];
   for (let repetition = 0; repetition < hostCount; repetition += 1) {
-    values.push(...sliceValues(source));
+    result.push(...storedValues(
+      values,
+      copyElement,
+      fromStorage,
+      toStorage,
+    ));
   }
-  return RuntimeSlice.literal(values);
+  return fromSlice(RuntimeSlice.literal(result));
 }
 
-export function Replace<T>(
-  source: RuntimeSlice<T>,
-  start: int64,
-  end: int64,
-  replacement: RuntimeSlice<T>,
-): RuntimeSlice<T> {
-  const startIndex = hostInteger(start);
-  const endIndex = hostInteger(end);
-  validateRange(source.length, startIndex, endIndex);
-  const values = sliceValues(source);
-  values.splice(startIndex, endIndex - startIndex, ...sliceValues(replacement));
-  return resultLike(source, values);
-}
-
-export function Reverse<T>(source: RuntimeSlice<T>): void {
+export function Reverse<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  source: S,
+): void {
+  const values = toSlice(source);
   for (
-    let left = 0, right = source.length - 1;
+    let left = 0, right = values.length - 1;
     left < right;
     left += 1, right -= 1
   ) {
-    const leftValue = source.get(left);
-    source.set(left, source.get(right));
-    source.set(right, leftValue);
+    const leftValue = readElement(values, left, copyElement, fromStorage);
+    const rightValue = readElement(values, right, copyElement, fromStorage);
+    storeElement(values, left, rightValue, copyElement, toStorage);
+    storeElement(values, right, leftValue, copyElement, toStorage);
   }
 }
 
@@ -385,51 +438,4 @@ function compactSynchronous<S, E, EStorage>(
     }
   }
   return source;
-}
-
-function clearTail<E, EStorage>(
-  values: RuntimeSlice<EStorage>,
-  start: number,
-  copyElement: CopyValue<E>,
-  toStorage: ToContainerStorage<E, EStorage>,
-  zeroElement: Zero<E>,
-): void {
-  for (let index = start; index < values.length; index += 1) {
-    storeElement(
-      values,
-      index,
-      zeroElement(),
-      copyElement,
-      toStorage,
-    );
-  }
-}
-
-function resultLike<T>(
-  source: RuntimeSlice<T>,
-  values: T[],
-): RuntimeSlice<T> {
-  if (values.length === 0 && source.isNil()) {
-    return RuntimeSlice.nil<T>();
-  }
-  return RuntimeSlice.literal(values);
-}
-
-function validateRange(length: number, start: number, end: number): void {
-  if (
-    !Number.isSafeInteger(start)
-    || !Number.isSafeInteger(end)
-    || start < 0
-    || end < start
-    || end > length
-  ) {
-    GoPanic.raiseRuntime("slice bounds out of range");
-  }
-}
-
-function validateIndex(length: number, index: number, allowEnd: boolean): void {
-  const upper = allowEnd ? length : length - 1;
-  if (!Number.isSafeInteger(index) || index < 0 || index > upper) {
-    GoPanic.raiseRuntime("slice bounds out of range");
-  }
 }
