@@ -19,7 +19,7 @@ func pointerValueOperationsStatement(
 	pointerType *types.Pointer,
 ) (tsgo.Statement, []api.RootRequest, bool, error) {
 	factory := context.Factory()
-	adapter, err := context.Names().InterfaceAdapter(sourceType, nil)
+	adapter, err := names.ReflectionInterfaceAdapter(sourceType)
 	if err != nil {
 		return nil, nil, false, err
 	}

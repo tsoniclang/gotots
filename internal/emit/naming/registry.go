@@ -255,6 +255,7 @@ type Registry struct {
 	providerObjectByIdentity            map[string]types.Object
 	interfaceContracts                  map[string]map[string]interfaceContractSelection
 	interfaceAdaptersByContract         map[string]map[string]struct{}
+	reflectionAdaptersByContract        map[string]map[string]struct{}
 	interfaceContractDemands            map[string]map[string]interfaceContractDemand
 	interfaceReflectionDemands          map[string]interfaceReflectionDemand
 	interfaceDemandRequests             map[interfaceDemandRequestKey][]api.RootRequest
@@ -283,6 +284,7 @@ func (r *Registry) TransferCanonicalIdentity() (*Registry, error) {
 		make(map[string]providerInterfaceCapabilityBinding)
 	r.providerInterfaceBridgesByContract = make(map[string]map[string]struct{})
 	r.interfaceAdaptersByContract = make(map[string]map[string]struct{})
+	r.reflectionAdaptersByContract = make(map[string]map[string]struct{})
 	r.interfaceContractDemands =
 		make(map[string]map[string]interfaceContractDemand)
 	r.interfaceReflectionDemands = make(map[string]interfaceReflectionDemand)
@@ -338,6 +340,7 @@ func NewRegistry() *Registry {
 		providerObjectByIdentity:            make(map[string]types.Object),
 		interfaceContracts:                  make(map[string]map[string]interfaceContractSelection),
 		interfaceAdaptersByContract:         make(map[string]map[string]struct{}),
+		reflectionAdaptersByContract:        make(map[string]map[string]struct{}),
 		interfaceContractDemands:            make(map[string]map[string]interfaceContractDemand),
 		interfaceReflectionDemands:          make(map[string]interfaceReflectionDemand),
 		interfaceDemandRequests:             make(map[interfaceDemandRequestKey][]api.RootRequest),

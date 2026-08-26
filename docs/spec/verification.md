@@ -545,10 +545,19 @@ ESM for:
 - open generic `TypeFor[T]` through exact private capability or
   concretization, with unchanged source value arity.
 
-Mutating an address callback from the canonical empty-interface surface to an
-unsubscribed adapter must remove the address-only interface method and fail the
-artifact assertion before runtime. Mutating the same callback back to eager
-pointer-descriptor demand must fail the bounded-closure gate.
+Mutating an address callback from the dedicated reflection-interface exposure
+owner to an unsubscribed adapter must remove the address-only interface method
+and fail the artifact assertion before runtime. Mutating it to ordinary empty-
+interface membership or eager pointer-descriptor demand must fail the bounded-
+closure gate. Registry proof covers both discovery orders, excludes unrelated
+adapters, and asserts that exposure yields method-contract requests but zero
+reflection-descriptor requests.
+
+Constructor proof covers value- and pointer-method contracts on values created
+by `Zero` and `New`, where no concrete source value previously crossed the
+empty-interface boundary. Removing reflection exposure from a value-operation
+registration must leave the constructed adapter without its asserted method
+and fail artifact inspection before runtime.
 
 Provider-facet tests independently certify the metadata operation target and
 its concrete result target. The checked return type of `$create` must

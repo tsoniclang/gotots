@@ -13,6 +13,7 @@ const (
 	interfaceDemandTransition uint8 = iota + 1
 	interfaceDemandAdapter
 	interfaceDemandProviderBridge
+	interfaceDemandReflectionAdapter
 )
 
 func (r *Registry) invalidateInterfaceDemandRequests() {
@@ -131,6 +132,40 @@ func (r *Registry) recordInterfaceContractDemand(
 		if !ok {
 			return nil, &api.NameError{
 				Reason: "interface contract reachability has no concrete source type",
+			}
+		}
+		if !types.Implements(sourceType, target.contract) {
+			continue
+		}
+		selected, err := r.interfaceAdapterContractRequests(
+			binding,
+			&target,
+		)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, selected...)
+	}
+	exposed := r.reflectionAdaptersByContract[source.contractKey]
+	exposedKeys := make([]string, 0, len(exposed))
+	for adapterKey := range exposed {
+		exposedKeys = append(exposedKeys, adapterKey)
+	}
+	sort.Strings(exposedKeys)
+	for _, adapterKey := range exposedKeys {
+		if _, ordinary := reached[adapterKey]; ordinary {
+			continue
+		}
+		binding, ok := r.interfaceAdapters[adapterKey]
+		if !ok || binding.owner == nil {
+			return nil, &api.NameError{
+				Reason: "reflection interface exposure has no adapter owner",
+			}
+		}
+		sourceType, ok := binding.owner.InterfaceAdapterType()
+		if !ok {
+			return nil, &api.NameError{
+				Reason: "reflection interface exposure has no concrete source type",
 			}
 		}
 		if !types.Implements(sourceType, target.contract) {

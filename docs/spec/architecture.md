@@ -776,12 +776,21 @@ pointer box's generated dynamic token to that descriptor, including when the
 descriptor is composed lazily from `T`; addressability does not force static
 reflection closure over every possible `*T`. Because `Addr().Interface()` and
 `TypeAssert` expose that box through Go's canonical empty-interface boundary,
-the address callback registers its `*T` adapter against that exact contract.
-This interface reachability fact is separate from pointer-descriptor and
-value-operation demand: a later exact assertion to `I` adds `I` only when
-`go/types` proves `*T` implements `I`, without retaining every `*T` reflection
-descriptor. A source-less synthetic address value, detached cell,
+the address callback records its `*T` adapter in a distinct reflection-
+interface exposure relation. That relation joins only later exact assertions
+from the same boundary to `I`, and adds `I` only when `go/types` proves `*T`
+implements `I`. It is not ordinary empty-interface adapter membership and can
+never request the `*T` reflection descriptor or value-operation facet. A
+source-less synthetic address value, detached cell,
 reconstructed pointer, or provider-side storage inspection is forbidden.
+
+The same dedicated exposure owner records every concrete adapter installed in
+a reflected value-operation registration, including values created by
+`Zero`, `New`, and container constructors. Therefore provider-created values
+receive later proven interface method contracts even when no source value of
+that concrete type first crossed an ordinary interface conversion. This adds
+no second reflection graph: normal value-operation demand still owns each
+descriptor, while the exposure relation carries method contracts only.
 
 Container descriptors are total over every statically representable Go
 element, key, and value type; basic scalars do not define a privileged

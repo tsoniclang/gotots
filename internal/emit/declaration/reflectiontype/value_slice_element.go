@@ -115,6 +115,7 @@ func (e reflectionSliceElement) copyFromBox(
 
 func (e reflectionSliceElement) indexOperation(
 	context api.Context,
+	names api.ReflectionNames,
 	indexType api.NameReference,
 	scaffold *locationScaffold,
 ) (tsgo.ArrowFunction, error) {
@@ -204,6 +205,7 @@ func (e reflectionSliceElement) indexOperation(
 	}
 	boxedAddress, err := boxedReflectionAddress(
 		context,
+		names,
 		e.member.sourceType,
 		pointer,
 	)

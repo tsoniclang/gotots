@@ -19,7 +19,7 @@ func structValueOperationsStatement(
 	structType *types.Struct,
 ) (tsgo.Statement, []api.RootRequest, bool, error) {
 	factory := context.Factory()
-	adapter, err := context.Names().InterfaceAdapter(sourceType, nil)
+	adapter, err := names.ReflectionInterfaceAdapter(sourceType)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -158,6 +158,7 @@ func structValueOperationsStatement(
 			}
 			fieldAddress, addressErr := reflectedStoreTargetAddress(
 				context,
+				names,
 				field.Type(),
 				target,
 			)

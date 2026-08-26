@@ -856,8 +856,11 @@ it never invents a second cell or an unboxed pointer-shaped object. The exact
 box token is registered against the canonical pointer descriptor at that
 boundary, so a later `ValueOf` resolves the same type without eagerly demanding
 reflection artifacts for every addressable child type. The pointer adapter is
-also registered at the empty-interface surface through which `Interface` and
-`TypeAssert` expose it. Thus this address-only generic value:
+also recorded by the dedicated reflection-interface exposure owner at the
+empty-interface surface through which `Interface` and `TypeAssert` expose it.
+That owner propagates exact asserted method contracts but does not enroll the
+adapter in ordinary empty-interface reflection reachability. Thus this
+address-only generic value:
 
 ```go
 type Decoder interface { Decode([]byte) error }
@@ -875,6 +878,13 @@ causes the canonical `*Cell[string]` adapter to carry `Decoder`'s exact method
 token and implementation. It does not demand a static `*Cell[string]`
 reflection descriptor merely to make the assertion work. No marker spelling,
 method-name lookup, or product-specific adapter list participates.
+
+Provider-created reflected values use the same relation. For example,
+`fresh := reflect.New(reflect.TypeOf(Label("")))` followed by
+`reflect.TypeAssert[Decoder](fresh)` gives the generated `*Label` adapter the
+`Decoder` contract even if no authored `*Label` value was converted to an
+interface. The already-demanded pointer descriptor still owns construction;
+the exposure relation adds only the proven method contract.
 
 For an open generic body:
 

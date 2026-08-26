@@ -69,7 +69,7 @@ func valueOperationsStatement(
 	_, interfaceSource := types.Unalias(sourceType).Underlying().(*types.Interface)
 	var adapter api.NameReference
 	if !interfaceSource {
-		adapter, err = context.Names().InterfaceAdapter(sourceType, nil)
+		adapter, err = names.ReflectionInterfaceAdapter(sourceType)
 		if err != nil {
 			return nil, nil, false, err
 		}
