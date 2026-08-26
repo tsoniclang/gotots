@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "5aa585b2432fc99b637fb5f6ef66e688557928d29504ddfa0a702b683f175764",
+  "providerDigest": "324aa2a0c67806e04fc19d0f706737751fb485cdbfef302aee86efb5a762446f",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -25563,6 +25563,1341 @@
       "facets": []
     },
     {
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs-direct.js",
+      "sourcePath": "src/internal/facets/provider-io-fs-direct.ts",
+      "callableProfiles": [
+        {
+          "sourceIdentity": "io/fs|kind=4|receiver=|name=FileInfoToDirEntry",
+          "profileKey": "ff10827c5aa31ec528f7878131e9ef2dea1962fe79bdfec958ed09c49587bd80",
+          "export": "IoFsFileInfoToDirEntryDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "contractInterfaces": [
+            "io/fs|kind=2|receiver=|name=DirEntry"
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-io-fs-direct.ts#IoFsFileInfoToDirEntryDirect@676"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+              "export": "ProviderDirEntry",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Info",
+                    "kind": "callable",
+                    "member": "Info",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "contractSignature": "func() (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/fs.go:122:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "85259c34589ad7340fa2d0cbc328d518cca5985483ab40c677e29974317c3a63"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=IsDir",
+                    "kind": "callable",
+                    "member": "IsDir",
+                    "effect": "sync",
+                    "sourceSignature": "func() bool|params=|results=",
+                    "contractSignature": "func() bool",
+                    "sourceLocation": "io/fs/fs.go:110:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "7ecc261c2cd925137be76ad3a6d7db278e49f7f8e5b308e47b4a8e9dd1bc2bca"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Name",
+                    "kind": "callable",
+                    "member": "Name",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "io/fs/fs.go:107:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "fb2846d340680a7d6e3f4d5c0891ddeed773f03906230af92fff96992850aaa1"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Type",
+                    "kind": "callable",
+                    "member": "Type",
+                    "effect": "sync",
+                    "sourceSignature": "func() io/fs.FileMode|params=|results=",
+                    "contractSignature": "func() io/fs.FileMode",
+                    "sourceLocation": "io/fs/fs.go:114:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "b2b57b6fde24348744ef5db875abbaca8c5121229721c0773b291566ddc9a42a"
+                  }
+                ]
+              },
+              "targetFingerprint": "c72bd8b2bca54f6ffb3c766119b5353443b3dac782c5d16d5a4114246e535a84"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+              "export": "ProviderFileInfo",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=IsDir",
+                    "kind": "callable",
+                    "member": "IsDir",
+                    "effect": "sync",
+                    "sourceSignature": "func() bool|params=|results=",
+                    "contractSignature": "func() bool",
+                    "sourceLocation": "io/fs/fs.go:173:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "7ecc261c2cd925137be76ad3a6d7db278e49f7f8e5b308e47b4a8e9dd1bc2bca"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=ModTime",
+                    "kind": "callable",
+                    "member": "ModTime",
+                    "effect": "sync",
+                    "sourceSignature": "func() time.Time|params=|results=",
+                    "contractSignature": "func() time.Time",
+                    "sourceLocation": "io/fs/fs.go:172:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "409e858bfd3f904bea4386efe7e6b9cd30502948abb21512985dd8a8a4a96660"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Mode",
+                    "kind": "callable",
+                    "member": "Mode",
+                    "effect": "sync",
+                    "sourceSignature": "func() io/fs.FileMode|params=|results=",
+                    "contractSignature": "func() io/fs.FileMode",
+                    "sourceLocation": "io/fs/fs.go:171:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "681abb73b4466f7b35f0d6782173e9ba7b426dde13fe5dae34c3150f29c78b4d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Name",
+                    "kind": "callable",
+                    "member": "Name",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "io/fs/fs.go:169:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "fb2846d340680a7d6e3f4d5c0891ddeed773f03906230af92fff96992850aaa1"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Size",
+                    "kind": "callable",
+                    "member": "Size",
+                    "effect": "sync",
+                    "sourceSignature": "func() int64|params=|results=",
+                    "contractSignature": "func() int64",
+                    "sourceLocation": "io/fs/fs.go:170:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "504ffc1327de7d80b0cf1140ed005d92a535676b6c893d1514368a80f1aff9e3"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Sys",
+                    "kind": "callable",
+                    "member": "Sys",
+                    "effect": "sync",
+                    "sourceSignature": "func() any|params=|results=",
+                    "contractSignature": "func() any",
+                    "sourceLocation": "io/fs/fs.go:174:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "422fef2932a80b1e41445ccf1e383d5e807733a5e9cefc80cb5d1a0255309327"
+                  }
+                ]
+              },
+              "targetFingerprint": "1b2da48c2ad8c0a0f712e86c570e8a231c772c5b27d13af0a6ddc33bcbf5a2c3"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+          "targetFingerprint": "e60029e6f81f64fef69b808eb217a9091e2941e31574a07af76bc3d471fb8700"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
+          "profileKey": "2fd830f02fd63a7513052f290fd2cc3ecc5b3f875a49268ac9194b86cbfe708c",
+          "export": "IoFsReadDirDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "capabilityViews": [
+            {
+              "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+              "targetParameter": "asReadDirFS"
+            },
+            {
+              "baseSourceIdentity": "io/fs|kind=2|receiver=|name=File",
+              "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+              "targetParameter": "asReadDirFile"
+            }
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-io-fs-direct.ts#IoFsReadDirDirect@1076"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+              "export": "ProviderDirEntry",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Info",
+                    "kind": "callable",
+                    "member": "Info",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "contractSignature": "func() (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/fs.go:122:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "85259c34589ad7340fa2d0cbc328d518cca5985483ab40c677e29974317c3a63"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=IsDir",
+                    "kind": "callable",
+                    "member": "IsDir",
+                    "effect": "sync",
+                    "sourceSignature": "func() bool|params=|results=",
+                    "contractSignature": "func() bool",
+                    "sourceLocation": "io/fs/fs.go:110:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "7ecc261c2cd925137be76ad3a6d7db278e49f7f8e5b308e47b4a8e9dd1bc2bca"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Name",
+                    "kind": "callable",
+                    "member": "Name",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "io/fs/fs.go:107:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "fb2846d340680a7d6e3f4d5c0891ddeed773f03906230af92fff96992850aaa1"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Type",
+                    "kind": "callable",
+                    "member": "Type",
+                    "effect": "sync",
+                    "sourceSignature": "func() io/fs.FileMode|params=|results=",
+                    "contractSignature": "func() io/fs.FileMode",
+                    "sourceLocation": "io/fs/fs.go:114:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "b2b57b6fde24348744ef5db875abbaca8c5121229721c0773b291566ddc9a42a"
+                  }
+                ]
+              },
+              "targetFingerprint": "c72bd8b2bca54f6ffb3c766119b5353443b3dac782c5d16d5a4114246e535a84"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "export": "ProviderFS",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.File, error)",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "91f697f0e2620232030a8bac4b7ef8485834f923589d45c7ab37bf03fef3324b"
+                  }
+                ]
+              },
+              "targetFingerprint": "fa56703be19fc2680d59d7126becfade48864b1c93bab5eaec759e12049ef7e1"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+              "export": "ProviderFile",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "io/fs/fs.go:98:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "86d81ec20663f4aae375a0f339a4db6d57e76fe064b4b35a398ae6cc1308f6d0"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) (int, error)|params=|results=,",
+                    "contractSignature": "func([]byte) (int, error)",
+                    "sourceLocation": "io/fs/fs.go:97:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "a98d4342edcf1aa6d019e7f710abc67cffb3b56bfcb21ba9fda3a9a7fed1a25d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "contractSignature": "func() (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/fs.go:96:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "ed1d42261878a34a0a91b0e1e487beb25c7339608232754d84506c92fc01e62d"
+                  }
+                ]
+              },
+              "targetFingerprint": "75476f8f6b18095188d82d4fe101402d46b396642858d358a12fa95026bd232e"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+              "export": "ProviderFileInfo",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=IsDir",
+                    "kind": "callable",
+                    "member": "IsDir",
+                    "effect": "sync",
+                    "sourceSignature": "func() bool|params=|results=",
+                    "contractSignature": "func() bool",
+                    "sourceLocation": "io/fs/fs.go:173:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "7ecc261c2cd925137be76ad3a6d7db278e49f7f8e5b308e47b4a8e9dd1bc2bca"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=ModTime",
+                    "kind": "callable",
+                    "member": "ModTime",
+                    "effect": "sync",
+                    "sourceSignature": "func() time.Time|params=|results=",
+                    "contractSignature": "func() time.Time",
+                    "sourceLocation": "io/fs/fs.go:172:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "409e858bfd3f904bea4386efe7e6b9cd30502948abb21512985dd8a8a4a96660"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Mode",
+                    "kind": "callable",
+                    "member": "Mode",
+                    "effect": "sync",
+                    "sourceSignature": "func() io/fs.FileMode|params=|results=",
+                    "contractSignature": "func() io/fs.FileMode",
+                    "sourceLocation": "io/fs/fs.go:171:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "681abb73b4466f7b35f0d6782173e9ba7b426dde13fe5dae34c3150f29c78b4d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Name",
+                    "kind": "callable",
+                    "member": "Name",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "io/fs/fs.go:169:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "fb2846d340680a7d6e3f4d5c0891ddeed773f03906230af92fff96992850aaa1"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Size",
+                    "kind": "callable",
+                    "member": "Size",
+                    "effect": "sync",
+                    "sourceSignature": "func() int64|params=|results=",
+                    "contractSignature": "func() int64",
+                    "sourceLocation": "io/fs/fs.go:170:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "504ffc1327de7d80b0cf1140ed005d92a535676b6c893d1514368a80f1aff9e3"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Sys",
+                    "kind": "callable",
+                    "member": "Sys",
+                    "effect": "sync",
+                    "sourceSignature": "func() any|params=|results=",
+                    "contractSignature": "func() any",
+                    "sourceLocation": "io/fs/fs.go:174:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "422fef2932a80b1e41445ccf1e383d5e807733a5e9cefc80cb5d1a0255309327"
+                  }
+                ]
+              },
+              "targetFingerprint": "1b2da48c2ad8c0a0f712e86c570e8a231c772c5b27d13af0a6ddc33bcbf5a2c3"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+              "export": "ProviderReadDirFS",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.File, error)",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "91f697f0e2620232030a8bac4b7ef8485834f923589d45c7ab37bf03fef3324b"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.ReadDirFS|name=ReadDir",
+                    "kind": "callable",
+                    "member": "ReadDir",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) ([]io/fs.DirEntry, error)|params=name|results=,",
+                    "contractSignature": "func(name string) ([]io/fs.DirEntry, error)",
+                    "sourceLocation": "io/fs/readdir.go:20:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "4b1b679545d2624661d06046057a7c8bf2be779008c20afe74adc0f71fc733b4"
+                  }
+                ]
+              },
+              "targetFingerprint": "a5cc700bf70abb0ddf085d9e1dd263d32123cdd4b06738b7e4464cafdc3a7303"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+              "export": "ProviderReadDirFile",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "io/fs/fs.go:98:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "86d81ec20663f4aae375a0f339a4db6d57e76fe064b4b35a398ae6cc1308f6d0"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) (int, error)|params=|results=,",
+                    "contractSignature": "func([]byte) (int, error)",
+                    "sourceLocation": "io/fs/fs.go:97:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "a98d4342edcf1aa6d019e7f710abc67cffb3b56bfcb21ba9fda3a9a7fed1a25d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "contractSignature": "func() (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/fs.go:96:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "ed1d42261878a34a0a91b0e1e487beb25c7339608232754d84506c92fc01e62d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.ReadDirFile|name=ReadDir",
+                    "kind": "callable",
+                    "member": "ReadDir",
+                    "effect": "sync",
+                    "sourceSignature": "func(n int) ([]io/fs.DirEntry, error)|params=n|results=,",
+                    "contractSignature": "func(n int) ([]io/fs.DirEntry, error)",
+                    "sourceLocation": "io/fs/fs.go:147:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "2eead25926741f307862ae795700c532bdadf245ff6bbf33353ff8740d44cbc7"
+                  }
+                ]
+              },
+              "targetFingerprint": "8f6f2beb153f72dd5dfaa9a1633f6a1a18947e4624698114138b69c346e76ccc"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+          "targetFingerprint": "53f39017111a66307a0786b7666452df170b3768aa22000d0d3a22850b176107"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadFile",
+          "profileKey": "58c5f4867ce18574bf7d1c275648b64d7e5130ab682cc475b61bc993c7c02f9e",
+          "export": "IoFsReadFileDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "canonicalValues": [
+            {
+              "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+              "targetParameter": "eof"
+            }
+          ],
+          "capabilityViews": [
+            {
+              "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
+              "targetParameter": "asReadFileFS"
+            }
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-io-fs-direct.ts#IoFsReadFileDirect@713"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "export": "ProviderFS",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.File, error)",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "91f697f0e2620232030a8bac4b7ef8485834f923589d45c7ab37bf03fef3324b"
+                  }
+                ]
+              },
+              "targetFingerprint": "fa56703be19fc2680d59d7126becfade48864b1c93bab5eaec759e12049ef7e1"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+              "export": "ProviderFile",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "io/fs/fs.go:98:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "86d81ec20663f4aae375a0f339a4db6d57e76fe064b4b35a398ae6cc1308f6d0"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) (int, error)|params=|results=,",
+                    "contractSignature": "func([]byte) (int, error)",
+                    "sourceLocation": "io/fs/fs.go:97:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "a98d4342edcf1aa6d019e7f710abc67cffb3b56bfcb21ba9fda3a9a7fed1a25d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "contractSignature": "func() (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/fs.go:96:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "ed1d42261878a34a0a91b0e1e487beb25c7339608232754d84506c92fc01e62d"
+                  }
+                ]
+              },
+              "targetFingerprint": "75476f8f6b18095188d82d4fe101402d46b396642858d358a12fa95026bd232e"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+              "export": "ProviderFileInfo",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=IsDir",
+                    "kind": "callable",
+                    "member": "IsDir",
+                    "effect": "sync",
+                    "sourceSignature": "func() bool|params=|results=",
+                    "contractSignature": "func() bool",
+                    "sourceLocation": "io/fs/fs.go:173:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "7ecc261c2cd925137be76ad3a6d7db278e49f7f8e5b308e47b4a8e9dd1bc2bca"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=ModTime",
+                    "kind": "callable",
+                    "member": "ModTime",
+                    "effect": "sync",
+                    "sourceSignature": "func() time.Time|params=|results=",
+                    "contractSignature": "func() time.Time",
+                    "sourceLocation": "io/fs/fs.go:172:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "409e858bfd3f904bea4386efe7e6b9cd30502948abb21512985dd8a8a4a96660"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Mode",
+                    "kind": "callable",
+                    "member": "Mode",
+                    "effect": "sync",
+                    "sourceSignature": "func() io/fs.FileMode|params=|results=",
+                    "contractSignature": "func() io/fs.FileMode",
+                    "sourceLocation": "io/fs/fs.go:171:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "681abb73b4466f7b35f0d6782173e9ba7b426dde13fe5dae34c3150f29c78b4d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Name",
+                    "kind": "callable",
+                    "member": "Name",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "io/fs/fs.go:169:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "fb2846d340680a7d6e3f4d5c0891ddeed773f03906230af92fff96992850aaa1"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Size",
+                    "kind": "callable",
+                    "member": "Size",
+                    "effect": "sync",
+                    "sourceSignature": "func() int64|params=|results=",
+                    "contractSignature": "func() int64",
+                    "sourceLocation": "io/fs/fs.go:170:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "504ffc1327de7d80b0cf1140ed005d92a535676b6c893d1514368a80f1aff9e3"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Sys",
+                    "kind": "callable",
+                    "member": "Sys",
+                    "effect": "sync",
+                    "sourceSignature": "func() any|params=|results=",
+                    "contractSignature": "func() any",
+                    "sourceLocation": "io/fs/fs.go:174:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "422fef2932a80b1e41445ccf1e383d5e807733a5e9cefc80cb5d1a0255309327"
+                  }
+                ]
+              },
+              "targetFingerprint": "1b2da48c2ad8c0a0f712e86c570e8a231c772c5b27d13af0a6ddc33bcbf5a2c3"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
+              "export": "ProviderReadFileFS",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.File, error)",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "91f697f0e2620232030a8bac4b7ef8485834f923589d45c7ab37bf03fef3324b"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.ReadFileFS|name=ReadFile",
+                    "kind": "callable",
+                    "member": "ReadFile",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) ([]byte, error)|params=name|results=,",
+                    "contractSignature": "func(name string) ([]byte, error)",
+                    "sourceLocation": "io/fs/readfile.go:21:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "cc46475abdd61d0676159f3fe1d84f162387071052d26b2c027fe66d36b60a46"
+                  }
+                ]
+              },
+              "targetFingerprint": "bf5fcc315e8c28cdef569acde9b670da8d243b925ec22ca745ef9b9e6b46de9e"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+          "targetFingerprint": "5b7f5bcb9b524c1fbc93fce2059e9fd258f34d4ea9e229352d60a0e08b85704b"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
+          "profileKey": "04ba3137fd429bac21d887170978c8a1f0567b1a153aa698001113b2226c1acc",
+          "export": "IoFsStatDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "capabilityViews": [
+            {
+              "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "targetSourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+              "targetParameter": "asStatFS"
+            }
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-io-fs-direct.ts#IoFsStatDirect@954"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "export": "ProviderFS",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.File, error)",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "91f697f0e2620232030a8bac4b7ef8485834f923589d45c7ab37bf03fef3324b"
+                  }
+                ]
+              },
+              "targetFingerprint": "fa56703be19fc2680d59d7126becfade48864b1c93bab5eaec759e12049ef7e1"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+              "export": "ProviderFile",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "io/fs/fs.go:98:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "86d81ec20663f4aae375a0f339a4db6d57e76fe064b4b35a398ae6cc1308f6d0"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) (int, error)|params=|results=,",
+                    "contractSignature": "func([]byte) (int, error)",
+                    "sourceLocation": "io/fs/fs.go:97:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "a98d4342edcf1aa6d019e7f710abc67cffb3b56bfcb21ba9fda3a9a7fed1a25d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "contractSignature": "func() (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/fs.go:96:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "ed1d42261878a34a0a91b0e1e487beb25c7339608232754d84506c92fc01e62d"
+                  }
+                ]
+              },
+              "targetFingerprint": "75476f8f6b18095188d82d4fe101402d46b396642858d358a12fa95026bd232e"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+              "export": "ProviderFileInfo",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=IsDir",
+                    "kind": "callable",
+                    "member": "IsDir",
+                    "effect": "sync",
+                    "sourceSignature": "func() bool|params=|results=",
+                    "contractSignature": "func() bool",
+                    "sourceLocation": "io/fs/fs.go:173:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "7ecc261c2cd925137be76ad3a6d7db278e49f7f8e5b308e47b4a8e9dd1bc2bca"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=ModTime",
+                    "kind": "callable",
+                    "member": "ModTime",
+                    "effect": "sync",
+                    "sourceSignature": "func() time.Time|params=|results=",
+                    "contractSignature": "func() time.Time",
+                    "sourceLocation": "io/fs/fs.go:172:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "409e858bfd3f904bea4386efe7e6b9cd30502948abb21512985dd8a8a4a96660"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Mode",
+                    "kind": "callable",
+                    "member": "Mode",
+                    "effect": "sync",
+                    "sourceSignature": "func() io/fs.FileMode|params=|results=",
+                    "contractSignature": "func() io/fs.FileMode",
+                    "sourceLocation": "io/fs/fs.go:171:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "681abb73b4466f7b35f0d6782173e9ba7b426dde13fe5dae34c3150f29c78b4d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Name",
+                    "kind": "callable",
+                    "member": "Name",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "io/fs/fs.go:169:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "fb2846d340680a7d6e3f4d5c0891ddeed773f03906230af92fff96992850aaa1"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Size",
+                    "kind": "callable",
+                    "member": "Size",
+                    "effect": "sync",
+                    "sourceSignature": "func() int64|params=|results=",
+                    "contractSignature": "func() int64",
+                    "sourceLocation": "io/fs/fs.go:170:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "504ffc1327de7d80b0cf1140ed005d92a535676b6c893d1514368a80f1aff9e3"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Sys",
+                    "kind": "callable",
+                    "member": "Sys",
+                    "effect": "sync",
+                    "sourceSignature": "func() any|params=|results=",
+                    "contractSignature": "func() any",
+                    "sourceLocation": "io/fs/fs.go:174:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "422fef2932a80b1e41445ccf1e383d5e807733a5e9cefc80cb5d1a0255309327"
+                  }
+                ]
+              },
+              "targetFingerprint": "1b2da48c2ad8c0a0f712e86c570e8a231c772c5b27d13af0a6ddc33bcbf5a2c3"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+              "export": "ProviderStatFS",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.File, error)",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "91f697f0e2620232030a8bac4b7ef8485834f923589d45c7ab37bf03fef3324b"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.StatFS|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.FileInfo, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/stat.go:13:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "0d5887145a88895e45a61cf0f853081389b3a7feea3d32a563c8d19c2b1840b0"
+                  }
+                ]
+              },
+              "targetFingerprint": "3193a23a138c9e0fe737b1ca389bb96b2dc431e1a5b73f868ca8bca7903b67ad"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+          "targetFingerprint": "fe2d0035a80afb79c7afbca47c919c304a160f98363b703c148d2d29c7e41fdd"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=4|receiver=|name=WalkDir",
+          "profileKey": "e0b9bd68ab1154b7623e3e0d3fef81fe03c034832c0240ece173b4e476ce6bca",
+          "export": "IoFsWalkDirDirect",
+          "canonicalParameters": [
+            0,
+            2
+          ],
+          "canonicalResults": null,
+          "canonicalValues": [
+            {
+              "sourceIdentity": "io/fs|kind=3|receiver=|name=SkipAll",
+              "targetParameter": "skipAll"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=3|receiver=|name=SkipDir",
+              "targetParameter": "skipDir"
+            }
+          ],
+          "capabilityViews": [
+            {
+              "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+              "targetParameter": "asReadDirFS"
+            },
+            {
+              "baseSourceIdentity": "io/fs|kind=2|receiver=|name=File",
+              "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+              "targetParameter": "asReadDirFile"
+            },
+            {
+              "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "targetSourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+              "targetParameter": "asStatFS"
+            }
+          ],
+          "contractInterfaces": [
+            "io/fs|kind=2|receiver=|name=DirEntry"
+          ],
+          "implementationSites": [
+            "src/internal/facets/provider-io-fs-direct.ts#IoFsWalkDirDirect@1294"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "ProviderErrorInterface",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-error.ts",
+                    "targetFingerprint": "eb0281ae32ab715d6687339ac48910f9c0873a7ca64ec57b3b6709c555c82a29"
+                  }
+                ]
+              },
+              "targetFingerprint": "d8ed351d56690f86ae4c8bbedca116b878b0447968910bde64f7c04a53c815af"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+              "export": "ProviderDirEntry",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Info",
+                    "kind": "callable",
+                    "member": "Info",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "contractSignature": "func() (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/fs.go:122:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "85259c34589ad7340fa2d0cbc328d518cca5985483ab40c677e29974317c3a63"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=IsDir",
+                    "kind": "callable",
+                    "member": "IsDir",
+                    "effect": "sync",
+                    "sourceSignature": "func() bool|params=|results=",
+                    "contractSignature": "func() bool",
+                    "sourceLocation": "io/fs/fs.go:110:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "7ecc261c2cd925137be76ad3a6d7db278e49f7f8e5b308e47b4a8e9dd1bc2bca"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Name",
+                    "kind": "callable",
+                    "member": "Name",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "io/fs/fs.go:107:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "fb2846d340680a7d6e3f4d5c0891ddeed773f03906230af92fff96992850aaa1"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Type",
+                    "kind": "callable",
+                    "member": "Type",
+                    "effect": "sync",
+                    "sourceSignature": "func() io/fs.FileMode|params=|results=",
+                    "contractSignature": "func() io/fs.FileMode",
+                    "sourceLocation": "io/fs/fs.go:114:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "b2b57b6fde24348744ef5db875abbaca8c5121229721c0773b291566ddc9a42a"
+                  }
+                ]
+              },
+              "targetFingerprint": "c72bd8b2bca54f6ffb3c766119b5353443b3dac782c5d16d5a4114246e535a84"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "export": "ProviderFS",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.File, error)",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "91f697f0e2620232030a8bac4b7ef8485834f923589d45c7ab37bf03fef3324b"
+                  }
+                ]
+              },
+              "targetFingerprint": "fa56703be19fc2680d59d7126becfade48864b1c93bab5eaec759e12049ef7e1"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+              "export": "ProviderFile",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "io/fs/fs.go:98:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "86d81ec20663f4aae375a0f339a4db6d57e76fe064b4b35a398ae6cc1308f6d0"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) (int, error)|params=|results=,",
+                    "contractSignature": "func([]byte) (int, error)",
+                    "sourceLocation": "io/fs/fs.go:97:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "a98d4342edcf1aa6d019e7f710abc67cffb3b56bfcb21ba9fda3a9a7fed1a25d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "contractSignature": "func() (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/fs.go:96:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "ed1d42261878a34a0a91b0e1e487beb25c7339608232754d84506c92fc01e62d"
+                  }
+                ]
+              },
+              "targetFingerprint": "75476f8f6b18095188d82d4fe101402d46b396642858d358a12fa95026bd232e"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+              "export": "ProviderFileInfo",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=IsDir",
+                    "kind": "callable",
+                    "member": "IsDir",
+                    "effect": "sync",
+                    "sourceSignature": "func() bool|params=|results=",
+                    "contractSignature": "func() bool",
+                    "sourceLocation": "io/fs/fs.go:173:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "7ecc261c2cd925137be76ad3a6d7db278e49f7f8e5b308e47b4a8e9dd1bc2bca"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=ModTime",
+                    "kind": "callable",
+                    "member": "ModTime",
+                    "effect": "sync",
+                    "sourceSignature": "func() time.Time|params=|results=",
+                    "contractSignature": "func() time.Time",
+                    "sourceLocation": "io/fs/fs.go:172:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "409e858bfd3f904bea4386efe7e6b9cd30502948abb21512985dd8a8a4a96660"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Mode",
+                    "kind": "callable",
+                    "member": "Mode",
+                    "effect": "sync",
+                    "sourceSignature": "func() io/fs.FileMode|params=|results=",
+                    "contractSignature": "func() io/fs.FileMode",
+                    "sourceLocation": "io/fs/fs.go:171:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "681abb73b4466f7b35f0d6782173e9ba7b426dde13fe5dae34c3150f29c78b4d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Name",
+                    "kind": "callable",
+                    "member": "Name",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "contractSignature": "func() string",
+                    "sourceLocation": "io/fs/fs.go:169:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "fb2846d340680a7d6e3f4d5c0891ddeed773f03906230af92fff96992850aaa1"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Size",
+                    "kind": "callable",
+                    "member": "Size",
+                    "effect": "sync",
+                    "sourceSignature": "func() int64|params=|results=",
+                    "contractSignature": "func() int64",
+                    "sourceLocation": "io/fs/fs.go:170:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "504ffc1327de7d80b0cf1140ed005d92a535676b6c893d1514368a80f1aff9e3"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FileInfo|name=Sys",
+                    "kind": "callable",
+                    "member": "Sys",
+                    "effect": "sync",
+                    "sourceSignature": "func() any|params=|results=",
+                    "contractSignature": "func() any",
+                    "sourceLocation": "io/fs/fs.go:174:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "422fef2932a80b1e41445ccf1e383d5e807733a5e9cefc80cb5d1a0255309327"
+                  }
+                ]
+              },
+              "targetFingerprint": "1b2da48c2ad8c0a0f712e86c570e8a231c772c5b27d13af0a6ddc33bcbf5a2c3"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+              "export": "ProviderReadDirFS",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.File, error)",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "91f697f0e2620232030a8bac4b7ef8485834f923589d45c7ab37bf03fef3324b"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.ReadDirFS|name=ReadDir",
+                    "kind": "callable",
+                    "member": "ReadDir",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) ([]io/fs.DirEntry, error)|params=name|results=,",
+                    "contractSignature": "func(name string) ([]io/fs.DirEntry, error)",
+                    "sourceLocation": "io/fs/readdir.go:20:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "4b1b679545d2624661d06046057a7c8bf2be779008c20afe74adc0f71fc733b4"
+                  }
+                ]
+              },
+              "targetFingerprint": "a5cc700bf70abb0ddf085d9e1dd263d32123cdd4b06738b7e4464cafdc3a7303"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+              "export": "ProviderReadDirFile",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "sync",
+                    "sourceSignature": "func() error|params=|results=",
+                    "contractSignature": "func() error",
+                    "sourceLocation": "io/fs/fs.go:98:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "86d81ec20663f4aae375a0f339a4db6d57e76fe064b4b35a398ae6cc1308f6d0"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) (int, error)|params=|results=,",
+                    "contractSignature": "func([]byte) (int, error)",
+                    "sourceLocation": "io/fs/fs.go:97:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "a98d4342edcf1aa6d019e7f710abc67cffb3b56bfcb21ba9fda3a9a7fed1a25d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "contractSignature": "func() (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/fs.go:96:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "ed1d42261878a34a0a91b0e1e487beb25c7339608232754d84506c92fc01e62d"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.ReadDirFile|name=ReadDir",
+                    "kind": "callable",
+                    "member": "ReadDir",
+                    "effect": "sync",
+                    "sourceSignature": "func(n int) ([]io/fs.DirEntry, error)|params=n|results=,",
+                    "contractSignature": "func(n int) ([]io/fs.DirEntry, error)",
+                    "sourceLocation": "io/fs/fs.go:147:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "2eead25926741f307862ae795700c532bdadf245ff6bbf33353ff8740d44cbc7"
+                  }
+                ]
+              },
+              "targetFingerprint": "8f6f2beb153f72dd5dfaa9a1633f6a1a18947e4624698114138b69c346e76ccc"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+              "export": "ProviderStatFS",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.File, error)",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "91f697f0e2620232030a8bac4b7ef8485834f923589d45c7ab37bf03fef3324b"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.StatFS|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.FileInfo, error)|params=name|results=,",
+                    "contractSignature": "func(name string) (io/fs.FileInfo, error)",
+                    "sourceLocation": "io/fs/stat.go:13:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+                    "targetFingerprint": "0d5887145a88895e45a61cf0f853081389b3a7feea3d32a563c8d19c2b1840b0"
+                  }
+                ]
+              },
+              "targetFingerprint": "3193a23a138c9e0fe737b1ca389bb96b2dc431e1a5b73f868ca8bca7903b67ad"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-io-fs-direct.ts",
+          "targetFingerprint": "ea1065c91987870b85e2964cb9cd32165d8e3f3798e12a7fee70cf60ea6b851e"
+        }
+      ],
+      "facets": []
+    },
+    {
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
       "sourcePath": "src/internal/facets/provider-io-fs.ts",
       "callableProfiles": [
@@ -31582,6 +32917,97 @@
     {
       "identity": "src/internal/facets/provider-io-contract.ts#canonicalBoundaryErrorType@70",
       "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#DirectInfoDirEntry@558",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-io-fs-direct.ts#directInfoDirEntryType@546",
+        "src/internal/portable/io/value.ts#ProviderInterfaceValue@17",
+        "src/io/fs.ts#Type@317"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#IoFsFileInfoToDirEntryDirect@676",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-io-fs-direct.ts#DirectInfoDirEntry@558"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#IoFsReadDirDirect@1076",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/errors.ts#New@76",
+        "src/internal/facets/provider-io-fs-direct.ts#requireFileSystem@1762",
+        "src/internal/facets/provider-io-fs-direct.ts#sortDirectoryEntries@1792",
+        "src/internal/portable/io/filesystem.ts#DirectoryFile@59",
+        "src/internal/runtime/slice.ts#sliceValues@19",
+        "src/io/fs.ts#PathError@550"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#IoFsReadFileDirect@713",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-io-fs-direct.ts#requireFileSystem@1762",
+        "src/internal/host-integer.ts#hostInteger@27",
+        "src/internal/runtime/interface.ts#goInterfaceEqual@10",
+        "src/internal/runtime/slice.ts#byteSlice@108"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#IoFsStatDirect@954",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-io-fs-direct.ts#requireFileSystem@1762"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#IoFsWalkDirDirect@1294",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-io-fs-direct.ts#IoFsFileInfoToDirEntryDirect@676",
+        "src/internal/facets/provider-io-fs-direct.ts#IoFsStatDirect@954",
+        "src/internal/facets/provider-io-fs-direct.ts#invokeWalkDir@1709",
+        "src/internal/facets/provider-io-fs-direct.ts#walk@1454",
+        "src/internal/runtime/interface.ts#goInterfaceEqual@10"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#JoinPath@61",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-io-fs-direct.ts#JoinPath@61",
+        "src/path.ts#Join@6"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#directInfoDirEntryType@546",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#invokeWalkDir@1709",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#requireFileSystem@1762",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#sortDirectoryEntries@1792",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/facets/provider-io-fs-direct.ts#walk@1454",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-io-fs-direct.ts#IoFsReadDirDirect@1076",
+        "src/internal/facets/provider-io-fs-direct.ts#JoinPath@61",
+        "src/internal/facets/provider-io-fs-direct.ts#invokeWalkDir@1709",
+        "src/internal/runtime/interface.ts#goInterfaceEqual@10",
+        "src/internal/runtime/slice.ts#sliceValues@19"
+      ]
     },
     {
       "identity": "src/internal/facets/provider-io-fs.ts#CanonicalInfoDirEntry@244",
@@ -38626,5 +40052,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "e50819ba4a454008c8a8137af4eccf3c448ef0bb48516a99dd7269fd5e59b5b0"
+  "manifestDigest": "5b5acc50b7e2de7158fd60bb89841a37fc641ffe8dba55189a88113eb806992c"
 }

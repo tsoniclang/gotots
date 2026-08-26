@@ -228,6 +228,10 @@
       "types": "./dist/src/internal/facets/provider-io-fs.d.ts",
       "default": "./dist/src/internal/facets/provider-io-fs.js"
     },
+    "./internal/facets/provider-io-fs-direct.js": {
+      "types": "./dist/src/internal/facets/provider-io-fs-direct.d.ts",
+      "default": "./dist/src/internal/facets/provider-io-fs-direct.js"
+    },
     "./internal/facets/provider-os-error.js": {
       "types": "./dist/src/internal/facets/provider-os-error.d.ts",
       "default": "./dist/src/internal/facets/provider-os-error.js"

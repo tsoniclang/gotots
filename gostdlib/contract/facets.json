@@ -1547,6 +1547,60 @@
     },
     {
       "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs-direct.js",
+      "sourcePath": "src/internal/facets/provider-io-fs-direct.ts",
+      "export": "IoFsReadDirDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "targetParameter": "asReadDirFS"
+        },
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "targetParameter": "asReadDirFile"
+        }
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+          "export": "ProviderDirEntry"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "ProviderFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "ProviderFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "ProviderFileInfo"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "export": "ProviderReadDirFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "export": "ProviderReadDirFile"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
       "sourcePath": "src/internal/facets/provider-io-fs.ts",
       "export": "IoFsReadDirCanonical",
@@ -1605,6 +1659,50 @@
     },
     {
       "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadFile",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs-direct.js",
+      "sourcePath": "src/internal/facets/provider-io-fs-direct.ts",
+      "export": "IoFsReadFileDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        }
+      ],
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
+          "targetParameter": "asReadFileFS"
+        }
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "ProviderFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "ProviderFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "ProviderFileInfo"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
+          "export": "ProviderReadFileFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadFile",
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
       "sourcePath": "src/internal/facets/provider-io-fs.ts",
       "export": "IoFsReadFileCanonical",
@@ -1652,6 +1750,47 @@
     },
     {
       "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs-direct.js",
+      "sourcePath": "src/internal/facets/provider-io-fs-direct.ts",
+      "export": "IoFsStatDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "targetParameter": "asStatFS"
+        }
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "ProviderFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "ProviderFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "ProviderFileInfo"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "export": "ProviderStatFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
       "sourcePath": "src/internal/facets/provider-io-fs.ts",
       "export": "IoFsStatCanonical",
@@ -1689,6 +1828,80 @@
         {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
           "export": "CanonicalStatFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=WalkDir",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs-direct.js",
+      "sourcePath": "src/internal/facets/provider-io-fs-direct.ts",
+      "export": "IoFsWalkDirDirect",
+      "canonicalParameters": [
+        0,
+        2
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io/fs|kind=3|receiver=|name=SkipAll",
+          "targetParameter": "skipAll"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=3|receiver=|name=SkipDir",
+          "targetParameter": "skipDir"
+        }
+      ],
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "targetParameter": "asReadDirFS"
+        },
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "targetParameter": "asReadDirFile"
+        },
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "targetParameter": "asStatFS"
+        }
+      ],
+      "contractInterfaces": [
+        "io/fs|kind=2|receiver=|name=DirEntry"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+          "export": "ProviderDirEntry"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "ProviderFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "ProviderFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "ProviderFileInfo"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "export": "ProviderReadDirFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "export": "ProviderReadDirFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "export": "ProviderStatFS"
         }
       ]
     },
@@ -1926,6 +2139,35 @@
         {
           "sourceIdentity": "io|kind=2|receiver=|name=Writer",
           "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=FileInfoToDirEntry",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs-direct.js",
+      "sourcePath": "src/internal/facets/provider-io-fs-direct.ts",
+      "export": "IoFsFileInfoToDirEntryDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "contractInterfaces": [
+        "io/fs|kind=2|receiver=|name=DirEntry"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+          "export": "ProviderDirEntry"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "ProviderFileInfo"
         }
       ]
     },
