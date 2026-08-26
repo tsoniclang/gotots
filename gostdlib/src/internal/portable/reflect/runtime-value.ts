@@ -350,6 +350,9 @@ export function runtimeValueOperations(
 let typeResolver:
   | ((value: GoInterfaceValue) => Type | undefined)
   | undefined;
+let typeRecorder:
+  | ((value: GoInterfaceValue, type: Type) => void)
+  | undefined;
 
 // bindRuntimeTypeResolver is installed once by the runtime-type module so
 // the public reflect module can resolve canonical descriptors without a
@@ -360,9 +363,25 @@ export function bindRuntimeTypeResolver(
   typeResolver = resolver;
 }
 
+export function bindRuntimeTypeRecorder(
+  recorder: (value: GoInterfaceValue, type: Type) => void,
+): void {
+  typeRecorder = recorder;
+}
+
 // resolveRuntimeType resolves the canonical descriptor of one boxed value.
 export function resolveRuntimeType(
   value: GoInterfaceValue,
 ): Type | undefined {
   return typeResolver === undefined ? undefined : typeResolver(value);
+}
+
+export function recordRuntimeType(
+  value: GoInterfaceValue,
+  type: Type,
+): void {
+  if (typeRecorder === undefined) {
+    return GoPanic.raiseRuntime("reflect: runtime type recorder is absent");
+  }
+  typeRecorder(value, type);
 }

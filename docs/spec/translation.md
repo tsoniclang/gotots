@@ -852,7 +852,10 @@ An addressable registration also carries its canonical pointer box callback.
 For example, a field callback returns the exact adapter around
 `addressOf(entry.Name)`, while a pointer-element callback returns the original
 pointer box. The portable `Value.Addr` implementation consumes that callback;
-it never invents a second cell or an unboxed pointer-shaped object.
+it never invents a second cell or an unboxed pointer-shaped object. The exact
+box token is registered against the canonical pointer descriptor at that
+boundary, so a later `ValueOf` resolves the same type without eagerly demanding
+reflection artifacts for every addressable child type.
 
 For an open generic body:
 

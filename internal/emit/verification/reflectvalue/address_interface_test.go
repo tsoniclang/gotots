@@ -1,6 +1,9 @@
 package reflectvalue_test
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // TestReflectAddressInterfacesCanonicalizeWithNativeEvidence proves that
 // addresses produced from pointer elements, struct fields, and slice elements
@@ -31,6 +34,7 @@ func Addresses() string {
 	directPointer, directOK := reflect.TypeAssert[*Label](directValue.Addr())
 	directAgain, directAgainOK := reflect.TypeAssert[*Label](directValue.Addr())
 	interfacePointer, interfaceOK := directValue.Addr().Interface().(*Label)
+	recoveredType := reflect.ValueOf(directValue.Addr().Interface()).Type()
 	_ = directPointer.UnmarshalText([]byte("changed"))
 
 	holder := Holder{Value: "field"}
@@ -44,10 +48,11 @@ func Addresses() string {
 	_ = slicePointer.UnmarshalText([]byte("indexed"))
 
 	return fmt.Sprintf(
-		"%t %t %t %t %t %s/%s %q %t %q %t %q",
+		"%t %t %t %t %t %t %s/%s %q %t %q %t %q",
 		directOK, directAgainOK,
 		directPointer == directAgain,
 		interfaceOK, interfacePointer == directPointer,
+		recoveredType == directValue.Addr().Type(),
 		directValue.Addr().Type().Kind(), directValue.Addr().Elem().Kind(), direct,
 		fieldOK, holder.Value,
 		sliceOK, values[0],
@@ -76,5 +81,52 @@ func main() {
 		"reflectvalue",
 		typescriptRunner,
 		goRunner,
+	)
+}
+
+func TestReflectAddressDoesNotDemandChildPointerReflectionClosure(t *testing.T) {
+	source := `package reflectvalue
+
+import "reflect"
+
+type Field int
+
+type Record struct {
+	Value Field
+}
+
+func Audit() int {
+	record := Record{Value: 42}
+	return int(reflect.ValueOf(&record).Elem().Field(0).Int())
+}
+`
+	verifyReflectCanonicalInspect(
+		t,
+		source,
+		"Audit",
+		"reflectvalue",
+		"console.log(Audit());\n",
+		`package main
+
+import (
+	"fmt"
+
+	fixture "example.com/reflectvalue"
+)
+
+func main() {
+	fmt.Println(fixture.Audit())
+}
+`,
+		func(artifacts renderedArtifacts) {
+			const adapter = "$goInterfaceAdapter$PointerTo_Named_reflectvalue$Field"
+			if !strings.Contains(artifacts.printed, adapter) {
+				t.Fatalf("address callback does not retain %q", adapter)
+			}
+			const descriptor = "$goReflectType$PointerTo_Named_reflectvalue$Field"
+			if strings.Contains(artifacts.printed, descriptor) {
+				t.Fatalf("address callback eagerly retains %q", descriptor)
+			}
+		},
 	)
 }

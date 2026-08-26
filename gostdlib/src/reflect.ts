@@ -25,6 +25,7 @@ import { providerPlaceholder } from "./internal/runtime/placeholder.js";
 import type { ProviderRawPointer } from "./internal/runtime/raw-pointer.js";
 import {
   pointerDescriptorFor,
+  recordRuntimeType,
   resolveRuntimeType,
   runtimeValueOperations,
   type RuntimeValueLocation,
@@ -172,7 +173,9 @@ export abstract class Value {
         ),
       );
     }
-    return new InterfaceValue(address(), pointerType);
+    const pointer = address();
+    recordRuntimeType(pointer, pointerType);
+    return new InterfaceValue(pointer, pointerType);
   }
 
   Bool(): bool {

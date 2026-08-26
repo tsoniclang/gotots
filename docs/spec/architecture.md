@@ -771,7 +771,10 @@ elements return their existing pointer box; struct fields and slice elements
 use the ordinary typed address and storage-projection owners. `Value.Addr`
 resolves the canonical `*T` descriptor and consumes that callback, so
 `Addr().Type`, `Addr().Elem`, `Addr().Interface`, `TypeAssert`, pointer equality,
-and mutation all observe one location. A source-less synthetic address value,
+and mutation all observe one location. The runtime-type owner exact-joins the
+pointer box's generated dynamic token to that descriptor, including when the
+descriptor is composed lazily from `T`; addressability does not force static
+reflection closure over every possible `*T`. A source-less synthetic address value,
 detached cell, reconstructed pointer, or provider-side storage inspection is
 forbidden.
 

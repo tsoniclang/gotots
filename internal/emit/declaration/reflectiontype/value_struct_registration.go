@@ -158,8 +158,6 @@ func structValueOperationsStatement(
 			}
 			fieldAddress, addressErr := reflectedStoreTargetAddress(
 				context,
-				names,
-				reflectionType,
 				field.Type(),
 				target,
 			)

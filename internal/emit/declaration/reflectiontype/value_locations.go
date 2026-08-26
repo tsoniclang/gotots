@@ -135,8 +135,6 @@ func locationLiteral(
 
 func reflectedStoreTargetAddress(
 	context api.Context,
-	names api.ReflectionNames,
-	reflectionType *types.TypeName,
 	elementType types.Type,
 	target api.StoreTargetEmission,
 ) (api.ExpressionEmission, error) {
@@ -191,8 +189,6 @@ func reflectedStoreTargetAddress(
 	}
 	return boxedReflectionAddress(
 		context,
-		names,
-		reflectionType,
 		elementType,
 		pointer,
 	)
@@ -211,17 +207,11 @@ func explicitAddressMarkerType(sourceType types.Type) bool {
 
 func boxedReflectionAddress(
 	context api.Context,
-	names api.ReflectionNames,
-	reflectionType *types.TypeName,
 	elementType types.Type,
 	pointer api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	pointerType := types.NewPointer(elementType)
 	adapter, err := context.Names().InterfaceAdapter(pointerType, nil)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	descriptor, err := names.ReflectionValueType(pointerType, reflectionType)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -235,7 +225,6 @@ func boxedReflectionAddress(
 		api.CombineRequests(
 			pointer.Requests(),
 			adapter.Requests(),
-			descriptor.Requests(),
 		),
 	)
 }

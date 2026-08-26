@@ -28,6 +28,7 @@ import {
 import { ProviderError } from "../../runtime/error.js";
 import {
   bindRuntimeTypeResolver,
+  bindRuntimeTypeRecorder,
   bindRuntimePointerTypeFactory,
   recordPointerDescriptor,
 } from "./runtime-value.js";
@@ -459,6 +460,17 @@ export function runtimeTypeOf(
 bindRuntimeTypeResolver((value: GoInterfaceValue): Type | undefined =>
   runtimeTypesByDynamicType.get(value.$go$type),
 );
+
+bindRuntimeTypeRecorder((value: GoInterfaceValue, type: Type): void => {
+  if (!(type instanceof RuntimeType)) {
+    return GoPanic.raiseRuntime("reflect: recorded runtime type is foreign");
+  }
+  const existing = runtimeTypesByDynamicType.get(value.$go$type);
+  if (existing !== undefined && existing !== type) {
+    return GoPanic.raiseRuntime("reflect: dynamic type token changed identity");
+  }
+  runtimeTypesByDynamicType.set(value.$go$type, type);
+});
 
 bindRuntimePointerTypeFactory((element: Type): Type | undefined =>
   element instanceof RuntimeType ? element.pointerType() : undefined,

@@ -98,13 +98,7 @@ func sliceValueProperties(
 			"Value.Cap",
 		)),
 	}
-	index, err := element.indexOperation(
-		context,
-		names,
-		reflectionType,
-		indexType,
-		scaffold,
-	)
+	index, err := element.indexOperation(context, indexType, scaffold)
 	if err != nil {
 		return nil, err
 	}

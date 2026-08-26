@@ -525,7 +525,8 @@ ESM for:
   indexes, maps, scalar projections, mutation, zero, and interface recovery;
 - `Addr` over pointer elements, struct fields, and slice elements, including
   exact pointer-interface assertion, repeated-address equality, `Type`/`Elem`
-  identity, and mutation of the original storage;
+  identity, `ValueOf(Addr().Interface())` type recovery, and mutation of the
+  original storage without eager pointer-reflection closure;
 - reflective map/slice/pointer construction and iterator behavior;
 - pointer and aggregate slice index/append/make/grow behavior, including
   capacity reuse versus reallocation, fresh aggregate zeros, value-copy
