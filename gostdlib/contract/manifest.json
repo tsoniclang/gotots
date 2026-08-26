@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "e0a84c29d8f50c76d8545cde5f88ea31f26e63e12a4942b01cefb27cb017c8a0",
+  "providerDigest": "017379a7a259ee1073b3618003abd7c2ba6baba745756788248b704738599f95",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -27547,6 +27547,66 @@
         },
         {
           "sourceIdentity": "sort|kind=4|receiver=|name=Sort",
+          "profileKey": "514e2d82b3b24b707872885130fd0e37331389f2370786ba86f045fc17fd108e",
+          "export": "SortDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "implementationSites": [
+            "src/internal/portable/sort/order.ts#SortDirect@84"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
+              "export": "SortInterfaceDirect",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "sort|kind=4|receiver=sort.Interface|name=Len",
+                    "kind": "callable",
+                    "member": "Len",
+                    "effect": "sync",
+                    "sourceSignature": "func() int|params=|results=",
+                    "contractSignature": "func() int",
+                    "sourceLocation": "sort/sort.go:19:2",
+                    "implementationOwner": "src/internal/portable/sort/order.ts",
+                    "targetFingerprint": "953d48d8303a796852b1526b1b46eed70b74e69bb4c9e341bf50c7625a1392a6"
+                  },
+                  {
+                    "sourceIdentity": "sort|kind=4|receiver=sort.Interface|name=Less",
+                    "kind": "callable",
+                    "member": "Less",
+                    "effect": "sync",
+                    "sourceSignature": "func(i int, j int) bool|params=i,j|results=",
+                    "contractSignature": "func(i int, j int) bool",
+                    "sourceLocation": "sort/sort.go:38:2",
+                    "implementationOwner": "src/internal/portable/sort/order.ts",
+                    "targetFingerprint": "0be59d3d7483349a6e136fb994c1c549cc9a98f456e041726bb84e68568a07b2"
+                  },
+                  {
+                    "sourceIdentity": "sort|kind=4|receiver=sort.Interface|name=Swap",
+                    "kind": "callable",
+                    "member": "Swap",
+                    "effect": "sync",
+                    "sourceSignature": "func(i int, j int)|params=i,j|results=",
+                    "contractSignature": "func(i int, j int)",
+                    "sourceLocation": "sort/sort.go:41:2",
+                    "implementationOwner": "src/internal/portable/sort/order.ts",
+                    "targetFingerprint": "5b2afc24345377ff8855adf6ef820a5ae4cb464b2253304c38da503df44698a7"
+                  }
+                ]
+              },
+              "targetFingerprint": "9d11fddb03817067920309812a13588e781dc904cf26552dc9460f723e7c13a5"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/portable/sort/order.ts",
+          "targetFingerprint": "b4d0d77b827c26e9e2907cdf7aed135cac673c91c0bf2c1ac4ee82890778218f"
+        },
+        {
+          "sourceIdentity": "sort|kind=4|receiver=|name=Sort",
           "profileKey": "b6d88d38296998a05d84710ebb2dc9ac21a84fbb75dd398109e38b5eaae6d8a5",
           "export": "SortCanonical",
           "canonicalParameters": [
@@ -27604,6 +27664,66 @@
           "effect": "async",
           "implementationOwner": "src/internal/portable/sort/cooperative.ts",
           "targetFingerprint": "38e70d6bb24c8888fcefc91a63b4a848ef9dfd49da9f2abd49f20edc7850d967"
+        },
+        {
+          "sourceIdentity": "sort|kind=4|receiver=|name=Stable",
+          "profileKey": "514e2d82b3b24b707872885130fd0e37331389f2370786ba86f045fc17fd108e",
+          "export": "SortStableDirect",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": null,
+          "implementationSites": [
+            "src/internal/portable/sort/order.ts#SortStableDirect@104"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
+              "export": "SortInterfaceDirect",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "sort|kind=4|receiver=sort.Interface|name=Len",
+                    "kind": "callable",
+                    "member": "Len",
+                    "effect": "sync",
+                    "sourceSignature": "func() int|params=|results=",
+                    "contractSignature": "func() int",
+                    "sourceLocation": "sort/sort.go:19:2",
+                    "implementationOwner": "src/internal/portable/sort/order.ts",
+                    "targetFingerprint": "953d48d8303a796852b1526b1b46eed70b74e69bb4c9e341bf50c7625a1392a6"
+                  },
+                  {
+                    "sourceIdentity": "sort|kind=4|receiver=sort.Interface|name=Less",
+                    "kind": "callable",
+                    "member": "Less",
+                    "effect": "sync",
+                    "sourceSignature": "func(i int, j int) bool|params=i,j|results=",
+                    "contractSignature": "func(i int, j int) bool",
+                    "sourceLocation": "sort/sort.go:38:2",
+                    "implementationOwner": "src/internal/portable/sort/order.ts",
+                    "targetFingerprint": "0be59d3d7483349a6e136fb994c1c549cc9a98f456e041726bb84e68568a07b2"
+                  },
+                  {
+                    "sourceIdentity": "sort|kind=4|receiver=sort.Interface|name=Swap",
+                    "kind": "callable",
+                    "member": "Swap",
+                    "effect": "sync",
+                    "sourceSignature": "func(i int, j int)|params=i,j|results=",
+                    "contractSignature": "func(i int, j int)",
+                    "sourceLocation": "sort/sort.go:41:2",
+                    "implementationOwner": "src/internal/portable/sort/order.ts",
+                    "targetFingerprint": "5b2afc24345377ff8855adf6ef820a5ae4cb464b2253304c38da503df44698a7"
+                  }
+                ]
+              },
+              "targetFingerprint": "9d11fddb03817067920309812a13588e781dc904cf26552dc9460f723e7c13a5"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/portable/sort/order.ts",
+          "targetFingerprint": "a0277ac36b154cb92b19cbabbd5fe4d8cea86360d1e63dce75070e49f2133505"
         },
         {
           "sourceIdentity": "sort|kind=4|receiver=|name=Stable",
@@ -35212,6 +35332,20 @@
       ]
     },
     {
+      "identity": "src/internal/portable/sort/order.ts#SortDirect@84",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sort/order.ts#reorder@242"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sort/order.ts#SortStableDirect@104",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sort/order.ts#reorder@242"
+      ]
+    },
+    {
       "identity": "src/internal/portable/sort/order.ts#applyPermutation@384",
       "disposition": "implemented",
       "dependencies": [
@@ -37961,5 +38095,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "f6a9ea507a4b529c9dbb27fae0f708add0ac6b780ce43c392b2641e3f307d229"
+  "manifestDigest": "4ca27d4daca0a39631c062359583b15515bb3ef06767ec90c941e5693f260cb1"
 }

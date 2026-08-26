@@ -1867,6 +1867,21 @@
       "sourceIdentity": "sort|kind=4|receiver=|name=Sort",
       "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
       "sourcePath": "src/internal/facets/provider-sort.ts",
+      "export": "SortDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
+          "export": "SortInterfaceDirect"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "sort|kind=4|receiver=|name=Sort",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
+      "sourcePath": "src/internal/facets/provider-sort.ts",
       "export": "SortCanonical",
       "canonicalParameters": [
         0
@@ -1875,6 +1890,21 @@
         {
           "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
           "export": "SortInterfaceCanonical"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "sort|kind=4|receiver=|name=Stable",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
+      "sourcePath": "src/internal/facets/provider-sort.ts",
+      "export": "SortStableDirect",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
+          "export": "SortInterfaceDirect"
         }
       ]
     },
