@@ -75,6 +75,7 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 			targets: []callableImplementationTarget{{
 				sourceIdentity:       "example.test/program|kind=5|receiver=|name=Value",
 				sourceSignature:      "func() int|params=|results=",
+				sourceBodyDigest:     "a3a86944267e41877ab54f798340439bd80038e34687c5dedb5dc7dbc857565b",
 				variant:              "source",
 				implementationOutput: "implementations/hot.ts",
 				implementationExport: "valueFast",
@@ -123,6 +124,27 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 	}
 	if _, err := readCompileWorkerDocument(handoffPath, output, os.Getpid()+1); err == nil {
 		t.Fatal("same-process compilation handoff was accepted")
+	}
+
+	withoutBodyDigest := plan
+	withoutBodyDigest.callableImplementation.targets = append(
+		[]callableImplementationTarget(nil),
+		plan.callableImplementation.targets...,
+	)
+	withoutBodyDigest.callableImplementation.targets[0].sourceBodyDigest = ""
+	omittedBodyDigest, err := encodeCompileWorkerDocument(
+		withoutBodyDigest,
+		digest,
+		os.Getpid()+1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(handoffPath, omittedBodyDigest, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readCompileWorkerDocument(handoffPath, output, os.Getpid()+1); err == nil {
+		t.Fatal("omitted callable source body digest was accepted")
 	}
 
 	duplicatePlan := plan

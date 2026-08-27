@@ -1211,6 +1211,10 @@ a second contract, and replace it with executable TypeScript. Digest drift,
 unsealed evidence, and a non-declaration source must fail before the staged
 project is printed; byte-identical declarations from multiple modules are
 materialized once in scratch and never appear in final output.
+Mutate a selected Go callable body without changing its identity or signature.
+Its canonical body digest must fail the post-load join before emission; omit or
+change that digest across the compile-worker handoff and the parent exact join
+must fail before staged TypeScript verification.
 Before checker evidence is trusted, TSTS independently checks both sets with
 its authoritative marker modules and exact-joins marker facts. The selected
 target then lowers and strict-typechecks both complete executable sets with one

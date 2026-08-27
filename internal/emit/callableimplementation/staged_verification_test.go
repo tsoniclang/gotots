@@ -311,6 +311,7 @@ func (f *stagedVerificationFixture) config(
 	callable, err := NewStagedCallable(
 		generated.SourceIdentity(),
 		"func(value int) int|params=value|results=",
+		strings.Repeat("0", 64),
 		VariantSource,
 		module.outputPath,
 		"addFast",

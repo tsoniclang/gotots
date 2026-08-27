@@ -103,6 +103,7 @@ func verifyCallableImplementationContracts(
 		callables[index], targetErr = callableimplementation.NewStagedCallable(
 			target.sourceIdentity,
 			target.sourceSignature,
+			target.sourceBodyDigest,
 			variant,
 			target.implementationOutput,
 			target.implementationExport,
@@ -188,7 +189,8 @@ func exactJoinPreparedCallablePlan(
 			exports[index] = claim.Export
 			expectedTargets[claim.SourceIdentity] = callableImplementationTarget{
 				sourceIdentity: claim.SourceIdentity, sourceSignature: claim.SourceSignature,
-				variant: string(claim.Variant), implementationOutput: expected.OutputPath(),
+				sourceBodyDigest: claim.SourceBodyDigest,
+				variant:          string(claim.Variant), implementationOutput: expected.OutputPath(),
 				implementationExport: claim.Export,
 			}
 		}
@@ -216,6 +218,7 @@ func exactJoinPreparedCallablePlan(
 	for _, actual := range plan.targets {
 		expected, ok := expectedTargets[actual.sourceIdentity]
 		if !ok || actual.sourceSignature != expected.sourceSignature ||
+			actual.sourceBodyDigest != expected.sourceBodyDigest ||
 			actual.variant != expected.variant ||
 			actual.implementationOutput != expected.implementationOutput ||
 			actual.implementationExport != expected.implementationExport {

@@ -1,7 +1,12 @@
 package callableimplementation
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"go/ast"
+	"go/format"
+	"go/token"
 	"go/types"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
@@ -9,8 +14,9 @@ import (
 )
 
 type sourceCallable struct {
-	function  *types.Func
-	signature string
+	function   *types.Func
+	signature  string
+	bodyDigest string
 }
 
 func (p *Prepared) Join(program *load.Program) (*Certificate, error) {
@@ -57,13 +63,20 @@ func (p *Prepared) Join(program *load.Program) (*Certificate, error) {
 					Reason: "selected source signature differs",
 				}
 			}
+			if selected.bodyDigest != claim.SourceBodyDigest {
+				return nil, &Error{
+					Operation: "join callable", Subject: claim.SourceIdentity,
+					Reason: "selected source body differs",
+				}
+			}
 			implementation := Implementation{
-				function:        selected.function,
-				sourceIdentity:  claim.SourceIdentity,
-				sourceSignature: claim.SourceSignature,
-				variant:         claim.Variant,
-				export:          claim.Export,
-				module:          module,
+				function:         selected.function,
+				sourceIdentity:   claim.SourceIdentity,
+				sourceSignature:  claim.SourceSignature,
+				sourceBodyDigest: claim.SourceBodyDigest,
+				variant:          claim.Variant,
+				export:           claim.Export,
+				module:           module,
 			}
 			certificate.byFunction[selected.function] = implementation
 			certificate.byIdentity[claim.SourceIdentity] = implementation
@@ -98,6 +111,16 @@ func sourceCallables(sourcePackage *load.Package) (map[string]sourceCallable, er
 					Reason: err.Error(),
 				}
 			}
+			bodyDigest, err := SourceBodyDigest(
+				sourcePackage.FileSet(),
+				functionDeclaration.Body,
+			)
+			if err != nil {
+				return nil, &Error{
+					Operation: "derive callable", Subject: contract.Identity(),
+					Reason: err.Error(),
+				}
+			}
 			if _, duplicate := result[contract.Identity()]; duplicate {
 				return nil, &Error{
 					Operation: "derive callable", Subject: contract.Identity(),
@@ -105,11 +128,23 @@ func sourceCallables(sourcePackage *load.Package) (map[string]sourceCallable, er
 				}
 			}
 			result[contract.Identity()] = sourceCallable{
-				function: function, signature: contract.Signature(),
+				function: function, signature: contract.Signature(), bodyDigest: bodyDigest,
 			}
 		}
 	}
 	return result, nil
+}
+
+func SourceBodyDigest(fileSet *token.FileSet, body *ast.BlockStmt) (string, error) {
+	if fileSet == nil || body == nil || !body.Pos().IsValid() || !body.End().IsValid() {
+		return "", &Error{Operation: "digest source body", Reason: "source body is invalid"}
+	}
+	var canonical bytes.Buffer
+	if err := format.Node(&canonical, fileSet, body); err != nil {
+		return "", &Error{Operation: "digest source body", Reason: err.Error()}
+	}
+	digest := sha256.Sum256(canonical.Bytes())
+	return hex.EncodeToString(digest[:]), nil
 }
 
 func sameBuildProfile(left load.BuildProfile, right load.BuildProfile) bool {

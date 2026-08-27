@@ -238,6 +238,7 @@ func validateStagedCallables(
 		module, moduleOK := modules[callable.implementationOutput]
 		_, generatedOK := generated[callable.generated.outputPath]
 		if callable.sourceIdentity == "" || callable.sourceSignature == "" ||
+			!validSHA256(callable.sourceBodyDigest) ||
 			!callable.variant.Valid() || !callable.generated.Valid() ||
 			!moduleOK || !generatedOK ||
 			!slices.Contains(module.exports, callable.implementationExport) {

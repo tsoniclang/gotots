@@ -3,6 +3,7 @@ package emit
 import (
 	"context"
 	"encoding/json"
+	"go/ast"
 	"go/types"
 	"path/filepath"
 	"sort"
@@ -71,6 +72,16 @@ func TestCallableImplementationsReplaceOnlyExactSelectedBodies(t *testing.T) {
 
 func TestCallableImplementationRejectsWrongVariantAndUnconsumedClaim(t *testing.T) {
 	fixture := loadCallableImplementationFixture(t)
+	wrongBody := fixture.callable(t, fixture.function("Add"), "addFast")
+	wrongBody.SourceBodyDigest = strings.Repeat("0", 64)
+	_, err := fixture.prepared(
+		t,
+		[]callableimplementation.CallableDocument{wrongBody},
+	).Join(fixture.program)
+	if err == nil || !strings.Contains(err.Error(), "selected source body differs") {
+		t.Fatalf("wrong source body error = %v", err)
+	}
+
 	wrongVariant := fixture.callable(t, fixture.function("Add"), "addFast")
 	wrongVariant.Variant = callableimplementation.VariantKernel
 	options := DefaultOptions()
@@ -222,11 +233,31 @@ func (f callableImplementationFixture) callable(
 	if err != nil {
 		t.Fatal(err)
 	}
+	bodyDigest := ""
+	for _, file := range f.source.Files() {
+		for _, declaration := range file.Syntax().Decls {
+			functionDeclaration, ok := declaration.(*ast.FuncDecl)
+			if !ok || f.source.TypesInfo().Defs[functionDeclaration.Name] != function {
+				continue
+			}
+			bodyDigest, err = callableimplementation.SourceBodyDigest(
+				f.source.FileSet(),
+				functionDeclaration.Body,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if bodyDigest == "" {
+		t.Fatal("callable fixture body is absent")
+	}
 	return callableimplementation.CallableDocument{
-		SourceIdentity:  contract.Identity(),
-		SourceSignature: contract.Signature(),
-		Variant:         callableimplementation.VariantSource,
-		Export:          export,
+		SourceIdentity:   contract.Identity(),
+		SourceSignature:  contract.Signature(),
+		SourceBodyDigest: bodyDigest,
+		Variant:          callableimplementation.VariantSource,
+		Export:           export,
 	}
 }
 
@@ -234,6 +265,19 @@ func (f callableImplementationFixture) certificate(
 	t *testing.T,
 	callables []callableimplementation.CallableDocument,
 ) *callableimplementation.Certificate {
+	t.Helper()
+	prepared := f.prepared(t, callables)
+	certificate, err := prepared.Join(f.program)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return certificate
+}
+
+func (f callableImplementationFixture) prepared(
+	t *testing.T,
+	callables []callableimplementation.CallableDocument,
+) *callableimplementation.Prepared {
 	t.Helper()
 	sort.Slice(callables, func(left, right int) bool {
 		leftKey := callables[left].SourceIdentity + "\x00" + string(callables[left].Variant)
@@ -291,11 +335,7 @@ func (f callableImplementationFixture) certificate(
 	if err != nil {
 		t.Fatal(err)
 	}
-	certificate, err := prepared.Join(f.program)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return certificate
+	return prepared
 }
 
 func (f callableImplementationFixture) roots(t *testing.T) []Root {

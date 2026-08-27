@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	compileWorkerCommand       = "__gotots_compile_worker_v3"
+	compileWorkerCommand       = "__gotots_compile_worker_v4"
 	compileWorkerDirectoryName = ".gotots-compile-worker"
-	compileWorkerSchemaVersion = 3
+	compileWorkerSchemaVersion = 4
 	compileWorkerLogLimit      = 64 * 1024
 )
 
@@ -77,6 +77,7 @@ type compileWorkerCallableImplementationSource struct {
 type compileWorkerCallableImplementationTarget struct {
 	SourceIdentity       string `json:"sourceIdentity"`
 	SourceSignature      string `json:"sourceSignature"`
+	SourceBodyDigest     string `json:"sourceBodyDigest"`
 	Variant              string `json:"variant"`
 	ImplementationOutput string `json:"implementationOutput"`
 	ImplementationExport string `json:"implementationExport"`
@@ -318,6 +319,7 @@ func readCompileWorkerDocument(
 			plan.callableImplementation.targets[index] = callableImplementationTarget{
 				sourceIdentity:       target.SourceIdentity,
 				sourceSignature:      target.SourceSignature,
+				sourceBodyDigest:     target.SourceBodyDigest,
 				variant:              target.Variant,
 				implementationOutput: target.ImplementationOutput,
 				implementationExport: target.ImplementationExport,
@@ -421,6 +423,7 @@ func encodeCompileWorkerDocument(
 				compileWorkerCallableImplementationTarget{
 					SourceIdentity:       target.sourceIdentity,
 					SourceSignature:      target.sourceSignature,
+					SourceBodyDigest:     target.sourceBodyDigest,
 					Variant:              target.variant,
 					ImplementationOutput: target.implementationOutput,
 					ImplementationExport: target.implementationExport,

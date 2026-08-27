@@ -303,10 +303,10 @@ Performance delivery follows measured ownership rather than corpus rules:
    after independent contract/equivalence proof, with every translated body
    absent from the installed artifact;
 4. a certified source-callable implementation may replace one measured body
-   only when canonical Go identity/signature, generated variant, checked target
-   callable, authored export, and equivalence envelope exact-join; the generated
-   declaration and all callers remain unchanged and the translated body is
-   absent;
+   only when canonical Go identity/signature/body digest, generated variant,
+   checked target callable, authored export, and equivalence envelope
+   exact-join; the generated declaration and all callers remain unchanged and
+   the translated body is absent;
 5. executable-representation optimizations belong to the selected target and
    consume finalized exact-node facts plus complete-flow evidence; and
 6. the next change is selected from measured source-size, typecheck, memory,

@@ -94,6 +94,7 @@ const (
 type callableImplementationTarget struct {
 	sourceIdentity       string
 	sourceSignature      string
+	sourceBodyDigest     string
 	variant              string
 	implementationOutput string
 	implementationExport string
@@ -235,6 +236,7 @@ func stagePrintPlan(
 				claims[claim.SourceIdentity] = callableImplementationTarget{
 					sourceIdentity:       claim.SourceIdentity,
 					sourceSignature:      claim.SourceSignature,
+					sourceBodyDigest:     claim.SourceBodyDigest,
 					variant:              string(claim.Variant),
 					implementationOutput: module.OutputPath(),
 					implementationExport: claim.Export,
@@ -460,6 +462,7 @@ func (p printPlan) validate(outputDirectory string) error {
 			module, moduleOK := modules[target.implementationOutput]
 			_, generatedOK := outputPaths[target.generatedOutput]
 			validTarget := target.sourceIdentity != "" && target.sourceSignature != "" &&
+				isSHA256(target.sourceBodyDigest) &&
 				(target.variant == "source" || target.variant == "kernel") &&
 				target.implementationExport != "" && moduleOK && generatedOK
 			switch target.kind {

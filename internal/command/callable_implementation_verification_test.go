@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
@@ -38,10 +39,11 @@ func TestPreparedCallablePlanExactJoinRejectsHandoffOmission(t *testing.T) {
 		t.Fatal(err)
 	}
 	claim := callableimplementation.CallableDocument{
-		SourceIdentity:  "example.test/program|kind=5|receiver=|name=Value",
-		SourceSignature: "func() int|params=|results=",
-		Variant:         callableimplementation.VariantSource,
-		Export:          "valueFast",
+		SourceIdentity:   "example.test/program|kind=5|receiver=|name=Value",
+		SourceSignature:  "func() int|params=|results=",
+		SourceBodyDigest: "a3a86944267e41877ab54f798340439bd80038e34687c5dedb5dc7dbc857565b",
+		Variant:          callableimplementation.VariantSource,
+		Export:           "valueFast",
 	}
 	document := callableimplementation.Document{
 		SchemaVersion: callableimplementation.SchemaVersion,
@@ -92,7 +94,8 @@ func TestPreparedCallablePlanExactJoinRejectsHandoffOmission(t *testing.T) {
 		}},
 		targets: []callableImplementationTarget{{
 			sourceIdentity: claim.SourceIdentity, sourceSignature: claim.SourceSignature,
-			variant: string(claim.Variant), implementationOutput: module.OutputPath(),
+			sourceBodyDigest: claim.SourceBodyDigest,
+			variant:          string(claim.Variant), implementationOutput: module.OutputPath(),
 			implementationExport: claim.Export,
 		}},
 	}
@@ -111,5 +114,15 @@ func TestPreparedCallablePlanExactJoinRejectsHandoffOmission(t *testing.T) {
 	withoutCallable.targets = nil
 	if err := exactJoinPreparedCallablePlan(prepared, withoutCallable); err == nil {
 		t.Fatal("omitted callable was accepted")
+	}
+
+	changedBodyDigest := plan
+	changedBodyDigest.targets = append(
+		[]callableImplementationTarget(nil),
+		plan.targets...,
+	)
+	changedBodyDigest.targets[0].sourceBodyDigest = strings.Repeat("0", 64)
+	if err := exactJoinPreparedCallablePlan(prepared, changedBodyDigest); err == nil {
+		t.Fatal("changed callable source body digest was accepted")
 	}
 }

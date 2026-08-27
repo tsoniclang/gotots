@@ -95,6 +95,7 @@ func NewStagedModule(
 type StagedCallable struct {
 	sourceIdentity       string
 	sourceSignature      string
+	sourceBodyDigest     string
 	variant              Variant
 	implementationOutput string
 	implementationExport string
@@ -104,12 +105,14 @@ type StagedCallable struct {
 func NewStagedCallable(
 	sourceIdentity string,
 	sourceSignature string,
+	sourceBodyDigest string,
 	variant Variant,
 	implementationOutput string,
 	implementationExport string,
 	generated GeneratedTarget,
 ) (StagedCallable, error) {
-	if sourceIdentity == "" || sourceSignature == "" || !variant.Valid() ||
+	if sourceIdentity == "" || sourceSignature == "" ||
+		!validSHA256(sourceBodyDigest) || !variant.Valid() ||
 		!validTargetPath(implementationOutput) || implementationExport == "" ||
 		!generated.Valid() || generated.sourceIdentity != sourceIdentity ||
 		generated.variant != variant {
@@ -121,7 +124,8 @@ func NewStagedCallable(
 	}
 	return StagedCallable{
 		sourceIdentity: sourceIdentity, sourceSignature: sourceSignature,
-		variant: variant, implementationOutput: implementationOutput,
+		sourceBodyDigest: sourceBodyDigest,
+		variant:          variant, implementationOutput: implementationOutput,
 		implementationExport: implementationExport, generated: generated,
 	}, nil
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 type Variant string
 
@@ -63,10 +63,11 @@ func (d CompilationDocument) valid() bool {
 }
 
 type CallableDocument struct {
-	SourceIdentity  string  `json:"sourceIdentity"`
-	SourceSignature string  `json:"sourceSignature"`
-	Variant         Variant `json:"variant"`
-	Export          string  `json:"export"`
+	SourceIdentity   string  `json:"sourceIdentity"`
+	SourceSignature  string  `json:"sourceSignature"`
+	SourceBodyDigest string  `json:"sourceBodyDigest"`
+	Variant          Variant `json:"variant"`
+	Export           string  `json:"export"`
 }
 
 type Module struct {
@@ -130,20 +131,22 @@ func (s CertificationSource) Valid() bool {
 }
 
 type Implementation struct {
-	function        *types.Func
-	sourceIdentity  string
-	sourceSignature string
-	variant         Variant
-	export          string
-	module          Module
+	function         *types.Func
+	sourceIdentity   string
+	sourceSignature  string
+	sourceBodyDigest string
+	variant          Variant
+	export           string
+	module           Module
 }
 
-func (i Implementation) Function() *types.Func   { return i.function }
-func (i Implementation) SourceIdentity() string  { return i.sourceIdentity }
-func (i Implementation) SourceSignature() string { return i.sourceSignature }
-func (i Implementation) Variant() Variant        { return i.variant }
-func (i Implementation) Export() string          { return i.export }
-func (i Implementation) Module() Module          { return i.module }
+func (i Implementation) Function() *types.Func    { return i.function }
+func (i Implementation) SourceIdentity() string   { return i.sourceIdentity }
+func (i Implementation) SourceSignature() string  { return i.sourceSignature }
+func (i Implementation) SourceBodyDigest() string { return i.sourceBodyDigest }
+func (i Implementation) Variant() Variant         { return i.variant }
+func (i Implementation) Export() string           { return i.export }
+func (i Implementation) Module() Module           { return i.module }
 
 type Prepared struct {
 	buildProfile load.BuildProfile

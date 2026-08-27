@@ -195,6 +195,7 @@ func validateDocument(document Document) error {
 	previous := ""
 	for _, callable := range document.Callables {
 		if callable.SourceIdentity == "" || callable.SourceSignature == "" ||
+			!validSHA256(callable.SourceBodyDigest) ||
 			!callable.Variant.Valid() || callable.Export == "" {
 			return &Error{Operation: "validate callable", Reason: "claim is incomplete"}
 		}
@@ -215,6 +216,11 @@ func validateDocument(document Document) error {
 		seenExports[callable.Export] = struct{}{}
 	}
 	return nil
+}
+
+func validSHA256(encoded string) bool {
+	decoded, err := hex.DecodeString(encoded)
+	return err == nil && len(decoded) == sha256.Size
 }
 
 func verifyBuild(selected load.BuildProfile, document BuildDocument) error {
