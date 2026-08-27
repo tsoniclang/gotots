@@ -333,7 +333,7 @@ Each type/value family has focused differentials and mutations:
 | pointers | canonical marker facts, nil, alias, read/store, equality, local/field/index addresses, target flow lowering |
 | unsafe pointers | opaque bind/nil/copy/interface/equality/hash/map identity; reinterpretation, arithmetic, pointer/integer, and provider-input boundaries |
 | maps | nil, set/get/comma-ok/delete/clear, key equality/hash, zero-on-miss, iteration |
-| strings | bytes/runes, indexing, range, slicing, conversions |
+| strings | bytes/runes, indexing, range, slicing, conversions, host text/raw-byte boundaries |
 | defined types | identity, native fixed-width numerics with value/pointer methods, projection/wrap, method calls/expressions/values, interfaces, nil-capable families |
 
 Large-static-array proof includes a keyed sparse literal above the 4096-entry
@@ -367,6 +367,14 @@ hash values for multiple inputs; a mutation removing result normalization must
 collapse or change those keys and fail before product runtime certification.
 The same fixture under `number` is recorded as profile boundary evidence,
 never as parity.
+
+Host-boundary string proof writes valid multibyte UTF-8, NUL, and invalid UTF-8
+through the selected `os.File.WriteString` provider and exact-compares the raw
+file bytes and reported byte count with Go. A direct codec round trip proves
+the one-code-unit-per-byte representation. Passing the canonical Go string to
+Node's string-writing overload must fail this gate by double-encoding the
+multibyte bytes; conversion by decoded host text must fail the invalid-UTF-8
+case.
 
 Embed fixtures exact-join parsed directives, selected toolchain patterns,
 selected files, variable identities, and immutable payload bytes. They cover

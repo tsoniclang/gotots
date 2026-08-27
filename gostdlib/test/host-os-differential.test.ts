@@ -75,15 +75,24 @@ function providerResult(root: string): string {
   const [file, createError] = Create(path);
   assert.equal(createError, undefined);
   assert.ok(file !== undefined);
-  assert.deepEqual(File.WriteString(file, "hello"), [5n, undefined]);
+  const payload = Buffer.from([
+    0xe2, 0x80, 0x9c,
+    0xc3, 0xa9,
+    0xf0, 0x9f, 0x99, 0x82,
+    0x00, 0xff,
+  ]);
+  assert.deepEqual(
+    File.WriteString(file, payload.toString("latin1")),
+    [11n, undefined],
+  );
   assert.equal(File.Close(file), undefined);
   const [information, statError] = Stat(path);
   assert.equal(statError, undefined);
   const [opened, openError] = Open(path);
   assert.equal(openError, undefined);
   assert.ok(opened !== undefined);
-  const contents = RuntimeSlice.make<number>(5, null, 0);
-  assert.deepEqual(File.Read(opened, contents), [5n, undefined]);
+  const contents = RuntimeSlice.make<number>(11, null, 0);
+  assert.deepEqual(File.Read(opened, contents), [11n, undefined]);
   assert.equal(File.Close(opened), undefined);
 
   const command = Command("printf", RuntimeSlice.literal(["child"]));
@@ -97,7 +106,7 @@ function providerResult(root: string): string {
     verbose.value,
     name.value,
     information?.Size(),
-    Buffer.from(sliceValues(contents)).toString("utf8"),
+    Buffer.from(sliceValues(contents)).toString("hex"),
     child,
     missing,
     SIGINT.String(),
@@ -133,7 +142,8 @@ func main() {
   if err != nil {
     panic(err)
   }
-  if _, err := file.WriteString("hello"); err != nil {
+  payload := string([]byte{0xe2, 0x80, 0x9c, 0xc3, 0xa9, 0xf0, 0x9f, 0x99, 0x82, 0x00, 0xff})
+  if _, err := file.WriteString(payload); err != nil {
     panic(err)
   }
   if err := file.Close(); err != nil {
@@ -147,7 +157,7 @@ func main() {
   if err != nil {
     panic(err)
   }
-  contents := make([]byte, 5)
+  contents := make([]byte, len(payload))
   if _, err := opened.Read(contents); err != nil {
     panic(err)
   }
@@ -159,6 +169,6 @@ func main() {
     panic(err)
   }
   missing := os.IsNotExist(os.Remove(filepath.Join(root, "missing")))
-  fmt.Printf("%t|%s|%d|%s|%s|%t|%s\\n", *verbose, *name, information.Size(), string(contents), string(output), missing, syscall.SIGINT.String())
+  fmt.Printf("%t|%s|%d|%x|%s|%t|%s\\n", *verbose, *name, information.Size(), contents, string(output), missing, syscall.SIGINT.String())
 }
 `;

@@ -498,6 +498,14 @@ Wide-result normalization requests one of the two demand-generated integer
 runtime operations; repeated source sites do not duplicate the target
 intrinsic expression.
 
+A canonical Go string is represented as one target code unit per Go byte. It
+is not a host-Unicode string. The portable UTF-8 boundary is the sole owner of
+conversions between canonical Go bytes and host text or bytes. A raw-byte host
+operation such as `os.File.WriteString` passes those bytes to Node unchanged;
+it must not pass the byte-coded target string to a host Unicode API and thereby
+UTF-8-encode it again. Host-text conversion is explicit and may decode UTF-8;
+raw-byte conversion preserves NUL and invalid UTF-8.
+
 Defined-value representation is selected once from the complete `go/types`
 declaration, never from a use site. Every non-generic source-owned defined
 fixed-width integer uses a plain named TypeScript alias over its selected

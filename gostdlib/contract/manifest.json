@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "5ad508990b715178aba4fefa370aa05441e16d94a4b014877113944c1b5accb1",
-  "providerDigest": "b1db2f7b33fb7a9ee03c981a09631adca8a6a974cd9d64a3c4f0066574daf6bb",
+  "providerDigest": "c90f13a3e61a85a2876da940238ba9f472829a9f46add12dae2be87a38fceab8",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -6033,7 +6033,7 @@
           "targetFingerprint": "f9872a66dbeaaf92fe092ad9c9c42d8e2ce8b7cc32da1906f99dab5e5201fcd4",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/node/os/file.ts#closeFile@316"
+            "src/internal/node/os/file.ts#closeFile@323"
           ],
           "implementationSites": [
             "src/os.ts#Close@257"
@@ -6052,7 +6052,7 @@
           "targetFingerprint": "bed40c0cda4def01dd71efad6b65c98925b6f8ce950e6351faa6ba253c52317e",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/node/os/file.ts#fileDescriptor@419"
+            "src/internal/node/os/file.ts#fileDescriptor@426"
           ],
           "implementationSites": [
             "src/os.ts#Fd@281"
@@ -6071,7 +6071,7 @@
           "targetFingerprint": "6596eba022bc76ae534cefa36acde8afb16a81b256b54ac4511df43c35bcf203",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/node/os/file.ts#readFile@473"
+            "src/internal/node/os/file.ts#readFile@480"
           ],
           "implementationSites": [
             "src/os.ts#Read@302"
@@ -6090,7 +6090,7 @@
           "targetFingerprint": "21934a9547908a74d9d05551b008dddd5198e5f0d689416571e5884b7ea87d0f",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/node/os/file.ts#writeFile@639"
+            "src/internal/node/os/file.ts#writeFile@646"
           ],
           "implementationSites": [
             "src/os.ts#Write@338"
@@ -6109,7 +6109,7 @@
           "targetFingerprint": "20d2296de8bbb71ff0c83c88a2a6e24f7b06b213e927aa5fb2d0f5338db9caa4",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/node/os/file.ts#writeFileString@771"
+            "src/internal/node/os/file.ts#writeFileString@778"
           ],
           "implementationSites": [
             "src/os.ts#WriteString@374"
@@ -6779,7 +6779,7 @@
             "src/internal/runtime/error.ts#providerError@213"
           ],
           "implementationSites": [
-            "src/internal/node/filepath/filesystem.ts#Abs@56"
+            "src/internal/node/filepath/filesystem.ts#Abs@60"
           ]
         },
         {
@@ -6830,15 +6830,15 @@
           "targetFingerprint": "7ab6c802b916cd050b261b3e3b8570016d735c77f79cfeb79a8c46f947ee41b5",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/node/filepath/filesystem.ts#bufferPath@325",
-            "src/internal/node/filepath/filesystem.ts#goPathBuffer@269",
+            "src/internal/node/filepath/filesystem.ts#bufferPath@294",
+            "src/internal/node/filepath/filesystem.ts#goPathBuffer@273",
             "src/internal/portable/filepath/lexical.ts#Clean@37",
             "src/internal/portable/filepath/lexical.ts#IsAbs@148",
             "src/internal/portable/utf8/codec.ts#fromHostString@934",
             "src/internal/runtime/error.ts#providerError@213"
           ],
           "implementationSites": [
-            "src/internal/node/filepath/filesystem.ts#EvalSymlinks@122"
+            "src/internal/node/filepath/filesystem.ts#EvalSymlinks@126"
           ]
         },
         {
@@ -13780,7 +13780,7 @@
           "dependencies": [
             "src/internal/portable/strconv/quote.ts#quoteRuneBody@949",
             "src/internal/portable/utf8/codec.ts#RuneError@30",
-            "src/internal/portable/utf8/codec.ts#validRune@978"
+            "src/internal/portable/utf8/codec.ts#validRune@1091"
           ],
           "implementationSites": [
             "src/internal/portable/strconv/quote.ts#QuoteRune@202"
@@ -14374,7 +14374,7 @@
             "src/internal/host-integer.ts#integerFromHost@69",
             "src/internal/portable/utf8/codec.ts#decodeRuneAt@51",
             "src/internal/portable/utf8/codec.ts#encodeRune@566",
-            "src/internal/portable/utf8/codec.ts#validRune@978"
+            "src/internal/portable/utf8/codec.ts#validRune@1091"
           ],
           "implementationSites": [
             "src/internal/portable/strings/search.ts#IndexRune@292"
@@ -18118,7 +18118,7 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/utf16/codec.ts#IsSurrogate@50",
-            "src/internal/portable/utf8/codec.ts#validRune@978"
+            "src/internal/portable/utf8/codec.ts#validRune@1091"
           ],
           "implementationSites": [
             "src/internal/portable/utf16/codec.ts#RuneLen@201"
@@ -27137,9 +27137,9 @@
       "identity": "src/internal/facets/named-os.ts#OsFileOperations@23",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/os/file.ts#assignFileValue@202",
-        "src/internal/node/os/file.ts#fileValueEqual@250",
-        "src/internal/node/os/file.ts#fileValueHash@279",
+        "src/internal/node/os/file.ts#assignFileValue@209",
+        "src/internal/node/os/file.ts#fileValueEqual@257",
+        "src/internal/node/os/file.ts#fileValueHash@286",
         "src/os.ts#File@252"
       ]
     },
@@ -28734,12 +28734,18 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/node/filepath/filesystem.ts#bufferPath@325",
-      "disposition": "implemented"
+      "identity": "src/internal/node/filepath/filesystem.ts#bufferPath@294",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/utf8/codec.ts#fromHostBytes@1052"
+      ]
     },
     {
-      "identity": "src/internal/node/filepath/filesystem.ts#goPathBuffer@269",
-      "disposition": "implemented"
+      "identity": "src/internal/node/filepath/filesystem.ts#goPathBuffer@273",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/utf8/codec.ts#toHostBytes@978"
+      ]
     },
     {
       "identity": "src/internal/node/flag/flag-set.ts#add@877",
@@ -29022,67 +29028,67 @@
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#assignFileValue@202",
+      "identity": "src/internal/node/os/file.ts#assignFileValue@209",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/os/file.ts#descriptors@121"
+        "src/internal/node/os/file.ts#descriptors@128"
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#attachFileDescriptor@130",
+      "identity": "src/internal/node/os/file.ts#attachFileDescriptor@137",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/os/file.ts#descriptors@121"
+        "src/internal/node/os/file.ts#descriptors@128"
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#attachStandardFileDescriptor@166",
+      "identity": "src/internal/node/os/file.ts#attachStandardFileDescriptor@173",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/os/file.ts#descriptors@121"
+        "src/internal/node/os/file.ts#descriptors@128"
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#closeFile@316",
+      "identity": "src/internal/node/os/file.ts#closeFile@323",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/node/os/error.ts#nodeError@232",
-        "src/internal/node/os/file.ts#descriptorOf@886",
+        "src/internal/node/os/file.ts#descriptorOf@913",
         "src/internal/node/os/file.ts#fsState@69"
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#descriptorOf@886",
+      "identity": "src/internal/node/os/file.ts#descriptorOf@913",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/os/file.ts#descriptors@121"
+        "src/internal/node/os/file.ts#descriptors@128"
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#descriptors@121",
+      "identity": "src/internal/node/os/file.ts#descriptors@128",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/node/os/file.ts#fileDescriptor@419",
+      "identity": "src/internal/node/os/file.ts#fileDescriptor@426",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#unsignedIntegerFromHost@90",
-        "src/internal/node/os/file.ts#descriptorOf@886",
-        "src/internal/node/os/file.ts#invalidDescriptor@92"
+        "src/internal/node/os/file.ts#descriptorOf@913",
+        "src/internal/node/os/file.ts#invalidDescriptor@99"
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#fileValueEqual@250",
+      "identity": "src/internal/node/os/file.ts#fileValueEqual@257",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/os/file.ts#descriptors@121"
+        "src/internal/node/os/file.ts#descriptors@128"
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#fileValueHash@279",
+      "identity": "src/internal/node/os/file.ts#fileValueHash@286",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/os/file.ts#descriptors@121"
+        "src/internal/node/os/file.ts#descriptors@128"
       ]
     },
     {
@@ -29094,7 +29100,7 @@
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#invalidDescriptor@92",
+      "identity": "src/internal/node/os/file.ts#invalidDescriptor@99",
       "disposition": "implemented"
     },
     {
@@ -29106,36 +29112,37 @@
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#readFile@473",
+      "identity": "src/internal/node/os/file.ts#readFile@480",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
         "src/internal/node/os/error.ts#nodeError@232",
-        "src/internal/node/os/file.ts#descriptorOf@886",
+        "src/internal/node/os/file.ts#descriptorOf@913",
         "src/internal/node/os/file.ts#fsState@69",
         "src/internal/node/os/file.ts#ioState@61",
         "src/internal/runtime/slice.ts#writeBytes@167"
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#writeFile@639",
+      "identity": "src/internal/node/os/file.ts#writeFile@646",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
         "src/internal/node/os/error.ts#nodeError@232",
-        "src/internal/node/os/file.ts#descriptorOf@886",
+        "src/internal/node/os/file.ts#descriptorOf@913",
         "src/internal/node/os/file.ts#fsState@69",
         "src/internal/runtime/slice.ts#bytes@141"
       ]
     },
     {
-      "identity": "src/internal/node/os/file.ts#writeFileString@771",
+      "identity": "src/internal/node/os/file.ts#writeFileString@778",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
         "src/internal/node/os/error.ts#nodeError@232",
-        "src/internal/node/os/file.ts#descriptorOf@886",
-        "src/internal/node/os/file.ts#fsState@69"
+        "src/internal/node/os/file.ts#descriptorOf@913",
+        "src/internal/node/os/file.ts#fsState@69",
+        "src/internal/portable/utf8/codec.ts#toHostBytes@978"
       ]
     },
     {
@@ -29161,7 +29168,7 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/node/os/error.ts#nodeError@232",
-        "src/internal/node/os/file.ts#attachFileDescriptor@130",
+        "src/internal/node/os/file.ts#attachFileDescriptor@137",
         "src/internal/node/os/filesystem.ts#NodeFileSystemFile@1197",
         "src/internal/node/os/filesystem.ts#directoryFileSystemType@1025",
         "src/internal/node/os/filesystem.ts#open@264",
@@ -29189,8 +29196,8 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
-        "src/internal/node/os/file.ts#closeFile@316",
-        "src/internal/node/os/file.ts#readFile@473",
+        "src/internal/node/os/file.ts#closeFile@323",
+        "src/internal/node/os/file.ts#readFile@480",
         "src/internal/node/os/filesystem.ts#FsFile@98",
         "src/internal/node/os/filesystem.ts#fileSystemFileType@1185",
         "src/internal/node/os/filesystem.ts#ioState@86",
@@ -32440,7 +32447,7 @@
       "dependencies": [
         "src/internal/portable/strconv/quote.ts#validDigits@1129",
         "src/internal/portable/utf8/codec.ts#encodeRune@566",
-        "src/internal/portable/utf8/codec.ts#validRune@978"
+        "src/internal/portable/utf8/codec.ts#validRune@1091"
       ]
     },
     {
@@ -33777,7 +33784,7 @@
         "src/internal/portable/utf8/codec.ts#RuneError@30",
         "src/internal/portable/utf8/codec.ts#RuneSelf@40",
         "src/internal/portable/utf8/codec.ts#decodeRuneAt@51",
-        "src/internal/portable/utf8/codec.ts#isContinuation@1023"
+        "src/internal/portable/utf8/codec.ts#isContinuation@1136"
       ]
     },
     {
@@ -33795,8 +33802,12 @@
       "dependencies": [
         "src/internal/portable/utf8/codec.ts#RuneError@30",
         "src/internal/portable/utf8/codec.ts#RuneSelf@40",
-        "src/internal/portable/utf8/codec.ts#validRune@978"
+        "src/internal/portable/utf8/codec.ts#validRune@1091"
       ]
+    },
+    {
+      "identity": "src/internal/portable/utf8/codec.ts#fromHostBytes@1052",
+      "disposition": "implemented"
     },
     {
       "identity": "src/internal/portable/utf8/codec.ts#fromHostString@934",
@@ -33807,7 +33818,7 @@
       ]
     },
     {
-      "identity": "src/internal/portable/utf8/codec.ts#isContinuation@1023",
+      "identity": "src/internal/portable/utf8/codec.ts#isContinuation@1136",
       "disposition": "implemented"
     },
     {
@@ -33827,6 +33838,10 @@
       ]
     },
     {
+      "identity": "src/internal/portable/utf8/codec.ts#toHostBytes@978",
+      "disposition": "implemented"
+    },
+    {
       "identity": "src/internal/portable/utf8/codec.ts#toHostString@861",
       "disposition": "implemented",
       "dependencies": [
@@ -33835,7 +33850,7 @@
       ]
     },
     {
-      "identity": "src/internal/portable/utf8/codec.ts#validRune@978",
+      "identity": "src/internal/portable/utf8/codec.ts#validRune@1091",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/utf8/codec.ts#MaxRune@48"
@@ -34146,7 +34161,7 @@
       "identity": "src/os.ts#newFile@1019",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/os/file.ts#attachFileDescriptor@130",
+        "src/internal/node/os/file.ts#attachFileDescriptor@137",
         "src/os.ts#File@252"
       ]
     },
@@ -34154,7 +34169,7 @@
       "identity": "src/os.ts#newStandardFile@1049",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/os/file.ts#attachStandardFileDescriptor@166",
+        "src/internal/node/os/file.ts#attachStandardFileDescriptor@173",
         "src/os.ts#File@252"
       ]
     },
@@ -34890,5 +34905,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "5ebb61550ec44099aa21e056c2ef06f775aa8e7b9b16262640b8cf7e245776e1"
+  "manifestDigest": "6295fe82d39971d1b5de7bf7f791924e70a7f5e084d313f7b1bc67f448884646"
 }

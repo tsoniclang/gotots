@@ -378,6 +378,15 @@ certified `DirEntry` profile bridges. A canonical `error` parameter, however,
 already has the generated interface ABI and is passed unchanged so generated
 `Is(error)` and `Unwrap()` implementations remain observable.
 
+Go strings retain their exact byte sequence in target storage: one target code
+unit represents one Go byte. Crossing to a host text API requires the canonical
+UTF-8 decoder; crossing to a host byte API requires the canonical raw-byte
+projection. Thus `File.WriteString("\xe2\x80\x9c")` writes the three source
+bytes, not the six bytes produced by UTF-8-encoding three Latin-1-looking host
+characters. NUL and invalid UTF-8 remain legal. Provider code may not pass a
+canonical Go string directly to a Node string-writing API or define a second
+byte/text conversion helper.
+
 ### Defined Types And Aliases
 
 Aliases reference the selected target representation directly. A defined type

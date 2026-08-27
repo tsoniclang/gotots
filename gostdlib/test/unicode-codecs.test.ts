@@ -4,6 +4,10 @@ import test from "node:test";
 
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import { sliceValues } from "../src/internal/runtime/slice.js";
+import {
+  fromHostBytes,
+  toHostBytes,
+} from "../src/internal/portable/utf8/codec.js";
 
 import {
   Is,
@@ -125,6 +129,18 @@ test("unicode utf16 handles valid and malformed surrogate pairs", () => {
     sliceValues(Decode(RuntimeSlice.literal([0x41, 0xd83d, 0xde42, 0xd800]))),
     [0x41, 0x1f642, 0xfffd],
   );
+});
+
+test("host byte conversion preserves canonical Go strings exactly", () => {
+  const expected = Uint8Array.from([
+    0xe2, 0x80, 0x9c,
+    0xc3, 0xa9,
+    0xf0, 0x9f, 0x99, 0x82,
+    0x00, 0xff,
+  ]);
+  const value = fromHostBytes(expected);
+  assert.deepEqual(toHostBytes(value), expected);
+  assert.throws(() => toHostBytes("🙂"), /non-canonical Go string byte/);
 });
 
 function goText(value: string): string {

@@ -97,3 +97,29 @@ test("os filesystem operations preserve Go result tuples and file state", () => 
     });
   }
 });
+
+test("os File.WriteString preserves exact Go string bytes", () => {
+  const root = mkdtempSync(join(tmpdir(), "gotots-os-bytes-"));
+  try {
+    const path = join(root, "bytes.bin");
+    const [created, createError] = Create(path);
+    assert.equal(createError, undefined);
+    assert.ok(created !== undefined);
+
+    const expected = Buffer.from([
+      0xe2, 0x80, 0x9c,
+      0xc3, 0xa9,
+      0xf0, 0x9f, 0x99, 0x82,
+      0x00, 0xff,
+    ]);
+    const goString = expected.toString("latin1");
+    assert.deepEqual(File.WriteString(created, goString), [11n, undefined]);
+    assert.equal(File.Close(created), undefined);
+    assert.deepEqual(readFileSync(path), expected);
+  } finally {
+    rmSync(root, {
+      force: true,
+      recursive: true,
+    });
+  }
+});

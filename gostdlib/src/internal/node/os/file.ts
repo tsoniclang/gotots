@@ -17,6 +17,7 @@ import {
   bytes,
   writeBytes,
 } from "../../runtime/slice.js";
+import { toHostBytes } from "../../portable/utf8/codec.js";
 import { nodeError } from "./error.js";
 
 const invalidDescriptor: uint64 = 0xffffffffffffffffn;
@@ -183,7 +184,15 @@ export function writeFileString(
     return [0n, nodeError("closed", "write", state.name)];
   }
   try {
-    return [integerFromHost(writeSync(state.descriptor, text)), undefined];
+    const source = toHostBytes(text);
+    const count = writeSync(
+      state.descriptor,
+      source,
+      0,
+      source.length,
+      null,
+    );
+    return [integerFromHost(count), undefined];
   } catch {
     return [0n, nodeError("operation", "write", state.name)];
   }
