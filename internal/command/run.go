@@ -17,6 +17,9 @@ func Run(
 	if ctx == nil || stdout == nil || stderr == nil {
 		return commandError("run", "context or output stream is absent")
 	}
+	if len(arguments) != 0 && arguments[0] == compileWorkerCommand {
+		return runCompileWorker(ctx, arguments[1:])
+	}
 	invocation, err := ParseArguments(workingDirectory, arguments)
 	if err != nil {
 		return err

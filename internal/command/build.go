@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"runtime/debug"
 
 	"github.com/tsoniclang/gotots/internal/config"
 	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
@@ -34,7 +33,7 @@ func Build(ctx context.Context, project config.Project) (Report, error) {
 	files, err := writeOutputTransaction(
 		project.OutputDirectory(),
 		func(outputDirectory string) (int, error) {
-			plan, digest, prepareErr := prepareBuild(
+			plan, digest, prepareErr := prepareBuildInWorker(
 				ctx,
 				project,
 				outputDirectory,
@@ -43,7 +42,6 @@ func Build(ctx context.Context, project config.Project) (Report, error) {
 				return 0, prepareErr
 			}
 			semanticDigest = digest
-			debug.FreeOSMemory()
 			written, writeErr := writePrintPlanTo(
 				project,
 				plan,

@@ -115,6 +115,7 @@ func (p printPlan) validate(outputDirectory string) error {
 	if len(p.files) == 0 {
 		return commandError("validate print plan", "target file set is empty")
 	}
+	outputPaths := make(map[string]struct{}, len(p.files))
 	for index, file := range p.files {
 		expected := filepath.Join(
 			p.protocolDirectory,
@@ -123,6 +124,10 @@ func (p printPlan) validate(outputDirectory string) error {
 		if file.outputPath == "" || file.protocolPath != expected {
 			return commandError("validate print plan", "target file identity is invalid")
 		}
+		if _, duplicate := outputPaths[file.outputPath]; duplicate {
+			return commandError("validate print plan", "target file identity is duplicated")
+		}
+		outputPaths[file.outputPath] = struct{}{}
 	}
 	if len(p.packageDocument) == 0 {
 		return commandError("validate print plan", "project package is absent")

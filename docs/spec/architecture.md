@@ -1832,23 +1832,26 @@ external AST protocol. The encoder validates required fields and discriminants.
 Pinned TS-Go decodes, constructs real nodes, and prints. No target text exists
 before printing, and no post-print mutation is allowed.
 
-Compilation and printing are separate bounded-memory lifetimes. After the
-complete target file set, provider closure, source digest, and semantic digest
-have been sealed, GoToTS encodes every file into the pinned official TS-Go
-external-AST protocol inside the unpublished output transaction. That encoded
-protocol is the only artifact crossing the lifetime boundary; it is not a
-semantic IR and contains no source AST, `go/types` object, emitter session,
-certificate, or mutable TS-Go node. The load/type graph and constructed target
-AST become unreachable before the external TS-Go printer starts, and the
-command performs one explicit heap-release boundary because the compiler and
-printer share one hard process-tree memory budget. The printer then consumes
-one bounded encoded file at a time. Temporary protocol payloads are removed
-before successful publication and never appear in the output manifest. Each
-payload is digest-sealed when staged and exact-checked immediately before it is
-sent to the printer.
+Compilation and printing are separate process lifetimes. The parent command
+owns one unpublished output transaction. A compilation worker loads and checks
+Go, settles the complete target file set, provider closure, source digest, and
+semantic digest, and encodes every file into the pinned official TS-Go
+external-AST protocol inside that transaction. The worker then exits. Only
+after its process has terminated may the parent start the external TS-Go
+printer. Consequently the compiler and printer memory peaks cannot overlap
+under their one hard process-tree budget.
 
-Starting the printer while either source evidence or constructed target AST is
-still reachable is forbidden. So are printing during semantic settlement,
+The digest-sealed encoded protocol plus a constructor-validated handoff is the
+only state crossing that process boundary. Neither is a semantic IR, and
+neither contains a source AST, `go/types` object, emitter session, certificate,
+mutable TS-Go node, callback, or target text. The handoff records the distinct
+worker process identity; an in-process handoff is invalid. The printer consumes
+one bounded encoded file at a time. Temporary protocol and worker artifacts are
+removed before successful publication and never appear in the output manifest.
+Each payload is exact-checked immediately before it is sent to the printer.
+
+Starting the printer before the compilation worker has exited is forbidden.
+So are retaining compilation state in the parent, printing during semantic settlement,
 retaining all printed text, using encoded bytes as a second decision model, or
 recovering semantics from the wire payload. Encoding failure produces no
 published output; printing failure leaves the previous completed output
