@@ -1686,6 +1686,12 @@ artifact reconstruction; a kernel selection requires a genuinely generic Go
 declaration. Removing the translated body therefore cannot flip source versus
 kernel ABI. Generated callers and the staged exact type join certify the
 selected private ABI while the source-facing declaration remains unchanged.
+For a generic replacement, the ordinary Go body is walked once to retain only
+its declaration-requirement requests; every translated statement and
+non-declaration request is discarded. This preserves canonical operation,
+representation, concretization, and caller coordination without retaining a
+second executable body. A source-variant contract cannot suppress a kernel ABI
+required by those retained source facts.
 The final exact-consumption gate rejects an absent or second selected target. Instance
 value-receiver bodies and recovery-aware deferred
 entries remain unsupported until their private implementation ABI is specified

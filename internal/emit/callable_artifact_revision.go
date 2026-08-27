@@ -400,6 +400,12 @@ func (s *programSession) SettleCallableImplementationVariant(
 		return inferredKernel, nil
 	}
 	if previous, exists := s.callableImplementationVariants[selected.SourceIdentity()]; exists {
+		if previous == api.CallableImplementationVariantSource && inferredKernel {
+			return false, &ScheduleError{
+				Object: selected.SourceIdentity(),
+				Reason: "callable implementation source variant omits required kernel ABI",
+			}
+		}
 		return previous == api.CallableImplementationVariantKernel, nil
 	}
 	settled := api.CallableImplementationVariantSource

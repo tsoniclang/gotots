@@ -1,9 +1,11 @@
 package function
 
 import (
+	"go/ast"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -109,4 +111,37 @@ func emitCallableImplementationBody(
 		context.Factory().Block([]tsgo.Statement{statement}, true),
 		reference.Requests()...,
 	), true, nil
+}
+
+func retainCallableImplementationRequirements(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.FuncDecl,
+	function *types.Func,
+	signature *types.Signature,
+	implementation api.BlockEmission,
+) (api.BlockEmission, error) {
+	if len(api.GenericDeclarationParameters(function)) == 0 || source.Body == nil {
+		return implementation, nil
+	}
+	evidence, err := callable.EmitBody(
+		context,
+		children,
+		source,
+		source.Type,
+		source.Body,
+		signature,
+		api.RoleFunctionBody,
+	)
+	if err != nil {
+		return api.BlockEmission{}, err
+	}
+	requirements, err := api.SelectDeclarationRequests(evidence.Requests())
+	if err != nil {
+		return api.BlockEmission{}, err
+	}
+	return api.DirectBlock(
+		implementation.Value(),
+		api.CombineRequests(implementation.Requests(), requirements)...,
+	), nil
 }

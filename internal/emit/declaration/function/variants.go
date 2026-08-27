@@ -254,7 +254,14 @@ func emitCallableVariant(
 		}
 	}
 	if implemented {
-		body = implementationBody
+		body, err = retainCallableImplementationRequirements(
+			context,
+			children,
+			source,
+			function,
+			signature,
+			implementationBody,
+		)
 	} else if context.SourceImplementationContract() {
 		body, err = sourceImplementationContractBody(context, function)
 	} else if source.Body == nil {
