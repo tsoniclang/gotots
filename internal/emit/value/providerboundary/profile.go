@@ -8,13 +8,15 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
-	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
 type CallableProfileSelection struct {
-	reference api.ProviderCallableProfileReference
-	requests  []api.RootRequest
+	reference           api.ProviderCallableProfileReference
+	canonicalParameters []int
+	canonicalResults    []int
+	interfaces          []gostdlib.ProviderCallableProfileInterface
+	requests            []api.RootRequest
 }
 
 func InterfaceABIExact(
@@ -106,21 +108,30 @@ func ResolveCallableProfile(
 			continue
 		}
 		expectedParameters := slices.Clone(canonicalParameters)
+		expectedResults := slices.Clone(canonicalResults)
 		if candidate.Profile().Required() {
 			semanticParameters, parameterErr := requiredProfileParameters(
 				candidate.Profile(),
+				base.parameterInterfaces,
 			)
 			if parameterErr != nil {
 				return CallableProfileSelection{}, false, parameterErr
 			}
 			expectedParameters = mergeIndexes(expectedParameters, semanticParameters)
+			expectedResults = mergeIndexes(
+				expectedResults,
+				requiredProfileResults(
+					candidate.Profile(),
+					base.resultInterfaces,
+				),
+			)
 		}
 		selected, matchesCurrent, mismatch, matchErr := matchCallableProfileCandidate(
 			context,
 			signature,
 			candidate,
 			expectedParameters,
-			canonicalResults,
+			expectedResults,
 		)
 		if matchErr != nil {
 			return CallableProfileSelection{}, false, matchErr
@@ -171,31 +182,23 @@ func ResolveCallableProfile(
 			"provider callable-profile reference diverged from its selected candidate",
 		)
 	}
+	if err := RequireProviderEffect(
+		context,
+		selected.profile.ProfileKey(),
+		selected.profile.Effect(),
+	); err != nil {
+		return CallableProfileSelection{}, false, err
+	}
 	return CallableProfileSelection{
-		reference: reference,
+		reference:           reference,
+		canonicalParameters: selected.canonicalParameters,
+		canonicalResults:    selected.canonicalResults,
+		interfaces:          selected.interfaces,
 		requests: api.CombineRequests(
 			base.analyzer.requests,
 			selected.requests,
 		),
 	}, true, nil
-}
-
-func requiredProfileParameters(
-	profile gostdlib.ProviderCallableProfile,
-) ([]int, error) {
-	var result []int
-	for _, selected := range profile.Interfaces() {
-		protocol, ok := selected.Protocol()
-		if !ok {
-			continue
-		}
-		parameters, err := gostdlib.ProviderProtocolCallableParameters(protocol)
-		if err != nil {
-			return nil, err
-		}
-		result = mergeIndexes(result, parameters)
-	}
-	return result, nil
 }
 
 func mergeIndexes(left []int, right []int) []int {
@@ -239,8 +242,11 @@ type callableProfileBoundary struct {
 }
 
 type matchedProfile struct {
-	profile  gostdlib.ProviderCallableProfile
-	requests []api.RootRequest
+	profile             gostdlib.ProviderCallableProfile
+	canonicalParameters []int
+	canonicalResults    []int
+	interfaces          []gostdlib.ProviderCallableProfileInterface
+	requests            []api.RootRequest
 }
 
 func analyzeCallableProfileBoundary(
@@ -294,7 +300,11 @@ func matchCallableProfileCandidate(
 ) (matchedProfile, bool, string, error) {
 	profile := candidate.Profile()
 	if profile.Receiver() != (signature.Recv() != nil) ||
-		!slices.Equal(profile.CanonicalParameters(), canonicalParameters) {
+		!profileRootsAccept(
+			profile.CanonicalParameters(),
+			canonicalParameters,
+			profile.Required(),
+		) {
 		return matchedProfile{}, false, "receiver or canonical roots differ", nil
 	}
 	selected, err := analyzeCallableProfileBoundary(context, signature)
@@ -316,14 +326,18 @@ func matchCallableProfileCandidate(
 		canonicalResults,
 		implementedResults,
 	)
-	if !slices.Equal(profile.CanonicalResults(), requiredResults) {
+	if !profileRootsAccept(
+		profile.CanonicalResults(),
+		requiredResults,
+		profile.Required(),
+	) {
 		return matchedProfile{}, false, "receiver or canonical roots differ", nil
 	}
 	profileCallables := profile.CallableParameters()
 	if !profileCallablesAccept(
 		context,
 		signature,
-		canonicalParameters,
+		profile.CanonicalParameters(),
 		profileCallables,
 	) {
 		return matchedProfile{}, false, "transported callable effects differ", nil
@@ -373,8 +387,36 @@ func matchCallableProfileCandidate(
 	for identity := range implemented {
 		expectedBoundaryIdentities[identity] = struct{}{}
 	}
-	if !sameIdentitySet(boundaryIdentities, expectedBoundaryIdentities) {
+	if profile.Required() {
+		for identity := range boundaryIdentities {
+			if identityOccursInRoots(
+				identity,
+				selected.parameterInterfaces,
+				selected.resultInterfaces,
+			) {
+				expectedBoundaryIdentities[identity] = struct{}{}
+			}
+		}
+	}
+	includeProfileInterfaceDescendants(
+		selected.analyzer.nodes,
+		expectedBoundaryIdentities,
+	)
+	if profile.Required() &&
+		!sameIdentitySet(boundaryIdentities, expectedBoundaryIdentities) ||
+		!profile.Required() &&
+			!identitySetContains(boundaryIdentities, expectedBoundaryIdentities) {
 		return matchedProfile{}, false, "affected interface set differs", nil
+	}
+	crossingInterfaces := make(
+		[]gostdlib.ProviderCallableProfileInterface,
+		0,
+		len(expectedBoundaryIdentities),
+	)
+	for _, selectedInterface := range profileInterfaces {
+		if _, selected := expectedBoundaryIdentities[selectedInterface.SourceIdentity()]; selected {
+			crossingInterfaces = append(crossingInterfaces, selectedInterface)
+		}
 	}
 	guardTypes := candidate.Guards()
 	guardIdentityList := profile.GuardInterfaces()
@@ -439,135 +481,12 @@ func matchCallableProfileCandidate(
 		return matchedProfile{}, false, "profile key differs", nil
 	}
 	return matchedProfile{
-		profile:  profile,
-		requests: selected.analyzer.requests,
+		profile:             profile,
+		canonicalParameters: slices.Clone(canonicalParameters),
+		canonicalResults:    slices.Clone(requiredResults),
+		interfaces:          crossingInterfaces,
+		requests:            selected.analyzer.requests,
 	}, true, "", nil
-}
-
-func profileCallableParameterRoots(signature *types.Signature) []int {
-	if signature == nil || signature.Params() == nil {
-		return nil
-	}
-	var result []int
-	for index := range signature.Params().Len() {
-		if _, callable := gostdlibsource.DirectCallableParameterSignature(
-			signature.Params().At(index).Type(),
-		); callable {
-			result = append(result, index)
-		}
-	}
-	return result
-}
-
-func profileCallableParameterBoundary(
-	context api.Context,
-	signature *types.Signature,
-	evidence []gostdlib.ProviderCallableParameterDocument,
-) ([]int, []int, error) {
-	roots := profileCallableParameterRoots(signature)
-	if len(roots) != len(evidence) {
-		return nil, nil, boundaryInvariant(
-			context,
-			"provider callable-parameter evidence does not exact-join the source signature",
-		)
-	}
-	expected := gostdlib.EffectSynchronous
-	if context.ConcurrencySemantics() == api.ConcurrencySemanticsCooperative {
-		expected = gostdlib.EffectAwaitable
-	}
-	var mismatched []int
-	for index, root := range roots {
-		selected := evidence[index]
-		if selected.Parameter != root || !selected.Effect.Valid() {
-			return nil, nil, boundaryInvariant(
-				context,
-				"provider callable-parameter evidence diverged from the source signature",
-			)
-		}
-		if !providerCallableEffectAccepts(selected.Effect, expected) {
-			mismatched = append(mismatched, root)
-		}
-	}
-	return roots, mismatched, nil
-}
-
-func profileCallablesAccept(
-	context api.Context,
-	signature *types.Signature,
-	canonicalParameters []int,
-	callables []gostdlib.ProviderCallableParameterDocument,
-) bool {
-	var roots []int
-	for _, parameter := range canonicalParameters {
-		if _, callable := gostdlibsource.DirectCallableParameterSignature(
-			signature.Params().At(parameter).Type(),
-		); callable {
-			roots = append(roots, parameter)
-		}
-	}
-	if len(roots) != len(callables) {
-		return false
-	}
-	expected := gostdlib.EffectSynchronous
-	if context.ConcurrencySemantics() == api.ConcurrencySemanticsCooperative {
-		expected = gostdlib.EffectAwaitable
-	}
-	for index, root := range roots {
-		if callables[index].Parameter != root ||
-			!providerCallableEffectAccepts(callables[index].Effect, expected) {
-			return false
-		}
-	}
-	return true
-}
-
-func profileKeyCallables(
-	source []gostdlib.ProviderCallableParameterDocument,
-) []gostdlib.ProviderCallableProfileKeyCallable {
-	result := make(
-		[]gostdlib.ProviderCallableProfileKeyCallable,
-		len(source),
-	)
-	for index, selected := range source {
-		result[index] = gostdlib.ProviderCallableProfileKeyCallable{
-			Parameter: selected.Parameter,
-			Effect:    selected.Effect,
-		}
-	}
-	return result
-}
-
-func providerCallableEffectAccepts(
-	provider gostdlib.EffectKind,
-	generated gostdlib.EffectKind,
-) bool {
-	return provider == generated ||
-		provider == gostdlib.EffectAwaitable &&
-			generated == gostdlib.EffectSynchronous
-}
-
-func rootsContainingIdentities(
-	roots []map[string]struct{},
-	identities map[string]struct{},
-) []int {
-	result := make([]int, 0, len(roots))
-	for index, root := range roots {
-		for identity := range identities {
-			if _, found := root[identity]; found {
-				result = append(result, index)
-				break
-			}
-		}
-	}
-	return result
-}
-
-func cloneIdentitySet(source map[string]struct{}) map[string]struct{} {
-	result := make(map[string]struct{}, len(source))
-	for identity := range source {
-		result[identity] = struct{}{}
-	}
-	return result
 }
 
 func (s CallableProfileSelection) Reference() api.ProviderCallableProfileReference {

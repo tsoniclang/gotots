@@ -48,7 +48,7 @@ func BlankFieldFacts() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await BlankFieldFacts();
+	typescriptRunner := `const facts = BlankFieldFacts();
 console.log(facts);
 `
 	goRunner := `package main

@@ -316,7 +316,7 @@ func buildFacetModules(
 				seed,
 				byName,
 				bindingDocuments,
-				selected,
+				seeds,
 				project,
 				effectMarker,
 				scalarAliases,
@@ -538,59 +538,5 @@ func buildFacetModules(
 			Facets:                        facets,
 		})
 	}
-	if err := verifySynchronousGenericKernelPairs(result); err != nil {
-		return nil, err
-	}
 	return result, nil
-}
-
-func verifySynchronousGenericKernelPairs(
-	modules []gostdlib.FacetModuleDocument,
-) error {
-	canonical := make(map[string]gostdlib.FacetDocument)
-	synchronous := make(map[string]gostdlib.FacetDocument)
-	for _, module := range modules {
-		for _, facet := range module.Facets {
-			if facet.Kind != gostdlib.FacetGenericCallableKernel ||
-				len(facet.Capabilities) != 1 {
-				continue
-			}
-			switch facet.Capabilities[0] {
-			case gostdlib.FacetCapabilityKernel:
-				canonical[facet.SourceIdentity] = facet
-			case gostdlib.FacetCapabilitySynchronousKernel:
-				synchronous[facet.SourceIdentity] = facet
-			}
-		}
-	}
-	for identity, narrowed := range synchronous {
-		base, ok := canonical[identity]
-		if !ok {
-			return certifyError(
-				"verify synchronous generic callable kernel",
-				identity,
-				"canonical kernel is absent",
-			)
-		}
-		if !slices.Equal(
-			narrowed.GenericTypeArguments,
-			base.GenericTypeArguments,
-		) || len(narrowed.CallableParameters) != len(base.CallableParameters) {
-			return certifyError(
-				"verify synchronous generic callable kernel",
-				identity,
-				"canonical and synchronous kernel projections differ",
-			)
-		}
-		for index, parameter := range narrowed.CallableParameters {
-			if parameter.Parameter != base.CallableParameters[index].Parameter {
-				return certifyError(
-					"verify synchronous generic callable kernel",
-					identity,
-					"canonical and synchronous callback indexes differ",
-				)
-			}
-		}
-	}
-	return nil
 }

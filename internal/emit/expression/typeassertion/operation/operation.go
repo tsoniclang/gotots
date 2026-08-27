@@ -19,13 +19,80 @@ func Apply(
 	commaOK bool,
 	receiver api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	sourceTarget, err := children.RepresentedType(
+	return apply(
 		context,
+		children,
 		source,
 		sourceType,
+		targetType,
+		commaOK,
+		receiver,
+		false,
 	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+}
+
+func ApplyGenericCapability(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	sourceType types.Type,
+	targetType types.Type,
+	commaOK bool,
+	receiver api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	return apply(
+		context,
+		children,
+		source,
+		sourceType,
+		targetType,
+		commaOK,
+		receiver,
+		true,
+	)
+}
+
+func apply(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	sourceType types.Type,
+	targetType types.Type,
+	commaOK bool,
+	receiver api.ExpressionEmission,
+	genericCapability bool,
+) (api.ExpressionEmission, error) {
+	var sourceTarget api.TypeEmission
+	if genericCapability {
+		runtimeValue, err := context.Names().Runtime(
+			api.RuntimeInterfaceValue,
+			api.ImportPhaseType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		sourceTarget = api.DirectType(
+			context.Factory().UnionTypeNode([]tsgo.TypeNode{
+				context.Factory().TypeReferenceNode(
+					runtimeValue.EntityName(context.Factory()),
+					nil,
+				),
+				context.Factory().KeywordTypeNode(
+					tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+				),
+			}),
+			runtimeValue.Requests()...,
+		)
+	} else {
+		var err error
+		sourceTarget, err = children.RepresentedType(
+			context,
+			source,
+			sourceType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	targetTarget, err := children.RepresentedType(
 		context,

@@ -214,6 +214,13 @@ func ResolveStatefulMethodBoundary(
 			"selected provider stateful profile omits method "+identity,
 		)
 	}
+	if err := RequireProviderEffect(
+		context,
+		identity,
+		profileMethod.Effect(),
+	); err != nil {
+		return StatefulMethodBoundary{}, false, err
+	}
 	boundary, err := analyzeCallableProfileBoundary(context, signature)
 	if err != nil {
 		return StatefulMethodBoundary{}, false, err

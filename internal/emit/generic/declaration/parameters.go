@@ -261,9 +261,8 @@ func EmitOperationParameters(
 			}
 		}
 		var (
-			target        api.TypeEmission
-			targetErr     error
-			facetRequests []api.RootRequest
+			target    api.TypeEmission
+			targetErr error
 		)
 		handled := false
 		if operation.Operation() ==
@@ -289,33 +288,12 @@ func EmitOperationParameters(
 		if targetErr != nil {
 			return nil, nil, targetErr
 		}
-		if !handled && operation.Operation() ==
-			api.GenericOperationConstraintMethod {
-			facet, facetErr :=
-				api.NewGenericOperationCallableFacet(operation)
-			if facetErr != nil {
-				return nil, nil, facetErr
-			}
-			observation, observationErr :=
-				context.ObserveCooperativeCallable(facet)
-			if observationErr != nil {
-				return nil, nil, observationErr
-			}
-			target, targetErr = callable.EmitInlineAwaitableType(
-				context.WithRole(api.RoleParameterType),
-				children,
-				source,
-				operation.Signature(),
-				observation.Cooperative(),
-			)
-			facetRequests = observation.Requests()
-		} else if !handled {
+		if !handled {
 			target, targetErr = callable.EmitInlineNonNilType(
 				context.WithRole(api.RoleParameterType),
 				children,
 				source,
 				operation.Signature(),
-				false,
 			)
 		}
 		if targetErr != nil {
@@ -336,10 +314,7 @@ func EmitOperationParameters(
 		capabilities = append(capabilities, binding)
 		requests = append(
 			requests,
-			api.CombineRequests(
-				target.Requests(),
-				facetRequests,
-			)...,
+			target.Requests()...,
 		)
 	}
 	return capabilities, requests, nil

@@ -1,5 +1,5 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { Awaitable, gostring, int64 } from "@gotots/gostdlib/internal/scalars.js";
+import type { gostring, int64 } from "@gotots/gostdlib/internal/scalars.js";
 import {
   hostInteger,
   integerFromHost,
@@ -23,26 +23,6 @@ export function signalProcess(
     return nodeError("invalid", "signal");
   }
   const name = signal.String();
-  const selected = nodeSignal(name);
-  if (selected === undefined) {
-    return nodeError("invalid", "signal");
-  }
-  try {
-    process.kill(hostInteger(receiver.Pid), selected);
-    return undefined;
-  } catch {
-    return nodeError("operation", "signal");
-  }
-}
-
-export async function signalProcessAsync(
-  receiver: ProcessValue | undefined,
-  signal: { String(): Awaitable<gostring> } | undefined,
-): Promise<GoError | undefined> {
-  if (receiver === undefined || signal === undefined) {
-    return nodeError("invalid", "signal");
-  }
-  const name = await signal.String();
   const selected = nodeSignal(name);
   if (selected === undefined) {
     return nodeError("invalid", "signal");

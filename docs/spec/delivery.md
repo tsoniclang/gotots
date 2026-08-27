@@ -137,20 +137,24 @@ Exit: source callable signatures contain no recovery parameter; every direct
 and dynamic defer form passes the recovery-directness matrix; functions without
 control demand remain artifact-stable.
 
-## 6. Cooperative Concurrency
+## 6. Serial Execution
 
-Install the explicit race-free `cooperative` profile:
+Install the one fixed synchronous execution contract:
 
-- channel representation and typed live queues;
-- goroutine scheduler and program settlement;
-- send, receive, close, range, and atomic select;
-- direct callable effect propagation;
-- one canonical `Awaitable` ABI per indirect signature and interface method;
-- package/program asynchronous initialization where demanded.
+- one direct callable ABI for functions, methods, literals, callable values,
+  interface methods, callbacks, deferred entries, and package initialization;
+- immediate serial execution of `go` calls;
+- buffered channel send, receive, close, range, and atomic ready/default
+  `select` operations;
+- typed serial-blocking panics for every operation that would suspend;
+- the narrow close-observer capability required by synchronous context and
+  signal providers; and
+- synchronous provider/facade/kernel certification.
 
-Exit: no per-method or combinatorial callable-profile variants, hidden effect
-type parameters, result shape tests, or all-function async conversion; full
-channel/scheduler differentials, deadlock/panic tests, and cost gates pass.
+Exit: generated and provider-facing callable surfaces contain no `Promise`,
+`async`, `await`, awaitable union, scheduler, blocked-operation queue, or
+execution-profile variant; ready channel differentials and every blocking,
+close, nil, and panic boundary pass.
 
 ## 7. Language Closure
 
@@ -196,19 +200,18 @@ the package normally through ESM package resolution; publication is a separate
 later action.
 
 Public provider APIs and generated facades preserve source arity. Generic,
-interface, cooperative, and recovery support remains statically linked in
-private facade/kernel artifacts. No runtime policy object, capability
-argument, per-method profile variant, or ambient fallback survives. Required
-semantic protocols may retain at most one uniform direct certificate and one
-uniform cooperative certificate for a Go identity; ordinary direct bindings
-are not duplicated.
+interface, and recovery support remains statically linked in private
+facade/kernel artifacts. No runtime policy object, capability argument,
+per-method effect variant, or ambient fallback survives. A semantic protocol
+may retain at most one uniform synchronous certificate for a Go identity;
+ordinary direct bindings are not duplicated.
 
 Capability views used only inside the provider and views permitted in generated
 bridges are separately certified. Only the latter enter reverse interface
 demand. Delivery fails if a provider-internal view appears in generated output,
 if an exported view lacks a usage, if a direct bridge selects a canonical view,
 if a canonical bridge selects a direct view, or if either usage selects an
-incompatible base or target callable profile.
+incompatible base or target provider profile.
 
 Exit: provider package independently strict-typechecks and executes; exact
 contract/facade joins pass; a linked representative product uses one runtime
@@ -250,6 +253,12 @@ For each acceptance corpus, including TS-Go:
    unresolved obligations;
 11. preserve exact failure artifacts.
 
+Step 4 is a strict lifecycle transition: seal and encode the complete official
+TS-Go AST, end the load/type/emitter/target-node lifetime, release that heap
+under the shared process-tree budget, and only then start the pinned printer.
+Printing streams one encoded file at a time and protocol scratch is absent from
+the published product.
+
 Compile-only is not runtime completion. Runtime completion requires an actual
 generated entry point to execute with expected observable output and error
 behavior.
@@ -265,8 +274,8 @@ entry and only demand-created private implementation artifacts:
   concretizations, never public operation/capability parameters;
 - recover support may use one private deferred entry while the ordinary source
   entry remains unchanged;
-- indirect cooperative callables use the one canonical awaitability mapping,
-  while exact direct effects remain fact evidence for a selected target; and
+- indirect callables recursively use the same direct synchronous signature as
+  their source callable type; and
 - provider boundaries use exact static facades whose public calls retain the
   source arguments.
 

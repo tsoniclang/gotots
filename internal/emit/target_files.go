@@ -295,7 +295,6 @@ func (s *programSession) assembleTargetFiles() ([]TargetFile, error) {
 	runtimePackage, err := runtimeemission.AssemblePackage(
 		s.factory,
 		s.scalar,
-		s.concurrency,
 		requirements.runtimeSymbols,
 		requirements.aliases(),
 	)
@@ -380,20 +379,13 @@ func (s *programSession) programInitializationFile(
 		if err := placement.Apply([]api.RootRequest{request}); err != nil {
 			return TargetFile{}, err
 		}
-		var call tsgo.Expression = s.factory.CallExpression(
+		call := s.factory.CallExpression(
 			s.factory.Identifier(localName),
 			nil,
 			nil,
 			nil,
 			tsgo.NodeFlagsNone,
 		)
-		cooperative, err := s.packageInitializationIsCooperative(builder)
-		if err != nil {
-			return TargetFile{}, err
-		}
-		if cooperative {
-			call = s.factory.AwaitExpression(call)
-		}
 		calls = append(calls, s.factory.ExpressionStatement(call))
 	}
 	statements := placement.Statements(s.factory)
@@ -476,7 +468,8 @@ func (r *targetRequirements) addProviderRuntime(s *programSession) error {
 	for _, alias := range requirements.PrimitiveAliases() {
 		r.primitiveAliases[alias] = struct{}{}
 	}
-	for symbol := range requirements.RuntimeSymbols() {
+	selectedSymbols := requirements.RuntimeSymbols()
+	for symbol := range selectedSymbols {
 		r.runtimeSymbols[symbol] = struct{}{}
 	}
 	return nil

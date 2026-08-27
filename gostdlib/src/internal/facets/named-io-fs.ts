@@ -1,15 +1,13 @@
-import { GoPanic } from "@gotots/runtime/panic.js";
 import { GoMapHash } from "@gotots/runtime/map.js";
-import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { GoRecovery } from "@gotots/runtime/panic.js";
-import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
+import { GoPanic, type GoRecovery } from "@gotots/runtime/panic.js";
 import type { uint32 } from "@gotots/gostdlib/internal/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { FileMode, PathError } from "../../io/fs.js";
-import type { CanonicalError } from "./provider-io-contract.js";
 import { goInterfaceEqual } from "../runtime/interface.js";
+import type { ProviderErrorInterface } from "./provider-error.js";
 
-export type { CanonicalError } from "./provider-io-contract.js";
+export type { ProviderErrorInterface } from "./provider-error.js";
 
 export class IoFsFileModeValueOperations {
   static $project(source: FileMode): uint32 {
@@ -21,125 +19,76 @@ export class IoFsFileModeValueOperations {
   }
 }
 
+export { PathError as IoFsPathErrorOperations };
 export type IoFsPathErrorStorage = PathError;
 
-export class IoFsPathErrorOperations {
-  static $make(
-    operation: gostring,
-    path: gostring,
-    failure: GoError | undefined,
-  ): PathError {
-    return new PathError(operation, path, failure);
-  }
-
-  static $copy(source: PathError): PathError {
-    return new PathError(source.Op, source.Path, source.Err);
-  }
-
-  static $assign(target: PathError, source: PathError): void {
-    const operation = source.Op;
-    const path = source.Path;
-    const failure = source.Err;
-    target.Op = operation;
-    target.Path = path;
-    target.Err = failure;
-  }
-
-  static $equal(left: PathError, right: PathError): boolean {
-    return left.Op === right.Op &&
-      left.Path === right.Path &&
-      goInterfaceEqual(left.Err, right.Err);
-  }
-
-  static $hash(source: PathError): number {
-    let hash = GoMapHash.string(source.Op);
-    hash = GoMapHash.mix(hash, GoMapHash.string(source.Path));
-    return GoMapHash.mix(hash, source.Err?.$go$hash() ?? 0);
-  }
-
-  static $storageOf(source: PathError): IoFsPathErrorStorage {
-    return source;
-  }
-
-  static $fromStorage(source: IoFsPathErrorStorage): PathError {
-    return source;
-  }
-}
-
-export class CanonicalPathError<Failure extends CanonicalError> {
+export class DirectPathError<Failure extends ProviderErrorInterface> {
   constructor(
     public Op: gostring,
     public Path: gostring,
     public Err: Failure | undefined,
   ) {}
 
-  static $make<Failure extends CanonicalError>(
+  static $make<Failure extends ProviderErrorInterface>(
     operation: gostring,
     path: gostring,
     failure: Failure | undefined,
-  ): CanonicalPathError<Failure> {
-    return new CanonicalPathError(operation, path, failure);
+  ): DirectPathError<Failure> {
+    return new DirectPathError(operation, path, failure);
   }
 
-  static $copy<Failure extends CanonicalError>(
-    source: CanonicalPathError<Failure>,
-  ): CanonicalPathError<Failure> {
-    return new CanonicalPathError(source.Op, source.Path, source.Err);
+  static $copy<Failure extends ProviderErrorInterface>(
+    source: DirectPathError<Failure>,
+  ): DirectPathError<Failure> {
+    return new DirectPathError(source.Op, source.Path, source.Err);
   }
 
-  static $assign<Failure extends CanonicalError>(
-    target: CanonicalPathError<Failure>,
-    source: CanonicalPathError<Failure>,
+  static $assign<Failure extends ProviderErrorInterface>(
+    target: DirectPathError<Failure>,
+    source: DirectPathError<Failure>,
   ): void {
-    const operation = source.Op;
-    const path = source.Path;
-    const failure = source.Err;
-    target.Op = operation;
-    target.Path = path;
-    target.Err = failure;
+    target.Op = source.Op;
+    target.Path = source.Path;
+    target.Err = source.Err;
   }
 
-  static $equal<Failure extends CanonicalError>(
-    left: CanonicalPathError<Failure>,
-    right: CanonicalPathError<Failure>,
+  static $equal<Failure extends ProviderErrorInterface>(
+    left: DirectPathError<Failure>,
+    right: DirectPathError<Failure>,
   ): boolean {
-    return left.Op === right.Op &&
-      left.Path === right.Path &&
+    return left.Op === right.Op && left.Path === right.Path &&
       goInterfaceEqual(left.Err, right.Err);
   }
 
-  static $hash<Failure extends CanonicalError>(
-    source: CanonicalPathError<Failure>,
+  static $hash<Failure extends ProviderErrorInterface>(
+    source: DirectPathError<Failure>,
   ): number {
     let hash = GoMapHash.string(source.Op);
     hash = GoMapHash.mix(hash, GoMapHash.string(source.Path));
     return GoMapHash.mix(hash, source.Err?.$go$hash() ?? 0);
   }
 
-  static $storageOf<Failure extends CanonicalError>(
-    source: CanonicalPathError<Failure>,
-  ): CanonicalPathError<Failure> {
+  static $storageOf<Failure extends ProviderErrorInterface>(
+    source: DirectPathError<Failure>,
+  ): DirectPathError<Failure> {
     return source;
   }
 
-  static $fromStorage<Failure extends CanonicalError>(
-    source: CanonicalPathError<Failure>,
-  ): CanonicalPathError<Failure> {
+  static $fromStorage<Failure extends ProviderErrorInterface>(
+    source: DirectPathError<Failure>,
+  ): DirectPathError<Failure> {
     return source;
   }
 
-  static async Error<Failure extends CanonicalError>(
-    receiver: CanonicalPathError<Failure> | undefined,
+  static Error<Failure extends ProviderErrorInterface>(
+    receiver: DirectPathError<Failure> | undefined,
     _recovery?: GoRecovery,
-  ): Promise<gostring> {
-    if (receiver === undefined) {
-      return "<nil>";
-    }
-    return await receiver.Error();
+  ): gostring {
+    return receiver === undefined ? "<nil>" : receiver.Error();
   }
 
-  static Unwrap<Failure extends CanonicalError>(
-    receiver: CanonicalPathError<Failure> | undefined,
+  static Unwrap<Failure extends ProviderErrorInterface>(
+    receiver: DirectPathError<Failure> | undefined,
   ): Failure | undefined {
     if (receiver === undefined) {
       GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
@@ -147,8 +96,8 @@ export class CanonicalPathError<Failure extends CanonicalError> {
     return receiver.Unwrap();
   }
 
-  async Error(_recovery?: GoRecovery): Promise<gostring> {
-    const detail = this.Err === undefined ? "<nil>" : await this.Err.Error();
+  Error(_recovery?: GoRecovery): gostring {
+    const detail = this.Err === undefined ? "<nil>" : this.Err.Error();
     if (this.Op === "") {
       return `${this.Path}: ${detail}`;
     }

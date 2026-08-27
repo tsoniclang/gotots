@@ -28,6 +28,7 @@ import {
 import { ProviderError } from "../../runtime/error.js";
 import {
   bindRuntimeTypeResolver,
+  bindRuntimeTypeRecorder,
   bindRuntimePointerTypeFactory,
   recordPointerDescriptor,
 } from "./runtime-value.js";
@@ -239,12 +240,12 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   Fields(): Seq<StructField> {
     const fields = this.structFields();
     return new Seq<StructField>(
-      async (yieldValue): Promise<void> => {
+      (yieldValue): void => {
         if (yieldValue === undefined) return;
         for (let index = 0; index < fields.length; index++) {
           const field = fields[index];
           if (field !== undefined &&
-            !await yieldValue(materializeField(field, index))) return;
+            !yieldValue(materializeField(field, index))) return;
         }
       },
     );
@@ -297,10 +298,10 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   Methods(): Seq<Method> {
     const methods = this.runtimeMethods();
     return new Seq<Method>(
-      async (yieldValue): Promise<void> => {
+      (yieldValue): void => {
         if (yieldValue === undefined) return;
         for (const method of methods) {
-          if (!await yieldValue(materializeMethod(method))) return;
+          if (!yieldValue(materializeMethod(method))) return;
         }
       },
     );
@@ -460,6 +461,17 @@ bindRuntimeTypeResolver((value: GoInterfaceValue): Type | undefined =>
   runtimeTypesByDynamicType.get(value.$go$type),
 );
 
+bindRuntimeTypeRecorder((value: GoInterfaceValue, type: Type): void => {
+  if (!(type instanceof RuntimeType)) {
+    return GoPanic.raiseRuntime("reflect: recorded runtime type is foreign");
+  }
+  const existing = runtimeTypesByDynamicType.get(value.$go$type);
+  if (existing !== undefined && existing !== type) {
+    return GoPanic.raiseRuntime("reflect: dynamic type token changed identity");
+  }
+  runtimeTypesByDynamicType.set(value.$go$type, type);
+});
+
 bindRuntimePointerTypeFactory((element: Type): Type | undefined =>
   element instanceof RuntimeType ? element.pointerType() : undefined,
 );
@@ -522,10 +534,10 @@ function sequenceAt(
 
 function typeSequence(values: readonly Type[]): Seq<Type | undefined> {
   return new Seq<Type | undefined>(
-    async (yieldValue): Promise<void> => {
+    (yieldValue): void => {
       if (yieldValue === undefined) return;
       for (const value of values) {
-        if (!await yieldValue(value)) return;
+        if (!yieldValue(value)) return;
       }
     },
   );

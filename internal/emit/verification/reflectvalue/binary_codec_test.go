@@ -69,7 +69,7 @@ func Transfer() string {
 	)
 }
 `
-	typescriptRunner := `const facts = await Transfer();
+	typescriptRunner := `const facts = Transfer();
 console.log(facts);
 `
 	goRunner := `package main

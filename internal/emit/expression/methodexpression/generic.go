@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -37,15 +36,6 @@ func emitGenericMethodExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	providerCooperative, _, contractRequests, err :=
-		cooperativecall.GenericValueContract(
-			context,
-			selection.Facet(),
-			valueSignature,
-		)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	parameters := targetSignature.ParameterReferences(context.Factory())
 	if len(parameters) == 0 {
 		return api.ExpressionEmission{}, &api.InvariantError{
@@ -70,15 +60,6 @@ func emitGenericMethodExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	call, err = cooperativecall.SourceInterfaceProviderCall(
-		context,
-		source,
-		call,
-		providerCooperative,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	call, err = selection.FromProviderResults(context, children, call)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -89,17 +70,11 @@ func emitGenericMethodExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	var modifiers []tsgo.ModifierLike
-	resultType := targetSignature.Result()
-	if providerCooperative {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	ordinary := context.Factory().ArrowFunction(
-		modifiers,
+		nil,
 		nil,
 		targetSignature.Parameters(),
-		resultType,
+		targetSignature.Result(),
 		context.Factory().EqualsGreaterThanToken(),
 		methodExpressionBody(context, valueSignature, call),
 	)
@@ -110,7 +85,6 @@ func emitGenericMethodExpression(
 				targetSignature.Requests(),
 				selection.Requests(),
 				call.Requests(),
-				contractRequests,
 				recoveryObservation.Requests(),
 			)...,
 		), nil
@@ -156,13 +130,13 @@ func emitGenericMethodExpression(
 		return api.ExpressionEmission{}, err
 	}
 	deferred := context.Factory().ArrowFunction(
-		modifiers,
+		nil,
 		nil,
 		append(
 			[]tsgo.ParameterDeclaration{recovery},
 			targetSignature.Parameters()...,
 		),
-		resultType,
+		targetSignature.Result(),
 		context.Factory().EqualsGreaterThanToken(),
 		methodExpressionBody(context, valueSignature, deferredCall),
 	)
@@ -188,7 +162,6 @@ func emitGenericMethodExpression(
 			deferredCall.Requests(),
 			recoveryRequests,
 			registry.Requests(),
-			contractRequests,
 			recoveryObservation.Requests(),
 		)...,
 	), nil

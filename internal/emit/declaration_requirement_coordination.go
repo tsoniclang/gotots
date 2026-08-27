@@ -153,41 +153,6 @@ func compareDeclarationRequirements(
 			return 0
 		}
 	}
-	if left.Kind() == api.DeclarationRequirementCooperativeCallable {
-		leftFacet, leftOK := left.CooperativeCallable()
-		rightFacet, rightOK := right.CooperativeCallable()
-		switch {
-		case !leftOK && rightOK:
-			return -1
-		case leftOK && !rightOK:
-			return 1
-		case !leftOK:
-			return 0
-		case leftFacet.Kind() < rightFacet.Kind():
-			return -1
-		case leftFacet.Kind() > rightFacet.Kind():
-			return 1
-		}
-		if leftLiteral, ok := leftFacet.FunctionLiteral(); ok {
-			rightLiteral, _ := rightFacet.FunctionLiteral()
-			switch {
-			case leftLiteral.Pos() < rightLiteral.Pos():
-				return -1
-			case leftLiteral.Pos() > rightLiteral.Pos():
-				return 1
-			}
-		}
-		if leftOperation, ok := leftFacet.GenericOperation(); ok {
-			rightOperation, _ := rightFacet.GenericOperation()
-			switch {
-			case leftOperation.Key() < rightOperation.Key():
-				return -1
-			case leftOperation.Key() > rightOperation.Key():
-				return 1
-			}
-		}
-		return 0
-	}
 	if left.Kind() == api.DeclarationRequirementAnonymousStruct {
 		leftArtifact, leftDemand, _ := left.AnonymousStruct()
 		rightArtifact, rightDemand, _ := right.AnonymousStruct()
@@ -395,8 +360,44 @@ func (s *programSession) settle() error {
 			}
 			continue
 		}
+		if scheduled, err := s.scheduleReflectionInterfaceDemands(); err != nil {
+			return err
+		} else if scheduled {
+			continue
+		}
 		return nil
 	}
+}
+
+func (s *programSession) scheduleReflectionInterfaceDemands() (
+	bool,
+	error,
+) {
+	requests, err := s.registry.FlushReflectionInterfaceDemands()
+	if err != nil {
+		return false, err
+	}
+	if len(requests) == 0 {
+		return false, nil
+	}
+	scheduled := false
+	err = api.WalkUniqueRootRequestPayloads(
+		requests,
+		func(request api.RootRequest) error {
+			requirement, ok := request.DeclarationRequirement()
+			if !ok {
+				return &ScheduleError{
+					Reason: "reflection interface batch contains a non-declaration request",
+				}
+			}
+			if err := s.scheduleDeclarationRequirement(requirement); err != nil {
+				return err
+			}
+			scheduled = true
+			return nil
+		},
+	)
+	return scheduled, err
 }
 
 func (s *programSession) removeTargetDeclaration(

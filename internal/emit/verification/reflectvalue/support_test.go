@@ -110,7 +110,7 @@ func linkedProviderCertificate(t *testing.T) *certify.Certificate {
 }
 
 // compileReflectFixture loads one reflection fixture package, compiles it
-// with the verified provider certificate under the cooperative profile, and
+// with the verified provider certificate under the serial profile, and
 // returns the emission.
 func compileReflectFixture(
 	t *testing.T,
@@ -139,7 +139,6 @@ func compileReflectFixture(
 		selected = append(selected, mustRoot(t, scope.Lookup(name)))
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, selected, options)
 	if err != nil {
@@ -413,7 +412,10 @@ type reflectionRegistrationMeasurement struct {
 }
 
 func TestReflectionRegistrationsShareBoundedCommonMachinery(t *testing.T) {
-	const maxRegistrationBytesPerType = 3_800
+	const (
+		maxAddressableRegistrationBytesPerType = 4_100
+		maxAddressableRegistrationNodesPerType = 600
+	)
 	small := measureReflectionRegistrations(t, 8)
 	large := measureReflectionRegistrations(t, 32)
 	countDelta := large.count - small.count
@@ -426,8 +428,8 @@ func TestReflectionRegistrationsShareBoundedCommonMachinery(t *testing.T) {
 			large.runtimeSize,
 		)
 	}
-	if countDelta != 24 || byteDelta/countDelta > maxRegistrationBytesPerType ||
-		nodeDelta/countDelta > 550 {
+	if countDelta != 24 || byteDelta/countDelta > maxAddressableRegistrationBytesPerType ||
+		nodeDelta/countDelta > maxAddressableRegistrationNodesPerType {
 		t.Fatalf(
 			"reflection registration growth is not bounded: counts=%d/%d bytes=%d/%d nodes=%d/%d",
 			small.count,

@@ -15,7 +15,6 @@ const (
 	OptionOutputDirectory
 	OptionExternals
 	OptionStandardLibrary
-	OptionConcurrency
 	OptionEvaluationOrder
 	OptionIntegers
 	OptionRootMode
@@ -48,7 +47,6 @@ var descriptors = []Descriptor{
 	{OptionOutputDirectory, "output.directory", "output", false},
 	{OptionExternals, "providers.externals", "externals", false},
 	{OptionStandardLibrary, "providers.standardLibrary", "standard-library", false},
-	{OptionConcurrency, "semantics.concurrency", "concurrency", false},
 	{OptionEvaluationOrder, "semantics.evaluationOrder", "evaluation-order", false},
 	{OptionIntegers, "semantics.integers", "integer", false},
 	{OptionRootMode, "source.mode", "root-mode", false},

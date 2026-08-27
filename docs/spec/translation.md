@@ -87,10 +87,8 @@ hash or package suffixes to every ordinary generated reference.
 Target host intrinsics have one closed identity owner. Value references use
 `globalThis.<name>`, so a valid Go declaration such as
 `func String(string) Token` keeps its source-shaped name without shadowing the
-target `String.fromCharCode` used by an unrelated conversion. Host type names
-remain idiomatic when TypeScript defines an unambiguous global type: generated
-async signatures use `Promise<T>`, and a conflicting Go type declaration is
-deterministically target-renamed. TypeScript's forbidden target class name
+target `String.fromCharCode` used by an unrelated conversion. Source callables
+never emit the host `Promise` type. TypeScript's forbidden target class name
 `Object` is reserved by the same closed owner. Bare host value intrinsics are
 forbidden in source-facing generated modules. A structurally isolated support
 or runtime module that admits no Go declaration may use the direct host
@@ -365,12 +363,29 @@ provider's `int64` carrier at the private boundary. Callable parameters are
 adapted recursively rather than treated as opaque merely because they mention
 a type parameter.
 
+Container-transforming kernels also retain Go assignment semantics. A call
+such as `slices.Clone(records)` receives typed conversion, copy, storage, and
+inverse-storage operations for the concrete `Record`; the kernel emits a new
+slice whose elements are copied values rather than shared target storage
+objects. In-place operations use the same operations while preserving the
+original backing descriptor. The compiler never selects behavior from the
+element's TypeScript spelling or assumes that a generic `T` is reference-safe.
+
 Canonical container results are also recursive. For example, provider
 `fs.ReadDir` returns a provider slice of provider `DirEntry` contracts; generated
 code receives a `RuntimeSliceProjection` whose element functions are the
 certified `DirEntry` profile bridges. A canonical `error` parameter, however,
 already has the generated interface ABI and is passed unchanged so generated
 `Is(error)` and `Unwrap()` implementations remain observable.
+
+Go strings retain their exact byte sequence in target storage: one target code
+unit represents one Go byte. Crossing to a host text API requires the canonical
+UTF-8 decoder; crossing to a host byte API requires the canonical raw-byte
+projection. Thus `File.WriteString("\xe2\x80\x9c")` writes the three source
+bytes, not the six bytes produced by UTF-8-encoding three Latin-1-looking host
+characters. NUL and invalid UTF-8 remain legal. Provider code may not pass a
+canonical Go string directly to a Node string-writing API or define a second
+byte/text conversion helper.
 
 ### Defined Types And Aliases
 
@@ -723,8 +738,8 @@ constant-size member calls; implementer switches are forbidden.
 Every generated root class, including the canonical interface-value contract,
 declares the erased nominal member
 `declare private readonly then?: never`. JavaScript therefore cannot mistake a
-generated Go value for a Promise-like value when it crosses an `async` return
-boundary, while structural TypeScript values cannot claim the guarantee. The
+generated Go value for a Promise-like value when a host Promise resolves it,
+while structural TypeScript values cannot claim the guarantee. The
 declaration emits no JavaScript field. Generated derived classes inherit the
 one root declaration and never redeclare its private member. A source Go method
 named `then` is unexported and keeps its package-qualified target member
@@ -789,6 +804,43 @@ descriptor. `TypeOf` returns that descriptor and `ValueOf` creates a typed
 reflective value view whose field/index/element operations delegate to
 generated typed accessors. No host object inspection occurs.
 
+Pointer element locations remain exact when the pointee is itself an interface
+or another non-scalar kind:
+
+```go
+var slot any = "before"
+element := reflect.ValueOf(&slot).Elem()
+element.Set(reflect.ValueOf(int64(7)))
+```
+
+The `*any` registration loads the existing interface box from `slot`, records
+the static element descriptor as `any`, admits writes through the canonical
+empty-interface contract, and stores the selected dynamic box back into the
+same location. It does not wrap that box in a fabricated interface adapter or
+fall back to JavaScript shape inspection. The same location path delegates
+array copies and pointer/function/channel reference values to the ordinary
+value-transfer owner rather than selecting pointee behavior from a reflection
+kind whitelist.
+
+Container operations retain the same assignment algebra as ordinary Go:
+
+```go
+type Cell struct { Count int }
+cells := []Cell{{Count: 1}}
+grown := reflect.Append(reflect.ValueOf(cells), reflect.ValueOf(Cell{Count: 2}))
+pointers := reflect.MakeSlice(reflect.TypeOf([]*Cell{}), 2, 4)
+```
+
+The `[]Cell` descriptor copies existing aggregate elements if append allocates
+a new backing array and stores a copied incoming `Cell`; it never aliases the
+same target object as two independent Go struct values. The `[]*Cell`
+descriptor instead stores pointer values directly and initializes new entries
+to the typed nil pointer. `MakeSlice` and `Value.Grow` use the same canonical
+slice-storage constructor and typed zero operation. Reflective maps similarly
+select the compiler's ordinary scalar, native-key, or hashed map
+representation from their exact Go key/value types rather than a basic-type
+whitelist.
+
 Per-type reflection output contains facts, not a copied reflection
 interpreter. For example, an addressable source struct contributes one compact
 typed registration equivalent to:
@@ -822,6 +874,46 @@ payload cast, source-name lookup, or host reflection is permitted. Provider-
 represented structs use a distinct typed opaque-field registration whose
 only generated facts are field-order-preserving failure messages; they do not
 retain the ordinary field-access path behind a fallback.
+
+An addressable registration also carries its canonical pointer box callback.
+For example, a field callback returns the exact adapter around
+`addressOf(entry.Name)`, while a pointer-element callback returns the original
+pointer box. The portable `Value.Addr` implementation consumes that callback;
+it never invents a second cell or an unboxed pointer-shaped object. The exact
+box token is registered against the canonical pointer descriptor at that
+boundary, so a later `ValueOf` resolves the same type without eagerly demanding
+reflection artifacts for every addressable child type. The pointer adapter
+is also recorded at the reflection-interface boundary through which
+`Interface` and `TypeAssert` expose it. Once ordinary emission is quiescent,
+that owner exact-joins the recorded adapter to reached assertion contracts
+using the selected checker graph and schedules all matches for that adapter as
+one requirement batch. It does not enroll the adapter in ordinary
+empty-interface reachability. Thus this address-only generic value:
+
+```go
+type Decoder interface { Decode([]byte) error }
+type Cell[T ~string] struct { Value T }
+func (cell *Cell[T]) Decode(text []byte) error {
+    cell.Value = T(text)
+    return nil
+}
+
+field := reflect.ValueOf(&holder).Elem().Field(0)
+decoder, ok := reflect.TypeAssert[Decoder](field.Addr())
+```
+
+causes the canonical `*Cell[string]` adapter to carry `Decoder`'s exact method
+token and implementation. Unasserted methods on `*Cell[string]` are not added.
+It does not demand a static pointer reflection descriptor merely to make the
+assertion work. No marker spelling, eager reconstruction, method-name lookup,
+or product-specific adapter list participates.
+
+Provider-created reflected values use the same rule. For example,
+`fresh := reflect.New(reflect.TypeOf(Label("")))` followed by
+`reflect.TypeAssert[Decoder](fresh)` gives the generated `*Label` adapter the
+`Decoder` contract even if no authored `*Label` value was converted to an
+interface. The already-demanded pointer descriptor still owns construction;
+the quiescent join adds only the selected method contract.
 
 For an open generic body:
 
@@ -1087,27 +1179,28 @@ entry, while absence uses the ordinary provider callable.
 
 ### Channels, Goroutines, And Select
 
-Under `cooperative`, channel send/receive and blocking select lower to typed
-Promise operations. Direct call effects propagate through revisable callable
-facets. Function values and interface methods use canonical
-`Awaitable<R>` results and are unconditionally awaited.
+Channel types use one typed runtime identity under fixed serial execution. A
+goroutine call is emitted as a direct call; ready buffered send/receive and
+ready/default select complete synchronously. A nil, unbuffered, full, empty, or
+otherwise unready operation that would suspend raises the typed
+serial-blocking panic instead of fabricating progress. The language path emits
+no `Promise`, `async`, `await`, scheduler, waiter queue, or host task.
+Explicit event-based provider APIs such as timers retain their separately
+certified host callback behavior without changing the source call's direct
+signature.
 
-```go
-func Consume(next func() int) int { return next() }
-```
+Source functions, methods, literals, callable values, interface methods,
+generated callable contracts, package initializers, provider facades, and
+selected generic kernels all have direct synchronous signatures at
+construction. Provider bindings and stateful profiles are selected by exact
+certified identity and must report a synchronous effect. A suspending provider
+path fails before publication; no consumer repairs its declaration or call.
 
-maps in the cooperative profile to:
-
-```ts
-export async function Consume(
-  next: () => Awaitable<int>,
-): Promise<int> {
-  return await next();
-}
-```
-
-The source still has one parameter. No synchronous/cooperative public variants,
-hidden effect parameters, or runtime Promise tests exist.
+When a stateful provider type retains interface-typed state, it has one
+certified synchronous target class and constructor profile. For example,
+`bufio.NewWriter(w)` selects a class whose `Write` and `Flush` methods and
+retained `io.Writer`/`error` contracts are synchronous. It has no awaitable
+sibling and is never selected by target spelling.
 
 Every possibly nil function value is evaluated once, its arguments are then
 evaluated in source order, and one generic runtime check returns the identical
@@ -1128,10 +1221,10 @@ dispatch, or result adaptation. Statically non-nil declarations and literals
 call directly. A conditional, assertion, or alternate nil-call path is
 forbidden.
 
-`go f(args)` captures/copies immediately and schedules one closure. `select`
-evaluates operands once, chooses a ready case fairly, commits once, and
-cancels every other registration. Receive assignment targets are evaluated
-only after their case wins.
+`go f(args)` evaluates/copies its callee and arguments immediately, then invokes
+the call on the current stack. `select` evaluates operands once, chooses one
+ready case fairly, and commits it once. It installs no registrations. Receive
+assignment targets are evaluated only after their case wins.
 
 ## Packages, Standard Library, And Externals
 
@@ -1145,11 +1238,18 @@ failure := fs.WalkDir(fileSystem, ".", visit)
 emits a call with the same three Go arguments:
 
 ```ts
-const failure = await io_fs.WalkDir(fileSystem, ".", visit);
+const failure = io_fs.WalkDir(fileSystem, ".", visit);
 ```
 
 The generated `io_fs.WalkDir` facade may statically import provider bridges
-or a private provider kernel, but no call site supplies a policy object.
+or a private provider kernel, but no call site supplies a policy object. Its
+provider contract and visitor callback are certified synchronous.
+
+A provider-defined callable type is joined by identity to the certified
+synchronous effect of its target carrier. For example, an `iter.Seq[int]`
+carrier accepts a direct generated sequence. A Promise-bearing carrier fails
+before the call AST is constructed. The compiler never inserts a cast, tests a
+result, or infers this contract from `Seq` spelling.
 
 Every standard-library or toolchain reference selects exactly one
 implementation route—provider binding, compiler intrinsic, generated runtime

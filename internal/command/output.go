@@ -11,12 +11,14 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/config"
-	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-const buildManifestName = "gotots-manifest.json"
+const (
+	buildManifestName          = "gotots-manifest.json"
+	buildManifestSchemaVersion = 1
+)
 
 const projectPackageName = "package.json"
 
@@ -47,69 +49,62 @@ func programDigest(program *load.Program) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-func writeEmission(
+func writePrintPlanTo(
 	project config.Project,
-	emission emit.ProgramEmission,
-	semanticDigest string,
-) (int, error) {
-	return writeOutputTransaction(
-		project.OutputDirectory(),
-		func(outputDirectory string) (int, error) {
-			files, err := writeEmissionTo(project, emission, semanticDigest, outputDirectory)
-			if err != nil {
-				return 0, err
-			}
-			if err := project.GoTool().VerifyComplete(); err != nil {
-				return 0, err
-			}
-			return files, nil
-		},
-	)
-}
-
-func writeEmissionTo(
-	project config.Project,
-	emission emit.ProgramEmission,
+	plan printPlan,
 	semanticDigest string,
 	outputDirectory string,
 ) (int, error) {
+	if err := plan.validate(outputDirectory); err != nil {
+		return 0, err
+	}
 	client, err := tsgo.StartClientWithTool(project.TSGoTool(), outputDirectory)
 	if err != nil {
 		return 0, err
 	}
-	files := emission.Files()
-	paths := make([]string, 0, len(files)+3)
-	for _, file := range files {
-		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+	closed := false
+	defer func() {
+		if !closed {
+			_ = client.Close()
+		}
+	}()
+	paths := make([]string, 0, len(plan.files)+3)
+	for _, file := range plan.files {
+		payload, err := os.ReadFile(file.protocolPath)
 		if err != nil {
-			_ = client.Close()
+			return 0, commandError("read staged target AST", err.Error())
+		}
+		if err := file.verifyProtocolPayload(payload); err != nil {
 			return 0, err
 		}
-		if err := writeTargetFile(outputDirectory, file.OutputPath(), []byte(printed)); err != nil {
-			_ = client.Close()
+		printed, err := client.PrintEncodedSourceFile(payload, tsgo.PrintOptions{})
+		if err != nil {
 			return 0, err
 		}
-		paths = append(paths, file.OutputPath())
+		if err := writeTargetFile(outputDirectory, file.outputPath, []byte(printed)); err != nil {
+			return 0, err
+		}
+		paths = append(paths, file.outputPath)
 	}
 	if err := client.Close(); err != nil {
 		return 0, err
 	}
-	if runtimePackage, ok := emission.RuntimePackage(); ok {
+	closed = true
+	if err := plan.removeProtocolScratch(); err != nil {
+		return 0, err
+	}
+	if plan.hasRuntimeManifest {
 		if err := writeTargetFile(
 			outputDirectory,
-			runtimePackage.ManifestPath(),
-			runtimePackage.Manifest(),
+			plan.runtimeManifest.outputPath,
+			plan.runtimeManifest.payload,
 		); err != nil {
 			return 0, err
 		}
-		paths = append(paths, runtimePackage.ManifestPath())
+		paths = append(paths, plan.runtimeManifest.outputPath)
 	}
 	sort.Strings(paths)
-	packageDocument, err := encodeProjectPackage(emission.PackageDependencies())
-	if err != nil {
-		return 0, err
-	}
-	if err := writeTargetFile(outputDirectory, projectPackageName, packageDocument); err != nil {
+	if err := writeTargetFile(outputDirectory, projectPackageName, plan.packageDocument); err != nil {
 		return 0, err
 	}
 	paths = append(paths, projectPackageName)
@@ -125,7 +120,7 @@ func writeEmissionTo(
 	return len(paths), nil
 }
 
-func encodeProjectPackage(dependencies []emit.PackageDependency) ([]byte, error) {
+func encodeProjectPackage(dependencies []packageDependency) ([]byte, error) {
 	document := struct {
 		Private      bool              `json:"private"`
 		Type         string            `json:"type"`
@@ -136,13 +131,13 @@ func encodeProjectPackage(dependencies []emit.PackageDependency) ([]byte, error)
 		Dependencies: make(map[string]string, len(dependencies)),
 	}
 	for _, dependency := range dependencies {
-		if dependency.Name() == "" || dependency.Version() == "" {
+		if dependency.name == "" || dependency.version == "" {
 			return nil, commandError("encode package", "dependency identity is incomplete")
 		}
-		if _, duplicate := document.Dependencies[dependency.Name()]; duplicate {
+		if _, duplicate := document.Dependencies[dependency.name]; duplicate {
 			return nil, commandError("encode package", "dependency is duplicated")
 		}
-		document.Dependencies[dependency.Name()] = dependency.Version()
+		document.Dependencies[dependency.name] = dependency.version
 	}
 	payload, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
@@ -177,7 +172,7 @@ func encodeBuildManifest(semanticDigest string, files []string) ([]byte, error) 
 		SemanticDigest string   `json:"semanticDigest"`
 		Files          []string `json:"files"`
 	}{
-		SchemaVersion:  config.SchemaVersion,
+		SchemaVersion:  buildManifestSchemaVersion,
 		SemanticDigest: semanticDigest,
 		Files:          selected,
 	}

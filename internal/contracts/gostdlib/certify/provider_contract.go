@@ -409,3 +409,44 @@ func compactStrings(values []string) []string {
 	}
 	return values[:write]
 }
+
+func verifyContractTypeParameters(
+	reference gostdlib.ContractTypeDocument,
+	typeParameterCount int,
+	callableParameterCount int,
+) error {
+	if reference.Kind == gostdlib.ContractTypeParameter {
+		if reference.TypeParameter == nil ||
+			*reference.TypeParameter < 0 ||
+			*reference.TypeParameter >= typeParameterCount {
+			return fmt.Errorf(
+				"type-parameter index is outside its Go declaration",
+			)
+		}
+	}
+	if reference.Kind == gostdlib.ContractTypeCallableParameter {
+		if reference.CallableParameter == nil ||
+			*reference.CallableParameter < 0 ||
+			*reference.CallableParameter >= callableParameterCount {
+			return fmt.Errorf(
+				"callable-parameter index is outside its Go declaration",
+			)
+		}
+	}
+	for _, child := range []*gostdlib.ContractTypeDocument{
+		reference.Key,
+		reference.Element,
+	} {
+		if child == nil {
+			continue
+		}
+		if err := verifyContractTypeParameters(
+			*child,
+			typeParameterCount,
+			callableParameterCount,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}

@@ -165,30 +165,6 @@ type providerStatefulRepresentationBinding struct {
 	name  string
 }
 
-type interfaceContractDemand struct {
-	source *types.Interface
-	target interfaceContractSelection
-}
-
-type interfaceDemandRequestKey struct {
-	kind       uint8
-	sourceKey  string
-	targetKey  string
-	adapterKey string
-}
-
-type interfaceContractSelection struct {
-	sourceType  types.Type
-	contract    *types.Interface
-	contractKey string
-	surfaceKey  string
-}
-
-type interfaceReflectionDemand struct {
-	source         *types.Interface
-	reflectionType *types.TypeName
-}
-
 type genericCapabilityBinding struct {
 	owner *api.GeneratedArtifact
 	name  string
@@ -255,6 +231,9 @@ type Registry struct {
 	providerObjectByIdentity            map[string]types.Object
 	interfaceContracts                  map[string]map[string]interfaceContractSelection
 	interfaceAdaptersByContract         map[string]map[string]struct{}
+	reflectionInterfaceExposures        map[string]reflectionInterfaceExposure
+	reflectionInterfaceContracts        map[string]map[string]struct{}
+	reflectionInterfaceDirty            bool
 	interfaceContractDemands            map[string]map[string]interfaceContractDemand
 	interfaceReflectionDemands          map[string]interfaceReflectionDemand
 	interfaceDemandRequests             map[interfaceDemandRequestKey][]api.RootRequest
@@ -283,6 +262,9 @@ func (r *Registry) TransferCanonicalIdentity() (*Registry, error) {
 		make(map[string]providerInterfaceCapabilityBinding)
 	r.providerInterfaceBridgesByContract = make(map[string]map[string]struct{})
 	r.interfaceAdaptersByContract = make(map[string]map[string]struct{})
+	r.reflectionInterfaceExposures = make(map[string]reflectionInterfaceExposure)
+	r.reflectionInterfaceContracts = make(map[string]map[string]struct{})
+	r.reflectionInterfaceDirty = false
 	r.interfaceContractDemands =
 		make(map[string]map[string]interfaceContractDemand)
 	r.interfaceReflectionDemands = make(map[string]interfaceReflectionDemand)
@@ -338,6 +320,8 @@ func NewRegistry() *Registry {
 		providerObjectByIdentity:            make(map[string]types.Object),
 		interfaceContracts:                  make(map[string]map[string]interfaceContractSelection),
 		interfaceAdaptersByContract:         make(map[string]map[string]struct{}),
+		reflectionInterfaceExposures:        make(map[string]reflectionInterfaceExposure),
+		reflectionInterfaceContracts:        make(map[string]map[string]struct{}),
 		interfaceContractDemands:            make(map[string]map[string]interfaceContractDemand),
 		interfaceReflectionDemands:          make(map[string]interfaceReflectionDemand),
 		interfaceDemandRequests:             make(map[interfaceDemandRequestKey][]api.RootRequest),

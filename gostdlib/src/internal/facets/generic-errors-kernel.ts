@@ -1,5 +1,5 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
-import type { Awaitable, bool, gostring } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   MessageWrappedErrors,
@@ -7,17 +7,13 @@ import {
 } from "../portable/errors/tree.js";
 import { sliceValues } from "../runtime/slice.js";
 
-interface KernelError extends GoInterfaceValue {
-  Error(): Awaitable<gostring>;
-}
-
 type AssertError<ErrorType> = (
-  failure: KernelError | undefined,
+  failure: GoInterfaceValue | undefined,
 ) => [ErrorType, bool];
 
 export function ErrorsAsTypeKernel<ErrorType>(
   assertError: AssertError<ErrorType>,
-  failure: KernelError | undefined,
+  failure: GoInterfaceValue | undefined,
 ): [ErrorType, bool] {
   const absent = assertError(undefined);
   return asType(assertError, failure, absent);
@@ -25,7 +21,7 @@ export function ErrorsAsTypeKernel<ErrorType>(
 
 function asType<ErrorType>(
   assertError: AssertError<ErrorType>,
-  failure: KernelError | undefined,
+  failure: GoInterfaceValue | undefined,
   absent: [ErrorType, bool],
 ): [ErrorType, bool] {
   let current = failure;

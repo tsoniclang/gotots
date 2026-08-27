@@ -3,7 +3,6 @@ package runtime
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	channelruntime "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
-	schedulerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/scheduler"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -37,7 +36,11 @@ func buildChannel(
 			}
 		}
 		seen[symbol] = struct{}{}
-		statement, err := buildChannelSymbol(factory, symbol, names)
+		statement, err := buildChannelSymbol(
+			factory,
+			symbol,
+			names,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +61,6 @@ func channelRuntimeNames() (map[api.RuntimeSymbol]string, error) {
 		api.RuntimeSendChannel,
 		api.RuntimeSelectCase,
 		api.RuntimeSelect,
-		api.RuntimeScheduler,
 		api.RuntimeSelectReady,
 		api.RuntimeSelectAttempt,
 		api.RuntimePanic,
@@ -77,14 +79,6 @@ func buildChannelSymbol(
 	symbol api.RuntimeSymbol,
 	names map[api.RuntimeSymbol]string,
 ) (tsgo.Statement, error) {
-	if symbol == api.RuntimeScheduler {
-		return schedulerruntime.Build(
-			factory,
-			symbol,
-			names[api.RuntimeScheduler],
-			names[api.RuntimePanic],
-		)
-	}
 	return channelruntime.Build(
 		factory,
 		symbol,

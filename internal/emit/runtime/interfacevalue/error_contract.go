@@ -11,17 +11,10 @@ func errorInterface(
 	name string,
 	valueName string,
 	runtimeError bool,
-	cooperative bool,
 ) tsgo.InterfaceDeclaration {
-	var result tsgo.TypeNode = factory.KeywordTypeNode(
+	result := factory.KeywordTypeNode(
 		tsgo.KeywordTypeSyntaxKindStringKeyword,
 	)
-	if cooperative {
-		result = factory.TypeReferenceNode(
-			factory.Identifier("Awaitable"),
-			[]tsgo.TypeNode{result},
-		)
-	}
 	members := []tsgo.TypeElement{
 		factory.MethodSignatureDeclaration(
 			nil,

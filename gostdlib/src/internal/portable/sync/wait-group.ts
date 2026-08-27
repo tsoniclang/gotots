@@ -1,31 +1,22 @@
-import type { Awaitable, int } from "@gotots/gostdlib/internal/scalars.js";
+import type { int } from "@gotots/gostdlib/internal/scalars.js";
 import { GoMapHash } from "@gotots/runtime/map.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 
-const noTaskFailure = Symbol("gotots.sync.WaitGroup.noTaskFailure");
-
 export class WaitGroup {
   #count: int = 0n;
-  readonly #waiters: Array<() => void> = [];
-  #taskFailure: unknown = noTaskFailure;
 
   static $copy(source: WaitGroup): WaitGroup {
     const result = new WaitGroup();
     result.#count = source.#count;
-    result.#waiters.push(...source.#waiters);
-    result.#taskFailure = source.#taskFailure;
     return result;
   }
 
   static $equal(left: WaitGroup, right: WaitGroup): boolean {
-    return left.#count === right.#count &&
-      left.#waiters.length === right.#waiters.length;
+    return left.#count === right.#count;
   }
 
   static $hash(source: WaitGroup): number {
-    let hash = GoMapHash.bigint(source.#count);
-    hash = GoMapHash.mix(hash, GoMapHash.number(source.#waiters.length));
-    return hash;
+    return GoMapHash.bigint(source.#count);
   }
 
   static Add(receiver: WaitGroup | undefined, delta: int): void {
@@ -37,11 +28,6 @@ export class WaitGroup {
       GoPanic.raiseRuntime("sync: negative WaitGroup counter");
     }
     receiver.#count = next;
-    if (next === 0n) {
-      for (const resume of receiver.#waiters.splice(0)) {
-        resume();
-      }
-    }
   }
 
   static Done(receiver: WaitGroup | undefined): void {
@@ -50,38 +36,30 @@ export class WaitGroup {
 
   static Go(
     receiver: WaitGroup | undefined,
-    f: (() => Awaitable<void>) | undefined,
+    f: (() => void) | undefined,
   ): void {
     if (receiver === undefined) {
       GoPanic.raiseRuntime("WaitGroup.Go called with nil receiver");
     }
-    const group = receiver;
-    WaitGroup.Add(group, 1n);
-    void (async (): Promise<void> => {
-      try {
-        if (f === undefined) {
-          GoPanic.raiseRuntime("sync.WaitGroup.Go called with nil function");
-        }
-        await f();
-      } catch (failure) {
-        if (group.#taskFailure === noTaskFailure) {
-          group.#taskFailure = failure;
-        }
-      } finally {
-        WaitGroup.Done(group);
+    WaitGroup.Add(receiver, 1n);
+    try {
+      if (f === undefined) {
+        GoPanic.raiseRuntime("sync.WaitGroup.Go called with nil function");
       }
-    })();
+      f();
+    } finally {
+      WaitGroup.Done(receiver);
+    }
   }
 
-  static async Wait(receiver: WaitGroup | undefined): Promise<void> {
+  static Wait(receiver: WaitGroup | undefined): void {
     if (receiver === undefined) {
       GoPanic.raiseRuntime("WaitGroup.Wait called with nil receiver");
     }
     if (receiver.#count !== 0n) {
-      await new Promise<void>((resolve) => receiver.#waiters.push(resolve));
-    }
-    if (receiver.#taskFailure !== noTaskFailure) {
-      throw receiver.#taskFailure;
+      GoPanic.raiseRuntime(
+        "sync: WaitGroup.Wait would block under serial execution",
+      );
     }
   }
 }

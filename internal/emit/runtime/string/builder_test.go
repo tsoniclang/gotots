@@ -18,7 +18,6 @@ func TestBuildExactJoinsRequestedStringSymbols(t *testing.T) {
 			api.RuntimeStringIndex,
 			api.RuntimeStringSlice,
 		},
-		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +51,6 @@ func TestBuildEmitsOnlyTheDemandedStringDefinition(t *testing.T) {
 				tsgo.NewFactory(),
 				api.RuntimeModuleString,
 				[]api.RuntimeSymbol{symbol},
-				api.ConcurrencySemanticsDisabled,
 			)
 			if err != nil {
 				t.Fatal(err)

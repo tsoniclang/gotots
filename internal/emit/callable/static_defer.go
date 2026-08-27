@@ -191,13 +191,6 @@ func deferredCallableType(
 	resultType := api.DirectType(context.Factory().KeywordTypeNode(
 		tsgo.KeywordTypeSyntaxKindVoidKeyword,
 	))
-	if context.IsCooperative() {
-		var err error
-		resultType, err = IndirectResult(context, resultType.Value())
-		if err != nil {
-			return nil, nil, err
-		}
-	}
 	return context.Factory().FunctionTypeNode(
 		nil,
 		[]tsgo.ParameterDeclaration{

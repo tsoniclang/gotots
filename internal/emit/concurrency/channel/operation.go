@@ -4,7 +4,6 @@ import (
 	"go/ast"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -72,5 +71,5 @@ func BlockingCall(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return cooperative.Operation(context, source, target)
+	return target, nil
 }

@@ -72,7 +72,16 @@ test("host OS modules expose only selected clean Go names", () => {
     "WriteString",
   ]);
   assert.deepEqual(staticMembers(os.Process), ["Signal"]);
-  assert.deepEqual(staticMembers(FsPathError), ["Error", "Unwrap"]);
+  assert.deepEqual(staticGoMembers(FsPathError), ["Error", "Unwrap"]);
+  assert.deepEqual(staticSupportMembers(FsPathError), [
+    "$assign",
+    "$copy",
+    "$equal",
+    "$fromStorage",
+    "$hash",
+    "$make",
+    "$storageOf",
+  ]);
   assert.deepEqual(staticMembers(exec.Cmd), ["Output"]);
   assert.deepEqual(staticMembers(flag.FlagSet), ["Bool", "Parse", "String"]);
   assert.deepEqual(
@@ -127,6 +136,14 @@ function staticMembers(value: Function): string[] {
       && name !== "prototype"
     ))
     .sort();
+}
+
+function staticGoMembers(value: Function): string[] {
+  return staticMembers(value).filter((name: string): boolean => !name.startsWith("$"));
+}
+
+function staticSupportMembers(value: Function): string[] {
+  return staticMembers(value).filter((name: string): boolean => name.startsWith("$"));
 }
 
 function instanceMembers(value: Function): string[] {

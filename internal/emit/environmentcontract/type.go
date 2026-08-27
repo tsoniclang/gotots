@@ -201,10 +201,6 @@ func interfaceDeclaration(
 		if err != nil {
 			return api.DeclarationEmission{}, err
 		}
-		resultType, err := callable.IndirectResult(context, target.Result())
-		if err != nil {
-			return api.DeclarationEmission{}, err
-		}
 		members = append(members,
 			context.Factory().MethodSignatureDeclaration(
 				nil,
@@ -212,11 +208,10 @@ func interfaceDeclaration(
 				nil,
 				nil,
 				target.Parameters(),
-				resultType.Value(),
+				target.Result(),
 			),
 		)
 		requests = append(requests, target.Requests()...)
-		requests = append(requests, resultType.Requests()...)
 		requests = append(requests, callableReference.Requests()...)
 	}
 	interfaceType := context.Factory().TypeReferenceNode(

@@ -25,10 +25,10 @@ func main() {
 	toolCache := flag.String("tool-cache", "", "selected .temp/cache root for sealed tools")
 	outputDirectory := flag.String("output", "", "runtime package output directory")
 	profileName := flag.String("profile", "number", "integer representation")
-	concurrencyName := flag.String(
-		"concurrency",
-		"disabled",
-		"concurrency semantics",
+	assembly := flag.String(
+		"assembly",
+		"product",
+		"runtime assembly purpose (product or provider-certification)",
 	)
 	check := flag.Bool("check", false, "verify output without changing it")
 	flag.Parse()
@@ -36,10 +36,6 @@ func main() {
 		fail("contract and output are required")
 	}
 	profile, err := integerProfile(*profileName)
-	if err != nil {
-		fail(err.Error())
-	}
-	concurrency, err := concurrencyProfile(*concurrencyName)
 	if err != nil {
 		fail(err.Error())
 	}
@@ -67,13 +63,25 @@ func main() {
 	if err != nil {
 		fail(err.Error())
 	}
-	assembled, err := runtimeemission.AssemblePackage(
-		tsgo.NewFactory(),
-		scalar,
-		concurrency,
-		requirements.RuntimeSymbols(),
-		requirements.PrimitiveAliases(),
-	)
+	var assembled runtimeemission.Package
+	switch *assembly {
+	case "product":
+		assembled, err = runtimeemission.AssemblePackage(
+			tsgo.NewFactory(),
+			scalar,
+			requirements.RuntimeSymbols(),
+			requirements.PrimitiveAliases(),
+		)
+	case "provider-certification":
+		assembled, err = runtimeemission.AssembleProviderCertificationPackage(
+			tsgo.NewFactory(),
+			scalar,
+			requirements.RuntimeSymbols(),
+			requirements.PrimitiveAliases(),
+		)
+	default:
+		fail("runtime assembly purpose is invalid: " + *assembly)
+	}
 	if err != nil {
 		fail(err.Error())
 	}
@@ -129,20 +137,6 @@ func main() {
 	expected["package.json"] = assembled.Manifest()
 	if err := synchronize(*outputDirectory, expected, *check); err != nil {
 		fail(err.Error())
-	}
-}
-
-func concurrencyProfile(value string) (api.ConcurrencySemantics, error) {
-	switch value {
-	case api.ConcurrencySemanticsDisabled.String():
-		return api.ConcurrencySemanticsDisabled, nil
-	case api.ConcurrencySemanticsCooperative.String():
-		return api.ConcurrencySemanticsCooperative, nil
-	default:
-		return api.ConcurrencySemanticsInvalid, fmt.Errorf(
-			"concurrency profile %q is invalid",
-			value,
-		)
 	}
 }
 

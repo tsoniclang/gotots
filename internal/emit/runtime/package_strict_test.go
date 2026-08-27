@@ -17,7 +17,6 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 	assembled, err := AssemblePackage(
 		tsgo.NewFactory(),
 		testScalarABI(t, api.IntegerRepresentationNumber),
-		api.ConcurrencySemanticsDisabled,
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeArray:         {},
 			api.RuntimeDeferPop:      {},
@@ -117,7 +116,6 @@ func TestCanonicalRuntimePackageManifestResolvesEveryBuildStage(t *testing.T) {
 	assembled, err := AssemblePackage(
 		tsgo.NewFactory(),
 		testScalarABI(t, api.IntegerRepresentationNumber),
-		api.ConcurrencySemanticsDisabled,
 		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)

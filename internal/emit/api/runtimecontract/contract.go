@@ -13,13 +13,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 		return contract, nil
 	}
 	switch symbol {
-	case RuntimeAwaitable:
-		return runtimeContract(
-			RuntimeModuleScalar,
-			"runtime/scalars.ts",
-			"Awaitable",
-			true,
-		), nil
 	case RuntimeStringIndex:
 		return runtimeContract(
 			RuntimeModuleString,

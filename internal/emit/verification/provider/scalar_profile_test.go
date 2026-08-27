@@ -181,7 +181,6 @@ func DurationMath(value time.Duration) time.Duration {
 	for _, profile := range profiles {
 		t.Run(profile.name, func(t *testing.T) {
 			options := emit.DefaultOptions()
-			options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 			options.IntegerRepresentation = profile.representation
 			options.StandardLibrary = certificate
 			emission, err := emit.CompileWithOptions(program, roots, options)

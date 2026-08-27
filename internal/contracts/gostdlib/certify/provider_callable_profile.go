@@ -358,12 +358,11 @@ func buildProfileCallableParameters(
 		if err != nil {
 			return nil, nil, err
 		}
-		if effect != gostdlib.EffectSynchronous &&
-			effect != gostdlib.EffectAwaitable {
+		if effect != gostdlib.EffectSynchronous {
 			return nil, nil, certifyError(
 				"build provider callable profile",
 				seed.SourceIdentity,
-				"transported callable parameter is neither direct nor awaitable",
+				"transported callable parameter is not synchronous",
 			)
 		}
 		documents = append(

@@ -21,9 +21,9 @@ import {
 } from "../src/bufio.js";
 import { New } from "../src/errors.js";
 import {
-  CanonicalBufioScanner,
-  NewScannerCanonical,
-  type CanonicalReader,
+  DirectBufioScanner,
+  NewScannerDirect,
+  type ProviderReaderInterface,
 } from "../src/internal/facets/provider-bufio-scanner.js";
 import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import { state as ioState, type Reader } from "../src/io.js";
@@ -58,7 +58,8 @@ class ChunkReader extends ProviderInterfaceValue implements Reader {
   }
 }
 
-class AsyncChunkReader extends ProviderInterfaceValue implements CanonicalReader<GoError> {
+class DirectChunkReader extends ProviderInterfaceValue
+  implements ProviderReaderInterface<GoError> {
   readonly #source: ChunkReader;
 
   constructor(source: string, chunkSize: number) {
@@ -66,8 +67,8 @@ class AsyncChunkReader extends ProviderInterfaceValue implements CanonicalReader
     this.#source = new ChunkReader(source, chunkSize);
   }
 
-  Read(destination: RuntimeSlice<uint8>): Promise<[int, GoError | undefined]> {
-    return Promise.resolve(this.#source.Read(destination));
+  Read(destination: RuntimeSlice<uint8>): [int, GoError | undefined] {
+    return this.#source.Read(destination);
   }
 }
 
@@ -108,20 +109,20 @@ test("bufio Scanner reports non-EOF and bounded-token failures", (): void => {
   assert.equal(Scanner.Err(oversized), bufioState.ErrTooLong);
 });
 
-test("bufio Scanner canonical boundary awaits an asynchronous reader", async (): Promise<void> => {
-  const scanner = NewScannerCanonical(
-    new AsyncChunkReader("one\ntwo", 2),
+test("bufio Scanner provider boundary reads synchronously", (): void => {
+  const scanner = NewScannerDirect(
+    new DirectChunkReader("one\ntwo", 2),
     bufioState.ErrBadReadCount,
     bufioState.ErrTooLong,
     ioState.EOF,
     ioState.ErrNoProgress,
   );
   const tokens: string[] = [];
-  while (await CanonicalBufioScanner.Scan(scanner)) {
-    tokens.push(CanonicalBufioScanner.Text(scanner));
+  while (DirectBufioScanner.Scan(scanner)) {
+    tokens.push(DirectBufioScanner.Text(scanner));
   }
   assert.deepEqual(tokens, ["one", "two"]);
-  assert.equal(CanonicalBufioScanner.Err(scanner), undefined);
+  assert.equal(DirectBufioScanner.Err(scanner), undefined);
 });
 
 function scannerProviderResult(): string {

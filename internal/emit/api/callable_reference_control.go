@@ -327,7 +327,6 @@ type GenericConcretizationNames interface {
 
 type GenericKernelNames interface {
 	GenericKernel(*types.Func) (NameReference, error)
-	SynchronousGenericKernel(*types.Func) (NameReference, error)
 	DeferredGenericCallable(*types.Func) (DeferredGenericCallableReference, error)
 	DeferredGenericKernel(*types.Func) (DeferredGenericCallableReference, error)
 }

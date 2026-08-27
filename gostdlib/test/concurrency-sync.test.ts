@@ -29,8 +29,8 @@ class TestLocker extends ProviderInterfaceValue implements Locker {
     super(testLockerType);
   }
 
-  Lock(): Promise<void> {
-    return Mutex.Lock(this.#mutex);
+  Lock(): void {
+    Mutex.Lock(this.#mutex);
   }
 
   Unlock(): void {
@@ -38,149 +38,122 @@ class TestLocker extends ProviderInterfaceValue implements Locker {
   }
 }
 
-test("Mutex serializes waiters and rejects an unmatched unlock", async () => {
+test("Mutex rejects serial blocking and unmatched unlock", () => {
   const mutex = new Mutex();
-  const events: string[] = [];
-
-  await Mutex.Lock(mutex);
-  const waiter = (async (): Promise<void> => {
-    await Mutex.Lock(mutex);
-    events.push("waiter");
-    Mutex.Unlock(mutex);
-  })();
-  events.push("owner");
+  Mutex.Lock(mutex);
+  assert.throws(
+    () => Mutex.Lock(mutex),
+    panicWith(/would block under serial execution/u),
+  );
   Mutex.Unlock(mutex);
-  await waiter;
-
-  assert.deepEqual(events, ["owner", "waiter"]);
+  Mutex.Lock(mutex);
+  Mutex.Unlock(mutex);
   assert.throws(() => Mutex.Unlock(mutex), panicWith(/unlocked mutex/u));
 });
 
-test("Cond Wait releases and reacquires its Locker before returning", async () => {
+test("Cond rejects a wait that would block", () => {
   const locker = new TestLocker();
   const condition = NewCond(locker);
-
-  await locker.Lock();
-  const waiting = Cond.Wait(condition);
-  await locker.Lock();
+  locker.Lock();
+  assert.throws(
+    () => Cond.Wait(condition),
+    panicWith(/would block under serial execution/u),
+  );
   Cond.Signal(condition);
-  locker.Unlock();
-  await waiting;
-  locker.Unlock();
-});
-
-test("Cond Broadcast wakes every registered waiter", async () => {
-  const locker = new TestLocker();
-  const condition = NewCond(locker);
-  let resumed = 0;
-  const waitOnce = async (): Promise<void> => {
-    await Cond.Wait(condition);
-    resumed += 1;
-    locker.Unlock();
-  };
-
-  await locker.Lock();
-  const first = waitOnce();
-  await locker.Lock();
-  const second = waitOnce();
-  await locker.Lock();
   Cond.Broadcast(condition);
   locker.Unlock();
-  await Promise.all([first, second]);
-  assert.equal(resumed, 2);
 });
 
-test("RWMutex allows readers together and gives a queued writer exclusivity", async () => {
+test("RWMutex allows readers and rejects a serially blocked writer", () => {
   const mutex = new RWMutex();
-  await RWMutex.RLock(mutex);
-  await RWMutex.RLock(mutex);
-
-  let acquired = false;
-  const writer = (async (): Promise<void> => {
-    await RWMutex.Lock(mutex);
-    acquired = true;
-    RWMutex.Unlock(mutex);
-  })();
-
-  await Promise.resolve();
-  assert.equal(acquired, false);
+  RWMutex.RLock(mutex);
+  RWMutex.RLock(mutex);
+  assert.throws(
+    () => RWMutex.Lock(mutex),
+    panicWith(/would block under serial execution/u),
+  );
   RWMutex.RUnlock(mutex);
   RWMutex.RUnlock(mutex);
-  await writer;
-  assert.equal(acquired, true);
+  RWMutex.Lock(mutex);
+  RWMutex.Unlock(mutex);
 });
 
-test("Once, OnceFunc, and OnceValue evaluate exactly once", async () => {
+test("Once, OnceFunc, and OnceValue evaluate exactly once", () => {
   const once = new Once();
   let count = 0;
-  await Promise.all([
-    Once.Do(once, async () => {
-      count += 1;
-      await Promise.resolve();
-    }),
-    Once.Do(once, async () => {
-      count += 1;
-    }),
-  ]);
+  Once.Do(once, () => {
+    count += 1;
+  });
+  Once.Do(once, () => {
+    count += 1;
+  });
 
-  const onceFunction = OnceFunc(async () => {
+  const onceFunction = OnceFunc(() => {
     count += 10;
   });
-  await Promise.all([onceFunction(), onceFunction()]);
+  onceFunction();
+  onceFunction();
 
-  const onceValue = OnceValue(async () => {
+  const onceValue = OnceValue(() => {
     count += 100;
-    await Promise.resolve();
     return count;
   });
-  assert.deepEqual(await Promise.all([onceValue(), onceValue()]), [111, 111]);
+  assert.deepEqual([onceValue(), onceValue()], [111, 111]);
   assert.equal(count, 111);
 });
 
-test("OnceValue replays the first panic", async () => {
+test("OnceValue replays the first panic", () => {
   let count = 0;
   const onceValue = OnceValue<number>(() => {
     count += 1;
     GoPanic.raise(new ProviderError("once failure"));
   });
 
-  const first = await onceValue().catch((failure: object): object => failure);
-  const second = await onceValue().catch((failure: object): object => failure);
+  let first: object | undefined;
+  let second: object | undefined;
+  try {
+    onceValue();
+  } catch (failure) {
+    first = failure as object;
+  }
+  try {
+    onceValue();
+  } catch (failure) {
+    second = failure as object;
+  }
   assert.equal(first, second);
   assert.equal(count, 1);
 });
 
-test("WaitGroup waits for Add, Done, and Go work", async () => {
+test("WaitGroup completes inline work and rejects a blocking wait", () => {
   const group = new WaitGroup();
   WaitGroup.Add(group, 1n);
-  const manual = Promise.resolve().then(() => WaitGroup.Done(group));
-  WaitGroup.Go(group, async () => {
-    await Promise.resolve();
-  });
-
-  await WaitGroup.Wait(group);
-  await manual;
+  assert.throws(
+    () => WaitGroup.Wait(group),
+    panicWith(/would block under serial execution/u),
+  );
+  WaitGroup.Done(group);
+  WaitGroup.Go(group, () => undefined);
+  WaitGroup.Wait(group);
   assert.throws(
     () => WaitGroup.Done(group),
     panicWith(/negative WaitGroup counter/u),
   );
 });
 
-test("WaitGroup surfaces a task failure from Wait", async () => {
+test("WaitGroup propagates an inline task failure", () => {
   const group = new WaitGroup();
   const failure = new Error("worker failure");
-  WaitGroup.Go(group, async () => {
-    await Promise.resolve();
-    throw failure;
-  });
-
-  const observed = await WaitGroup.Wait(group).catch(
-    (caught: unknown): unknown => caught,
+  assert.throws(
+    () => WaitGroup.Go(group, () => {
+      throw failure;
+    }),
+    (caught: unknown): boolean => caught === failure,
   );
-  assert.equal(observed, failure);
+  WaitGroup.Wait(group);
 });
 
-test("sync Map and Pool preserve stored interface values", async () => {
+test("sync Map and Pool preserve stored interface values", () => {
   const key = new ProviderError("key");
   const first = new ProviderError("first");
   const second = new ProviderError("second");
@@ -191,7 +164,7 @@ test("sync Map and Pool preserve stored interface values", async () => {
   assert.deepEqual(SyncMap.LoadOrStore(values, key, second), [first, true]);
 
   const visited: Array<[object | undefined, object | undefined]> = [];
-  await SyncMap.Range(values, async (entryKey, entryValue) => {
+  SyncMap.Range(values, (entryKey, entryValue) => {
     visited.push([entryKey, entryValue]);
     return true;
   });

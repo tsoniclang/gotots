@@ -3,7 +3,7 @@ import type {
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { hostInteger, integerFromHost } from "../../host-integer.js";
 
@@ -29,33 +29,6 @@ export function readFullSync<Failure extends GoInterfaceValue>(
       ? destination
       : destination.slice(total, destination.length, null);
     const result = read(target);
-    const count = hostInteger(result[0]);
-    failure = result[1];
-    total += count;
-  }
-  if (total >= destination.length) {
-    return [integerFromHost(total), undefined];
-  }
-  return total > 0 && goInterfaceEqual(failure, eof)
-    ? [integerFromHost(total), unexpected]
-    : [integerFromHost(total), failure];
-}
-
-export async function readFullAsync<Failure extends GoInterfaceValue>(
-  read: (
-    destination: RuntimeSlice<uint8>,
-  ) => Awaitable<[int, Failure | undefined]>,
-  destination: RuntimeSlice<uint8>,
-  eof: Failure,
-  unexpected: Failure,
-): Promise<[int, Failure | undefined]> {
-  let total = 0;
-  let failure: Failure | undefined;
-  while (total < destination.length && failure === undefined) {
-    const target = total === 0
-      ? destination
-      : destination.slice(total, destination.length, null);
-    const result = await read(target);
     const count = hostInteger(result[0]);
     failure = result[1];
     total += count;

@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	channelmodel "github.com/tsoniclang/gotots/internal/emit/concurrency/channel"
-	concurrencyprofile "github.com/tsoniclang/gotots/internal/emit/concurrency/profile"
 	runtimechannel "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
 )
 
@@ -18,13 +17,6 @@ func Emit(
 	if source == nil || source.Chan == nil || source.Value == nil {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	if err := concurrencyprofile.Admit(
-		context,
-		api.CategoryStatement,
-		source,
-	); err != nil {
-		return api.StatementEmission{}, err
 	}
 	channelType := context.TypesInfo().TypeOf(source.Chan)
 	model, ok := channelmodel.Resolve(channelType)

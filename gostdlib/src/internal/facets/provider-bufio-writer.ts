@@ -1,5 +1,4 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
@@ -9,12 +8,13 @@ import {
 } from "../host-integer.js";
 
 import { byteSlice } from "../runtime/slice.js";
-import type { CanonicalWriter } from "./provider-io-contract.js";
+import type { ProviderWriterInterface } from "./provider-io-contract.js";
+import type { ProviderErrorInterface } from "./provider-error.js";
 
 export type {
-  CanonicalError,
-  CanonicalWriter,
+  ProviderWriterInterface,
 } from "./provider-io-contract.js";
+export type { ProviderErrorInterface } from "./provider-error.js";
 
 const defaultBufferSize = 4096;
 
@@ -104,28 +104,25 @@ class WriterBuffer<Failure> {
   }
 }
 
-export class CanonicalBufioWriter<
-  Failure extends GoInterfaceValue,
-  Target extends CanonicalWriter<Failure>,
+export class DirectBufioWriter<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
 > {
   #state: WriterBuffer<Failure>;
   #target: Target | undefined;
 
-  constructor(
-    target: Target | undefined,
-    shortWrite: Failure,
-  ) {
+  constructor(target: Target | undefined, shortWrite: Failure) {
     this.#target = target;
     this.#state = new WriterBuffer(shortWrite);
   }
 
   static $copy<
-    Failure extends GoInterfaceValue,
-    Target extends CanonicalWriter<Failure>,
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
   >(
-    source: CanonicalBufioWriter<Failure, Target>,
-  ): CanonicalBufioWriter<Failure, Target> {
-    const target = new CanonicalBufioWriter(
+    source: DirectBufioWriter<Failure, Target>,
+  ): DirectBufioWriter<Failure, Target> {
+    const target = new DirectBufioWriter(
       source.#target,
       source.#state.shortWrite,
     );
@@ -134,65 +131,63 @@ export class CanonicalBufioWriter<
   }
 
   static $assign<
-    Failure extends GoInterfaceValue,
-    Target extends CanonicalWriter<Failure>,
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
   >(
-    target: CanonicalBufioWriter<Failure, Target>,
-    source: CanonicalBufioWriter<Failure, Target>,
+    target: DirectBufioWriter<Failure, Target>,
+    source: DirectBufioWriter<Failure, Target>,
   ): void {
-    const state = source.#state.copy();
-    const providerTarget = source.#target;
-    target.#state = state;
-    target.#target = providerTarget;
+    target.#state = source.#state.copy();
+    target.#target = source.#target;
   }
 
   static Flush<
-    Failure extends GoInterfaceValue,
-    Target extends CanonicalWriter<Failure>,
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
   >(
-    receiver: CanonicalBufioWriter<Failure, Target> | undefined,
+    receiver: DirectBufioWriter<Failure, Target> | undefined,
     recovery?: GoRecovery,
-  ): Promise<Failure | undefined> {
-    return requireWriter(receiver).Flush(recovery);
+  ): Failure | undefined {
+    return requireDirectWriter(receiver).Flush(recovery);
   }
 
   static Write<
-    Failure extends GoInterfaceValue,
-    Target extends CanonicalWriter<Failure>,
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
   >(
-    receiver: CanonicalBufioWriter<Failure, Target> | undefined,
+    receiver: DirectBufioWriter<Failure, Target> | undefined,
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int, Failure | undefined]> {
-    return requireWriter(receiver).Write(source, recovery);
+  ): [int, Failure | undefined] {
+    return requireDirectWriter(receiver).Write(source, recovery);
   }
 
   static WriteByte<
-    Failure extends GoInterfaceValue,
-    Target extends CanonicalWriter<Failure>,
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
   >(
-    receiver: CanonicalBufioWriter<Failure, Target> | undefined,
+    receiver: DirectBufioWriter<Failure, Target> | undefined,
     value: uint8,
     recovery?: GoRecovery,
-  ): Promise<Failure | undefined> {
-    return requireWriter(receiver).WriteByte(value, recovery);
+  ): Failure | undefined {
+    return requireDirectWriter(receiver).WriteByte(value, recovery);
   }
 
-  async Flush(recovery?: GoRecovery): Promise<Failure | undefined> {
+  Flush(recovery?: GoRecovery): Failure | undefined {
     if (this.#state.failure !== undefined || this.#state.length === 0) {
       return this.#state.failure;
     }
-    const [count, failure] = await requireTarget(this.#target).Write(
+    const [count, failure] = requireTarget(this.#target).Write(
       this.#state.source(),
       recovery,
     );
     return this.#state.finishFlush(count, failure);
   }
 
-  async Write(
+  Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int, Failure | undefined]> {
+  ): [int, Failure | undefined] {
     if (this.#state.failure !== undefined) {
       return [0n, this.#state.failure];
     }
@@ -201,7 +196,7 @@ export class CanonicalBufioWriter<
       this.#state.failure === undefined) {
       let count: number;
       if (this.#state.length === 0) {
-        const result = await requireTarget(this.#target).Write(
+        const result = requireTarget(this.#target).Write(
           source.slice(accepted, source.length, null),
           recovery,
         );
@@ -210,7 +205,7 @@ export class CanonicalBufioWriter<
       } else {
         count = Math.min(this.#state.available, source.length - accepted);
         this.#state.append(source, accepted, count);
-        await this.Flush(recovery);
+        this.Flush(recovery);
       }
       accepted += count;
     }
@@ -222,15 +217,12 @@ export class CanonicalBufioWriter<
     return [integerFromHost(accepted + count), undefined];
   }
 
-  async WriteByte(
-    value: uint8,
-    recovery?: GoRecovery,
-  ): Promise<Failure | undefined> {
+  WriteByte(value: uint8, recovery?: GoRecovery): Failure | undefined {
     if (this.#state.failure !== undefined) {
       return this.#state.failure;
     }
     if (this.#state.available === 0) {
-      const failure = await this.Flush(recovery);
+      const failure = this.Flush(recovery);
       if (failure !== undefined) {
         return failure;
       }
@@ -242,33 +234,33 @@ export class CanonicalBufioWriter<
 
 export class BufioWriterOperations {
   static $copy<
-    Failure extends GoInterfaceValue,
-    Target extends CanonicalWriter<Failure>,
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
   >(
-    source: CanonicalBufioWriter<Failure, Target>,
-  ): CanonicalBufioWriter<Failure, Target> {
-    return CanonicalBufioWriter.$copy(source);
+    source: DirectBufioWriter<Failure, Target>,
+  ): DirectBufioWriter<Failure, Target> {
+    return DirectBufioWriter.$copy(source);
   }
 
   static $assign<
-    Failure extends GoInterfaceValue,
-    Target extends CanonicalWriter<Failure>,
+    Failure extends ProviderErrorInterface,
+    Target extends ProviderWriterInterface<Failure>,
   >(
-    target: CanonicalBufioWriter<Failure, Target>,
-    source: CanonicalBufioWriter<Failure, Target>,
+    target: DirectBufioWriter<Failure, Target>,
+    source: DirectBufioWriter<Failure, Target>,
   ): void {
-    CanonicalBufioWriter.$assign(target, source);
+    DirectBufioWriter.$assign(target, source);
   }
 }
 
-export function NewWriterCanonical<
-  Failure extends GoInterfaceValue,
-  Target extends CanonicalWriter<Failure>,
+export function NewWriterDirect<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
 >(
   target: Target | undefined,
   shortWrite: Failure | undefined,
-): CanonicalBufioWriter<Failure, Target> {
-  return new CanonicalBufioWriter(target, requireShortWrite(shortWrite));
+): DirectBufioWriter<Failure, Target> {
+  return new DirectBufioWriter(target, requireShortWrite(shortWrite));
 }
 
 function requireTarget<Target>(target: Target | undefined): Target {
@@ -285,12 +277,12 @@ function requireShortWrite<Failure>(failure: Failure | undefined): Failure {
   return failure;
 }
 
-function requireWriter<
-  Failure extends GoInterfaceValue,
-  Target extends CanonicalWriter<Failure>,
+function requireDirectWriter<
+  Failure extends ProviderErrorInterface,
+  Target extends ProviderWriterInterface<Failure>,
 >(
-  receiver: CanonicalBufioWriter<Failure, Target> | undefined,
-): CanonicalBufioWriter<Failure, Target> {
+  receiver: DirectBufioWriter<Failure, Target> | undefined,
+): DirectBufioWriter<Failure, Target> {
   if (receiver === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }

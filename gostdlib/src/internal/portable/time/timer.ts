@@ -1,7 +1,7 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import { GoMapHash } from "@gotots/runtime/map.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool } from "@gotots/gostdlib/internal/scalars.js";
 import { hostInteger } from "../../host-integer.js";
 import {
   cancelSchedule,
@@ -29,9 +29,9 @@ export class Timer {
   #handle: ClockHandle | undefined;
   #active = false;
   #initialized = false;
-  readonly #action: (() => Awaitable<void>) | undefined;
+  readonly #action: (() => void) | undefined;
 
-  constructor(duration?: Duration, action?: () => Awaitable<void>) {
+  constructor(duration?: Duration, action?: () => void) {
     this.#action = action;
     if (duration !== undefined && action === undefined) {
       this.#channel = new ProviderChannel<Time>(
@@ -97,7 +97,7 @@ export class Timer {
       if (this.#action === undefined) {
         this.#channel?.offer(Now());
       } else {
-        void this.#action();
+        this.#action();
       }
     });
   }
@@ -220,7 +220,7 @@ export function After(d: Duration): GoReceiveChannel<Time> {
 
 export function AfterFunc(
   d: Duration,
-  f: (() => Awaitable<void>) | undefined,
+  f: (() => void) | undefined,
 ): Timer {
   const invoke = f ?? (() => {
     GoPanic.raiseRuntime("time.AfterFunc called with nil function");
@@ -236,13 +236,15 @@ export function NewTimer(d: Duration): Timer {
   return new Timer(d);
 }
 
-export function Sleep(d: Duration): Promise<void> {
+const sleepSignal = new Int32Array(
+  new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
+);
+
+export function Sleep(d: Duration): void {
   if (d.Nanoseconds() <= 0n) {
-    return Promise.resolve();
+    return;
   }
-  return new Promise<void>((resolve) => {
-    schedule(delay(d), resolve);
-  });
+  Atomics.wait(sleepSignal, 0, 0, delay(d));
 }
 
 function requireTimer(receiver: Timer | undefined): Timer {

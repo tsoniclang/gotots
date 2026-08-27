@@ -51,7 +51,7 @@ export {
 
 export function Lines(text: gostring): Seq<gostring> {
   return new Seq<gostring>(
-    async (yieldValue): Promise<void> => {
+    (yieldValue): void => {
       if (yieldValue === undefined) {
         GoPanic.raiseRuntime("call of nil yield function");
       }
@@ -60,7 +60,7 @@ export function Lines(text: gostring): Seq<gostring> {
         const newline = remaining.indexOf("\n");
         const line = newline < 0 ? remaining : remaining.slice(0, newline + 1);
         remaining = newline < 0 ? "" : remaining.slice(newline + 1);
-        if (!(await yieldValue(line))) {
+        if (!yieldValue(line)) {
           return;
         }
       }

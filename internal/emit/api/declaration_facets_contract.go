@@ -109,7 +109,6 @@ const (
 	DeclarationRequirementInterfaceDynamicTypeToken          DeclarationRequirementKind = 11
 	DeclarationRequirementGenericCapability                  DeclarationRequirementKind = 12
 	DeclarationRequirementCallableControl                    DeclarationRequirementKind = 13
-	DeclarationRequirementCooperativeCallable                DeclarationRequirementKind = 14
 	DeclarationRequirementCallableABI                        DeclarationRequirementKind = 15
 	DeclarationRequirementClassMethod                        DeclarationRequirementKind = 18
 	DeclarationRequirementValueReceiverCopy                  DeclarationRequirementKind = 19
@@ -139,7 +138,6 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementInterfaceDynamicTypeToken ||
 		k == DeclarationRequirementGenericCapability ||
 		k == DeclarationRequirementCallableControl ||
-		k == DeclarationRequirementCooperativeCallable ||
 		k == DeclarationRequirementCallableABI ||
 		k == DeclarationRequirementClassMethod ||
 		k == DeclarationRequirementValueReceiverCopy ||

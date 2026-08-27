@@ -107,11 +107,11 @@ the selected `go/types.Signature` as its public/source-facing contract.
 - A Go variadic parameter remains one semantic parameter. Its exact target
   representation may be a represented Go slice or a TypeScript rest parameter,
   but it may not create an additional source argument.
-- Cooperative execution may map a result to `Promise<R>` or
-  `Awaitable<R>` where the selected profile requires it; it never adds a
-  scheduler, effect, recovery, bridge, policy, or capability parameter.
-- Source type-parameter arity is preserved. Logical/storage distinctions and
-  callable effects do not become extra public type parameters.
+- Every result remains the direct synchronous projection of the selected Go
+  result tuple. A source callable never gains `Promise`, `async`, `await`, a
+  scheduler, recovery authority, bridge, policy, or capability parameter.
+- Source type-parameter arity is preserved. Logical/storage distinctions do
+  not become extra public type parameters.
 
 Compiler mechanics may appear only in compiler-owned private support artifacts
 that do not claim a Go source identity. Such artifacts may be selected by exact

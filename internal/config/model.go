@@ -9,7 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 type RootMode string
 
@@ -41,7 +41,6 @@ type Overrides struct {
 	BuildTagsSet          bool
 	IntegerRepresentation *string
 	EvaluationOrder       *string
-	ConcurrencySemantics  *string
 	StandardLibrary       *bool
 	Externals             *bool
 	ImplementationBundles []string
@@ -66,7 +65,6 @@ type Project struct {
 	toolCacheRoot         string
 	integer               emit.IntegerRepresentation
 	evaluation            emit.EvaluationOrder
-	concurrency           emit.ConcurrencySemantics
 	standardLibrary       bool
 	externals             bool
 	implementationBundles []string
@@ -84,7 +82,6 @@ func (p Project) TSGoTool() tsgo.Tool                               { return p.t
 func (p Project) ToolCacheRoot() string                             { return p.toolCacheRoot }
 func (p Project) IntegerRepresentation() emit.IntegerRepresentation { return p.integer }
 func (p Project) EvaluationOrder() emit.EvaluationOrder             { return p.evaluation }
-func (p Project) ConcurrencySemantics() emit.ConcurrencySemantics   { return p.concurrency }
 func (p Project) StandardLibraryEnabled() bool                      { return p.standardLibrary }
 func (p Project) ExternalsEnabled() bool                            { return p.externals }
 func (p Project) ImplementationBundles() []string {

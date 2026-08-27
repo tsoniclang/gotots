@@ -6,8 +6,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
+	genericparameters "github.com/tsoniclang/gotots/internal/emit/generic/callableparameters"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -56,7 +56,7 @@ func emitDeferredGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	callableFacet, err := cooperativecall.SelectGenericClassMethod(
+	_, callableFacet, err := callable.SelectGeneric(
 		context,
 		owner,
 	)
@@ -70,6 +70,12 @@ func emitDeferredGeneric(
 	}
 	openConcretization := requiresConcretization &&
 		instance.TypeArgs.ContainsGenericTypeParameter()
+	parameterSelection, err := genericparameters.ForCallable(context, owner)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	providerParameters := parameterSelection.Parameters()
+	providerKernel := parameterSelection.ProviderKernel()
 	var (
 		ordinaryReference      api.NameReference
 		deferredReference      api.NameReference
@@ -87,7 +93,6 @@ func emitDeferredGeneric(
 			owner,
 			instance.TypeArgs,
 			signature,
-			api.GenericConcretizationEffectCanonical,
 		)
 		if concreteErr != nil {
 			return api.ExpressionEmission{}, true, concreteErr
@@ -121,10 +126,10 @@ func emitDeferredGeneric(
 		if err == nil {
 			deferredTarget, err =
 				kernelNames.DeferredGenericKernel(owner)
-		}
-		if err == nil {
-			deferredReference = deferredTarget.Reference()
-			deferredTargetSelected = true
+			if err == nil {
+				deferredReference = deferredTarget.Reference()
+				deferredTargetSelected = true
+			}
 		}
 		if err == nil {
 			typeArguments, typeRequests, err =
@@ -161,20 +166,37 @@ func emitDeferredGeneric(
 				Reason: "generic mechanics reached a source-facing deferred call",
 			}
 		}
-		ordinaryReference, err = context.Names().Reference(owner)
-		if err == nil {
+		if providerKernel {
 			kernelNames, available := context.Names().(api.GenericKernelNames)
 			if !available {
 				return api.ExpressionEmission{}, true, &api.ContextError{
-					Reason: "generic callable variant names are unavailable",
+					Reason: "generic kernel names are unavailable",
 				}
 			}
-			deferredTarget, err =
-				kernelNames.DeferredGenericCallable(owner)
-		}
-		if err == nil {
-			deferredReference = deferredTarget.Reference()
-			deferredTargetSelected = true
+			ordinaryReference, err = kernelNames.GenericKernel(owner)
+			if err == nil {
+				deferredTarget, err = kernelNames.DeferredGenericKernel(owner)
+			}
+			if err == nil {
+				deferredReference = deferredTarget.Reference()
+				deferredTargetSelected = true
+			}
+		} else {
+			ordinaryReference, err = context.Names().Reference(owner)
+			if err == nil {
+				kernelNames, available := context.Names().(api.GenericKernelNames)
+				if !available {
+					return api.ExpressionEmission{}, true, &api.ContextError{
+						Reason: "generic callable variant names are unavailable",
+					}
+				}
+				deferredTarget, err =
+					kernelNames.DeferredGenericCallable(owner)
+			}
+			if err == nil {
+				deferredReference = deferredTarget.Reference()
+				deferredTargetSelected = true
+			}
 		}
 		if err == nil {
 			typeArguments, typeRequests, err =
@@ -201,12 +223,13 @@ func emitDeferredGeneric(
 		var providerBefore []tsgo.Statement
 		var providerRequests []api.RootRequest
 		arguments, providerBefore, providerRequests, err =
-			providerboundary.ToProviderGenericArguments(
+			providerboundary.ToProviderGenericArgumentsWithCallableParameters(
 				context,
 				children,
 				contract.Params(),
 				signature.Params(),
 				arguments,
+				providerParameters,
 			)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
@@ -236,11 +259,6 @@ func emitDeferredGeneric(
 			return api.ExpressionEmission{}, true, err
 		}
 	}
-	cooperative, contractRequests, err :=
-		cooperativecall.GenericContract(context, callableFacet)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
 	call := context.Factory().CallExpression(
 		reference.Expression(context.Factory()),
 		nil,
@@ -253,14 +271,12 @@ func emitDeferredGeneric(
 		before,
 		nil,
 		call,
-		cooperative,
 		api.CombineRequests(
 			reference.Requests(),
 			concreteRequests,
 			typeRequests,
 			capabilityRequests,
 			argumentRequests,
-			contractRequests,
 			recoveryObservation.Requests(),
 		),
 	)

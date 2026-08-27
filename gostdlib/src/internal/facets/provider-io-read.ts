@@ -1,27 +1,25 @@
-import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
-import { readFullAsync } from "../portable/io/read.js";
-import type { CanonicalReader } from "./provider-io-contract.js";
+import { readFullSync } from "../portable/io/read.js";
+import type { ProviderReaderInterface } from "./provider-io-contract.js";
+import type { ProviderErrorInterface } from "./provider-error.js";
 
-export type {
-  CanonicalError,
-  CanonicalReader,
-} from "./provider-io-contract.js";
+export type { ProviderReaderInterface } from "./provider-io-contract.js";
+export type { ProviderErrorInterface } from "./provider-error.js";
 
-export async function IoReadFullCanonical<
-  Failure extends GoInterfaceValue,
-  Source extends CanonicalReader<Failure>,
+export function IoReadFullDirect<
+  Failure extends ProviderErrorInterface,
+  Source extends ProviderReaderInterface<Failure>,
 >(
   reader: Source | undefined,
   destination: RuntimeSlice<uint8>,
   eof: Failure | undefined,
   unexpectedEOF: Failure | undefined,
-): Promise<[int, Failure | undefined]> {
+): [int, Failure | undefined] {
   const source = requireValue(reader, "io.Reader");
-  return readFullAsync(
+  return readFullSync(
     (target) => source.Read(target),
     destination,
     requireValue(eof, "io.EOF"),

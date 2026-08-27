@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	conversionexpression "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -190,16 +189,6 @@ func emit(
 		context.TypesInfo(),
 		source.Fun,
 	)
-	exactSynchronous := false
-	var exactSynchronousRequests []api.RootRequest
-	if _, literal := directFunctionLiteral(source.Fun); !direct && !literal {
-		var selectionErr error
-		exactSynchronous, exactSynchronousRequests, selectionErr =
-			cooperativecall.ExactSynchronousValue(context, source.Fun)
-		if selectionErr != nil {
-			return api.ExpressionEmission{}, selectionErr
-		}
-	}
 	if direct {
 		target, selected, requests, err := emitProviderProfileFunction(
 			context,
@@ -330,84 +319,13 @@ func emit(
 		argumentRequests,
 		guardRequests,
 		profileRequests,
-		exactSynchronousRequests,
 	)
 	target, err := api.NewExpressionEmission(before, call, requests)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if literal, direct := directFunctionLiteral(source.Fun); direct {
-		if detached {
-			return cooperativecall.DetachedLiteralCall(
-				context,
-				source,
-				literal,
-				target,
-			)
-		}
-		return cooperativecall.LiteralCall(
-			context,
-			source,
-			literal,
-			target,
-		)
-	}
-	if direct {
-		if detached {
-			return cooperativecall.DetachedSourceCall(
-				context,
-				source,
-				directFunction,
-				target,
-			)
-		}
-		target, err := cooperativecall.SourceCall(
-			context,
-			source,
-			directFunction,
-			target,
-		)
-		if err != nil || discarded || !providerBoundary {
-			return target, err
-		}
-		return providerboundary.FromProviderResults(
-			context,
-			children,
-			nil,
-			"",
-			signature.Results(),
-			target,
-		)
-	}
-	if exactSynchronous {
-		if discarded || !providerBoundary {
-			return target, nil
-		}
-		return providerboundary.FromProviderResults(
-			context,
-			children,
-			nil,
-			"",
-			signature.Results(),
-			target,
-		)
-	}
-	if detached {
-		return cooperativecall.DetachedValueCall(
-			context,
-			source,
-			signature,
-			target,
-		)
-	}
-	target, err = cooperativecall.ValueCall(
-		context,
-		source,
-		signature,
-		target,
-	)
-	if err != nil || discarded || !providerBoundary {
-		return target, err
+	if discarded || !providerBoundary {
+		return target, nil
 	}
 	return providerboundary.FromProviderResults(
 		context,
@@ -496,6 +414,14 @@ func emitCallee(
 		reference, err := context.Names().Reference(object)
 		if err != nil {
 			return api.ExpressionEmission{}, false, false, err
+		}
+		if reference.ProviderBoundary() {
+			if err := providerboundary.RequireProviderCallable(
+				context,
+				object,
+			); err != nil {
+				return api.ExpressionEmission{}, false, false, err
+			}
 		}
 		return api.DirectExpression(
 			reference.Expression(context.Factory()),

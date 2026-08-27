@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
@@ -119,27 +118,20 @@ func emitDeferredMethod(
 		if callErr != nil {
 			return api.ExpressionEmission{}, callErr
 		}
-		cooperative, contractRequests, contractErr :=
-			cooperativecall.GenericContract(context, invocation.Facet())
-		if contractErr != nil {
-			return api.ExpressionEmission{}, contractErr
-		}
 		return deferredInvocation(
 			context,
 			append(before, call.Before()...),
 			nil,
 			call.Value(),
-			cooperative,
 			api.CombineRequests(
 				receiver.Requests(),
 				argumentRequests,
 				call.Requests(),
-				contractRequests,
 				recoveryObservation.Requests(),
 			),
 		)
 	}
-	call, providerRecovery, recoveryCooperative, err :=
+	call, err :=
 		invocation.RecoveryCall(
 			context,
 			children,
@@ -152,30 +144,16 @@ func emitDeferredMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	cooperative := recoveryCooperative
-	var contractRequests []api.RootRequest
-	if !providerRecovery {
-		cooperative, contractRequests, err =
-			cooperativecall.GenericContract(
-				context,
-				invocation.Facet(),
-			)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
 	before = append(before, call.Before()...)
 	return deferredInvocation(
 		context,
 		before,
 		nil,
 		call.Value(),
-		cooperative,
 		api.CombineRequests(
 			receiver.Requests(),
 			argumentRequests,
 			call.Requests(),
-			contractRequests,
 			recoveryObservation.Requests(),
 		),
 	)
@@ -209,19 +187,6 @@ func emitDeferredInterfaceMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callableReference, err :=
-		context.Names().InterfaceMethodCallable(method)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	cooperative, contractRequests, err :=
-		cooperativecall.InterfaceMethodContract(
-			context,
-			callableReference,
-		)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	call, err := interfaceoperation.ApplyDeferred(
 		context,
 		children,
@@ -230,7 +195,6 @@ func emitDeferredInterfaceMethod(
 		receiver,
 		method,
 		signature,
-		cooperative,
 		arguments,
 		context.Factory().Identifier(callable.RecoveryAuthorityName),
 	)
@@ -250,10 +214,6 @@ func emitDeferredInterfaceMethod(
 		call.Before(),
 		nil,
 		call.Value(),
-		cooperative,
-		api.CombineRequests(
-			call.Requests(),
-			contractRequests,
-		),
+		call.Requests(),
 	)
 }

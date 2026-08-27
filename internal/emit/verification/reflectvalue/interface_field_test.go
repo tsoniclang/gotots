@@ -90,7 +90,7 @@ func InterfaceFieldFacts() string {
 	return before + " | " + after + " | " + final + " | " + genericResult
 }
 `
-	typescriptRunner := `const facts = await InterfaceFieldFacts();
+	typescriptRunner := `const facts = InterfaceFieldFacts();
 console.log(facts);
 `
 	goRunner := `package main
@@ -147,7 +147,7 @@ func ProviderInterfaceFieldFacts() string {
 	return fmt.Sprintf("%s %s", before, holder.Value.String())
 }
 `
-	typescriptRunner := `const facts = await ProviderInterfaceFieldFacts();
+	typescriptRunner := `const facts = ProviderInterfaceFieldFacts();
 console.log(facts);
 `
 	goRunner := `package main
@@ -172,6 +172,106 @@ func main() {
 		func(artifacts renderedArtifacts) {
 			if !strings.Contains(artifacts.printed, "$candidate is reflect.Type") {
 				t.Fatal("sealed provider interface field lacks its typed admission guard")
+			}
+		},
+	)
+}
+
+func TestReflectPointerElementKindsCanonicalizeWithNativeEvidence(t *testing.T) {
+	source := `package reflectvalue
+
+import (
+	"fmt"
+	"reflect"
+)
+
+func PointerElementFacts() string {
+	var slot any = "before"
+	interfaceElement := reflect.ValueOf(&slot).Elem()
+	before := interfaceElement.Elem().String()
+	interfaceElement.Set(reflect.ValueOf(int64(41)))
+
+	value := 7
+	pointer := &value
+	pointerElement := reflect.ValueOf(&pointer).Elem()
+	pointerElement.Elem().SetInt(9)
+
+	array := [2]int{1, 2}
+	arrayElement := reflect.ValueOf(&array).Elem()
+	replacementArray := [2]int{4, 5}
+	arrayElement.Set(reflect.ValueOf(replacementArray))
+	replacementArray[0] = 99
+
+	values := []int{1}
+	sliceElement := reflect.ValueOf(&values).Elem()
+	sliceElement.Set(reflect.ValueOf([]int{2, 3}))
+
+	entries := map[string]int{"before": 1}
+	mapElement := reflect.ValueOf(&entries).Elem()
+	mapElement.Set(reflect.ValueOf(map[string]int{"after": 2}))
+
+	function := func() int { return 3 }
+	functionElement := reflect.ValueOf(&function).Elem()
+	functionElement.Set(reflect.ValueOf(func() int { return 5 }))
+
+	channel := make(chan int, 1)
+	replacementChannel := make(chan int, 1)
+	replacementChannel <- 6
+	channelElement := reflect.ValueOf(&channel).Elem()
+	channelElement.Set(reflect.ValueOf(replacementChannel))
+
+	anonymous := struct{ Count int }{Count: 1}
+	anonymousElement := reflect.ValueOf(&anonymous).Elem()
+	anonymousElement.Field(0).SetInt(4)
+
+	var nilSlot any
+	nilElement := reflect.ValueOf(&nilSlot).Elem()
+	var absent *int
+	invalidNilPointer := !reflect.ValueOf(absent).Elem().IsValid()
+	return fmt.Sprintf(
+		"%s %d %d %v %v %d %d %d %d %t %t %t %t",
+		before, slot.(int64), value, array, values, entries["after"],
+		function(), <-channel, anonymous.Count, interfaceElement.CanSet(),
+		nilElement.IsNil(), nilElement.IsZero(), invalidNilPointer,
+	)
+}
+`
+	typescriptRunner := `console.log(PointerElementFacts());
+`
+	goRunner := `package main
+
+import (
+	"fmt"
+
+	fixture "example.com/reflectvalue"
+)
+
+func main() {
+	fmt.Println(fixture.PointerElementFacts())
+}
+`
+	verifyReflectCanonicalInspect(
+		t,
+		source,
+		"PointerElementFacts",
+		"reflectvalue",
+		typescriptRunner,
+		goRunner,
+		func(artifacts renderedArtifacts) {
+			for _, required := range []string{
+				"$goReflectType$PointerTo_Interface_void",
+				"$goReflectType$PointerTo_PointerTo_int",
+				"$goReflectType$PointerTo_Array2Of_int",
+				"$goReflectType$PointerTo_SliceOf_int",
+				"$goReflectType$PointerTo_MapOf_string_To_int",
+				"$goReflectType$PointerTo_void_to_int",
+				"$goReflectType$PointerTo_ChannelOf_int",
+				"loadPointer(pointer)",
+				"storePointer(pointer",
+			} {
+				if !strings.Contains(artifacts.printed, required) {
+					t.Fatalf("pointer-element artifact lacks %q", required)
+				}
 			}
 		},
 	)

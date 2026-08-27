@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import type { SpawnSyncOptionsWithBufferEncoding } from "node:child_process";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, gostring, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import type { gostring, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 import { hostInteger, integerFromHost } from "../../../host-integer.js";
 import {
   state as ioState,
@@ -38,7 +38,7 @@ export interface CommandValue {
   Process: Process | undefined;
   ProcessState: ProcessState | undefined;
   Err: GoError | undefined;
-  Cancel: (() => Awaitable<GoError | undefined>) | undefined;
+  Cancel: (() => GoError | undefined) | undefined;
   WaitDelay: Duration;
 }
 

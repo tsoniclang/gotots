@@ -186,7 +186,7 @@ class TestFS extends ProviderInterfaceValue implements FS {
   }
 }
 
-test("filesystem functions read, stat, sort, and walk", async () => {
+test("filesystem functions read, stat, sort, and walk", () => {
   const fileSystem = new TestFS();
   const [content, readFailure] = ReadFile(fileSystem, "a.txt");
   assert.equal(readFailure, undefined);
@@ -205,7 +205,7 @@ test("filesystem functions read, stat, sort, and walk", async () => {
   );
 
   const visited: string[] = [];
-  const walkFailure = await WalkDir(fileSystem, ".", async (path) => {
+  const walkFailure = WalkDir(fileSystem, ".", (path) => {
     visited.push(path);
     return undefined;
   });

@@ -26,9 +26,6 @@ func sourceModuleForExport(
 		if !strings.Contains(
 			printed,
 			"export function "+name+"(",
-		) && !strings.Contains(
-			printed,
-			"export async function "+name+"(",
 		) {
 			continue
 		}
@@ -66,7 +63,6 @@ func environmentDeclarationLine(
 
 func waveNineOptions() emit.Options {
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	return options
 }
 

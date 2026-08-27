@@ -46,15 +46,3 @@ func parseEvaluation(selected string) (emit.EvaluationOrder, error) {
 	}
 	return value, nil
 }
-
-func parseConcurrency(selected string) (emit.ConcurrencySemantics, error) {
-	value, err := emit.ParseConcurrencySemantics(selected)
-	if err != nil {
-		return emit.ConcurrencySemanticsInvalid, projectError(
-			"validate config",
-			"semantics.concurrency",
-			err.Error(),
-		)
-	}
-	return value, nil
-}

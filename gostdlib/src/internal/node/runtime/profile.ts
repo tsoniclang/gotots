@@ -17,7 +17,7 @@ export interface ProfileIdentity {
   readonly [ProfileNameKey]: string;
 }
 
-type CpuProfileWrite = (content: Uint8Array) => Promise<void>;
+type CpuProfileWrite = (content: Uint8Array) => void;
 
 interface CpuProfileSession {
   readonly sample: CpuSample;
@@ -53,11 +53,11 @@ export function beginCpuProfile(write: CpuProfileWrite): boolean {
   return true;
 }
 
-export async function finishCpuProfile(): Promise<void> {
+export function finishCpuProfile(): void {
   const session = activeCpuProfile;
   activeCpuProfile = undefined;
   if (session !== undefined) {
-    await session.write(finishCpuSample(session.sample));
+    session.write(finishCpuSample(session.sample));
   }
 }
 

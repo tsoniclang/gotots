@@ -4,30 +4,10 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"strings"
 	"testing"
 
 	. "github.com/tsoniclang/gotots/internal/emit/api"
 )
-
-func TestMissingCooperativeFacetDiagnosticNamesOwnerAndRole(t *testing.T) {
-	sourcePackage := types.NewPackage("example.com/diagnostic", "diagnostic")
-	owner := types.NewFunc(
-		token.Pos(1),
-		sourcePackage,
-		"Run",
-		types.NewSignatureType(nil, nil, nil, nil, nil, false),
-	)
-	context := (Context{}).
-		WithArtifactOwner(MustSourceArtifactOwner(owner)).
-		WithRole(RoleFunctionBody)
-	_, err := context.CooperativeRequest()
-	if err == nil ||
-		!strings.Contains(err.Error(), "Run") ||
-		!strings.Contains(err.Error(), string(RoleFunctionBody)) {
-		t.Fatalf("missing-facet diagnostic = %v", err)
-	}
-}
 
 func TestAnonymousStructRequestCarriesExactGeneratedArtifact(t *testing.T) {
 	sourceType := types.NewStruct(
@@ -272,7 +252,7 @@ func TestGenericCapabilityUsesItsExactValidatingConstructor(t *testing.T) {
 	}
 }
 
-func TestGenericCooperativeFacetsCarryExactCallableIdentity(t *testing.T) {
+func TestGenericFacetsCarryExactCallableIdentity(t *testing.T) {
 	valueSignature := types.NewSignatureType(
 		nil,
 		nil,
@@ -393,20 +373,6 @@ func TestGenericCooperativeFacetsCarryExactCallableIdentity(t *testing.T) {
 	if operationReference.Contract() != operation ||
 		operationReference.Name() != operation.TargetName() {
 		t.Fatalf("generic-operation reference = %#v", operationReference)
-	}
-	for _, facet := range []CallableFacet{
-		capabilityFacet,
-		operationFacet,
-	} {
-		request, requestErr := NewCooperativeCallableRequest(facet)
-		if requestErr != nil {
-			t.Fatal(requestErr)
-		}
-		requirement, ok := request.DeclarationRequirement()
-		selectedFacet, cooperative := requirement.CooperativeCallable()
-		if !ok || !cooperative || selectedFacet != facet {
-			t.Fatalf("cooperative facet request = %#v", request)
-		}
 	}
 	if CallableFacetSource != 1 ||
 		CallableFacetFunctionLiteral != 2 ||

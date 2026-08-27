@@ -22,6 +22,7 @@ export interface RuntimeValueLocation {
   readonly settable: bool;
   readonly get: () => GoInterfaceValue | undefined;
   readonly set: (box: GoInterfaceValue | undefined) => void;
+  readonly address?: () => GoInterfaceValue;
 }
 
 export interface RuntimeValueAdapter<T> {
@@ -41,6 +42,7 @@ export interface RuntimeStructFieldOperations<T> {
     value: T,
     field: GoInterfaceValue | undefined,
   ) => void;
+  readonly address?: (value: T) => GoInterfaceValue;
 }
 
 export interface RuntimePointerElementOperations<P> {
@@ -88,7 +90,7 @@ export interface RuntimeValueOperations {
   ) => RuntimeValueLocation;
   readonly append?: (
     box: GoInterfaceValue,
-    values: readonly GoInterfaceValue[],
+    values: readonly (GoInterfaceValue | undefined)[],
   ) => GoInterfaceValue;
   readonly makeSlice?: (
     length: int64,
@@ -106,16 +108,17 @@ export interface RuntimeValueOperations {
   readonly boxBytes?: (value: RuntimeSlice<uint8>) => GoInterfaceValue;
   readonly mapIndex?: (
     box: GoInterfaceValue,
-    key: GoInterfaceValue,
-  ) => GoInterfaceValue | undefined;
+    key: GoInterfaceValue | undefined,
+  ) => readonly [GoInterfaceValue | undefined, bool];
   readonly mapStore?: (
     box: GoInterfaceValue,
-    key: GoInterfaceValue,
+    key: GoInterfaceValue | undefined,
     value: GoInterfaceValue | undefined,
+    deleteEntry: bool,
   ) => void;
   readonly mapKeys?: (
     box: GoInterfaceValue,
-  ) => readonly GoInterfaceValue[];
+  ) => readonly (GoInterfaceValue | undefined)[];
   readonly makeMap?: () => GoInterfaceValue;
   readonly zero?: () => GoInterfaceValue | undefined;
   readonly boxInt?: (value: int64) => GoInterfaceValue;
@@ -211,6 +214,10 @@ export function registerRuntimeStructValueOperations<T>(
         return GoPanic.raiseRuntime("reflect: Field index out of range");
       }
       const value = box.$go$value;
+      const selectedAddress = selected.address;
+      const address = selectedAddress === undefined
+        ? {}
+        : { address: (): GoInterfaceValue => selectedAddress(value) };
       return {
         type: selected.type,
         settable: selected.settable,
@@ -218,6 +225,7 @@ export function registerRuntimeStructValueOperations<T>(
         set: (fieldValue: GoInterfaceValue | undefined): void => {
           selected.set(value, fieldValue);
         },
+        ...address,
       };
     };
     if (clone === undefined) {
@@ -297,6 +305,7 @@ export function registerRuntimePointerValueOperations<P>(
             set: (value: GoInterfaceValue | undefined): void => {
               element.set(pointer, value);
             },
+            address: (): GoInterfaceValue => box,
           };
         },
       };
@@ -341,6 +350,9 @@ export function runtimeValueOperations(
 let typeResolver:
   | ((value: GoInterfaceValue) => Type | undefined)
   | undefined;
+let typeRecorder:
+  | ((value: GoInterfaceValue, type: Type) => void)
+  | undefined;
 
 // bindRuntimeTypeResolver is installed once by the runtime-type module so
 // the public reflect module can resolve canonical descriptors without a
@@ -351,9 +363,25 @@ export function bindRuntimeTypeResolver(
   typeResolver = resolver;
 }
 
+export function bindRuntimeTypeRecorder(
+  recorder: (value: GoInterfaceValue, type: Type) => void,
+): void {
+  typeRecorder = recorder;
+}
+
 // resolveRuntimeType resolves the canonical descriptor of one boxed value.
 export function resolveRuntimeType(
   value: GoInterfaceValue,
 ): Type | undefined {
   return typeResolver === undefined ? undefined : typeResolver(value);
+}
+
+export function recordRuntimeType(
+  value: GoInterfaceValue,
+  type: Type,
+): void {
+  if (typeRecorder === undefined) {
+    return GoPanic.raiseRuntime("reflect: runtime type recorder is absent");
+  }
+  typeRecorder(value, type);
 }

@@ -108,7 +108,7 @@ func Results() (bool, bool, bool, bool, bool, bool) {
 		}
 	}
 	if strings.Contains(artifacts.printed, "ErrorsIsCanonical(") {
-		t.Fatalf("direct errors.Is output selected cooperative boundary:\n%s", artifacts.printed)
+		t.Fatalf("direct errors.Is output selected a retired boundary:\n%s", artifacts.printed)
 	}
 	for _, view := range []string{
 		"provider_error.AsProviderErrorIsDirect(value)",
@@ -119,25 +119,25 @@ func Results() (bool, bool, bool, bool, bool, bool) {
 			t.Fatalf("direct provider capability view %q calls = %d, want 1:\n%s", view, count, artifacts.printed)
 		}
 	}
-	for _, cooperativeView := range []string{
+	for _, retiredView := range []string{
 		"provider_error.AsProviderErrorIs(value)",
 		"provider_error.AsProviderErrorUnwrap(value)",
 		"provider_error.AsProviderErrorUnwrapMany(value)",
 	} {
-		if strings.Contains(artifacts.printed, cooperativeView) {
-			t.Fatalf("direct provider bridge selected cooperative view %q:\n%s", cooperativeView, artifacts.printed)
+		if strings.Contains(artifacts.printed, retiredView) {
+			t.Fatalf("direct provider bridge selected retired view %q:\n%s", retiredView, artifacts.printed)
 		}
 	}
 }
 
-func TestErrorsIsSelectsCooperativeOptionalProtocol(t *testing.T) {
+func TestErrorsIsSelectsSynchronousOptionalProtocol(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
 		filepath.Join(project, "go.mod"),
-		"module example.com/asyncerrorprotocol\n\ngo 1.26.4\n",
+		"module example.com/errorprotocolmethod\n\ngo 1.26.4\n",
 	)
-	writeProgramFile(t, filepath.Join(project, "source.go"), `package asyncerrorprotocol
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package errorprotocolmethod
 
 import (
 	"errors"
@@ -175,7 +175,6 @@ func Result() bool {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -190,13 +189,13 @@ func Result() bool {
 	assemblyPath := ""
 	for _, file := range emission.Files() {
 		if file.Kind() == emit.TargetFilePackageAssembly &&
-			file.PackageName() == "asyncerrorprotocol" {
+			file.PackageName() == "errorprotocolmethod" {
 			assemblyPath = file.OutputPath()
 			break
 		}
 	}
 	if assemblyPath == "" {
-		t.Fatal("cooperative error package assembly is absent")
+		t.Fatal("synchronous error package assembly is absent")
 	}
 	typecheckProviderRunner(
 		t,
@@ -204,35 +203,39 @@ func Result() bool {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Result"},
-		"console.log(await Result());\n",
+		"console.log(Result());\n",
 	)
 	for _, required := range []string{
-		"ErrorsIsCanonical",
-		"async Is(",
+		"ErrorsIsDirect",
+		"Is(",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
-			t.Fatalf("cooperative errors.Is output lacks %q:\n%s", required, artifacts.printed)
+			t.Fatalf("synchronous errors.Is output lacks %q:\n%s", required, artifacts.printed)
 		}
 	}
 	for _, forbidden := range []string{
 		"ErrorsIsCanonicalAsyncIs(",
 		"ErrorsIsCanonicalAsyncUnwrap(",
 		"ErrorsIsCanonicalAsyncUnwrapMany(",
+		"async ",
+		"await ",
+		"Promise<",
+		"Awaitable<",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
-			t.Fatalf("cooperative errors.Is retained partial profile %q:\n%s", forbidden, artifacts.printed)
+			t.Fatalf("synchronous errors.Is retained %q:\n%s", forbidden, artifacts.printed)
 		}
 	}
 }
 
-func TestErrorsIsUsesCanonicalCooperativeProtocolWithoutInvokingError(t *testing.T) {
+func TestErrorsIsUsesSynchronousProtocolWithoutInvokingError(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
 		filepath.Join(project, "go.mod"),
-		"module example.com/asyncerrormethod\n\ngo 1.26.4\n",
+		"module example.com/errorstringmethod\n\ngo 1.26.4\n",
 	)
-	writeProgramFile(t, filepath.Join(project, "source.go"), `package asyncerrormethod
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package errorstringmethod
 
 import (
 	"errors"
@@ -264,7 +267,6 @@ func Result() bool {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -279,13 +281,13 @@ func Result() bool {
 	assemblyPath := ""
 	for _, file := range emission.Files() {
 		if file.Kind() == emit.TargetFilePackageAssembly &&
-			file.PackageName() == "asyncerrormethod" {
+			file.PackageName() == "errorstringmethod" {
 			assemblyPath = file.OutputPath()
 			break
 		}
 	}
 	if assemblyPath == "" {
-		t.Fatal("cooperative Error package assembly is absent")
+		t.Fatal("synchronous Error package assembly is absent")
 	}
 	typecheckProviderRunner(
 		t,
@@ -293,14 +295,19 @@ func Result() bool {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Result"},
-		"console.log(await Result());\n",
+		"console.log(Result());\n",
 	)
 	for _, required := range []string{
-		"ErrorsIsCanonical",
-		"async Error(",
+		"ErrorsIsDirect",
+		"Error(",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
-			t.Fatalf("cooperative Error output lacks %q:\n%s", required, artifacts.printed)
+			t.Fatalf("synchronous Error output lacks %q:\n%s", required, artifacts.printed)
+		}
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("synchronous Error output contains %q", forbidden)
 		}
 	}
 }
@@ -345,7 +352,6 @@ func Message(failure error) string { return failure.Error() }
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -369,12 +375,17 @@ func Message(failure error) string { return failure.Error() }
 		t.Fatalf("provider error bridge definitions = %d, want 1:\n%s", count, artifacts.printed)
 	}
 	for _, required := range []string{
-		"async Error(",
+		"Error(",
 		"errors__from_gostdlib.New(\"provider\")",
 		"extends GoProviderInterfaceBridge<GoError> implements GoInterface",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("provider error artifact lacks %q:\n%s", required, artifacts.printed)
+		}
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("provider error artifact contains %q", forbidden)
 		}
 	}
 }

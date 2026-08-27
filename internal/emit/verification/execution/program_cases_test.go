@@ -14,7 +14,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestCooperativeStructuredForClausesStayInTheEnclosingCallable(
+func TestSerialStructuredForClausesStayInTheEnclosingCallable(
 	t *testing.T,
 ) {
 	directory := filepath.Join(
@@ -54,8 +54,8 @@ func TestCooperativeStructuredForClausesStayInTheEnclosingCallable(
 		"CooperativePost",
 	} {
 		target := waveNineFunctionText(t, artifacts.printed, function)
-		if !strings.Contains(target, "export async function "+function+"(") {
-			t.Fatalf("structured for function is not cooperative:\n%s", target)
+		if !strings.Contains(target, "export function "+function+"(") {
+			t.Fatalf("structured for function is not synchronous:\n%s", target)
 		}
 		for _, forbidden := range []string{
 			"__gotots_for_condition_",
@@ -75,7 +75,7 @@ func TestCooperativeStructuredForClausesStayInTheEnclosingCallable(
 		"let __gotots_for_first_",
 		"if (__gotots_for_first_",
 		"else {",
-		"await next(",
+		"next(",
 	} {
 		if !strings.Contains(post, required) {
 			t.Fatalf("structured post lacks %q:\n%s", required, post)
@@ -84,11 +84,8 @@ func TestCooperativeStructuredForClausesStayInTheEnclosingCallable(
 	runner := filepath.Join(workingDirectory, "runner.ts")
 	writeProgramFile(t, runner, `import "./program.js";
 import { CooperativeCondition, CooperativePost } from "`+artifacts.sourceModule+`";
-import { GoScheduler } from "./runtime/channel.js";
 
-await GoScheduler.run(async () => {
-    console.log(String(await CooperativeCondition()) + " " + String(await CooperativePost()));
-});
+console.log(String(CooperativeCondition()) + " " + String(CooperativePost()));
 `)
 	writeProgramFile(
 		t,
@@ -99,6 +96,12 @@ await GoScheduler.run(async () => {
 		t,
 		workingDirectory,
 		append(artifacts.paths, runner),
+	)
+	targetOutput := runProgram(
+		t,
+		workingDirectory,
+		"node",
+		filepath.Join(workingDirectory, "out", "runner.js"),
 	)
 	goRunner := filepath.Join(workingDirectory, "go-runner")
 	writeProgramFile(t, filepath.Join(goRunner, "go.mod"), fmt.Sprintf(
@@ -131,10 +134,12 @@ func main() {
 		"run",
 		".",
 	)
-	requireNativeGoEvidence(t, goOutput)
+	if targetOutput != goOutput {
+		t.Fatalf("structured for mismatch:\nGo: %s\nTypeScript: %s", goOutput, targetOutput)
+	}
 }
 
-func TestCooperativeIteratorCallbackPropagatesThroughCallableABIs(
+func TestSerialIteratorCallbackPropagatesThroughCallableABIs(
 	t *testing.T,
 ) {
 	directory := filepath.Join(
@@ -169,21 +174,21 @@ func TestCooperativeIteratorCallbackPropagatesThroughCallableABIs(
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	cooperative := waveNineFunctionText(
+	channelBacked := waveNineFunctionText(
 		t,
 		artifacts.printed,
 		"CooperativeAudit",
 	)
 	for _, required := range []string{
-		"export async function CooperativeAudit(",
-		"async ($argument0: int32): Promise<bool> =>",
-		"await __gotots_range_",
+		"export function CooperativeAudit(",
+		"($argument0: int32): bool =>",
+		"__gotots_range_",
 	} {
-		if !strings.Contains(cooperative, required) {
+		if !strings.Contains(channelBacked, required) {
 			t.Fatalf(
-				"cooperative iterator artifact lacks %q:\n%s",
+				"channel-backed iterator artifact lacks %q:\n%s",
 				required,
-				cooperative,
+				channelBacked,
 			)
 		}
 	}
@@ -193,8 +198,8 @@ func TestCooperativeIteratorCallbackPropagatesThroughCallableABIs(
 		"SynchronousAudit",
 	)
 	for _, required := range []string{
-		"export async function SynchronousAudit(): Promise<int32>",
-		"await __gotots_range_",
+		"export function SynchronousAudit(): int32",
+		"__gotots_range_",
 	} {
 		if !strings.Contains(synchronous, required) {
 			t.Fatalf(
@@ -207,11 +212,8 @@ func TestCooperativeIteratorCallbackPropagatesThroughCallableABIs(
 	runner := filepath.Join(workingDirectory, "runner.ts")
 	writeProgramFile(t, runner, `import "./program.js";
 import { CooperativeAudit, SynchronousAudit } from "`+artifacts.sourceModule+`";
-import { GoScheduler } from "./runtime/channel.js";
 
-await GoScheduler.run(async () => {
-	    console.log(String(await CooperativeAudit()) + " " + String(await SynchronousAudit()));
-});
+console.log(String(CooperativeAudit()) + " " + String(SynchronousAudit()));
 `)
 	writeProgramFile(
 		t,
@@ -262,7 +264,7 @@ func main() {
 	)
 	if targetOutput != goOutput {
 		t.Fatalf(
-			"cooperative iterator output differs\nTypeScript: %q\nGo: %q",
+			"serial iterator output differs\nTypeScript: %q\nGo: %q",
 			targetOutput,
 			goOutput,
 		)

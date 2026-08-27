@@ -32,17 +32,17 @@ func ToProviderProfileArguments(
 	context api.Context,
 	children api.ChildEmitter,
 	parameters *types.Tuple,
-	profile gostdlib.ProviderCallableProfile,
+	selection CallableProfileSelection,
 	sourceArguments []tsgo.Expression,
 ) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
 	return toProviderArgumentsSelected(
 		context,
 		children,
 		parameters,
-		profile.CanonicalParameters(),
+		selection.canonicalParameters,
 		nil,
 		"",
-		profile.Interfaces(),
+		selection.interfaces,
 		sourceArguments,
 	)
 }

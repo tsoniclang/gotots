@@ -282,7 +282,7 @@ test("named-struct facets expose only selected static operations", (): void => {
   assert.equal(poolCopy.New, poolNew);
 });
 
-test("provider assignment facets preserve selected Go representations", async (): Promise<void> => {
+test("provider assignment facets preserve selected Go representations", (): void => {
   const parseSource = new ParseError(
     "layout",
     "value",
@@ -306,7 +306,7 @@ test("provider assignment facets preserve selected Go representations", async ()
   const mutexSource = new Mutex();
   const mutexTarget = new Mutex();
   SyncMutexOperations.$assign(mutexTarget, mutexSource);
-  await Mutex.Lock(mutexTarget);
+  Mutex.Lock(mutexTarget);
   Mutex.Unlock(mutexTarget);
 
   const builderSource = new StringBuilder();
@@ -359,7 +359,7 @@ test("provider assignment facets preserve selected Go representations", async ()
   assert.equal(Timer.Stop(timerSource), true);
 });
 
-test("sync value facets preserve comparable state", async (): Promise<void> => {
+test("sync value facets preserve comparable state", (): void => {
   const mutex = new Mutex();
   const otherMutex = new Mutex();
   assert.equal(SyncMutexOperations.$equal(mutex, otherMutex), true);
@@ -397,11 +397,11 @@ test("sync value facets preserve comparable state", async (): Promise<void> => {
     SyncCondOperations.$hash(otherCondition),
   );
 
-  await Mutex.Lock(mutex);
+  Mutex.Lock(mutex);
   Mutex.Unlock(mutex);
-  await Once.Do(once, (): void => undefined);
-  await Once.Do(otherOnce, (): void => undefined);
-  await RWMutex.RLock(readWrite);
+  Once.Do(once, (): void => undefined);
+  Once.Do(otherOnce, (): void => undefined);
+  RWMutex.RLock(readWrite);
   RWMutex.RUnlock(readWrite);
   WaitGroup.Add(waitGroup, 1n);
   WaitGroup.Done(waitGroup);

@@ -32,6 +32,10 @@ type code int
 
 func (value code) Error() string { return "code" }
 
+type record struct {
+	Count int
+}
+
 func AsCode(failure error) (code, bool) {
 	return errors.AsType[code](failure)
 }
@@ -49,6 +53,10 @@ func Grow(source []string) []string {
 }
 
 func GenericClone[T any](source []T) []T {
+	return slices.Clone(source)
+}
+
+func CloneRecords(source []record) []record {
 	return slices.Clone(source)
 }
 
@@ -115,7 +123,7 @@ func SortOpen(source []string, compare func(string, string) int) {
 	slices.SortFunc(source, compare)
 }
 
-func SortCooperative(source []string, ready <-chan struct{}) {
+func SortChannelBacked(source []string, ready <-chan struct{}) {
 	slices.SortFunc(source, func(left, right string) int {
 		<-ready
 		return strings.Compare(left, right)
@@ -221,7 +229,6 @@ func TimeAddress() time.Time {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -229,6 +236,7 @@ func TimeAddress() time.Time {
 			mustProviderRoot(t, scope.Lookup("Concat")),
 			mustProviderRoot(t, scope.Lookup("Clone")),
 			mustProviderRoot(t, scope.Lookup("GenericClone")),
+			mustProviderRoot(t, scope.Lookup("CloneRecords")),
 			mustProviderRoot(t, scope.Lookup("GenericGrow")),
 			mustProviderRoot(t, scope.Lookup("GenericGrowValue")),
 			mustProviderRoot(t, scope.Lookup("DeferredGenericGrow")),
@@ -241,7 +249,7 @@ func TimeAddress() time.Time {
 			mustProviderRoot(t, scope.Lookup("SortMethod")),
 			mustProviderRoot(t, scope.Lookup("SortVariable")),
 			mustProviderRoot(t, scope.Lookup("SortOpen")),
-			mustProviderRoot(t, scope.Lookup("SortCooperative")),
+			mustProviderRoot(t, scope.Lookup("SortChannelBacked")),
 			mustProviderRoot(t, scope.Lookup("SortRecovering")),
 			mustProviderRoot(t, scope.Lookup("BinarySearchDirect")),
 			mustProviderRoot(t, scope.Lookup("CompareDirect")),
@@ -269,25 +277,30 @@ func TimeAddress() time.Time {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	printed := artifacts.printed
 	for _, exact := range []string{
-		"SlicesConcatKernel<gostring>(",
+		"SlicesConcatKernel<RuntimeSlice<gostring>, gostring, gostring>(",
 		"MapsCloneKernel<GoMapValue<gostring, int>, gostring, int>(",
 		"SlicesGrowKernel<RuntimeSlice<gostring>, gostring, gostring>(",
-		"SlicesCloneKernel<GoContainerStorage<T>>(",
-		"SlicesCloneKernel<GoContainerStorage<T>>($argument0)",
+		"SlicesCloneKernel<RuntimeSlice<GoContainerStorage<T>>, T, GoContainerStorage<T>>(",
+		"$go$copy$T0_to_T0",
+		"SlicesCloneKernel<RuntimeSlice<record__from_providerprojection$Storage>, record__from_providerprojection, record__from_providerprojection$Storage>(",
+		"record__from_providerprojection.$copy($argument0)",
+		"record__from_providerprojection.$fromStorage($argument0)",
+		"record__from_providerprojection.$storageOf($argument0)",
 		"CmpCompareKernel<gostring>(",
+		"CmpCompare<gostring>(",
 		"SlicesValuesKernel<RuntimeSlice<gostring>, gostring, gostring>(",
-		"ErrorsAsTypeKernel<code__from_providerprojection>(($argument0:",
+		"ErrorsAsTypeKernel<code__from_providerprojection>(($argument0: GoInterfaceValue | undefined)",
 		"GenericAddress$kernel<T>",
-		"SlicesSortFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
-		"SlicesSortStableFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
-		"SlicesBinarySearchFuncSynchronousKernel<",
-		"SlicesCompareFuncSynchronousKernel<",
-		"SlicesContainsFuncSynchronousKernel<",
-		"SlicesEqualFuncSynchronousKernel<",
-		"SlicesIndexFuncSynchronousKernel<",
-		"SlicesCompactFuncSynchronousKernel<",
-		"SlicesDeleteFuncSynchronousKernel<",
-		"MapsEqualFuncSynchronousKernel<",
+		"SlicesSortFuncKernel<RuntimeSlice<gostring>, gostring, gostring>(",
+		"SlicesSortStableFuncKernel<RuntimeSlice<gostring>, gostring, gostring>(",
+		"SlicesBinarySearchFuncKernel<",
+		"SlicesCompareFuncKernel<",
+		"SlicesContainsFuncKernel<",
+		"SlicesEqualFuncKernel<",
+		"SlicesIndexFuncKernel<",
+		"SlicesCompactFuncKernel<",
+		"SlicesDeleteFuncKernel<",
+		"MapsEqualFuncKernel<",
 		"SlicesContainsFuncKernel<",
 		"export function SortDirect(source: RuntimeSlice<gostring>): void",
 		"export function SortStableDirect(source: RuntimeSlice<gostring>): void",
@@ -295,9 +308,9 @@ func TimeAddress() time.Time {
 		"export function SortLocal(source: RuntimeSlice<gostring>): void",
 		"export function SortGenericNamed(source: RuntimeSlice<gostring>): void",
 		"export function SortMethod(source: RuntimeSlice<gostring>): void",
-		"export async function SortVariable(",
-		"export async function SortOpen(",
-		"export async function SortCooperative(",
+		"export function SortVariable(",
+		"export function SortOpen(",
+		"export function SortChannelBacked(",
 		"export function SortRecovering(source: RuntimeSlice<gostring>): void",
 		"export function BinarySearchDirect(",
 		"export function CompareDirect(",
@@ -307,7 +320,7 @@ func TimeAddress() time.Time {
 		"export function CompactDirect(",
 		"export function DeleteDirect(",
 		"export function MapsEqualDirect(",
-		"export async function ContainsOpen(",
+		"export function ContainsOpen(",
 		"Pointer<T>",
 		"addressOf<GoArray<GoContainerStorage<T>, 1>>(values)",
 		"BigInt.asIntN(64, goNumberToBigInt(count))",
@@ -321,6 +334,10 @@ func TimeAddress() time.Time {
 	for _, forbidden := range []string{
 		"$goCapability_",
 		"support/generics/capabilities/",
+		"async ",
+		"await ",
+		"Promise<",
+		"Awaitable<",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("provider generic projection retains %q:\n%s", forbidden, printed)
@@ -331,6 +348,7 @@ func TimeAddress() time.Time {
 		"Clone<gostring, int64>(",
 		"SlicesValuesCooperative<",
 		"SlicesValuesFullyCooperative<",
+		"SynchronousKernel<",
 		"export async function SortDirect(",
 		"export async function SortStableDirect(",
 		"export async function SortNamed(",
@@ -345,255 +363,10 @@ func TimeAddress() time.Time {
 		"export async function CompactDirect(",
 		"export async function DeleteDirect(",
 		"export async function MapsEqualDirect(",
-		"SlicesBinarySearchFuncKernel<RuntimeSlice<gostring>",
-		"SlicesCompareFuncKernel<RuntimeSlice<gostring>",
-		"SlicesEqualFuncKernel<RuntimeSlice<gostring>",
-		"SlicesIndexFuncKernel<RuntimeSlice<gostring>",
-		"SlicesCompactFuncKernel<RuntimeSlice<gostring>",
-		"SlicesDeleteFuncKernel<RuntimeSlice<gostring>",
-		"MapsEqualFuncKernel<GoMapValue<gostring, gostring>",
 	} {
 		if strings.Contains(printed, superseded) {
 			t.Fatalf("provider generic projection retained %q:\n%s", superseded, printed)
 		}
-	}
-	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
-}
-
-func TestGenericSynchronousCallbackSelectionUsesExactFieldEvidence(t *testing.T) {
-	project := t.TempDir()
-	writeProgramFile(
-		t,
-		filepath.Join(project, "go.mod"),
-		"module example.com/synchronousfield\n\ngo 1.26.4\n",
-	)
-	writeProgramFile(t, filepath.Join(project, "source.go"), `package synchronousfield
-
-import "slices"
-
-type closedComparer struct {
-	compare func(string, string) int
-}
-
-func newClosedComparer() *closedComparer {
-	value := &closedComparer{}
-	value.compare = nil
-	value.compare = value.compareMethod
-	return value
-}
-
-func (*closedComparer) compareMethod(left, right string) int {
-	if left < right { return -1 }
-	if left > right { return 1 }
-	return 0
-}
-
-func SortClosed(source []string) {
-	value := newClosedComparer()
-	slices.SortFunc(source, value.compare)
-}
-
-func CallClosed(left, right string) int { return newClosedComparer().compare(left, right) }
-
-func DeferClosed() {
-	value := newClosedComparer()
-	defer value.compare("left", "right")
-}
-
-func GoClosed() {
-	value := newClosedComparer()
-	go value.compare("left", "right")
-}
-
-type directComparer struct{}
-
-func (directComparer) compare(left, right string) int {
-	if left < right { return -1 }
-	if left > right { return 1 }
-	return 0
-}
-
-func SortMethod(source []string) {
-	slices.SortFunc(source, directComparer{}.compare)
-}
-
-type exportedComparer struct {
-	Compare func(string, string) int
-}
-
-func SortExported(source []string, value *exportedComparer) {
-	slices.SortFunc(source, value.Compare)
-}
-
-type openComparer struct {
-	compare func(string, string) int
-}
-
-func SortOpen(source []string, compare func(string, string) int) {
-	value := &openComparer{compare: compare}
-	slices.SortFunc(source, value.compare)
-}
-
-func CallOpen(
-	value *openComparer,
-	left, right string,
-) int {
-	return value.compare(left, right)
-}
-
-type cooperativeComparer struct {
-	compare func(string, string) int
-}
-
-func (value *cooperativeComparer) compareMethod(
-	left, right string,
-) int {
-	ready := make(chan struct{})
-	<-ready
-	return 0
-}
-
-func SortCooperative(source []string, value *cooperativeComparer) {
-	value.compare = value.compareMethod
-	slices.SortFunc(source, value.compare)
-}
-
-type literalComparer struct {
-	compare func(string, string) int
-}
-
-func newLiteralComparer() *literalComparer {
-	value := &literalComparer{}
-	value.compare = func(left, right string) int {
-		ready := make(chan struct{})
-		<-ready
-		return 0
-	}
-	return value
-}
-
-func SortLiteral(source []string) {
-	value := newLiteralComparer()
-	slices.SortFunc(source, value.compare)
-}
-
-type addressedComparer struct {
-	compare func(string, string) int
-}
-
-func address(value *addressedComparer) *func(string, string) int {
-	return &value.compare
-}
-
-func SortAddressed(source []string, value *addressedComparer) {
-	value.compare = directComparer{}.compare
-	slices.SortFunc(source, value.compare)
-}
-
-type comparer interface {
-	compare(string, string) int
-}
-
-type interfaceComparer struct {
-	compare func(string, string) int
-}
-
-func SortInterface(source []string, provider comparer) {
-	value := &interfaceComparer{compare: provider.compare}
-	slices.SortFunc(source, value.compare)
-}
-
-`)
-	program, err := load.Load(context.Background(), load.Request{
-		Directory:    project,
-		Pattern:      ".",
-		BuildProfile: linkedProviderBuildProfile(t),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
-	options.StandardLibrary = linkedProviderCertificate(t)
-	var roots []emit.Root
-	for _, name := range []string{
-		"SortClosed",
-		"CallClosed",
-		"DeferClosed",
-		"GoClosed",
-		"SortMethod",
-		"SortExported",
-		"SortOpen",
-		"CallOpen",
-		"SortCooperative",
-		"SortLiteral",
-		"SortAddressed",
-		"SortInterface",
-	} {
-		roots = append(roots, mustProviderRoot(t, scope.Lookup(name)))
-	}
-	emission, err := emit.CompileWithOptions(program, roots, options)
-	if err != nil {
-		t.Fatal(err)
-	}
-	workingDirectory := t.TempDir()
-	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	printed := artifacts.printed
-	for _, synchronous := range []string{
-		"export function SortClosed(",
-		"export function SortMethod(",
-	} {
-		if !strings.Contains(printed, synchronous) {
-			t.Fatalf("closed synchronous callback lacks %q:\n%s", synchronous, printed)
-		}
-	}
-	for _, canonical := range []string{
-		"export async function SortExported(",
-		"export async function SortOpen(",
-		"export async function CallOpen(",
-		"export async function SortCooperative(",
-		"export async function SortLiteral(",
-		"export async function SortAddressed(",
-		"export async function SortInterface(",
-	} {
-		if !strings.Contains(printed, canonical) {
-			t.Fatalf("open callback lacks %q:\n%s", canonical, printed)
-		}
-	}
-	if !strings.Contains(printed, "SlicesSortFuncSynchronousKernel<") {
-		t.Fatalf("closed callback lacks synchronous provider kernel:\n%s", printed)
-	}
-	if !strings.Contains(
-		printed,
-		"public compare: (($0: gostring, $1: gostring) => int) | undefined",
-	) {
-		t.Fatalf("closed callback field lacks synchronous transport:\n%s", printed)
-	}
-	if !strings.Contains(
-		printed,
-		"public compare: (($0: gostring, $1: gostring) => Awaitable<int>) | undefined",
-	) {
-		t.Fatalf("open callback field lost canonical transport:\n%s", printed)
-	}
-	for _, synchronous := range []string{"CallClosed", "GoClosed"} {
-		if !strings.Contains(printed, "export function "+synchronous+"(") ||
-			strings.Contains(printed, "export async function "+synchronous+"(") {
-			t.Fatalf(
-				"closed callback invocation retained cooperative transport in %s:\n%s",
-				synchronous,
-				printed,
-			)
-		}
-	}
-	if !strings.Contains(printed, "export async function DeferClosed(") {
-		t.Fatalf("deferred recovery transport lost its canonical effect:\n%s", printed)
-	}
-	if !strings.Contains(
-		printed,
-		"=> int) | undefined = loadPointer<closedComparer>",
-	) {
-		t.Fatalf("deferred callback capture lost synchronous transport:\n%s", printed)
 	}
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }

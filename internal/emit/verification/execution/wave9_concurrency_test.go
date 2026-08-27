@@ -2,7 +2,9 @@ package emit_test
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -10,7 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestWaveNineConcurrencyCompilesThroughPublicPipeline(t *testing.T) {
+func TestWaveNineSerialExecutionCompilesWithoutAsyncArtifacts(t *testing.T) {
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: waveNineConcurrencyDirectory(),
 		Pattern:   ".",
@@ -18,21 +20,47 @@ func TestWaveNineConcurrencyCompilesThroughPublicPipeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	auditRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("Audit"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	synchronousRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("WhollySynchronous"),
-	)
-	if err != nil {
-		t.Fatal(err)
+	scope := program.Roots()[0].Types().Scope()
+	var roots []emit.Root
+	for _, name := range []string{
+		"Audit",
+		"WhollySynchronous",
+		"Buffered",
+		"CloseDrain",
+		"DirectionAndMeasure",
+		"ChannelRange",
+		"SelectDefault",
+		"SelectReceive",
+		"SelectSend",
+		"SelectDelayedTarget",
+		"Transport",
+		"AggregateClosures",
+		"Recursive",
+		"ValueRecursive",
+		"DirectSynchronous",
+		"DiscardedReceive",
+		"ChannelIdentityAndCopy",
+		"GenericChannel",
+		"GoroutineEvaluation",
+		"GoroutineForms",
+		"SelectEvaluation",
+		"SelectControl",
+		"DeferCooperative",
+		"GenericConstraintChannel",
+		"GenericConstraintForward",
+		"GenericConstraintSynchronous",
+		"DeferRecoverCooperative",
+		"GenericInterfaceAudit",
+	} {
+		root, rootError := emit.NewRoot(scope.Lookup(name))
+		if rootError != nil {
+			t.Fatal(rootError)
+		}
+		roots = append(roots, root)
 	}
 	emission, err := emit.CompileWithOptions(
 		program,
-		[]emit.Root{auditRoot, synchronousRoot},
+		roots,
 		waveNineOptions(),
 	)
 	if err != nil {
@@ -40,60 +68,50 @@ func TestWaveNineConcurrencyCompilesThroughPublicPipeline(t *testing.T) {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	t.Logf(
-		"Wave 9 matrix: files=%d bytes=%d nodes=%d largest=%d",
-		len(artifacts.paths),
-		artifacts.bytes,
-		artifacts.nodes,
-		artifacts.largest,
-	)
-	limit := min(20, len(artifacts.sizes))
-	for index, artifact := range artifacts.sizes[:limit] {
-		t.Logf(
-			"Wave 9 artifact %02d: %s bytes=%d nodes=%d",
-			index+1,
-			artifact.path,
-			artifact.bytes,
-			artifact.nodes,
-		)
+	for _, forbidden := range []string{
+		"async ",
+		"await ",
+		"Promise<",
+		"Awaitable<",
+		"GoScheduler",
+		"$cooperative_",
+	} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("serial artifacts contain %q", forbidden)
+		}
 	}
-	assertWaveNineGenericArtifactBudget(t, artifacts.sizes)
-	if artifacts.bytes > 146_000 || artifacts.largest > 32_000 {
+	for _, required := range []string{
+		"export class GoChannel<T>",
+		"serial channel send would block",
+		"serial channel receive would block",
+		"serial select would block",
+		"export function WhollySynchronous(): gostring",
+		"export function Unbuffered(): int32",
+	} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf("serial artifacts lack %q", required)
+		}
+	}
+	if artifacts.bytes > 131_000 || artifacts.largest > 30_000 {
 		t.Fatalf(
-			"Wave 9 artifact bounds exceeded: total=%d largest=%d",
+			"serial artifact bounds exceeded: total=%d largest=%d",
 			artifacts.bytes,
 			artifacts.largest,
 		)
 	}
-	if artifacts.nodes > 25_600 {
-		t.Fatalf(
-			"Wave 9 artifact AST bound exceeded: nodes=%d",
-			artifacts.nodes,
-		)
-	}
-	assertWaveNineArtifactShape(t, artifacts.printed)
-	runner := filepath.Join(workingDirectory, "runner.ts")
-	writeProgramFile(t, runner, `import "./program.js";
-import { Audit } from "`+artifacts.sourceModule+`";
-import { GoScheduler } from "./runtime/channel.js";
-
-await GoScheduler.run(async () => {
-    const values = await Audit();
-    console.log(values.join(" "));
-});
-`)
-	writeProgramFile(
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+	targetOutput := executeSerialWaveNineTypeScript(
 		t,
-		filepath.Join(workingDirectory, "package.json"),
-		"{\"type\":\"module\"}\n",
+		workingDirectory,
+		artifacts,
 	)
-	paths := append(artifacts.paths, runner)
-	waveThreeTypecheck(t, workingDirectory, paths)
-	goOutput := executeWaveNineGo(t, workingDirectory)
-	requireNativeGoEvidence(t, goOutput)
+	goOutput := executeSerialWaveNineGo(t, workingDirectory)
+	if targetOutput != goOutput {
+		t.Fatalf("serial execution mismatch:\nGo: %s\nTypeScript: %s", goOutput, targetOutput)
+	}
 }
 
-func TestWaveNineKeepsTransportedCallableABIByteStableAcrossRoots(t *testing.T) {
+func TestWaveNineSynchronousCallableIsRootStable(t *testing.T) {
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: waveNineConcurrencyDirectory(),
 		Pattern:   ".",
@@ -118,7 +136,7 @@ func TestWaveNineKeepsTransportedCallableABIByteStableAcrossRoots(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	withConcurrency, err := emit.CompileWithOptions(
+	withChannels, err := emit.CompileWithOptions(
 		program,
 		[]emit.Root{auditRoot, synchronousRoot},
 		waveNineOptions(),
@@ -126,54 +144,31 @@ func TestWaveNineKeepsTransportedCallableABIByteStableAcrossRoots(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	synchronousArtifacts := materializeArtifacts(
+	onlyText := strings.TrimSpace(waveNineFunctionText(
 		t,
-		synchronousOnly,
-		t.TempDir(),
-	)
-	concurrentArtifacts := materializeArtifacts(
-		t,
-		withConcurrency,
-		t.TempDir(),
-	)
-	synchronousFunction := waveNineFunctionText(
-		t,
-		synchronousArtifacts.printed,
+		materializeArtifacts(t, synchronousOnly, t.TempDir()).printed,
 		"WhollySynchronous",
-	)
-	concurrentFunction := waveNineFunctionText(
+	))
+	withChannelsText := strings.TrimSpace(waveNineFunctionText(
 		t,
-		concurrentArtifacts.printed,
+		materializeArtifacts(t, withChannels, t.TempDir()).printed,
 		"WhollySynchronous",
-	)
-	synchronousFunction = strings.TrimRight(synchronousFunction, "\n")
-	concurrentFunction = strings.TrimRight(concurrentFunction, "\n")
-	if synchronousFunction != concurrentFunction {
+	))
+	if onlyText != withChannelsText {
 		t.Fatalf(
-			"unrelated cooperative contracts changed synchronous bytes\nonly:\n%s\nwith concurrency:\n%s",
-			synchronousFunction,
-			concurrentFunction,
+			"unrelated channel roots changed synchronous bytes\nonly:\n%s\nwith channels:\n%s",
+			onlyText,
+			withChannelsText,
 		)
 	}
-	for _, required := range []string{
-		"export async function WhollySynchronous(): Promise<gostring>",
-		"(($0: gostring) => Awaitable<gostring>) | undefined",
-		"return await (__gotots_callee_",
-	} {
-		if !strings.Contains(synchronousFunction, required) {
-			t.Fatalf(
-				"transported callable contract lacks %q:\n%s",
-				required,
-				synchronousFunction,
-			)
+	for _, forbidden := range []string{"async", "await", "Promise", "Awaitable"} {
+		if strings.Contains(onlyText, forbidden) {
+			t.Fatalf("synchronous callable contains %q:\n%s", forbidden, onlyText)
 		}
-	}
-	if strings.Contains(synchronousFunction, "$cooperative_") {
-		t.Fatalf("transported callable retained a profile variant:\n%s", synchronousFunction)
 	}
 }
 
-func TestImmediateFunctionLiteralBypassesFirstClassCallableABI(t *testing.T) {
+func TestImmediateFunctionLiteralAndDeferRemainSynchronous(t *testing.T) {
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: filepath.Join(
 			repositoryRoot(),
@@ -188,8 +183,7 @@ func TestImmediateFunctionLiteralBypassesFirstClassCallableABI(t *testing.T) {
 		t.Fatal(err)
 	}
 	root, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().
-			Lookup("ImmediateLiteralABIIsolation"),
+		program.Roots()[0].Types().Scope().Lookup("ImmediateLiteralABIIsolation"),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -204,62 +198,25 @@ func TestImmediateFunctionLiteralBypassesFirstClassCallableABI(t *testing.T) {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	packageAssemblies := artifacts.printedByKind[emit.TargetFilePackageAssembly]
-	if len(packageAssemblies) != 1 {
-		t.Fatalf("package assemblies = %d, want one", len(packageAssemblies))
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("immediate literal artifacts contain %q", forbidden)
+		}
 	}
-	packageAssembly := packageAssemblies[0]
-	if strings.Contains(packageAssembly, "async function $initialize") ||
-		strings.Contains(packageAssembly, "await (") {
-		t.Fatalf(
-			"immediate synchronous literal inherited its callable ABI:\n%s",
-			packageAssembly,
-		)
-	}
-	if !strings.Contains(
-		artifacts.printed,
-		"__gotots_deferred_0 = ($go$recovery: GoRecovery): void => {",
-	) {
-		t.Fatalf(
-			"deferred direct literal lacks its recovery-owned static slot:\n%s",
-			artifacts.printed,
-		)
-	}
-	if !strings.Contains(
-		artifacts.printed,
-		"let __gotots_deferred_0: (($go$recovery: GoRecovery) => Awaitable<void>) | undefined = undefined;",
-	) {
-		t.Fatalf(
-			"cooperative defer slot lacks its canonical Awaitable transport:\n%s",
-			artifacts.printed,
-		)
-	}
-	if strings.Contains(
-		artifacts.printed,
-		" = function ($go$recovery: GoRecovery): void {",
-	) {
-		t.Fatalf(
-			"non-recovering direct literal acquired a recovery parameter:\n%s",
-			artifacts.printed,
-		)
-	}
-	if strings.Contains(
-		artifacts.printed,
-		"=> Promise<void>) | undefined = function",
-	) {
-		t.Fatalf(
-			"deferred direct literal inherited its first-class ABI:\n%s",
-			artifacts.printed,
-		)
+	for _, required := range []string{
+		"export function ImmediateLiteralABIIsolation(): gostring",
+		"__gotots_deferred_0",
+		"($go$recovery: GoRecovery): void =>",
+	} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf("immediate literal artifacts lack %q", required)
+		}
 	}
 	runner := filepath.Join(workingDirectory, "runner.ts")
 	writeProgramFile(t, runner, `import "./program.js";
 import { ImmediateLiteralABIIsolation } from "`+artifacts.sourceModule+`";
-import { GoScheduler } from "./runtime/channel.js";
 
-await GoScheduler.run(async () => {
-    console.log(await ImmediateLiteralABIIsolation());
-});
+console.log(ImmediateLiteralABIIsolation());
 `)
 	writeProgramFile(
 		t,
@@ -268,300 +225,134 @@ await GoScheduler.run(async () => {
 	)
 	paths := append(artifacts.paths, runner)
 	waveThreeTypecheck(t, workingDirectory, paths)
-	targetOutput := runProgram(
+	if output := runProgram(
 		t,
 		workingDirectory,
 		"node",
 		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
-	if targetOutput != "literalimmediateproviderbodydeferred\n" {
-		t.Fatalf("immediate-literal output = %q", targetOutput)
+	); output != "literalimmediateproviderbodydeferred\n" {
+		t.Fatalf("immediate-literal output = %q", output)
 	}
 }
 
-func assertWaveNineArtifactShape(t *testing.T, printed string) {
+func waveNineFunctionText(t *testing.T, printed, name string) string {
 	t.Helper()
-	for _, required := range []string{
-		"export class GoChannel<T>",
-		"export class GoScheduler",
-		"await GoScheduler.block",
-		"GoScheduler.spawn",
-		"GoScheduler.block(goSelect",
-	} {
-		if !strings.Contains(printed, required) {
-			t.Fatalf("Wave 9 artifacts lack %q:\n%s", required, printed)
-		}
+	start := strings.Index(printed, "export function "+name)
+	if start < 0 {
+		t.Fatalf("generated output lacks function %s", name)
 	}
-	for _, forbidden := range []string{
-		"CallableFacetVariable",
-		"CallableFacetStructField",
-		"CallableFacetCallResult",
-		": any",
-		": unknown",
-		" as any",
-		" as unknown",
-		".call(",
-		".apply(",
-		".bind(",
-	} {
-		if strings.Contains(printed, forbidden) {
-			t.Fatalf("Wave 9 artifacts contain %q:\n%s", forbidden, printed)
-		}
+	rest := printed[start:]
+	end := strings.Index(rest[len("export "):], "\nexport ")
+	artifactEnd := strings.Index(rest, "\n\n// ")
+	if end >= 0 {
+		end += len("export ")
 	}
-	unbuffered := waveNineFunctionText(t, printed, "Unbuffered")
-	for _, required := range []string{
-		"export async function Unbuffered(): Promise<int32>",
-		"async (): Promise<void> =>",
-		"GoScheduler.spawn(async (): Promise<void>",
-		"await __gotots_callee_",
-	} {
-		if !strings.Contains(unbuffered, required) {
-			t.Fatalf("Unbuffered lacks %q:\n%s", required, unbuffered)
-		}
+	if artifactEnd >= 0 && (end < 0 || artifactEnd < end) {
+		end = artifactEnd
 	}
-	transport := waveNineFunctionText(t, printed, "Transport")
-	for _, required := range []string{
-		"export async function Transport(): Promise<int32>",
-		"GoArray.literal<(($0: GoReceiveChannel<int32> | undefined) => Awaitable<int32>) | undefined",
-		"RuntimeSlice.literal<(($0: GoReceiveChannel<int32> | undefined) => Awaitable<int32>) | undefined",
-		"mapping.lookup(0)",
-		"let asserted: (($0: GoReceiveChannel<int32> | undefined) => Awaitable<int32>) | undefined",
-		"identity$",
-		"let methodValue: (() => Awaitable<int32>) | undefined",
-		"await goInterfaceNonNil<Reader>(",
-		"[receiveOne, synchronousOne]",
-	} {
-		if !strings.Contains(transport, required) {
-			t.Fatalf("Transport lacks %q:\n%s", required, transport)
-		}
+	if end >= 0 {
+		return rest[:end]
 	}
-	if strings.Contains(
-		transport,
-		"async ($argument0: GoReceiveChannel<int32> | undefined): Promise<int32>",
-	) {
-		t.Fatalf("synchronous callable transport retained an async wrapper:\n%s", transport)
+	return rest
+}
+
+func executeSerialWaveNineTypeScript(
+	t *testing.T,
+	workingDirectory string,
+	artifacts waveFourArtifacts,
+) string {
+	t.Helper()
+	packageModule := artifacts.packageModules["wave9concurrency"]
+	if packageModule == "" {
+		t.Fatal("wave 9 package assembly module is absent")
 	}
-	if concretizations := strings.Count(
-		transport,
-		"identity$",
-	); concretizations != 2 {
-		t.Fatalf(
-			"Transport uses %d identity concretizations, want callable and slice",
-			concretizations,
-		)
-	}
-	if strings.Contains(transport, "identity<") {
-		t.Fatalf("Transport bypasses exact generic concretization:\n%s", transport)
-	}
-	synchronous := waveNineFunctionText(t, printed, "synchronousOne")
-	if strings.Contains(synchronous, "async") ||
-		strings.Contains(synchronous, "Promise<") {
-		t.Fatalf("synchronous provider acquired async tax:\n%s", synchronous)
-	}
-	directSynchronous := waveNineFunctionText(
+	runner := filepath.Join(workingDirectory, "serial-runner.ts")
+	writeProgramFile(t, runner, `import "./program.js";
+import * as values from "`+packageModule+`";
+
+console.log([
+    values.WhollySynchronous(),
+    values.Buffered(),
+    values.CloseDrain(),
+    values.DirectionAndMeasure(),
+    values.ChannelRange(),
+    values.SelectDefault(),
+    values.SelectReceive(),
+    values.SelectSend(),
+    values.AggregateClosures(),
+    values.Recursive(),
+    values.ValueRecursive(),
+    values.DirectSynchronous(),
+    values.DiscardedReceive(),
+    values.ChannelIdentityAndCopy(),
+    values.GenericChannel(),
+    values.SelectControl(),
+].join(" "));
+`)
+	writeProgramFile(
 		t,
-		printed,
-		"DirectSynchronous",
+		filepath.Join(workingDirectory, "package.json"),
+		"{\"type\":\"module\"}\n",
 	)
-	for _, forbidden := range []string{"async", "Promise<", "await "} {
-		if strings.Contains(directSynchronous, forbidden) {
-			t.Fatalf(
-				"direct synchronous call acquired %q:\n%s",
-				forbidden,
-				directSynchronous,
-			)
-		}
-	}
-	selectDefault := waveNineFunctionText(t, printed, "SelectDefault")
-	if !strings.Contains(
-		selectDefault,
-		"export function SelectDefault(): int32",
-	) || !strings.Contains(selectDefault, "goSelectReady(") {
-		t.Fatalf(
-			"default-bearing select lacks its synchronous ready path:\n%s",
-			selectDefault,
-		)
-	}
-	for _, forbidden := range []string{
-		"async",
-		"Promise<",
-		"await ",
-		"GoScheduler",
-		"goSelect(",
-	} {
-		if strings.Contains(selectDefault, forbidden) {
-			t.Fatalf(
-				"default-bearing select acquired %q:\n%s",
-				forbidden,
-				selectDefault,
-			)
-		}
-	}
-	channelCopy := waveNineFunctionText(
+	paths := append(artifacts.paths, runner)
+	waveThreeTypecheck(t, workingDirectory, paths)
+	return runProgram(
 		t,
-		printed,
-		"ChannelIdentityAndCopy",
+		workingDirectory,
+		"node",
+		filepath.Join(workingDirectory, "out", "serial-runner.js"),
 	)
-	for _, required := range []string{
-		"return Payload.$copy(value);",
-		"mapping.lookup(projected)",
-		"projected === undefined",
-	} {
-		if !strings.Contains(channelCopy, required) {
-			t.Fatalf(
-				"channel identity/copy lacks %q:\n%s",
-				required,
-				channelCopy,
-			)
-		}
+}
+
+func executeSerialWaveNineGo(t *testing.T, workingDirectory string) string {
+	t.Helper()
+	modulePath, err := filepath.Abs(waveNineConcurrencyDirectory())
+	if err != nil {
+		t.Fatal(err)
 	}
-	goroutineEvaluation := waveNineFunctionText(
+	runnerDirectory := filepath.Join(workingDirectory, "go-serial-runner")
+	writeProgramFile(t, filepath.Join(runnerDirectory, "go.mod"), fmt.Sprintf(`module example.com/serial-runner
+
+go 1.26.4
+
+require example.com/wave9concurrency v0.0.0
+
+replace example.com/wave9concurrency => %s
+`, modulePath))
+	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+    "fmt"
+
+    values "example.com/wave9concurrency"
+)
+
+func main() {
+    fmt.Println(
+        values.WhollySynchronous(),
+        values.Buffered(),
+        values.CloseDrain(),
+        values.DirectionAndMeasure(),
+        values.ChannelRange(),
+        values.SelectDefault(),
+        values.SelectReceive(),
+        values.SelectSend(),
+        values.AggregateClosures(),
+        values.Recursive(),
+        values.ValueRecursive(),
+        values.DirectSynchronous(),
+        values.DiscardedReceive(),
+        values.ChannelIdentityAndCopy(),
+        values.GenericChannel(),
+        values.SelectControl(),
+    )
+}
+`)
+	return runProgram(
 		t,
-		printed,
-		"GoroutineEvaluation",
+		runnerDirectory,
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"run",
+		".",
 	)
-	for _, required := range []string{
-		"const __gotots_callee_",
-		"const __gotots_argument_",
-		"GoScheduler.spawn(async (): Promise<void>",
-	} {
-		if !strings.Contains(goroutineEvaluation, required) {
-			t.Fatalf(
-				"goroutine evaluation lacks %q:\n%s",
-				required,
-				goroutineEvaluation,
-			)
-		}
-	}
-	goroutineForms := waveNineFunctionText(t, printed, "GoroutineForms")
-	if spawns := strings.Count(
-		goroutineForms,
-		"GoScheduler.spawn",
-	); spawns != 4 {
-		t.Fatalf("goroutine forms emit %d spawn sites, want four", spawns)
-	}
-	for _, function := range []string{
-		"DiscardedReceive",
-		"GenericChannel",
-		"SelectEvaluation",
-		"SelectControl",
-	} {
-		target := waveNineFunctionText(t, printed, function)
-		if !strings.Contains(target, "await GoScheduler.block") {
-			t.Fatalf("%s did not propagate cooperative execution:\n%s", function, target)
-		}
-	}
-	valueRecursive := waveNineFunctionText(t, printed, "ValueRecursive")
-	if !strings.Contains(valueRecursive, "return await valueCycleA(") {
-		t.Fatalf(
-			"recursive callable propagation lacks direct await:\n%s",
-			valueRecursive,
-		)
-	}
-	deferred := waveNineFunctionText(t, printed, "deferredOnly")
-	for _, required := range []string{
-		"export async function deferredOnly(",
-		"await __gotots_deferred_",
-	} {
-		if !strings.Contains(deferred, required) {
-			t.Fatalf(
-				"cooperative defer lacks %q:\n%s",
-				required,
-				deferred,
-			)
-		}
-	}
-	deferredRecover := waveNineFunctionText(
-		t,
-		printed,
-		"cooperativeDeferredRecover",
-	)
-	for _, required := range []string{
-		"export async function cooperativeDeferredRecover(",
-		"let __gotots_deferred_0: (($go$recovery: GoRecovery) => Awaitable<void>) | undefined",
-		"__gotots_deferred_0 = ($go$recovery: GoRecovery): void =>",
-		"await __gotots_deferred_",
-	} {
-		if !strings.Contains(deferredRecover, required) {
-			t.Fatalf(
-				"cooperative deferred recover lacks %q:\n%s",
-				required,
-				deferredRecover,
-			)
-		}
-	}
-	if strings.Contains(deferredRecover, "__gotots_defers_") ||
-		strings.Contains(deferredRecover, ".push(") {
-		t.Fatalf(
-			"single direct cooperative defer retained a dynamic stack:\n%s",
-			deferredRecover,
-		)
-	}
-	if strings.Contains(deferredRecover, "push(async ($go$recovery") {
-		t.Fatalf(
-			"synchronous deferred recover acquired an async wrapper:\n%s",
-			deferredRecover,
-		)
-	}
-	genericConstraint := waveNineFunctionText(
-		t,
-		printed,
-		"pullConstraint",
-	)
-	for _, required := range []string{
-		"export async function pullConstraint$kernel<",
-		"return await $go$constraint_method$",
-	} {
-		if !strings.Contains(genericConstraint, required) {
-			t.Fatalf(
-				"cooperative constraint method lacks %q:\n%s",
-				required,
-				genericConstraint,
-			)
-		}
-	}
-	forwardLeaf := waveNineFunctionText(t, printed, "forwardLeaf")
-	for _, required := range []string{
-		"export async function forwardLeaf$kernel<",
-		"return await $go$constraint_method$",
-	} {
-		if !strings.Contains(forwardLeaf, required) {
-			t.Fatalf(
-				"cooperative generic leaf lacks %q:\n%s",
-				required,
-				forwardLeaf,
-			)
-		}
-	}
-	forwardBridge := waveNineFunctionText(t, printed, "forwardBridge")
-	for _, required := range []string{
-		"export async function forwardBridge$kernel<",
-		"return await forwardLeaf$kernel<T>(",
-	} {
-		if !strings.Contains(forwardBridge, required) {
-			t.Fatalf(
-				"cooperative generic forwarding lacks %q:\n%s",
-				required,
-				forwardBridge,
-			)
-		}
-	}
-	staticConstraint := waveNineFunctionText(t, printed, "readStatic")
-	for _, required := range []string{
-		"export async function readStatic$kernel<",
-		"($0: T) => Awaitable<int64>",
-		"return await $go$constraint_method$",
-	} {
-		if !strings.Contains(staticConstraint, required) {
-			t.Fatalf(
-				"transported generic constraint lacks %q:\n%s",
-				required,
-				staticConstraint,
-			)
-		}
-	}
-	if !strings.Contains(printed, "PackageReceiver") ||
-		!strings.Contains(printed, "Awaitable<int32>") {
-		t.Fatal("function-valued package storage lacks its cooperative ABI")
-	}
 }

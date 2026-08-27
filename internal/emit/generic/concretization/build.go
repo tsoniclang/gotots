@@ -40,36 +40,19 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
-	synchronous := concretization.Effect().Synchronous()
-	if synchronous && deferred {
-		return nil, nil, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "synchronous generic concretization has a deferred variant",
-		}
-	}
-	var synchronousParameters []int
-	if synchronous {
-		var available bool
-		synchronousParameters, available, err =
-			context.GenericCallableSynchronousParameters(owner)
-		if err != nil {
-			return nil, nil, err
-		}
-		if !available {
-			return nil, nil, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "synchronous generic concretization has no certified kernel",
-			}
-		}
+	providerParameters, providerKernel, err :=
+		context.GenericCallableParameters(owner)
+	if err != nil {
+		return nil, nil, err
 	}
 	var targetSignature callable.SignatureEmission
-	if synchronous {
-		targetSignature, err = callable.EmitAdapterWithSynchronousParameters(
+	if providerKernel {
+		targetSignature, err = callable.EmitAdapterWithProviderCallableParameters(
 			context,
 			children,
 			nil,
 			wrapperSignature,
-			synchronousParameters,
+			providerParameters,
 		)
 	} else {
 		targetSignature, err = callable.EmitAdapter(
@@ -96,21 +79,6 @@ func Build(
 			Reason: "generic concretization operation set is unresolved",
 		}
 	}
-	cooperative := false
-	var observationRequests []api.RootRequest
-	if !synchronous {
-		facet, facetErr := api.NewSourceCallableFacet(owner)
-		if facetErr != nil {
-			return nil, nil, facetErr
-		}
-		observation, observationErr :=
-			context.ObserveCooperativeCallable(facet)
-		if observationErr != nil {
-			return nil, nil, observationErr
-		}
-		cooperative = observation.Cooperative()
-		observationRequests = observation.Requests()
-	}
 	capabilities, capabilityRequests, err :=
 		genericinstance.EmitCapabilities(
 			context,
@@ -136,13 +104,7 @@ func Build(
 				Reason: "generic kernel names are unavailable",
 			}
 		}
-		var kernel api.NameReference
-		var nameErr error
-		if synchronous {
-			kernel, nameErr = kernelNames.SynchronousGenericKernel(owner)
-		} else {
-			kernel, nameErr = kernelNames.GenericKernel(owner)
-		}
+		kernel, nameErr := kernelNames.GenericKernel(owner)
 		if nameErr != nil {
 			return nil, nil, nameErr
 		}
@@ -171,26 +133,15 @@ func Build(
 		var kernelBefore []tsgo.Statement
 		var kernelRequests []api.RootRequest
 		if providerKernelBoundary {
-			if synchronous {
-				kernelArguments, kernelBefore, kernelRequests, err =
-					providerboundary.ToProviderGenericArgumentsWithSynchronousParameters(
-						context,
-						children,
-						declaration.Params(),
-						wrapperSignature.Params(),
-						sourceArguments,
-						synchronousParameters,
-					)
-			} else {
-				kernelArguments, kernelBefore, kernelRequests, err =
-					providerboundary.ToProviderGenericArguments(
-						context,
-						children,
-						declaration.Params(),
-						wrapperSignature.Params(),
-						sourceArguments,
-					)
-			}
+			kernelArguments, kernelBefore, kernelRequests, err =
+				providerboundary.ToProviderGenericArgumentsWithCallableParameters(
+					context,
+					children,
+					declaration.Params(),
+					wrapperSignature.Params(),
+					sourceArguments,
+					providerParameters,
+				)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -323,18 +274,6 @@ func Build(
 		}
 	}
 	if providerKernelBoundary {
-		if cooperative {
-			call, err = awaitEmission(context, call)
-			if err != nil {
-				return nil, nil, err
-			}
-			if deferred {
-				deferredCall, err = awaitEmission(context, deferredCall)
-				if err != nil {
-					return nil, nil, err
-				}
-			}
-		}
 		call, err = providerboundary.FromProviderGenericResults(
 			context,
 			children,
@@ -358,18 +297,13 @@ func Build(
 			}
 		}
 	}
-	resultType := targetSignature.Result()
-	if cooperative {
-		modifiers = append(modifiers, context.Factory().AsyncKeyword())
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	statement := context.Factory().FunctionDeclaration(
 		modifiers,
 		nil,
 		context.Factory().Identifier(artifact.TargetName()),
 		nil,
 		targetSignature.Parameters(),
-		resultType,
+		targetSignature.Result(),
 		context.Factory().Block(
 			returnStatements(context.Factory(), call),
 			true,
@@ -397,7 +331,7 @@ func Build(
 					[]tsgo.ParameterDeclaration{recovery},
 					targetSignature.Parameters()...,
 				),
-				resultType,
+				targetSignature.Result(),
 				context.Factory().Block(
 					returnStatements(context.Factory(), deferredCall),
 					true,
@@ -412,19 +346,7 @@ func Build(
 		call.Requests(),
 		deferredCall.Requests(),
 		recoveryRequests,
-		observationRequests,
 	), nil
-}
-
-func awaitEmission(
-	context api.Context,
-	emission api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	return api.NewExpressionEmission(
-		emission.Before(),
-		context.Factory().AwaitExpression(emission.Value()),
-		emission.Requests(),
-	)
 }
 
 func returnStatements(

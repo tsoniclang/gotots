@@ -3,13 +3,11 @@ package emit
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"slices"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
@@ -201,7 +199,6 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 		e.values,
 		e.scalar.IntegerRepresentation(),
 		e.order,
-		e.concurrency,
 	)
 	if err != nil {
 		return api.Context{}, err
@@ -212,7 +209,6 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 	context = context.
 		WithGenericCallableResolver(e.generic).
 		WithDeclarationDemandResolver(e.declarationDemands).
-		WithCooperativeCallableResolver(e.cooperative).
 		WithRecoveryCallableResolver(e.recovery).
 		WithExternalFunctionResolver(e.external).
 		WithGoRuntimeContract(e.goRuntime)
@@ -403,40 +399,23 @@ func (s *programSession) packageAssemblyFile(
 		)
 	}
 	for _, initFunction := range builder.initFunctions {
-		cooperative, err := s.sourceCallableIsCooperative(
-			initFunction.function,
-		)
-		if err != nil {
-			return TargetFile{}, err
-		}
-		var call tsgo.Expression = s.factory.CallExpression(
+		call := s.factory.CallExpression(
 			s.factory.Identifier(initFunction.name),
 			nil,
 			nil,
 			nil,
 			tsgo.NodeFlagsNone,
 		)
-		if cooperative {
-			call = s.factory.AwaitExpression(call)
-		}
 		initialization = append(
 			initialization,
 			s.factory.ExpressionStatement(call),
 		)
 	}
 	if len(initialization) != 0 || builder.implementationInit {
-		cooperative, err := s.packageInitializationIsCooperative(builder)
-		if err != nil {
-			return TargetFile{}, err
-		}
 		modifiers := []tsgo.ModifierLike{s.factory.ExportKeyword()}
-		var result tsgo.TypeNode = s.factory.KeywordTypeNode(
+		result := s.factory.KeywordTypeNode(
 			tsgo.KeywordTypeSyntaxKindVoidKeyword,
 		)
-		if cooperative {
-			modifiers = append(modifiers, s.factory.AsyncKeyword())
-			result = callable.PromiseResult(s.factory, result)
-		}
 		statements = append(statements, s.factory.FunctionDeclaration(
 			modifiers,
 			nil,
@@ -516,65 +495,6 @@ func (b *packageTargetBuilder) hasInitializationWork() bool {
 		len(b.storage) != 0 ||
 		len(b.initialization) != 0 ||
 		len(b.initFunctions) != 0
-}
-
-func (s *programSession) packageInitializationIsCooperative(
-	builder *packageTargetBuilder,
-) (bool, error) {
-	if builder == nil {
-		return false, &ScheduleError{
-			Reason: "package initialization owner is nil",
-		}
-	}
-	for _, artifact := range builder.initialization {
-		facet, err := api.NewPackageInitializerCallableFacet(artifact.owner)
-		if err != nil {
-			return false, err
-		}
-		cooperative, err := s.callableFacetIsCooperative(facet)
-		if err != nil {
-			return false, err
-		}
-		if cooperative {
-			return true, nil
-		}
-	}
-	for _, initFunction := range builder.initFunctions {
-		cooperative, err := s.sourceCallableIsCooperative(
-			initFunction.function,
-		)
-		if err != nil {
-			return false, err
-		}
-		if cooperative {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (s *programSession) sourceCallableIsCooperative(
-	function *types.Func,
-) (bool, error) {
-	facet, err := api.NewSourceCallableFacet(function)
-	if err != nil {
-		return false, err
-	}
-	return s.callableFacetIsCooperative(facet)
-}
-
-func (s *programSession) callableFacetIsCooperative(
-	facet api.CallableFacet,
-) (bool, error) {
-	observation, err := s.observeCooperativeCallable(
-		facet.Owner(),
-		nil,
-		facet,
-	)
-	if err != nil {
-		return false, err
-	}
-	return observation.Cooperative(), nil
 }
 
 func hasExportedPackageVariable(storage []packageStorage) bool {

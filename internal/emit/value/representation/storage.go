@@ -16,6 +16,9 @@ func (owner Owner) RequiresStorageProjection(
 	context api.Context,
 	sourceType types.Type,
 ) (bool, error) {
+	if _, generic := api.GenericTypeParameter(sourceType); generic {
+		return true, nil
+	}
 	if panicNilRuntimeValue(context, sourceType) {
 		return false, nil
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestIoReadFullPreservesCanonicalReaderAndErrorBehavior(t *testing.T) {
+func TestIoReadFullPreservesDirectReaderAndErrorBehavior(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
@@ -75,7 +75,6 @@ func Result(text string, custom bool) (int, string) {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -108,19 +107,24 @@ func Result(text string, custom bool) (int, string) {
 		assemblyPath,
 		[]string{"Result"},
 		`for (const [count, result] of [
-  await Result("four", false),
-  await Result("abc", false),
-  await Result("abc", true),
+  Result("four", false),
+  Result("abc", false),
+  Result("abc", true),
 ]) {
   console.log(count + " " + JSON.stringify(result));
 }
 `,
 	)
-	if !strings.Contains(artifacts.printed, "IoReadFullCanonical") {
-		t.Fatalf("io.ReadFull output lacks canonical boundary:\n%s", artifacts.printed)
+	if !strings.Contains(artifacts.printed, "IoReadFullDirect") {
+		t.Fatalf("io.ReadFull output lacks direct boundary:\n%s", artifacts.printed)
 	}
 	if strings.Contains(artifacts.printed, "IoReadFullCanonicalSync") ||
 		strings.Contains(artifacts.printed, "IoReadFullCanonicalAsync") {
 		t.Fatalf("io.ReadFull output retained a profile variant:\n%s", artifacts.printed)
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("io.ReadFull output contains %q", forbidden)
+		}
 	}
 }

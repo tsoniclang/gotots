@@ -3,7 +3,6 @@ package emit_test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,21 +14,20 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
-func TestDemandCompilerRejectsUnsupportedPackageVariableRepresentation(t *testing.T) {
+func TestDemandCompilerAcceptsPackageChannelStorage(t *testing.T) {
 	projectDirectory := filepath.Join(
 		repositoryRoot(),
 		"testdata",
 		"constructs",
 		"declaration",
-		"unsupported",
 		"variable",
+		"channel",
 	)
 	loaded, err := load.One(context.Background(), load.Request{
 		Directory: projectDirectory,
@@ -39,12 +37,8 @@ func TestDemandCompilerRejectsUnsupportedPackageVariableRepresentation(t *testin
 		t.Fatal(err)
 	}
 
-	_, err = emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	var unsupported *api.UnsupportedError
-	if !errors.As(err, &unsupported) ||
-		unsupported.Category != api.CategoryType ||
-		unsupported.Role != api.RolePackageVariableType {
-		t.Fatalf("error = %#v, want exact unsupported declaration obligation", err)
+	if _, err = emit.CompileFile(loaded, loaded.Files()[0].Syntax()); err != nil {
+		t.Fatal(err)
 	}
 }
 

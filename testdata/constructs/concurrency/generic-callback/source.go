@@ -25,7 +25,7 @@ var InitializerApply = Apply("initializer", func(value string) bool {
 	return value == "initializer"
 })
 
-var CooperativeInitializerApply = Apply(int32(2), func(value int32) bool {
+var ChannelInitializerApply = Apply(int32(2), func(value int32) bool {
 	return value+<-dependency.Values == 42
 })
 
@@ -52,7 +52,7 @@ func FilterSequence[T any](
 	}
 }
 
-func SynchronousSequence() string {
+func PlainSequence() string {
 	sequence := FilterSequence(
 		[]string{"skip", "kept"},
 		func(value string) bool { return value == "kept" },
@@ -65,7 +65,7 @@ func SynchronousSequence() string {
 	return result
 }
 
-func CooperativeSequence() int32 {
+func ChannelSequence() int32 {
 	values := make(chan int32, 1)
 	values <- 2
 	sequence := FilterSequence(
@@ -82,7 +82,7 @@ func CooperativeSequence() int32 {
 	return result
 }
 
-func CooperativeBoolSequence() bool {
+func ChannelBoolSequence() bool {
 	values := make(chan bool, 1)
 	values <- true
 	sequence := FilterSequence(
@@ -99,7 +99,7 @@ func CooperativeBoolSequence() bool {
 	return result
 }
 
-func CooperativeApply() bool {
+func ChannelApply() bool {
 	values := make(chan int32, 1)
 	values <- 40
 	return Apply(int32(2), func(value int32) bool {
@@ -107,7 +107,7 @@ func CooperativeApply() bool {
 	})
 }
 
-func CooperativeLexicalResult() int32 {
+func ChannelLexicalResult() int32 {
 	type result struct {
 		value int32
 	}
@@ -119,13 +119,13 @@ func CooperativeLexicalResult() int32 {
 	return resolved.value
 }
 
-func SynchronousApply() bool {
+func PlainApply() bool {
 	return Apply("value", func(value string) bool {
 		return value == "value"
 	})
 }
 
-func CooperativeFunctionValue() bool {
+func ChannelFunctionValue() bool {
 	values := make(chan int32, 1)
 	values <- 40
 	apply := Apply[int32]
@@ -134,14 +134,14 @@ func CooperativeFunctionValue() bool {
 	})
 }
 
-func SynchronousFunctionValue() bool {
+func PlainFunctionValue() bool {
 	apply := Apply[string]
 	return apply("value", func(value string) bool {
 		return value == "value"
 	})
 }
 
-func CooperativeNested() bool {
+func ChannelNested() bool {
 	values := make(chan int32, 1)
 	values <- 40
 	return ApplyFirst(int32(2), []func(int32) bool{
@@ -151,7 +151,7 @@ func CooperativeNested() bool {
 	})
 }
 
-func CooperativeMethod() bool {
+func ChannelMethod() bool {
 	values := make(chan int32, 1)
 	values <- 40
 	return (Box[int32]{Value: 2}).Apply(func(value int32) bool {
@@ -159,7 +159,7 @@ func CooperativeMethod() bool {
 	})
 }
 
-func CooperativeMethodValue() bool {
+func ChannelMethodValue() bool {
 	values := make(chan int32, 1)
 	values <- 40
 	apply := (Box[int32]{Value: 2}).Apply
@@ -168,14 +168,14 @@ func CooperativeMethodValue() bool {
 	})
 }
 
-func SynchronousMethodValue() bool {
+func PlainMethodValue() bool {
 	apply := (Box[string]{Value: "value"}).Apply
 	return apply(func(value string) bool {
 		return value == "value"
 	})
 }
 
-func CooperativeMethodExpression() bool {
+func ChannelMethodExpression() bool {
 	values := make(chan int32, 1)
 	values <- 40
 	apply := Box[int32].Apply
@@ -184,7 +184,7 @@ func CooperativeMethodExpression() bool {
 	})
 }
 
-func CooperativeResult() int32 {
+func ChannelResult() int32 {
 	values := make(chan int32, 1)
 	values <- 9
 	receive := MakeReceiver(values)
@@ -195,25 +195,25 @@ func Independent(value int64, predicate func(int64) bool) bool {
 	return predicate(value)
 }
 
-func IndependentSynchronous() bool {
+func IndependentPlain() bool {
 	return Independent(7, func(value int64) bool {
 		return value == 7
 	})
 }
 
-func InitializedSynchronousCallback() bool {
+func InitializedPlainCallback() bool {
 	return InitializerApply
 }
 
-func InitializedCooperativeCallback() bool {
-	return CooperativeInitializerApply
+func InitializedChannelCallback() bool {
+	return ChannelInitializerApply
 }
 
 func IndependentPackageInitializer() int32 {
 	return dependency.Value
 }
 
-func CooperativePredicateProvider(
+func ChannelPredicateProvider(
 	values <-chan int32,
 ) func(int32) bool {
 	return func(value int32) bool {
@@ -229,7 +229,7 @@ func InvokeIntPredicate(predicate func(int32) bool) bool {
 	return predicate(7)
 }
 
-func NamedSynchronousApply() bool {
+func NamedPlainApply() bool {
 	return InvokeIntPredicate(IsSeven)
 }
 
@@ -240,7 +240,7 @@ func GenericProfileWithNamedCallback[T any](
 	return InvokeIntPredicate(IsSeven) && predicate(value)
 }
 
-func CooperativeGenericProfileWithNamedCallback() bool {
+func ChannelGenericProfileWithNamedCallback() bool {
 	values := make(chan int32, 1)
 	values <- 7
 	return GenericProfileWithNamedCallback(
@@ -270,7 +270,7 @@ func (s CallbackSet[T]) Range(callback func(T) bool) bool {
 	})
 }
 
-func CooperativeNestedGenericMethod() bool {
+func ChannelNestedGenericMethod() bool {
 	values := make(chan int32, 1)
 	values <- 7
 	set := CallbackSet[int32]{
@@ -293,7 +293,7 @@ func (box *RecursiveBox[T]) Apply(callback func(T) bool) bool {
 	return callback(box.Value)
 }
 
-func CooperativeRecursiveGenericMethod() bool {
+func ChannelRecursiveGenericMethod() bool {
 	values := make(chan int32, 1)
 	values <- 7
 	leaf := &RecursiveBox[int32]{Value: 7}
@@ -321,7 +321,7 @@ func CloneCallbackHolder[T any](
 	return &CallbackHolder[T]{Apply: holder.Apply}
 }
 
-func CooperativeStoredCallback() int32 {
+func ChannelStoredCallback() int32 {
 	values := make(chan int32, 1)
 	values <- 40
 	holder := NewCallbackHolder(func(value int32) int32 {
@@ -330,14 +330,14 @@ func CooperativeStoredCallback() int32 {
 	return holder.Run(2)
 }
 
-func SynchronousStoredCallback() string {
+func PlainStoredCallback() string {
 	holder := NewCallbackHolder(func(value string) string {
 		return value + "!"
 	})
 	return holder.Run("value")
 }
 
-func CloneSynchronousStoredCallback() string {
+func ClonePlainStoredCallback() string {
 	holder := NewCallbackHolder(func(value string) string {
 		return value + "?"
 	})
@@ -356,7 +356,7 @@ func (box *MutableBox[T]) Change(apply func(T)) {
 	apply(box.Value)
 }
 
-func CooperativeGenericInterfaceMethod() int32 {
+func ChannelGenericInterfaceMethod() int32 {
 	values := make(chan int32, 1)
 	values <- 40
 	var target MutableValue[int32] = &MutableBox[int32]{Value: 2}
@@ -367,7 +367,7 @@ func CooperativeGenericInterfaceMethod() int32 {
 	return result
 }
 
-func SynchronousGenericInterfaceMethod() string {
+func PlainGenericInterfaceMethod() string {
 	var target MutableValue[string] = &MutableBox[string]{Value: "value"}
 	var result string
 	target.Change(func(value string) {

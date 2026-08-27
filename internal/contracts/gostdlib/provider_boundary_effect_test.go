@@ -5,25 +5,28 @@ import (
 	"testing"
 )
 
-func TestProviderBoundaryProfilesAreUniformAndModeBounded(t *testing.T) {
-	direct := providerBoundaryTestInterface(EffectSynchronous)
-	cooperative := providerBoundaryTestInterface(EffectAwaitable)
-
+func TestProviderBoundaryProfilesAreUniformlySynchronous(t *testing.T) {
+	interfaces := providerBoundaryTestInterface(EffectSynchronous)
 	for _, test := range []struct {
 		name       string
 		interfaces []ProviderCallableProfileInterfaceDocument
 		callables  []ProviderCallableParameterDocument
-		want       EffectKind
 	}{
-		{name: "direct", interfaces: direct, want: EffectSynchronous},
-		{name: "cooperative", interfaces: cooperative, want: EffectAwaitable},
+		{name: "interface", interfaces: interfaces},
 		{
-			name: "callback-only",
+			name: "callable",
 			callables: []ProviderCallableParameterDocument{{
 				Parameter: 1,
-				Effect:    EffectAwaitable,
+				Effect:    EffectSynchronous,
 			}},
-			want: EffectAwaitable,
+		},
+		{
+			name:       "interface-and-callable",
+			interfaces: interfaces,
+			callables: []ProviderCallableParameterDocument{{
+				Parameter: 1,
+				Effect:    EffectSynchronous,
+			}},
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -32,82 +35,56 @@ func TestProviderBoundaryProfilesAreUniformAndModeBounded(t *testing.T) {
 				test.callables,
 				"profile",
 			)
-			if err != nil || got != test.want {
-				t.Fatalf("boundary effect = %q, %v; want %q", got, err, test.want)
+			if err != nil || got != EffectSynchronous {
+				t.Fatalf("boundary effect = %q, %v; want %q", got, err, EffectSynchronous)
 			}
 		})
 	}
 
-	mixed := append(
-		providerBoundaryTestInterface(EffectSynchronous),
-		providerBoundaryTestInterface(EffectAwaitable)...,
-	)
-	if _, err := providerProfileBoundaryEffect(mixed, nil, "profile"); err == nil ||
-		!strings.Contains(err.Error(), "mixes direct and cooperative") {
-		t.Fatalf("mixed boundary error = %v", err)
-	}
 	if _, err := providerProfileBoundaryEffect(
-		providerBoundaryTestInterface(EffectAsynchronous),
+		providerBoundaryTestInterface(EffectKind("async")),
 		nil,
 		"profile",
-	); err == nil || !strings.Contains(err.Error(), "neither direct nor awaitable") {
-		t.Fatalf("asynchronous boundary error = %v", err)
+	); err == nil || !strings.Contains(err.Error(), "not synchronous") {
+		t.Fatalf("non-synchronous interface error = %v", err)
 	}
 	if _, err := providerProfileBoundaryEffect(
-		direct,
+		interfaces,
 		[]ProviderCallableParameterDocument{{
 			Parameter: 0,
-			Effect:    EffectAwaitable,
+			Effect:    EffectKind("awaitable"),
 		}},
 		"profile",
-	); err == nil || !strings.Contains(err.Error(), "mixes direct and cooperative") {
-		t.Fatalf("mixed callback boundary error = %v", err)
+	); err == nil || !strings.Contains(err.Error(), "not synchronous") {
+		t.Fatalf("non-synchronous callable error = %v", err)
 	}
 
-	directKey, err := BuildProviderCallableProfileKey(nil, []ProviderCallableProfileKeyCallable{{
+	key, err := BuildProviderCallableProfileKey(nil, []ProviderCallableProfileKeyCallable{{
 		Parameter: 1,
 		Effect:    EffectSynchronous,
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	cooperativeKey, err := BuildProviderCallableProfileKey(
-		nil,
-		[]ProviderCallableProfileKeyCallable{{
-			Parameter: 1,
-			Effect:    EffectAwaitable,
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if directKey == cooperativeKey {
-		t.Fatal("callback effects produced the same profile key")
+	if key == "" {
+		t.Fatal("synchronous callback profile key is empty")
 	}
 	lookups := make(map[string]struct{})
 	if err := recordProviderBoundaryProfile(
 		lookups,
 		"func:example",
 		EffectSynchronous,
-		"direct",
+		"first",
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := recordProviderBoundaryProfile(
 		lookups,
 		"func:example",
-		EffectAwaitable,
-		"cooperative",
-	); err != nil {
-		t.Fatal(err)
-	}
-	if err := recordProviderBoundaryProfile(
-		lookups,
-		"func:example",
-		EffectAwaitable,
+		EffectSynchronous,
 		"duplicate",
 	); err == nil || !strings.Contains(err.Error(), "multiple profiles") {
-		t.Fatalf("duplicate boundary-mode error = %v", err)
+		t.Fatalf("duplicate boundary error = %v", err)
 	}
 }
 

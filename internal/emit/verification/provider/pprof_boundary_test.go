@@ -10,7 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestRuntimePprofRetainsCanonicalWriterAcrossCalls(t *testing.T) {
+func TestRuntimePprofSelectsDirectWriterProfilesAcrossCalls(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
@@ -75,7 +75,6 @@ func Result() (bool, bool, bool, bool) {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -104,17 +103,27 @@ func Result() (bool, bool, bool, bool) {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Result"},
-		`console.log((await Result()).map(String).join(" "));
+		`console.log(Result().map(String).join(" "));
 `,
 	)
 	for _, required := range []string{
-		"PprofStartCPUProfileCanonical",
-		"PprofProfileWriteToCanonical",
+		"provider_runtime_pprof.PprofStartCPUProfileDirect(",
+		"provider_runtime_pprof.PprofProfileWriteToDirect(",
 		"bindPointer<",
-		"await pprof__from_gostdlib.StopCPUProfile()",
+		"pprof__from_gostdlib.StopCPUProfile()",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("runtime/pprof output lacks %q:\n%s", required, artifacts.printed)
+		}
+	}
+	for _, forbidden := range []string{
+		"PprofStartCPUProfileCanonical",
+		"PprofProfileWriteToCanonical",
+		"async ",
+		"await ",
+	} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("runtime/pprof output retains %q:\n%s", forbidden, artifacts.printed)
 		}
 	}
 }

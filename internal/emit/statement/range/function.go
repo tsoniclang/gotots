@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	"github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
@@ -114,24 +113,16 @@ func emitIterator(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	invocation, err := cooperativecall.ValueCall(
-		context.WithRole(api.RoleRangeExpression),
-		source,
-		signature,
-		api.DirectExpression(
-			context.Factory().CallExpression(
-				targetIterator,
-				nil,
-				nil,
-				[]tsgo.Expression{callback},
-				tsgo.NodeFlagsNone,
-			),
-			callbackRequests...,
+	invocation := api.DirectExpression(
+		context.Factory().CallExpression(
+			targetIterator,
+			nil,
+			nil,
+			[]tsgo.Expression{callback},
+			tsgo.NodeFlagsNone,
 		),
+		callbackRequests...,
 	)
-	if err != nil {
-		return api.StatementEmission{}, err
-	}
 	after := append(
 		invocation.Before(),
 		context.Factory().ExpressionStatement(
@@ -229,18 +220,6 @@ func iteratorCallback(
 	returnSelected bool,
 	panicName string,
 ) (tsgo.ArrowFunction, []api.RootRequest, error) {
-	reference, err := callable.ABIReference(context, yield)
-	if err != nil {
-		return nil, nil, err
-	}
-	facet, err := context.CallableABIFacet(reference)
-	if err != nil {
-		return nil, nil, err
-	}
-	observation, err := context.ObserveCooperativeCallable(facet)
-	if err != nil {
-		return nil, nil, err
-	}
 	targetSignature, err := callable.EmitAdapter(
 		context.WithRole(api.RoleRangeValue),
 		children,
@@ -271,8 +250,7 @@ func iteratorCallback(
 	}
 	bodyContext := context.
 		WithRole(api.RoleRangeBody).
-		EnterIteratorRange(control).
-		WithCooperativeCallableABI(facet, observation.Cooperative())
+		EnterIteratorRange(control)
 	var bindings api.StatementEmission
 	if source.Key != nil {
 		bindings, err = assignment.EmitRangeIteration(
@@ -316,22 +294,14 @@ func iteratorCallback(
 			context.Factory().TrueLiteral(),
 		),
 	)
-	var modifiers []tsgo.ModifierLike
-	resultType := targetSignature.Result()
-	if observation.Cooperative() {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	return context.Factory().ArrowFunction(
-			modifiers,
+			nil,
 			nil,
 			targetSignature.Parameters(),
-			resultType,
+			targetSignature.Result(),
 			context.Factory().EqualsGreaterThanToken(),
 			context.Factory().Block(statements, true),
 		), api.CombineRequests(
-			reference.Requests(),
-			observation.Requests(),
 			targetSignature.Requests(),
 			bindings.Requests(),
 			sourceBody.Requests(),

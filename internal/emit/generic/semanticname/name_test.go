@@ -19,18 +19,16 @@ func TestConcretizationSuffixIsSemanticAndExact(t *testing.T) {
 		nil,
 	)
 	tests := []struct {
-		name        string
-		arguments   []types.Type
-		synchronous bool
-		want        string
+		name      string
+		arguments []types.Type
+		want      string
 	}{
 		{name: "basic", arguments: []types.Type{types.Typ[types.Int32]}, want: "$int32"},
 		{name: "aggregate", arguments: []types.Type{types.NewSlice(packageType)}, want: "$SliceOf_Named_example_u2e_com_u2f_model_Item"},
-		{name: "effect", arguments: []types.Type{types.Typ[types.String]}, synchronous: true, want: "$string$synchronous"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := ConcretizationSuffix(test.arguments, test.synchronous)
+			got, err := ConcretizationSuffix(test.arguments)
 			if err != nil {
 				t.Fatal(err)
 			}

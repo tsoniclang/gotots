@@ -59,37 +59,6 @@ func Emit(
 	)
 }
 
-func cooperativeRequirement(
-	context api.Context,
-	facet api.CallableFacet,
-	requirements []api.DeclarationRequirement,
-) (bool, error) {
-	selected := false
-	for _, requirement := range requirements {
-		if requirement.Kind() != api.DeclarationRequirementCooperativeCallable {
-			continue
-		}
-		requirementFacet, ok := requirement.CooperativeCallable()
-		if !ok || requirementFacet.Owner() != facet.Owner() {
-			return false, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "function received an invalid cooperative requirement",
-			}
-		}
-		if requirementFacet != facet {
-			continue
-		}
-		if selected {
-			return false, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "function received a duplicate cooperative requirement",
-			}
-		}
-		selected = true
-	}
-	return selected, nil
-}
-
 func applyLocalConstantProjections(
 	context api.Context,
 	source *ast.FuncDecl,

@@ -167,30 +167,6 @@ func (a MethodReceiverABI) Valid() bool {
 		a == MethodReceiverABIContractDirect
 }
 
-type ConcurrencySemantics uint8
-
-const (
-	ConcurrencySemanticsDisabled    ConcurrencySemantics = 0
-	ConcurrencySemanticsCooperative ConcurrencySemantics = 1
-	ConcurrencySemanticsInvalid     ConcurrencySemantics = 255
-)
-
-func (s ConcurrencySemantics) Valid() bool {
-	return s == ConcurrencySemanticsDisabled ||
-		s == ConcurrencySemanticsCooperative
-}
-
-func (s ConcurrencySemantics) String() string {
-	switch s {
-	case ConcurrencySemanticsDisabled:
-		return "disabled"
-	case ConcurrencySemanticsCooperative:
-		return "cooperative"
-	default:
-		return fmt.Sprintf("concurrency-semantics(%d)", s)
-	}
-}
-
 func IntegerLiteral(
 	factory tsgo.Factory,
 	abi ScalarABI,

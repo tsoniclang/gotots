@@ -105,8 +105,6 @@ func bindDescriptor(
 		flags.Var(newBoolValue(&overrides.Externals), descriptor.Flag(), description)
 	case config.OptionStandardLibrary:
 		flags.Var(newBoolValue(&overrides.StandardLibrary), descriptor.Flag(), description)
-	case config.OptionConcurrency:
-		flags.Var(newStringValue(&overrides.ConcurrencySemantics), descriptor.Flag(), description)
 	case config.OptionEvaluationOrder:
 		flags.Var(newStringValue(&overrides.EvaluationOrder), descriptor.Flag(), description)
 	case config.OptionIntegers:

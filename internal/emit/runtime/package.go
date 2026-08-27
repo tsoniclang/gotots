@@ -10,9 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -35,7 +33,6 @@ type Package struct {
 	manifest    []byte
 	fingerprint string
 	scalar      api.ScalarABI
-	concurrency api.ConcurrencySemantics
 	valid       bool
 }
 
@@ -79,10 +76,6 @@ func (p Package) NativeIntegerWidth() api.NativeIntegerWidth {
 	return p.scalar.NativeIntegerWidth()
 }
 
-func (p Package) Concurrency() api.ConcurrencySemantics {
-	return p.concurrency
-}
-
 func (p Package) Files() []PackageFile {
 	return slices.Clone(p.files)
 }
@@ -98,18 +91,40 @@ func (p Package) Fingerprint() string {
 func AssemblePackage(
 	factory tsgo.Factory,
 	scalar api.ScalarABI,
-	concurrency api.ConcurrencySemantics,
+	requested map[api.RuntimeSymbol]struct{},
+	aliases []api.PrimitiveAlias,
+) (Package, error) {
+	return assemblePackage(
+		factory,
+		scalar,
+		requested,
+		aliases,
+	)
+}
+
+func AssembleProviderCertificationPackage(
+	factory tsgo.Factory,
+	scalar api.ScalarABI,
+	requested map[api.RuntimeSymbol]struct{},
+	aliases []api.PrimitiveAlias,
+) (Package, error) {
+	return assemblePackage(
+		factory,
+		scalar,
+		requested,
+		aliases,
+	)
+}
+
+func assemblePackage(
+	factory tsgo.Factory,
+	scalar api.ScalarABI,
 	requested map[api.RuntimeSymbol]struct{},
 	aliases []api.PrimitiveAlias,
 ) (Package, error) {
 	if !scalar.Valid() {
 		return Package{}, &AssemblyError{
 			Reason: "runtime package scalar ABI is invalid",
-		}
-	}
-	if !concurrency.Valid() {
-		return Package{}, &AssemblyError{
-			Reason: "runtime package concurrency profile is invalid",
 		}
 	}
 	aliases = slices.Clone(aliases)
@@ -159,30 +174,6 @@ func AssemblePackage(
 	})
 	files := make([]PackageFile, 0, len(modules)+1)
 	statements := make([]tsgo.Statement, 0, len(aliases)+1)
-	if symbols := byModule[api.RuntimeModuleScalar]; len(symbols) != 0 {
-		symbols, err = orderModuleSymbols(api.RuntimeModuleScalar, symbols)
-		if err != nil {
-			return Package{}, err
-		}
-		definitions, err := Build(
-			factory,
-			api.RuntimeModuleScalar,
-			symbols,
-			concurrency,
-		)
-		if err != nil {
-			return Package{}, err
-		}
-		statements, err = exactDefinitions(
-			api.RuntimeModuleScalar,
-			symbols,
-			definitions,
-		)
-		if err != nil {
-			return Package{}, err
-		}
-		delete(byModule, api.RuntimeModuleScalar)
-	}
 	for _, alias := range aliases {
 		name, keyword, err := api.PrimitiveAliasRepresentation(alias, scalar)
 		if err != nil {
@@ -207,9 +198,6 @@ func AssemblePackage(
 		files = append(files, file)
 	}
 	for _, module := range modules {
-		if module == api.RuntimeModuleScalar {
-			continue
-		}
 		symbols := byModule[module]
 		symbols, err = orderModuleSymbols(module, symbols)
 		if err != nil {
@@ -219,7 +207,6 @@ func AssemblePackage(
 			factory,
 			module,
 			symbols,
-			concurrency,
 		)
 		if err != nil {
 			return Package{}, err
@@ -250,7 +237,7 @@ func AssemblePackage(
 	sort.Slice(files, func(left, right int) bool {
 		return files[left].outputPath < files[right].outputPath
 	})
-	manifest, fingerprint, err := packageManifest(scalar, concurrency, files)
+	manifest, fingerprint, err := packageManifest(scalar, files)
 	if err != nil {
 		return Package{}, err
 	}
@@ -259,235 +246,8 @@ func AssemblePackage(
 		manifest:    manifest,
 		fingerprint: fingerprint,
 		scalar:      scalar,
-		concurrency: concurrency,
 		valid:       true,
 	}, nil
-}
-
-func awaitableType(
-	factory tsgo.Factory,
-) tsgo.Statement {
-	parameter := factory.Identifier("T")
-	value := factory.TypeReferenceNode(parameter, nil)
-	result := factory.UnionTypeNode([]tsgo.TypeNode{
-		value,
-		factory.TypeReferenceNode(
-			api.TargetIntrinsicPromise.TypeName(factory),
-			[]tsgo.TypeNode{value},
-		),
-	})
-	return factory.TypeAliasDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.Identifier("Awaitable"),
-		[]tsgo.TypeParameterDeclaration{
-			factory.TypeParameterDeclaration(nil, parameter, nil, nil, nil),
-		},
-		result,
-	)
-}
-
-func dependencyClosure(
-	requested map[api.RuntimeSymbol]struct{},
-) (map[api.RuntimeSymbol]struct{}, error) {
-	result := make(map[api.RuntimeSymbol]struct{}, len(requested))
-	state := make(map[api.RuntimeSymbol]uint8, len(requested))
-	var visit func(api.RuntimeSymbol) error
-	visit = func(symbol api.RuntimeSymbol) error {
-		switch state[symbol] {
-		case 1:
-			return &AssemblyError{
-				Symbol: symbol,
-				Reason: "runtime dependency graph contains a cycle",
-			}
-		case 2:
-			return nil
-		}
-		contract, err := api.RuntimeContract(symbol)
-		if err != nil {
-			return err
-		}
-		state[symbol] = 1
-		dependencies := contract.Dependencies()
-		slices.Sort(dependencies)
-		for _, dependency := range dependencies {
-			if err := visit(dependency); err != nil {
-				return err
-			}
-		}
-		state[symbol] = 2
-		result[symbol] = struct{}{}
-		return nil
-	}
-	symbols := make([]api.RuntimeSymbol, 0, len(requested))
-	for symbol := range requested {
-		symbols = append(symbols, symbol)
-	}
-	slices.Sort(symbols)
-	for _, symbol := range symbols {
-		if err := visit(symbol); err != nil {
-			return nil, err
-		}
-	}
-	return result, nil
-}
-
-func exactDefinitions(
-	module api.RuntimeModule,
-	symbols []api.RuntimeSymbol,
-	definitions []Definition,
-) ([]tsgo.Statement, error) {
-	requested := make(map[api.RuntimeSymbol]struct{}, len(symbols))
-	for _, symbol := range symbols {
-		requested[symbol] = struct{}{}
-	}
-	bySymbol := make(map[api.RuntimeSymbol]tsgo.Statement, len(definitions))
-	for _, definition := range definitions {
-		symbol := definition.Symbol()
-		contract, err := api.RuntimeContract(symbol)
-		if err != nil {
-			return nil, err
-		}
-		if contract.Module() != module {
-			return nil, &AssemblyError{
-				Module: module,
-				Symbol: symbol,
-				Reason: "definition belongs to another runtime module",
-			}
-		}
-		if _, ok := requested[symbol]; !ok {
-			return nil, &AssemblyError{
-				Module: module,
-				Symbol: symbol,
-				Reason: "definition was not requested",
-			}
-		}
-		if _, duplicate := bySymbol[symbol]; duplicate {
-			return nil, &AssemblyError{
-				Module: module,
-				Symbol: symbol,
-				Reason: "runtime symbol has duplicate definitions",
-			}
-		}
-		bySymbol[symbol] = definition.Statement()
-	}
-	statements := make([]tsgo.Statement, 0, len(symbols))
-	for _, symbol := range symbols {
-		statement := bySymbol[symbol]
-		if statement == nil {
-			return nil, &AssemblyError{
-				Module: module,
-				Symbol: symbol,
-				Reason: "requested runtime symbol has no definition",
-			}
-		}
-		statements = append(statements, statement)
-	}
-	return statements, nil
-}
-
-func moduleImports(
-	factory tsgo.Factory,
-	outputPath string,
-	module api.RuntimeModule,
-	symbols []api.RuntimeSymbol,
-) ([]tsgo.Statement, error) {
-	placement := targetplacement.New()
-	for _, symbol := range symbols {
-		contract, err := api.RuntimeContract(symbol)
-		if err != nil {
-			return nil, err
-		}
-		for _, dependency := range contract.Dependencies() {
-			dependencyContract, err := api.RuntimeContract(dependency)
-			if err != nil {
-				return nil, err
-			}
-			if dependencyContract.Module() == module {
-				continue
-			}
-			modulePath, err := targetoutput.ModuleSpecifier(
-				outputPath,
-				dependencyContract.OutputPath(),
-			)
-			if err != nil {
-				return nil, err
-			}
-			request, err := api.NewRuntimeImportRequest(
-				factory,
-				api.ImportPhaseValue,
-				modulePath,
-				dependency,
-				dependencyContract.ExportedName(),
-			)
-			if err != nil {
-				return nil, err
-			}
-			if err := placement.Apply([]api.RootRequest{request}); err != nil {
-				return nil, err
-			}
-		}
-	}
-	if module == api.RuntimeModuleSlice &&
-		(slices.Contains(symbols, api.RuntimeSliceAddress) ||
-			slices.Contains(symbols, api.RuntimeSliceArrayPointer)) {
-		for _, symbol := range []tsoniccore.Symbol{
-			tsoniccore.SymbolPointer,
-			tsoniccore.SymbolAddressOf,
-			tsoniccore.SymbolProjectPointer,
-		} {
-			declaration, err := tsoniccore.Resolve(symbol)
-			if err != nil {
-				return nil, err
-			}
-			phase := api.ImportPhaseValue
-			if declaration.Phase() == tsoniccore.PhaseType {
-				phase = api.ImportPhaseType
-			}
-			request, err := api.NewImportRequest(
-				factory,
-				phase,
-				declaration.Module(),
-				declaration.Export(),
-				declaration.Export(),
-			)
-			if err != nil {
-				return nil, err
-			}
-			if err := placement.Apply([]api.RootRequest{request}); err != nil {
-				return nil, err
-			}
-		}
-	}
-	if module == api.RuntimeModulePanicNil &&
-		slices.Contains(symbols, api.RuntimePanicNilValue) {
-		for _, symbol := range []tsoniccore.Symbol{
-			tsoniccore.SymbolPointer,
-			tsoniccore.SymbolAllocatePointer,
-		} {
-			declaration, err := tsoniccore.Resolve(symbol)
-			if err != nil {
-				return nil, err
-			}
-			phase := api.ImportPhaseValue
-			if declaration.Phase() == tsoniccore.PhaseType {
-				phase = api.ImportPhaseType
-			}
-			request, err := api.NewImportRequest(
-				factory,
-				phase,
-				declaration.Module(),
-				declaration.Export(),
-				declaration.Export(),
-			)
-			if err != nil {
-				return nil, err
-			}
-			if err := placement.Apply([]api.RootRequest{request}); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return placement.Statements(factory), nil
 }
 
 func packageSourceFile(
@@ -516,7 +276,6 @@ func packageSourceFile(
 type packageMetadata struct {
 	IntegerRepresentation string `json:"integerRepresentation"`
 	NativeIntegerBits     uint8  `json:"nativeIntegerBits"`
-	ConcurrencySemantics  string `json:"concurrencySemantics"`
 }
 
 type packageDocument struct {
@@ -530,7 +289,6 @@ type packageDocument struct {
 
 func packageManifest(
 	scalar api.ScalarABI,
-	concurrency api.ConcurrencySemantics,
 	files []PackageFile,
 ) ([]byte, string, error) {
 	exports := make(map[string]string, len(files))
@@ -567,7 +325,6 @@ func packageManifest(
 		GoToTS: packageMetadata{
 			IntegerRepresentation: scalar.IntegerRepresentation().String(),
 			NativeIntegerBits:     uint8(scalar.NativeIntegerWidth()),
-			ConcurrencySemantics:  concurrency.String(),
 		},
 		Exports: exports,
 	}

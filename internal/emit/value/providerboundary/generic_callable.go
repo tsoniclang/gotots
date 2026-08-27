@@ -9,13 +9,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type genericCallableBoundary uint8
-
-const (
-	genericCallableBoundaryCanonical genericCallableBoundary = iota + 1
-	genericCallableBoundarySynchronous
-)
-
 func toProviderGenericCallable(
 	context api.Context,
 	children api.ChildEmitter,
@@ -23,8 +16,13 @@ func toProviderGenericCallable(
 	concrete *types.Signature,
 	model definedtype.Model,
 	source api.ExpressionEmission,
-	boundary genericCallableBoundary,
 ) (api.ExpressionEmission, bool, error) {
+	if err := RequireProviderDefinedCallableInput(
+		context,
+		model,
+	); err != nil {
+		return api.ExpressionEmission{}, false, err
+	}
 	parameters := make([]tsgo.ParameterDeclaration, 0, concrete.Params().Len())
 	parameterValues := make([]tsgo.Expression, 0, concrete.Params().Len())
 	for index := range concrete.Params().Len() {
@@ -57,22 +55,6 @@ func toProviderGenericCallable(
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
 	}
-	cooperative := false
-	var contractRequests []api.RootRequest
-	if boundary == genericCallableBoundaryCanonical {
-		cooperative, contractRequests, err = providerCallableContract(
-			context,
-			concrete,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, false, err
-		}
-	} else if boundary != genericCallableBoundarySynchronous {
-		return api.ExpressionEmission{}, false, boundaryInvariant(
-			context,
-			"provider generic callable boundary is invalid",
-		)
-	}
 	callValue := tsgo.Expression(context.Factory().CallExpression(
 		context.Factory().Identifier(captured),
 		nil,
@@ -80,13 +62,10 @@ func toProviderGenericCallable(
 		arguments,
 		tsgo.NodeFlagsNone,
 	))
-	if cooperative {
-		callValue = context.Factory().AwaitExpression(callValue)
-	}
 	call, err := api.NewExpressionEmission(
 		before,
 		callValue,
-		api.CombineRequests(requests, contractRequests),
+		api.CombineRequests(requests),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
@@ -108,17 +87,13 @@ func toProviderGenericCallable(
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
 	}
-	var modifiers []tsgo.ModifierLike
-	if cooperative {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-	}
 	adapter := context.Factory().ConditionalExpression(
 		isUndefined(context.Factory(), captured),
 		context.Factory().QuestionToken(),
 		context.Factory().Identifier("undefined"),
 		context.Factory().ColonToken(),
 		context.Factory().ArrowFunction(
-			modifiers,
+			nil,
 			nil,
 			parameters,
 			nil,

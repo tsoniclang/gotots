@@ -4,8 +4,6 @@ import (
 	"go/ast"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -100,42 +98,16 @@ func emitLayoutFields(
 	var requests []api.RootRequest
 	for _, sourceField := range fields {
 		fieldContext := context.WithRole(api.RoleStructFieldType)
-		synchronous := false
-		var selectionRequests []api.RootRequest
-		var err error
-		fieldSignature, callableField := callable.Signature(
+		logical, err := children.RepresentedType(
+			fieldContext,
+			sourceField.typeSource,
 			sourceField.object.Type(),
 		)
-		if callableField {
-			synchronous, selectionRequests, err =
-				cooperativecall.ExactSynchronousField(
-					fieldContext,
-					sourceField.object,
-				)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-		var logical api.TypeEmission
-		if synchronous {
-			logical, err = callable.EmitSynchronousType(
-				fieldContext,
-				children,
-				sourceField.typeSource,
-				fieldSignature,
-			)
-		} else {
-			logical, err = children.RepresentedType(
-				fieldContext,
-				sourceField.typeSource,
-				sourceField.object.Type(),
-			)
-		}
 		if err != nil {
 			return nil, nil, err
 		}
 		storageType := logical
-		if storage && !synchronous {
+		if storage {
 			storageType, err = context.Values().StorageType(
 				context.WithRole(api.RoleStorageType),
 				sourceField.typeSource,
@@ -153,7 +125,6 @@ func emitLayoutFields(
 		requests = append(
 			requests,
 			api.CombineRequests(
-				selectionRequests,
 				logical.Requests(),
 				storageType.Requests(),
 			)...,

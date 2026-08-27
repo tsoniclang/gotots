@@ -203,7 +203,8 @@ test("Timer delivers once, supports reset, and reports stop state", async () => 
   const timer = NewTimer(new Duration(50_000_000n));
   assert.equal(Timer.Stop(timer), true);
   assert.equal(Timer.Reset(timer, new Duration(1_000_000n)), false);
-  const [fired, ok] = await timer.C!.receive();
+  await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  const [fired, ok] = timer.C!.receive();
   assert.equal(ok, true);
   assert.equal(fired.IsZero(), false);
   assert.equal(Timer.Stop(timer), false);
@@ -211,17 +212,20 @@ test("Timer delivers once, supports reset, and reports stop state", async () => 
 
 test("Ticker produces values until stopped", async () => {
   const ticker = NewTicker(new Duration(1_000_000n));
-  const [, ok] = await ticker.C.receive();
+  await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  const [, ok] = ticker.C.receive();
   assert.equal(ok, true);
   Ticker.Stop(ticker);
 });
 
 test("After and AfterFunc schedule through the provider clock", async () => {
-  const [, open] = await After(new Duration(1_000_000n)).receive();
+  const after = After(new Duration(1_000_000n));
+  await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  const [, open] = after.receive();
   assert.equal(open, true);
 
   let called = false;
-  const timer = AfterFunc(new Duration(1_000_000n), async () => {
+  const timer = AfterFunc(new Duration(1_000_000n), () => {
     called = true;
   });
   await new Promise<void>((resolve) => setTimeout(resolve, 5));
@@ -229,15 +233,15 @@ test("After and AfterFunc schedule through the provider clock", async () => {
   assert.equal(timer.C, undefined);
 });
 
-test("Sleep delays positive durations and accepts non-positive durations", async () => {
+test("Sleep blocks directly and accepts non-positive durations", () => {
   const order: string[] = [];
-  const sleeping = Sleep(new Duration(1_000_000n)).then(() => order.push("awake"));
-  order.push("scheduled");
-  await sleeping;
-  assert.deepEqual(order, ["scheduled", "awake"]);
+  order.push("before");
+  Sleep(new Duration(1_000_000n));
+  order.push("awake");
+  assert.deepEqual(order, ["before", "awake"]);
 
-  await Sleep(new Duration(0n));
-  await Sleep(new Duration(-1n));
+  Sleep(new Duration(0n));
+  Sleep(new Duration(-1n));
 });
 
 test("Context cancellation, causes, values, and deadlines propagate", async () => {
@@ -252,17 +256,17 @@ test("Context cancellation, causes, values, and deadlines propagate", async () =
     new NilDoneFailedContext(ignoredFailure),
   );
   assert.equal(neverCanceled.Err(), undefined);
-  await cancelNever();
+  cancelNever();
   assert.equal(neverCanceled.Err(), state.Canceled);
 
   const [closedParent, closeParent] = WithCancel(root);
-  await closeParent();
+  closeParent();
   const [closedChild] = WithCancel(closedParent);
   assert.equal(closedChild.Err(), state.Canceled);
 
   const [futureParent, closeFutureParent] = WithCancel(root);
   const [futureChild] = WithCancel(futureParent);
-  await closeFutureParent();
+  closeFutureParent();
   assert.equal(futureChild.Err(), state.Canceled);
   const key = new ProviderError("key");
   const value = new ProviderError("value");
@@ -271,27 +275,27 @@ test("Context cancellation, causes, values, and deadlines propagate", async () =
 
   const [cancelled, cancel] = WithCancel(valued);
   let callbackCount = 0;
-  const stopCallback = ContextAfterFunc(cancelled, async () => {
+  const stopCallback = ContextAfterFunc(cancelled, () => {
     callbackCount += 1;
   });
-  await cancel();
-  const [, open] = await cancelled.Done()!.receive();
+  cancel();
+  const [, open] = cancelled.Done()!.receive();
   assert.equal(open, false);
   assert.equal(cancelled.Err(), state.Canceled);
-  await Promise.resolve();
   assert.equal(callbackCount, 1);
-  assert.equal(await stopCallback(), false);
+  assert.equal(stopCallback(), false);
 
   const cause = new ProviderError("cause");
   const [caused, cancelCause] = WithCancelCause(root);
-  await cancelCause(cause);
+  cancelCause(cause);
   assert.equal(caused.Err(), state.Canceled);
   assert.equal(Cause(caused), cause);
 
   const [timed, stop] = WithTimeout(root, new Duration(1_000_000n));
-  const [, deadlineOpen] = await timed.Done()!.receive();
+  await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  const [, deadlineOpen] = timed.Done()!.receive();
   assert.equal(deadlineOpen, false);
   assert.match(timed.Err()!.Error(), /deadline exceeded/u);
   assert.equal(Cause(timed), state.DeadlineExceeded);
-  await stop();
+  stop();
 });

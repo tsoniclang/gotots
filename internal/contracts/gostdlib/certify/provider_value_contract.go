@@ -9,8 +9,10 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"go/types"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 )
 
 func selectMethodOwner(
@@ -144,6 +146,200 @@ func applyDefinedValueRepresentations(
 		}
 	}
 	return result, nil
+}
+
+func certifyCanonicalDefinedCallableEffects(
+	config resolvedConfig,
+	project *tsgo.ProjectInspection,
+	source goSurface,
+	modules []gostdlib.ModuleDocument,
+	effectMarker tsgo.ProjectExport,
+) ([]gostdlib.ModuleDocument, error) {
+	result := append([]gostdlib.ModuleDocument(nil), modules...)
+	for moduleIndex := range result {
+		result[moduleIndex].Bindings = append(
+			[]gostdlib.BindingDocument(nil),
+			result[moduleIndex].Bindings...,
+		)
+		callableBindings := make([]int, 0)
+		for bindingIndex := range result[moduleIndex].Bindings {
+			binding := &result[moduleIndex].Bindings[bindingIndex]
+			if binding.Kind != gostdlib.BindingType ||
+				binding.Access != gostdlib.AccessExport ||
+				binding.DefinedValue !=
+					gostdlib.DefinedValueRepresentationCanonical {
+				continue
+			}
+			evidence, ok := source.objects[binding.Identity]
+			if !ok {
+				return nil, certifyError(
+					"certify defined callable",
+					binding.Identity,
+					"selected-Go declaration is absent",
+				)
+			}
+			typeName, ok := evidence.object.(*types.TypeName)
+			if !ok {
+				return nil, certifyError(
+					"certify defined callable",
+					binding.Identity,
+					"source type evidence is absent",
+				)
+			}
+			if _, callable := typeName.Type().Underlying().(*types.Signature); callable {
+				callableBindings = append(callableBindings, bindingIndex)
+			}
+		}
+		if len(callableBindings) == 0 {
+			continue
+		}
+		targets, err := project.Exports(filepath.Join(
+			config.providerRoot,
+			filepath.FromSlash(result[moduleIndex].SourcePath),
+		))
+		if err != nil {
+			return nil, err
+		}
+		targetByName := make(map[string]tsgo.ProjectExport, len(targets))
+		for _, target := range targets {
+			targetByName[target.Name()] = target
+		}
+		for _, bindingIndex := range callableBindings {
+			binding := &result[moduleIndex].Bindings[bindingIndex]
+			target, ok := targetByName[binding.Export]
+			if !ok {
+				return nil, certifyError(
+					"certify defined callable",
+					binding.Identity,
+					"canonical target export is absent",
+				)
+			}
+			binding.Effect, err = exportCallableEffect(
+				project,
+				target,
+				effectMarker,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return result, nil
+}
+
+func definedValueOperationEffect(
+	project *tsgo.ProjectInspection,
+	evidence goObject,
+	target tsgo.ProjectExport,
+	effectMarker tsgo.ProjectExport,
+) (gostdlib.EffectKind, error) {
+	typeName, ok := evidence.object.(*types.TypeName)
+	if !ok {
+		return gostdlib.EffectInvalid, certifyError(
+			"build defined-value operations",
+			evidence.contract.Identity(),
+			"source type evidence is absent",
+		)
+	}
+	if _, callable := typeName.Type().Underlying().(*types.Signature); !callable {
+		return gostdlib.EffectInvalid, nil
+	}
+	projectMember, found := target.ValueMember("$project")
+	if !found {
+		return gostdlib.EffectInvalid, certifyError(
+			"build defined-value operations",
+			target.Name()+".$project",
+			"callable projection is absent",
+		)
+	}
+	selected, err := project.CallableReturnEffect(projectMember, effectMarker)
+	if err != nil {
+		return gostdlib.EffectInvalid, err
+	}
+	return providerEffect(selected)
+}
+
+func verifyDefinedCallableEffects(
+	source goSurface,
+	modules []gostdlib.ModuleDocument,
+	facetModules []gostdlib.FacetModuleDocument,
+) error {
+	operationEffects := make(map[string]gostdlib.EffectKind)
+	for _, module := range facetModules {
+		for _, facet := range module.Facets {
+			if facet.Kind != gostdlib.FacetDefinedValueOperations {
+				continue
+			}
+			if _, duplicate := operationEffects[facet.SourceIdentity]; duplicate {
+				return certifyError(
+					"verify defined callable",
+					facet.SourceIdentity,
+					"defined-value operation effect is duplicated",
+				)
+			}
+			operationEffects[facet.SourceIdentity] = facet.Effect
+		}
+	}
+	for _, module := range modules {
+		for _, binding := range module.Bindings {
+			if binding.Kind != gostdlib.BindingType ||
+				binding.Access != gostdlib.AccessExport ||
+				!binding.DefinedValue.Valid() {
+				continue
+			}
+			evidence, ok := source.objects[binding.Identity]
+			if !ok {
+				return certifyError(
+					"verify defined callable",
+					binding.Identity,
+					"selected-Go declaration is absent",
+				)
+			}
+			typeName, ok := evidence.object.(*types.TypeName)
+			if !ok {
+				return certifyError(
+					"verify defined callable",
+					binding.Identity,
+					"source type evidence is absent",
+				)
+			}
+			_, callable := typeName.Type().Underlying().(*types.Signature)
+			operationEffect, hasOperations := operationEffects[binding.Identity]
+			switch binding.DefinedValue {
+			case gostdlib.DefinedValueRepresentationCanonical:
+				if hasOperations || callable != binding.Effect.Valid() {
+					return certifyError(
+						"verify defined callable",
+						binding.Identity,
+						"canonical callable effect does not exact-join the source type",
+					)
+				}
+			case gostdlib.DefinedValueRepresentationOperations:
+				if binding.Effect != gostdlib.EffectInvalid || !hasOperations ||
+					callable != operationEffect.Valid() {
+					return certifyError(
+						"verify defined callable",
+						binding.Identity,
+						"operation callable effect does not exact-join the source type",
+					)
+				}
+			}
+			delete(operationEffects, binding.Identity)
+		}
+	}
+	if len(operationEffects) != 0 {
+		identities := make([]string, 0, len(operationEffects))
+		for identity := range operationEffects {
+			identities = append(identities, identity)
+		}
+		sort.Strings(identities)
+		return certifyError(
+			"verify defined callable",
+			strings.Join(identities, ", "),
+			"defined-value operation effects have no selected source binding",
+		)
+	}
+	return nil
 }
 
 func definedValueType(source types.Type) bool {

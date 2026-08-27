@@ -37,10 +37,8 @@ import {
   SlicesReplaceKernel as Replace,
   SlicesReverseKernel as Reverse,
   SlicesSortFuncKernel as SortFunc,
-  SlicesSortFuncSynchronousKernel as SortFuncSynchronous,
   SlicesSortKernel as Sort,
   SlicesSortStableFuncKernel as SortStableFunc,
-  SlicesSortStableFuncSynchronousKernel as SortStableFuncSynchronous,
   SlicesSortedFuncKernel as SortedFunc,
   SlicesSortedKernel as Sorted,
   SlicesValuesKernel as Values,
@@ -52,6 +50,7 @@ function values<T>(source: RuntimeSlice<T>): T[] {
 
 const copyValue = <T>(value: T): T => value;
 const copyNumber = (value: number): number => value;
+const copyString = (value: string): string => value;
 const equalValue = <T>(left: T, right: T): boolean => left === right;
 const lessValue = <T extends number | string>(left: T, right: T): boolean => (
   left < right
@@ -60,7 +59,7 @@ const sliceValue = <T>(source: RuntimeSlice<T>): RuntimeSlice<T> => source;
 const zeroNumber = (): number => 0;
 const zeroString = (): string => "";
 
-test("slices search and comparison operations are generic", async (): Promise<void> => {
+test("slices search and comparison operations are generic", (): void => {
   const source = RuntimeSlice.literal([1, 3, 3, 8]);
   assert.deepEqual(BinarySearch(
     lessValue,
@@ -80,7 +79,7 @@ test("slices search and comparison operations are generic", async (): Promise<vo
     source,
     4,
   ), [3n, false]);
-  assert.deepEqual(await BinarySearchFunc<RuntimeSlice<number>, number, number, string>(
+  assert.deepEqual(BinarySearchFunc<RuntimeSlice<number>, number, number, string>(
     sliceValue,
     copyNumber,
     copyNumber,
@@ -96,7 +95,7 @@ test("slices search and comparison operations are generic", async (): Promise<vo
     source,
     8,
   ), true);
-  assert.equal(await ContainsFunc(
+  assert.equal(ContainsFunc(
     sliceValue,
     copyValue,
     copyValue,
@@ -111,7 +110,7 @@ test("slices search and comparison operations are generic", async (): Promise<vo
     source,
     3,
   ), 1n);
-  assert.equal(await IndexFunc(
+  assert.equal(IndexFunc(
     sliceValue,
     copyValue,
     copyValue,
@@ -126,7 +125,7 @@ test("slices search and comparison operations are generic", async (): Promise<vo
     source,
     RuntimeSlice.literal([1, 3, 3, 8]),
   ), true);
-  assert.equal(await EqualFunc(
+  assert.equal(EqualFunc(
     sliceValue,
     sliceValue,
     copyValue,
@@ -146,7 +145,7 @@ test("slices search and comparison operations are generic", async (): Promise<vo
     RuntimeSlice.literal(["a", "b"]),
     RuntimeSlice.literal(["a", "c"]),
   ), -1n);
-  assert.equal(await CompareFunc<
+  assert.equal(CompareFunc<
     RuntimeSlice<number>,
     RuntimeSlice<number>,
     number,
@@ -166,7 +165,7 @@ test("slices search and comparison operations are generic", async (): Promise<vo
   ), -1n);
 });
 
-test("slices transformations preserve order and nilness", async (): Promise<void> => {
+test("slices transformations preserve order and nilness", (): void => {
   const source = RuntimeSlice.literal([1, 1, 2, 2, 3]);
   assert.deepEqual(values(Compact(
     sliceValue,
@@ -179,7 +178,7 @@ test("slices transformations preserve order and nilness", async (): Promise<void
     source,
   )), [1, 2, 3]);
   assert.deepEqual(values(source), [1, 2, 3, 0, 0]);
-  assert.deepEqual(values(await CompactFunc(
+  assert.deepEqual(values(CompactFunc(
     sliceValue,
     sliceValue,
     copyValue,
@@ -189,8 +188,18 @@ test("slices transformations preserve order and nilness", async (): Promise<void
     RuntimeSlice.literal(["A", "a", "B"]),
     (left, right): boolean => left.toLowerCase() === right.toLowerCase(),
   )), ["A", "B"]);
-  assert.deepEqual(values(Delete(RuntimeSlice.literal([0, 1, 2, 3]), 1n, 3n)), [0, 3]);
-  assert.deepEqual(values(await DeleteFunc(
+  assert.deepEqual(values(Delete(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
+    RuntimeSlice.literal([0, 1, 2, 3]),
+    1n,
+    3n,
+  )), [0, 3]);
+  assert.deepEqual(values(DeleteFunc(
     sliceValue,
     sliceValue,
     copyValue,
@@ -200,24 +209,60 @@ test("slices transformations preserve order and nilness", async (): Promise<void
     RuntimeSlice.literal([1, 2, 3, 4]),
     (value): boolean => value % 2 === 0,
   )), [1, 3]);
-  assert.deepEqual(values(Insert(RuntimeSlice.literal([1, 4]), 1n, RuntimeSlice.literal([2, 3]))), [1, 2, 3, 4]);
-  assert.deepEqual(values(Repeat(RuntimeSlice.literal(["x", "y"]), 3n)), ["x", "y", "x", "y", "x", "y"]);
-  assert.deepEqual(values(Replace(RuntimeSlice.literal([1, 2, 3, 4]), 1n, 3n, RuntimeSlice.literal([8, 9]))), [1, 8, 9, 4]);
-  assert.equal(Clone(RuntimeSlice.nil<number>()).isNil(), true);
+  assert.deepEqual(values(Insert(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
+    RuntimeSlice.literal([1, 4]),
+    1n,
+    RuntimeSlice.literal([2, 3]),
+  )), [1, 2, 3, 4]);
+  assert.deepEqual(values(Repeat(
+    sliceValue,
+    sliceValue,
+    copyString,
+    copyString,
+    copyString,
+    RuntimeSlice.literal(["x", "y"]),
+    3n,
+  )), ["x", "y", "x", "y", "x", "y"]);
+  assert.deepEqual(values(Replace(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
+    RuntimeSlice.literal([1, 2, 3, 4]),
+    1n,
+    3n,
+    RuntimeSlice.literal([8, 9]),
+  )), [1, 8, 9, 4]);
+  assert.equal(Clone(
+    sliceValue,
+    sliceValue,
+    copyNumber,
+    copyNumber,
+    copyNumber,
+    RuntimeSlice.nil<number>(),
+  ).isNil(), true);
   assert.equal(Clip(RuntimeSlice.literal([1, 2])).capacity, 2);
 });
 
-test("slices sequence and sorting operations use one typed path", async (): Promise<void> => {
+test("slices sequence and sorting operations use one typed path", (): void => {
   const sequence = new Seq<number>((yieldValue): void => {
     yieldValue?.(3);
     yieldValue?.(1);
     yieldValue?.(2);
   });
   assert.deepEqual(
-    values(await Collect(copyValue, copyValue, sequence)),
+    values(Collect(copyValue, copyValue, sequence)),
     [3, 1, 2],
   );
-  assert.deepEqual(values(await AppendSeq(
+  assert.deepEqual(values(AppendSeq(
     sliceValue,
     sliceValue,
     copyNumber,
@@ -227,10 +272,18 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
     RuntimeSlice.literal([0]),
     sequence,
   )), [0, 3, 1, 2]);
-  assert.deepEqual(values(Concat(RuntimeSlice.literal([
-    RuntimeSlice.literal([1, 2]),
-    RuntimeSlice.literal([3]),
-  ]))), [1, 2, 3]);
+  assert.deepEqual(values(Concat(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
+    RuntimeSlice.literal([
+      RuntimeSlice.literal([1, 2]),
+      RuntimeSlice.literal([3]),
+    ]),
+  )), [1, 2, 3]);
 
   const ordered = RuntimeSlice.literal([3, Number.NaN, 1, 2]);
   Sort<RuntimeSlice<number>, number, number>(
@@ -246,7 +299,7 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
   assert.deepEqual(sliceValues(ordered).slice(1), [1, 2, 3]);
 
   const descending = RuntimeSlice.literal([1, 3, 2]);
-  await SortFunc<RuntimeSlice<number>, number, number>(
+  SortFunc<RuntimeSlice<number>, number, number>(
     sliceValue,
     copyValue,
     copyValue,
@@ -256,39 +309,20 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
   );
   assert.deepEqual(values(descending), [3, 2, 1]);
 
-  const canonicalTrace: string[] = [];
-  const synchronousTrace: string[] = [];
-  const canonicalValues = RuntimeSlice.literal([4, 1, 3, 1, 2]);
-  const synchronousValues = RuntimeSlice.literal([4, 1, 3, 1, 2]);
-  await SortStableFunc(
+  const stableValues = RuntimeSlice.literal([4, 1, 3, 1, 2]);
+  SortStableFunc(
     sliceValue,
     copyValue,
     copyValue,
     copyValue,
-    canonicalValues,
-    (left: number, right: number): bigint => {
-      canonicalTrace.push(`${left}:${right}`);
-      return BigInt(left - right);
-    },
+    stableValues,
+    (left: number, right: number): bigint => BigInt(left - right),
   );
-  const synchronousResult = SortStableFuncSynchronous(
-    sliceValue,
-    copyValue,
-    copyValue,
-    copyValue,
-    synchronousValues,
-    (left: number, right: number): bigint => {
-      synchronousTrace.push(`${left}:${right}`);
-      return BigInt(left - right);
-    },
-  );
-  assert.equal(synchronousResult, undefined);
-  assert.deepEqual(values(synchronousValues), values(canonicalValues));
-  assert.deepEqual(synchronousTrace, canonicalTrace);
+  assert.deepEqual(values(stableValues), [1, 1, 2, 3, 4]);
 
   let canonicalPanic = "";
   try {
-    await SortFunc<RuntimeSlice<number>, number, number>(
+    SortFunc<RuntimeSlice<number>, number, number>(
       sliceValue,
       copyValue,
       copyValue,
@@ -299,52 +333,26 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
   } catch (failure: unknown) {
     canonicalPanic = String(failure);
   }
-  let synchronousPanic = "";
-  try {
-    SortFuncSynchronous<RuntimeSlice<number>, number, number>(
-      sliceValue,
-      copyValue,
-      copyValue,
-      copyValue,
-      RuntimeSlice.literal([2, 1]),
-      undefined,
-    );
-  } catch (failure: unknown) {
-    synchronousPanic = String(failure);
-  }
   assert.notEqual(canonicalPanic, "");
-  assert.equal(synchronousPanic, canonicalPanic);
 
-  const synchronousDescending = RuntimeSlice.literal([1, 3, 2]);
-  SortFuncSynchronous(
-    sliceValue,
-    copyValue,
-    copyValue,
-    copyValue,
-    synchronousDescending,
-    (left: number, right: number): bigint => BigInt(right - left),
-  );
-  assert.deepEqual(values(synchronousDescending), [3, 2, 1]);
-
-  const asynchronous = RuntimeSlice.literal([6, 1, 5, 2, 4, 3]);
+  const sortedValues = RuntimeSlice.literal([6, 1, 5, 2, 4, 3]);
   let comparisonCount = 0;
-  await SortFunc(
+  SortFunc<RuntimeSlice<number>, number, number>(
     sliceValue,
     copyValue,
     copyValue,
     copyValue,
-    asynchronous,
-    async (left: number, right: number): Promise<bigint> => {
+    sortedValues,
+    (left: number, right: number): bigint => {
       comparisonCount += 1;
-      await Promise.resolve();
       return BigInt(left - right);
     },
   );
-  assert.deepEqual(values(asynchronous), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(values(sortedValues), [1, 2, 3, 4, 5, 6]);
   assert.ok(comparisonCount <= 18);
 
   const empty = RuntimeSlice.literal<number>([]);
-  await SortFunc<RuntimeSlice<number>, number, number>(
+  SortFunc<RuntimeSlice<number>, number, number>(
     sliceValue,
     copyValue,
     copyValue,
@@ -359,7 +367,7 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
     { key: 0, order: "b" },
     { key: 1, order: "c" },
   ]);
-  await SortStableFunc<
+  SortStableFunc<
     RuntimeSlice<{ key: number; order: string }>,
     { key: number; order: string },
     { key: number; order: string }
@@ -372,7 +380,7 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
     (left, right): bigint => BigInt(left.key - right.key),
   );
   assert.deepEqual(values(stable).map((entry): string => entry.order), ["b", "a", "c"]);
-  assert.deepEqual(values(await Sorted<number, number>(
+  assert.deepEqual(values(Sorted<number, number>(
     lessValue,
     copyValue,
     equalValue,
@@ -380,7 +388,7 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
     copyValue,
     sequence,
   )), [1, 2, 3]);
-  assert.deepEqual(values(await SortedFunc<number, number>(
+  assert.deepEqual(values(SortedFunc<number, number>(
     copyValue,
     copyValue,
     copyValue,
@@ -389,7 +397,7 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
   )), [3, 2, 1]);
 
   const yielded: number[] = [];
-  await Values<RuntimeSlice<number>, number, number>(
+  Values<RuntimeSlice<number>, number, number>(
     sliceValue,
     copyValue,
     copyValue,
@@ -400,16 +408,16 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
   });
   assert.deepEqual(yielded, [4, 5]);
   const reversed = RuntimeSlice.literal([1, 2, 3]);
-  Reverse(reversed);
+  Reverse(sliceValue, copyNumber, copyNumber, copyNumber, reversed);
   assert.deepEqual(values(reversed), [3, 2, 1]);
 });
 
-test("maps functions use the semantic GoMapValue contract", async (): Promise<void> => {
+test("maps functions use the semantic GoMapValue contract", (): void => {
   const mapValue = <K, V>(value: GoMapValue<K, V>): GoMapValue<K, V> => value;
   const first = GoMap.make<string, number>(0, 0, [["a", 1], ["b", 2]]);
   const second = GoMap.make<string, number>(0, 0, [["a", 1], ["b", 2]]);
   assert.equal(
-    await MapsEqualFunc(
+    MapsEqualFunc(
       mapValue,
       mapValue,
       copyValue,
@@ -425,40 +433,28 @@ test("maps functions use the semantic GoMapValue contract", async (): Promise<vo
   assert.deepEqual(target.keys().sort(), ["a", "b"]);
 
   const keys: string[] = [];
-  await Keys(mapValue, copyValue, first).value?.((key): boolean => {
+  Keys(mapValue, copyValue, first).value?.((key): boolean => {
     keys.push(key);
     return true;
   });
   assert.deepEqual(keys.sort(), ["a", "b"]);
 
   const mapValues: number[] = [];
-  await MapValues(mapValue, copyValue, first).value?.((value): boolean => {
+  MapValues(mapValue, copyValue, first).value?.((value): boolean => {
     mapValues.push(value);
     return true;
   });
   assert.deepEqual(mapValues.sort(), [1, 2]);
 });
 
-test("cooperative collection facets have one typed internal owner", async (): Promise<void> => {
-  const sequence = new Seq<number>(async (yieldValue): Promise<void> => {
-    if (yieldValue !== undefined) {
-      await yieldValue(3);
-      await yieldValue(1);
-      await yieldValue(2);
-    }
-  });
-  assert.deepEqual(values(await Collect(
-    copyValue,
-    copyValue,
-    sequence,
-  )), [3, 1, 2]);
+test("callback collection facets have one typed internal owner", (): void => {
   assert.equal(
-    await ContainsFunc(
+    ContainsFunc(
       sliceValue,
       copyValue,
       copyValue,
       RuntimeSlice.literal([1, 2, 3]),
-      async (value): Promise<boolean> => value === 2,
+      (value): boolean => value === 2,
     ),
     true,
   );
@@ -467,7 +463,7 @@ test("cooperative collection facets have one typed internal owner", async (): Pr
     { group: 0, order: "b" },
     { group: 1, order: "c" },
   ]);
-  await SortStableFunc<
+  SortStableFunc<
     RuntimeSlice<{ group: number; order: string }>,
     { group: number; order: string },
     { group: number; order: string }
@@ -477,7 +473,7 @@ test("cooperative collection facets have one typed internal owner", async (): Pr
     copyValue,
     copyValue,
     sortable,
-    async (left, right): Promise<bigint> => BigInt(left.group - right.group),
+    (left, right): bigint => BigInt(left.group - right.group),
   );
   assert.deepEqual(
     sliceValues(sortable).map((entry): string => entry.order),
@@ -486,11 +482,11 @@ test("cooperative collection facets have one typed internal owner", async (): Pr
 
   const source = GoMap.make<string, number>(0, 0, [["a", 1], ["b", 2]]);
   const keys: string[] = [];
-  await Keys(
+  Keys(
     (value): GoMapValue<string, number> => value,
     (key): string => key,
     source,
-  ).value?.(async (key): Promise<boolean> => {
+  ).value?.((key): boolean => {
     keys.push(key);
     return true;
   });

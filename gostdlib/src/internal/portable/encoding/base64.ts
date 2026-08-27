@@ -1,12 +1,7 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type {
-  Awaitable,
-  gostring,
-  int,
-  uint8,
-} from "@gotots/gostdlib/internal/scalars.js";
+import type { gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 import { integerFromHost } from "../../host-integer.js";
 
 import type { WriteCloser, Writer } from "../../../io.js";
@@ -362,20 +357,6 @@ export function runBase64EncoderSync<Result, Failure>(
   let current = initial;
   while (current.kind === "write") {
     const result = writeOutput(current.output);
-    current = current.resume(result[1]);
-  }
-  return current.result;
-}
-
-export async function runBase64EncoderAsync<Result, Failure>(
-  initial: Base64EncoderStep<Result, Failure>,
-  writeOutput: (
-    output: RuntimeSlice<uint8>,
-  ) => Awaitable<[int, Failure | undefined]>,
-): Promise<Result> {
-  let current = initial;
-  while (current.kind === "write") {
-    const result = await writeOutput(current.output);
     current = current.resume(result[1]);
   }
   return current.result;

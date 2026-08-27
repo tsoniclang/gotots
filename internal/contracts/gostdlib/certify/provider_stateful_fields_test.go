@@ -34,20 +34,20 @@ func TestStatefulProfileTargetFieldsExactJoin(t *testing.T) {
 		"src",
 		"internal",
 		"facets",
-		"provider-compress-gzip.ts",
+		"provider-compress-gzip-direct.ts",
 	))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var target tsgo.ProjectExport
 	for _, selected := range exports {
-		if selected.Name() == "CanonicalGzipReader" {
+		if selected.Name() == "DirectGzipReader" {
 			target = selected
 			break
 		}
 	}
 	if target.Name() == "" {
-		t.Fatal("canonical gzip stateful target is absent")
+		t.Fatal("direct gzip stateful target is absent")
 	}
 	fields := []gostdlib.ProviderStructFieldDocument{{Member: "Header"}}
 	methods := []gostdlib.ProviderStatefulProfileMethodDocument{
@@ -136,13 +136,13 @@ func TestStatefulProfileOperationsExactJoin(t *testing.T) {
 	}
 	var target tsgo.ProjectExport
 	for _, selected := range exports {
-		if selected.Name() == "CanonicalPathError" {
+		if selected.Name() == "DirectPathError" {
 			target = selected
 			break
 		}
 	}
 	if target.Name() == "" {
-		t.Fatal("canonical path-error target is absent")
+		t.Fatal("direct path-error target is absent")
 	}
 	fields := []gostdlib.ProviderStructFieldDocument{
 		{Member: "Err"},

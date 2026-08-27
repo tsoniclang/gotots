@@ -5,7 +5,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
@@ -112,18 +111,7 @@ func Build(
 		implementsRequests,
 	)
 	for _, selected := range demanded {
-		targets := make(
-			[]api.InterfaceMethodCallableReference,
-			0,
-			len(selected.contracts),
-		)
 		for _, contract := range selected.contracts {
-			callableReference, callableErr :=
-				context.Names().InterfaceMethodCallable(contract)
-			if callableErr != nil {
-				return nil, nil, callableErr
-			}
-			targets = append(targets, callableReference)
 			token, tokenErr :=
 				context.Names().InterfaceMethodToken(contract)
 			if tokenErr != nil {
@@ -147,7 +135,6 @@ func Build(
 			sourceType,
 			selected.selection,
 			selected.method,
-			targets,
 			selected.contracts,
 		)
 		if err != nil {
@@ -246,12 +233,10 @@ func emitMethod(
 	sourceType types.Type,
 	selected *types.Selection,
 	method *types.Func,
-	targets []api.InterfaceMethodCallableReference,
 	contracts []*types.Func,
 ) ([]tsgo.ClassElement, []tsgo.Statement, []api.RootRequest, error) {
 	sourceSignature, ok := method.Type().(*types.Signature)
-	if !ok || sourceSignature.Recv() == nil || len(targets) == 0 ||
-		len(targets) != len(contracts) {
+	if !ok || sourceSignature.Recv() == nil || len(contracts) == 0 {
 		return nil, nil, nil, &api.GeneratedArtifactShapeError{
 			Reason: "adapter method contract is incomplete",
 		}
@@ -301,28 +286,8 @@ func emitMethod(
 	if _, selected := interfacetype.Resolve(dispatchType); selected {
 		interfaceDispatch = true
 	}
-	var providerCooperative bool
-	var contractCooperative bool
-	var contractRequests []api.RootRequest
 	var invocation methodcall.Selection
-	if interfaceDispatch {
-		provider, providerErr :=
-			context.Names().InterfaceMethodCallable(method)
-		if providerErr != nil {
-			return nil, nil, nil, methodStageError(
-				MethodStageContract,
-				providerErr,
-			)
-		}
-		providerCooperative,
-			contractCooperative,
-			contractRequests,
-			err = cooperativecall.InterfaceProviderMethodContracts(
-			context,
-			provider,
-			targets,
-		)
-	} else {
+	if !interfaceDispatch {
 		invocation, err = methodcall.Resolve(
 			context,
 			children,
@@ -338,15 +303,6 @@ func emitMethod(
 				Reason: "adapter method invocation signature is inconsistent",
 			}
 		}
-		providerCooperative, contractCooperative, contractRequests, err =
-			cooperativecall.ProviderInterfaceMethodContracts(
-				context,
-				invocation.Facet(),
-				targets,
-			)
-	}
-	if err != nil {
-		return nil, nil, nil, methodStageError(MethodStageContract, err)
 	}
 	sourceArguments := target.ParameterReferences(context.Factory())
 	var call api.ExpressionEmission
@@ -387,25 +343,6 @@ func emitMethod(
 			return nil, nil, nil, methodStageError(MethodStageInvocation, err)
 		}
 	}
-	call, err = api.NewExpressionEmission(
-		call.Before(),
-		call.Value(),
-		api.CombineRequests(
-			call.Requests(),
-			contractRequests,
-		),
-	)
-	if err != nil {
-		return nil, nil, nil, methodStageError(MethodStageInvocation, err)
-	}
-	call, err = cooperativecall.GeneratedInterfaceProviderCall(
-		context,
-		call,
-		providerCooperative,
-	)
-	if err != nil {
-		return nil, nil, nil, methodStageError(MethodStageInvocation, err)
-	}
 	if !interfaceDispatch {
 		call, err = invocation.FromProviderResults(context, children, call)
 		if err != nil {
@@ -431,19 +368,9 @@ func emitMethod(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	var modifiers []tsgo.ModifierLike
 	resultType := target.Result()
-	if contractCooperative {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
-	if providerCooperative && !contractCooperative {
-		return nil, nil, nil, &api.GeneratedArtifactShapeError{
-			Reason: "cooperative adapter provider has a synchronous contract",
-		}
-	}
 	ordinaryMember := context.Factory().MethodDeclaration(
-		modifiers,
+		nil,
 		nil,
 		context.Factory().Identifier(memberName),
 		nil,
@@ -477,7 +404,6 @@ func emitMethod(
 			receiver,
 			method,
 			signature,
-			contractCooperative,
 			sourceArguments,
 			context.Factory().Identifier(callable.RecoveryAuthorityName),
 		)
@@ -520,7 +446,7 @@ func emitMethod(
 	members := []tsgo.ClassElement{
 		ordinaryMember,
 		context.Factory().MethodDeclaration(
-			modifiers,
+			nil,
 			nil,
 			context.Factory().Identifier(
 				memberName+api.DeferredEntrySuffix,
@@ -546,7 +472,6 @@ func emitMethod(
 		signature,
 		target,
 		resultType,
-		contractCooperative,
 		contracts,
 	)
 	if err != nil {

@@ -28,7 +28,7 @@ func ToProviderGenericArguments(
 	return target, before, requests, err
 }
 
-func ToProviderGenericArgumentsWithSynchronousParameters(
+func ToProviderGenericArgumentsWithCallableParameters(
 	context api.Context,
 	children api.ChildEmitter,
 	contract *types.Tuple,
@@ -41,7 +41,7 @@ func ToProviderGenericArgumentsWithSynchronousParameters(
 		if index < 0 || concrete == nil || index >= concrete.Len() {
 			return nil, nil, nil, boundaryInvariant(
 				context,
-				"synchronous provider generic parameter index is invalid",
+				"provider generic callable parameter index is invalid",
 			)
 		}
 		selected[index] = struct{}{}
@@ -61,7 +61,7 @@ func ToProviderGenericArgumentsWithSynchronousParameters(
 			value api.ExpressionEmission,
 		) (api.ExpressionEmission, bool, error) {
 			if _, ok := selected[index]; ok {
-				return toProviderSynchronousGenericValue(
+				return toProviderGenericCallableValue(
 					context,
 					children,
 					contractType,
@@ -384,7 +384,6 @@ func toProviderGenericValue(
 			concrete,
 			model,
 			value,
-			genericCallableBoundaryCanonical,
 		)
 	}
 	if genericOpaque(contractType) {
@@ -401,7 +400,7 @@ func toProviderGenericValue(
 	)
 }
 
-func toProviderSynchronousGenericValue(
+func toProviderGenericCallableValue(
 	context api.Context,
 	children api.ChildEmitter,
 	contractType types.Type,
@@ -415,7 +414,7 @@ func toProviderSynchronousGenericValue(
 	if !callablePair {
 		return api.ExpressionEmission{}, false, boundaryInvariant(
 			context,
-			"synchronous provider generic parameter is not callable",
+			"provider generic callable parameter is not callable",
 		)
 	}
 	return toProviderGenericCallable(
@@ -425,7 +424,6 @@ func toProviderSynchronousGenericValue(
 		concrete,
 		model,
 		value,
-		genericCallableBoundarySynchronous,
 	)
 }
 
@@ -450,6 +448,9 @@ func fromProviderGenericCallable(
 	model definedtype.Model,
 	source api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	if err := RequireProviderDefinedCallableOutput(context, model); err != nil {
+		return api.ExpressionEmission{}, false, err
+	}
 	target, err := callable.EmitABIAdapter(context, children, nil, concrete)
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
@@ -501,26 +502,16 @@ func fromProviderGenericCallable(
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
 	}
-	cooperative, contractRequests, err := providerCallableContract(context, concrete)
-	if err != nil {
-		return api.ExpressionEmission{}, false, err
-	}
-	resultType := target.Result()
-	var modifiers []tsgo.ModifierLike
-	if cooperative {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	adapter := context.Factory().ConditionalExpression(
 		isUndefined(context.Factory(), captured),
 		context.Factory().QuestionToken(),
 		context.Factory().Identifier("undefined"),
 		context.Factory().ColonToken(),
 		context.Factory().ArrowFunction(
-			modifiers,
+			nil,
 			nil,
 			target.Parameters(),
-			resultType,
+			target.Result(),
 			context.Factory().EqualsGreaterThanToken(),
 			adapterBody(context.Factory(), concrete.Results(), result),
 		),
@@ -534,7 +525,6 @@ func fromProviderGenericCallable(
 				projected.Requests(),
 				target.Requests(),
 				result.Requests(),
-				contractRequests,
 			)...,
 		),
 	)

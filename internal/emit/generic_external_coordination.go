@@ -24,9 +24,8 @@ type genericOperationIdentity struct {
 }
 
 type genericConcretizationIdentity struct {
-	owner  *types.Func
-	key    string
-	effect api.GenericConcretizationEffect
+	owner *types.Func
+	key   string
 }
 
 func (s *programSession) GenericCallableRequiresConcretization(
@@ -54,11 +53,10 @@ func (s *programSession) GenericCallableRequiresConcretization(
 	)
 }
 
-func (s *programSession) GenericCallableSynchronousParameters(
+func (s *programSession) GenericCallableParameters(
 	owner *types.Func,
 ) ([]int, bool, error) {
-	selected, ok, err :=
-		s.registry.ProviderSynchronousGenericKernel(owner)
+	selected, ok, err := s.registry.ProviderGenericKernel(owner)
 	if err != nil || !ok {
 		return nil, ok, err
 	}
@@ -74,13 +72,12 @@ func (s *programSession) ResolveGenericConcretization(
 	owner *types.Func,
 	arguments api.TypeArgumentList,
 	signature *types.Signature,
-	effect api.GenericConcretizationEffect,
 	placement api.GeneratedArtifactPlacement,
 	lexicalOwner api.ArtifactOwner,
 	anchor *types.TypeName,
 ) (*api.GenericConcretization, error) {
 	if owner == nil || owner.Origin() != owner || arguments.Len() == 0 ||
-		signature == nil || !effect.Valid() ||
+		signature == nil ||
 		(placement != api.GeneratedArtifactPlacementCompilation &&
 			placement != api.GeneratedArtifactPlacementLexical) {
 		return nil, &ScheduleError{
@@ -124,9 +121,6 @@ func (s *programSession) ResolveGenericConcretization(
 	identity.WriteByte(':')
 	identity.WriteString(ownerIdentity)
 	identity.WriteByte('|')
-	if effect.Synchronous() {
-		identity.WriteString("effect=synchronous|")
-	}
 	namedIdentity := s.genericConcretizationNamedIdentity(
 		placement,
 		lexicalOwner,
@@ -156,9 +150,8 @@ func (s *programSession) ResolveGenericConcretization(
 	digest := sha256.Sum256([]byte(identity.String()))
 	key := hex.EncodeToString(digest[:])
 	selection := genericConcretizationIdentity{
-		owner:  owner,
-		key:    key,
-		effect: effect,
+		owner: owner,
+		key:   key,
 	}
 	if existing := s.genericConcretizations[selection]; existing != nil {
 		if !types.Identical(existing.Signature(), signature) {
@@ -191,7 +184,6 @@ func (s *programSession) ResolveGenericConcretization(
 		owner,
 		selected,
 		signature,
-		effect,
 		key,
 		placement,
 		lexicalOwner,

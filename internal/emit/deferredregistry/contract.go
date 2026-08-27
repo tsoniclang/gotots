@@ -143,8 +143,6 @@ func observedCallableTypes(
 		context,
 		children,
 		signature,
-		context.ConcurrencySemantics() ==
-			api.ConcurrencySemanticsCooperative,
 	)
 	contract.requests = api.CombineRequests(
 		contract.requests,

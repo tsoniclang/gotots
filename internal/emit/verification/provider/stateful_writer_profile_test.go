@@ -103,7 +103,6 @@ func NilConstructed() bool { return bufio.NewWriter(nil) != nil }
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -138,22 +137,26 @@ func NilConstructed() bool { return bufio.NewWriter(nil) != nil }
 		artifacts.paths,
 		assemblyPath,
 		[]string{"NilConstructed", "Run", "ShortWrite", "StickyFailure"},
-		`const [text, failure] = await Run("alpha");
+		`const [text, failure] = Run("alpha");
 console.log(JSON.stringify(text) + " " + JSON.stringify(failure));
-console.log(await ShortWrite());
-console.log(await StickyFailure());
-console.log(await NilConstructed());
+console.log(ShortWrite());
+console.log(StickyFailure());
+console.log(NilConstructed());
 `,
 	)
 	for _, required := range []string{
-		"CanonicalBufioWriter",
+		"DirectBufioWriter",
 		"bindPointer<",
-		"await GoProviderState",
 		"WriteByte",
 		".Flush(",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("stateful writer output lacks %q:\n%s", required, artifacts.printed)
+		}
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("stateful writer output contains %q", forbidden)
 		}
 	}
 	if strings.Contains(artifacts.printed, "BufioWriterWrite") {

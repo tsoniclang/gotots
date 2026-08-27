@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
@@ -190,23 +189,8 @@ func emitMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if detached {
-		target, err = cooperativecall.DetachedGenericCall(
-			context,
-			source,
-			invocation.Facet(),
-			target,
-		)
-	} else {
-		target, err = cooperativecall.GenericCall(
-			context,
-			source,
-			invocation.Facet(),
-			target,
-		)
-	}
-	if err != nil || discarded {
-		return target, err
+	if discarded {
+		return target, nil
 	}
 	return invocation.FromProviderResults(context, children, target)
 }
@@ -318,23 +302,8 @@ func emitConcretizedConstraintMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if detached {
-		target, err = cooperativecall.DetachedGenericCall(
-			context,
-			source,
-			invocation.Facet(),
-			target,
-		)
-	} else {
-		target, err = cooperativecall.GenericCall(
-			context,
-			source,
-			invocation.Facet(),
-			target,
-		)
-	}
-	if err != nil || discarded {
-		return target, err
+	if discarded {
+		return target, nil
 	}
 	return invocation.FromProviderResults(context, children, target)
 }

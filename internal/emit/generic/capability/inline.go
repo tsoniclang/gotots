@@ -32,12 +32,24 @@ func Inline(
 	); handled {
 		return storage, true, err
 	}
-	target, err := callable.EmitAdapter(
-		context.WithRole(api.RoleCallArgument),
-		children,
-		nil,
-		signature,
-	)
+	var target callable.SignatureEmission
+	var err error
+	if operation == api.GenericOperationInterfaceAssert ||
+		operation == api.GenericOperationInterfaceAssertOK {
+		target, err = callable.EmitAdapterWithRootInterfaceParameter(
+			context.WithRole(api.RoleCallArgument),
+			children,
+			nil,
+			signature,
+		)
+	} else {
+		target, err = callable.EmitAdapter(
+			context.WithRole(api.RoleCallArgument),
+			children,
+			nil,
+			signature,
+		)
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}

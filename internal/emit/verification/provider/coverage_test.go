@@ -169,7 +169,6 @@ func LocalBuilder() string {
 	}
 	certificate := linkedProviderCertificate(t)
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = certificate
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -262,15 +261,9 @@ func assertProviderReceiverProjection(
 			t.Fatalf("stored provider receiver lacks %q:\n%s", stored, printed)
 		}
 	}
-	for _, projected := range []string{
-		"await sync__from_gostdlib.Mutex.Lock(",
-	} {
-		if !strings.Contains(printed, projected) {
-			t.Fatalf("stored provider receiver lacks %q:\n%s", projected, printed)
-		}
-	}
 	for _, bypass := range []string{
 		"GoPointer.",
+		"await sync__from_gostdlib.Mutex.Lock(",
 		"await strings__from_gostdlib.Builder.Len(",
 		"SyncMutexOperations.$fromStorage(__gotots_receiver_",
 		"StringsBuilderOperations.$fromStorage(__gotots_receiver_",
@@ -484,13 +477,20 @@ func assertProviderRepresentationABI(
 	}
 	for _, module := range []string{
 		"@gotots/gostdlib/encoding/binary.js",
+		"@gotots/gostdlib/io/fs.js",
 		"@gotots/gostdlib/internal/facets/named-encoding-binary.js",
-		"@gotots/gostdlib/internal/facets/named-io-fs.js",
 		"@gotots/gostdlib/internal/facets/recovery-sync.js",
 	} {
 		if !imports[module] {
-			t.Fatalf("provider representation import %q is absent", module)
+			t.Fatalf(
+				"provider representation import %q is absent; imports: %v",
+				module,
+				imports,
+			)
 		}
+	}
+	if imports["@gotots/gostdlib/internal/facets/named-io-fs.js"] {
+		t.Fatal("direct PathError construction retained the superseded private facade")
 	}
 }
 

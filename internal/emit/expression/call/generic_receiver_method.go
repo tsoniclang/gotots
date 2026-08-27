@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -57,23 +56,8 @@ func emitGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if detached {
-		target, err = cooperativecall.DetachedGenericCall(
-			context,
-			source,
-			call.invocation.Facet(),
-			target,
-		)
-	} else {
-		target, err = cooperativecall.GenericCall(
-			context,
-			source,
-			call.invocation.Facet(),
-			target,
-		)
-	}
-	if err != nil || discarded {
-		return target, err
+	if discarded {
+		return target, nil
 	}
 	return call.invocation.FromProviderResults(context, children, target)
 }
@@ -111,62 +95,37 @@ func emitDeferredGenericReceiverMethod(
 		if expressionErr != nil {
 			return api.ExpressionEmission{}, expressionErr
 		}
-		cooperative, contractRequests, contractErr :=
-			cooperativecall.GenericContract(
-				context,
-				call.invocation.Facet(),
-			)
-		if contractErr != nil {
-			return api.ExpressionEmission{}, contractErr
-		}
 		return deferredInvocation(
 			context,
 			append(call.before, expression.Before()...),
 			nil,
 			expression.Value(),
-			cooperative,
 			api.CombineRequests(
 				call.requests,
 				expression.Requests(),
-				contractRequests,
 				recoveryObservation.Requests(),
 			),
 		)
 	}
-	expression, providerRecovery, recoveryCooperative, err :=
-		call.recoveryExpression(
-			context,
-			children,
-			call.arguments,
-			context.Factory().Identifier(
-				callable.RecoveryAuthorityName,
-			),
-		)
+	expression, err := call.recoveryExpression(
+		context,
+		children,
+		call.arguments,
+		context.Factory().Identifier(
+			callable.RecoveryAuthorityName,
+		),
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
-	}
-	cooperative := recoveryCooperative
-	var contractRequests []api.RootRequest
-	if !providerRecovery {
-		cooperative, contractRequests, err =
-			cooperativecall.GenericContract(
-				context,
-				call.invocation.Facet(),
-			)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
 	}
 	return deferredInvocation(
 		context,
 		append(call.before, expression.Before()...),
 		nil,
 		expression.Value(),
-		cooperative,
 		api.CombineRequests(
 			call.requests,
 			expression.Requests(),
-			contractRequests,
 			recoveryObservation.Requests(),
 		),
 	)
@@ -277,8 +236,6 @@ func (c genericReceiverMethodCall) recoveryExpression(
 	recovery tsgo.Expression,
 ) (
 	api.ExpressionEmission,
-	bool,
-	bool,
 	error,
 ) {
 	return c.invocation.RecoveryCall(

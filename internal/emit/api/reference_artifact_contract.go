@@ -92,8 +92,7 @@ type MethodTarget struct {
 }
 
 type RecoveryCallableReference struct {
-	reference   NameReference
-	cooperative bool
+	reference NameReference
 }
 
 type ProviderCallableProfileReference struct {
@@ -157,6 +156,9 @@ type ProviderStatefulProfileCandidate struct {
 type ReflectionNames interface {
 	DeclarationOwnershipNames
 	ReflectionMethodIdentity(*types.Func) (string, error)
+	// ReflectionInterfaceAdapter returns the canonical adapter for a value that
+	// can leave reflection without demanding that value's descriptor.
+	ReflectionInterfaceAdapter(types.Type) (NameReference, error)
 	ReflectionType(types.Type, *types.TypeName) (NameReference, error)
 	ReflectionOperations(*types.TypeName) (NameReference, error)
 	ReflectionDescriptorType(*types.TypeName) (NameReference, error)
@@ -365,7 +367,6 @@ func (r ProviderCallableProfileReference) CanonicalTypeArguments() []types.Type 
 
 func NewRecoveryCallableReference(
 	reference NameReference,
-	cooperative bool,
 ) (RecoveryCallableReference, error) {
 	if reference.Name() == "" {
 		return RecoveryCallableReference{}, &NameError{
@@ -373,8 +374,7 @@ func NewRecoveryCallableReference(
 		}
 	}
 	return RecoveryCallableReference{
-		reference:   reference,
-		cooperative: cooperative,
+		reference: reference,
 	}, nil
 }
 
@@ -386,10 +386,6 @@ func (r RecoveryCallableReference) Expression(
 
 func (r RecoveryCallableReference) Requests() []RootRequest {
 	return r.reference.Requests()
-}
-
-func (r RecoveryCallableReference) Cooperative() bool {
-	return r.cooperative
 }
 
 func (r RecoveryCallableReference) ProviderBoundary() bool {

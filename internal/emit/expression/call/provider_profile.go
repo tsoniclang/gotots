@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -46,7 +45,7 @@ func emitProviderProfileFunction(
 			context,
 			children,
 			signature.Params(),
-			selection.Reference().Profile(),
+			selection,
 			arguments,
 		)
 	if err != nil {
@@ -119,7 +118,7 @@ func emitProviderProfileMethod(
 			context,
 			children,
 			signature.Params(),
-			profile.Reference().Profile(),
+			profile,
 			arguments,
 		)
 	if err != nil {
@@ -294,21 +293,14 @@ func emitProviderProfileInvocation(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	target, err = cooperativecall.ProviderProfileCall(
-		context,
-		source,
-		target,
-		reference.Profile().Effect().MaySuspend(),
-		detached,
-	)
-	if err != nil || discarded {
-		return target, err
+	if discarded {
+		return target, nil
 	}
 	return providerboundary.FromProviderProfileResults(
 		context,
 		children,
 		signature.Results(),
-		reference.Profile(),
+		selection,
 		target,
 	)
 }

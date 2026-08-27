@@ -58,6 +58,30 @@ func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 	}
 }
 
+func TestPackageRequirementsRejectRetiredExecutionSymbols(t *testing.T) {
+	for _, symbol := range []string{
+		`{"id": 1105, "export": "GoScheduler"}`,
+		`{"id": 1300, "export": "Awaitable"}`,
+	} {
+		contract, err := runtimecontract.Decode([]byte(`{
+		  "schemaVersion": 3,
+		  "integerRepresentations": ["number"],
+		  "providerIntegerRepresentation": "number",
+		  "providerScalarModule": "./internal/scalars.js",
+		  "providerPointerModule": "./internal/runtime/pointer.js",
+		  "nativeIntegerBits": 64,
+		  "primitiveAliases": [],
+		  "runtimeSymbols": [` + symbol + `]
+		}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ResolvePackageRequirements(contract); err == nil {
+			t.Fatalf("retired execution symbol %s was accepted", symbol)
+		}
+	}
+}
+
 func TestPackageRequirementsRejectIdentityMutations(t *testing.T) {
 	for _, source := range []string{
 		`{

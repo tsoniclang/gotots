@@ -19,7 +19,7 @@ func pointerValueOperationsStatement(
 	pointerType *types.Pointer,
 ) (tsgo.Statement, []api.RootRequest, bool, error) {
 	factory := context.Factory()
-	adapter, err := context.Names().InterfaceAdapter(sourceType, nil)
+	adapter, err := names.ReflectionInterfaceAdapter(sourceType)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -28,65 +28,51 @@ func pointerValueOperationsStatement(
 		adapter:        adapter,
 		descriptorType: descriptorType,
 	}
-	properties := make([]tsgo.ObjectLiteralElementLike, 0, 3)
+	if err := attachPointerPanic(context, scaffold); err != nil {
+		return nil, nil, false, err
+	}
+	properties := []tsgo.ObjectLiteralElementLike{
+		booleanProperty(factory, "zero", true),
+	}
 	pointee := pointerType.Elem()
-	switch types.Unalias(pointee).Underlying().(type) {
-	case *types.Struct:
-		properties = append(properties, booleanProperty(factory, "zero", true))
-		named, namedOK := types.Unalias(pointee).(*types.Named)
-		if namedOK && named.Obj() != nil {
-			if err := attachPointerPanic(context, scaffold); err != nil {
-				return nil, nil, false, err
-			}
-			element, elementErr := pointerStoredElementOperations(
-				context,
-				names,
-				reflectionType,
-				pointee,
-				true,
-				scaffold,
-			)
-			if elementErr != nil {
-				return nil, nil, false, elementErr
-			}
-			properties = append(
-				properties,
-				expressionProperty(factory, "element", element),
-			)
-		}
-	case *types.Slice, *types.Basic, *types.Map:
-		if err := attachPointerPanic(context, scaffold); err != nil {
-			return nil, nil, false, err
-		}
-		properties = append(properties, booleanProperty(factory, "zero", true))
-		element, elementErr := pointerStoredElementOperations(
+	var element tsgo.ObjectLiteralExpression
+	var elementErr error
+	if _, isInterface := types.Unalias(pointee).Underlying().(*types.Interface); isInterface {
+		element, elementErr = pointerInterfaceElementOperations(
 			context,
 			names,
 			reflectionType,
 			pointee,
-			false,
 			scaffold,
 		)
-		if elementErr != nil {
-			return nil, nil, false, elementErr
-		}
-		properties = append(
-			properties,
-			expressionProperty(factory, "element", element),
+	} else {
+		element, elementErr = pointerStoredElementOperations(
+			context,
+			names,
+			reflectionType,
+			pointee,
+			scaffold,
 		)
-		if _, basic := types.Unalias(pointee).Underlying().(*types.Basic); basic {
-			newPointer, newRequests, supported, newErr :=
-				pointerNewOperation(context, pointee, scaffold)
-			if newErr != nil {
-				return nil, nil, false, newErr
-			}
-			scaffold.requests = append(scaffold.requests, newRequests...)
-			if supported {
-				properties = append(
-					properties,
-					expressionProperty(factory, "newPointer", newPointer),
-				)
-			}
+	}
+	if elementErr != nil {
+		return nil, nil, false, elementErr
+	}
+	properties = append(
+		properties,
+		expressionProperty(factory, "element", element),
+	)
+	if _, basic := types.Unalias(pointee).Underlying().(*types.Basic); basic {
+		newPointer, newRequests, supported, newErr :=
+			pointerNewOperation(context, pointee, scaffold)
+		if newErr != nil {
+			return nil, nil, false, newErr
+		}
+		scaffold.requests = append(scaffold.requests, newRequests...)
+		if supported {
+			properties = append(
+				properties,
+				expressionProperty(factory, "newPointer", newPointer),
+			)
 		}
 	}
 	statement := factory.ExpressionStatement(factory.CallExpression(
@@ -143,7 +129,6 @@ func pointerStoredElementOperations(
 	names api.ReflectionNames,
 	reflectionType *types.TypeName,
 	pointee types.Type,
-	copyValue bool,
 	scaffold *locationScaffold,
 ) (tsgo.ObjectLiteralExpression, error) {
 	factory := scaffold.factory
@@ -167,23 +152,20 @@ func pointerStoredElementOperations(
 	scaffold.requests = append(scaffold.requests, descriptor.Requests()...)
 	scaffold.requests = append(scaffold.requests, loadPointer.Requests()...)
 	scaffold.requests = append(scaffold.requests, storePointer.Requests()...)
-	value := api.DirectExpression(guardedForeignPayload(
-		scaffold,
-		elemAdapter,
-		"Value.Set",
-	))
-	if copyValue {
-		value, err = context.Values().Transfer(
-			context.WithRole(api.RoleStructCopyField),
-			nil,
-			pointee,
-			pointee,
-			api.ValueTransferCopy,
-			value,
-		)
-		if err != nil {
-			return nil, err
-		}
+	value, err := context.Values().Transfer(
+		context.WithRole(api.RoleStructCopyField),
+		nil,
+		pointee,
+		pointee,
+		api.ValueTransferCopy,
+		api.DirectExpression(guardedForeignPayload(
+			scaffold,
+			elemAdapter,
+			"Value.Set",
+		)),
+	)
+	if err != nil {
+		return nil, err
 	}
 	scaffold.requests = append(scaffold.requests, value.Requests()...)
 	setStatements := append([]tsgo.Statement(nil), value.Before()...)
@@ -237,19 +219,94 @@ func pointerStoredElementOperations(
 	}, true), nil
 }
 
+func pointerInterfaceElementOperations(
+	context api.Context,
+	names api.ReflectionNames,
+	reflectionType *types.TypeName,
+	pointee types.Type,
+	scaffold *locationScaffold,
+) (tsgo.ObjectLiteralExpression, error) {
+	factory := scaffold.factory
+	descriptor, err := names.ReflectionValueType(pointee, reflectionType)
+	if err != nil {
+		return nil, err
+	}
+	loadPointer, err := context.Names().TsonicCore(tsoniccore.SymbolLoadPointer)
+	if err != nil {
+		return nil, err
+	}
+	storePointer, err := context.Names().TsonicCore(tsoniccore.SymbolStorePointer)
+	if err != nil {
+		return nil, err
+	}
+	assigned, admissionRequests, err := admittedInterfaceValue(
+		context,
+		pointee,
+		factory.Identifier("value"),
+		"Value.Set",
+		scaffold,
+	)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = api.CombineRequests(
+		scaffold.requests,
+		descriptor.Requests(),
+		loadPointer.Requests(),
+		storePointer.Requests(),
+		admissionRequests,
+	)
+	set := factory.Block([]tsgo.Statement{factory.ExpressionStatement(
+		factory.CallExpression(
+			storePointer.Expression(factory),
+			nil,
+			nil,
+			[]tsgo.Expression{
+				factory.Identifier("pointer"),
+				assigned,
+			},
+			tsgo.NodeFlagsNone,
+		),
+	)}, true)
+	return factory.ObjectLiteralExpression([]tsgo.ObjectLiteralElementLike{
+		expressionProperty(factory, "type", arrow(
+			factory,
+			scaffold.descriptorType,
+			descriptor.Expression(factory),
+		)),
+		expressionProperty(factory, "get", factory.ArrowFunction(
+			nil,
+			nil,
+			[]tsgo.ParameterDeclaration{untypedParameter(factory, "pointer")},
+			nil,
+			factory.EqualsGreaterThanToken(),
+			factory.ParenthesizedExpression(factory.CallExpression(
+				loadPointer.Expression(factory),
+				nil,
+				nil,
+				[]tsgo.Expression{factory.Identifier("pointer")},
+				tsgo.NodeFlagsNone,
+			)),
+		)),
+		expressionProperty(factory, "set", factory.ArrowFunction(
+			nil,
+			nil,
+			[]tsgo.ParameterDeclaration{
+				untypedParameter(factory, "pointer"),
+				untypedParameter(factory, "value"),
+			},
+			nil,
+			factory.EqualsGreaterThanToken(),
+			set,
+		)),
+	}, true), nil
+}
+
 func pointerNewOperation(
 	context api.Context,
 	pointee types.Type,
 	scaffold *locationScaffold,
 ) (tsgo.Expression, []api.RootRequest, bool, error) {
-	basic, ok := types.Unalias(pointee).Underlying().(*types.Basic)
-	if !ok {
-		return nil, nil, false, nil
-	}
-	supportedZero, err := scalarZeroExpression(context, scaffold.factory, basic)
-	if err != nil || supportedZero == nil {
-		return nil, nil, false, err
-	}
 	logicalZero, err := context.Values().Zero(context, nil, pointee)
 	if err != nil {
 		return nil, nil, false, err

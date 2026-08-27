@@ -141,6 +141,26 @@ export function fromHostString(value: string): gostring {
   return result;
 }
 
+export function toHostBytes(value: gostring): Uint8Array {
+  const result = new Uint8Array(value.length);
+  for (let index = 0; index < value.length; index += 1) {
+    const byte = value.charCodeAt(index);
+    if (byte > 0xff) {
+      throw new RangeError("non-canonical Go string byte");
+    }
+    result[index] = byte;
+  }
+  return result;
+}
+
+export function fromHostBytes(value: Uint8Array): gostring {
+  let result = "";
+  for (const byte of value) {
+    result += String.fromCharCode(byte);
+  }
+  return result;
+}
+
 export function validRune(rune: int32): bool {
   return Number.isInteger(rune) && rune >= 0 && rune <= MaxRune && (rune < 0xd800 || rune > 0xdfff);
 }

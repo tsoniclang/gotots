@@ -72,18 +72,13 @@ func Build(
 			context.Factory().ReturnStatement(value.Value()),
 		)
 	}
-	resultType := target.Result()
-	if context.IsCooperative() {
-		modifiers = append(modifiers, context.Factory().AsyncKeyword())
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	statement := tsgo.Statement(context.Factory().FunctionDeclaration(
 		modifiers,
 		nil,
 		context.Factory().Identifier(artifact.TargetName()),
 		nil,
 		target.Parameters(),
-		resultType,
+		target.Result(),
 		context.Factory().Block(body, true),
 	))
 	return statement, api.CombineRequests(
@@ -433,7 +428,7 @@ func emitInterfaceAssertion(
 			)) {
 		return api.ExpressionEmission{}, shapeError(context, operation)
 	}
-	return assertionoperation.Apply(
+	return assertionoperation.ApplyGenericCapability(
 		context,
 		children,
 		nil,

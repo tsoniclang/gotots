@@ -443,18 +443,6 @@ func (s *programSession) buildGenericCapabilityRevision(
 	); err != nil {
 		return artifactRevision{}, err
 	}
-	facet, err := api.NewGenericCapabilityCallableFacet(artifact)
-	if err != nil {
-		return artifactRevision{}, err
-	}
-	observation, err := context.ObserveCooperativeCallable(facet)
-	if err != nil {
-		return artifactRevision{}, err
-	}
-	context = context.WithCooperativeCallable(
-		facet,
-		observation.Cooperative(),
-	)
 	statement, requests, err := genericcapability.Build(
 		context,
 		builder.emitter,
@@ -468,7 +456,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 	placement, dependencies, requirements, err :=
 		s.consumeArtifactRequests(
 			owner,
-			api.CombineRequests(requests, observation.Requests()),
+			requests,
 		)
 	if err != nil {
 		return artifactRevision{}, err

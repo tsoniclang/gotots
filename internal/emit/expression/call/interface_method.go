@@ -7,7 +7,6 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -22,7 +21,7 @@ func emitInterfaceMethod(
 	selection *types.Selection,
 	signature *types.Signature,
 	discarded bool,
-	detached bool,
+	_ bool,
 ) (api.ExpressionEmission, error) {
 	providerInterface, providerOwned, err :=
 		context.Names().ProviderInterface(selection.Recv())
@@ -114,15 +113,5 @@ func emitInterfaceMethod(
 			target,
 		)
 	}
-	callableReference, err := context.Names().InterfaceMethodCallable(method)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return cooperativecall.InterfaceMethodCall(
-		context,
-		source,
-		callableReference,
-		target,
-		detached,
-	)
+	return target, nil
 }

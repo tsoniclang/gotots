@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -35,18 +34,6 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	facet, err := context.FunctionLiteralCallableFacet(source)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	observation, err := context.ObserveCooperativeCallable(facet)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	context = context.WithCooperativeCallable(
-		facet,
-		observation.Cooperative(),
-	)
 	targetSignature, err := callable.Emit(
 		context,
 		children,
@@ -72,25 +59,18 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	var modifiers []tsgo.ModifierLike
-	resultType := targetSignature.Result()
-	if observation.Cooperative() {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	ordinary := api.DirectExpression(
 		context.Factory().ArrowFunction(
-			modifiers,
+			nil,
 			nil,
 			parameters,
-			resultType,
+			targetSignature.Result(),
 			context.Factory().EqualsGreaterThanToken(),
 			body.Value(),
 		),
 		api.CombineRequests(
 			requests,
 			body.Requests(),
-			observation.Requests(),
 		)...,
 	)
 	if deferredSelected {
@@ -103,20 +83,13 @@ func Emit(
 			source,
 			signature,
 			targetSignature,
-			observation.Cooperative(),
-			false,
 		)
 	}
 	if staticallySelected {
 		return ordinary, nil
 	}
-	ordinary, err = cooperativecall.TransportLiteralValue(
-		context,
-		source,
-		ordinary,
-	)
-	if err != nil || !context.CallableControlFor(source).Recovery() {
-		return ordinary, err
+	if !context.CallableControlFor(source).Recovery() {
+		return ordinary, nil
 	}
 	deferred, err := emitDeferredLiteral(
 		context,
@@ -124,8 +97,6 @@ func Emit(
 		source,
 		signature,
 		targetSignature,
-		observation.Cooperative(),
-		true,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -164,8 +135,6 @@ func emitDeferredLiteral(
 	source *ast.FuncLit,
 	signature *types.Signature,
 	targetSignature callable.SignatureEmission,
-	providerCooperative bool,
-	transported bool,
 ) (api.ExpressionEmission, error) {
 	body, err := callable.EmitBody(
 		context.WithRecoveryAuthority(callable.RecoveryAuthorityName),
@@ -184,29 +153,15 @@ func emitDeferredLiteral(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	var abiRequests []api.RootRequest
-	if transported {
-		_, abiRequests, err =
-			cooperativecall.ValueContract(context, signature)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
-	var modifiers []tsgo.ModifierLike
-	resultType := targetSignature.Result()
-	if providerCooperative {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	return api.DirectExpression(
 		context.Factory().ArrowFunction(
-			modifiers,
+			nil,
 			nil,
 			append(
 				[]tsgo.ParameterDeclaration{recovery},
 				targetSignature.Parameters()...,
 			),
-			resultType,
+			targetSignature.Result(),
 			context.Factory().EqualsGreaterThanToken(),
 			body.Value(),
 		),
@@ -214,7 +169,6 @@ func emitDeferredLiteral(
 			targetSignature.Requests(),
 			body.Requests(),
 			recoveryRequests,
-			abiRequests,
 		)...,
 	), nil
 }

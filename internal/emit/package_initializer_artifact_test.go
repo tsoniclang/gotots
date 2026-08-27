@@ -312,7 +312,6 @@ func Run() int32 {
 		t.Fatal(err)
 	}
 	options := DefaultOptions()
-	options.ConcurrencySemantics = ConcurrencySemanticsCooperative
 	session, err := newProgramSession(program, options)
 	if err != nil {
 		t.Fatal(err)
@@ -357,15 +356,21 @@ func Run() int32 {
 	result, ok := callable.Type().(tsgo.TypeReferenceNode)
 	if !ok {
 		t.Fatalf(
-			"package callable result = %T, want Awaitable<value>",
+			"package callable result = %T, want direct value type",
 			callable.Type(),
 		)
 	}
-	awaitable, ok := result.TypeName().(tsgo.Identifier)
-	if !ok || awaitable.Text() != "Awaitable" {
+	resultName, ok := result.TypeName().(tsgo.Identifier)
+	if !ok {
 		t.Fatalf(
-			"package callable result name = %T, want Awaitable",
+			"package callable result name = %T, want identifier",
 			result.TypeName(),
+		)
+	}
+	if resultName.Text() != "int32" {
+		t.Fatalf(
+			"package callable result name = %q, want int32",
+			resultName.Text(),
 		)
 	}
 	if session.requirements.HasPending() ||

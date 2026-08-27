@@ -7,7 +7,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 )
 
@@ -292,18 +291,8 @@ func (a *profileBoundaryAnalyzer) ensureInterface(
 		if err != nil {
 			return err
 		}
-		cooperative, requests, err := cooperativecall.InterfaceMethodContract(
-			a.context,
-			callableReference,
-		)
-		if err != nil {
-			return err
-		}
-		a.requests = append(a.requests, requests...)
+		a.requests = append(a.requests, callableReference.Requests()...)
 		effect := gostdlib.EffectSynchronous
-		if cooperative {
-			effect = gostdlib.EffectAwaitable
-		}
 		node.directMismatch = node.directMismatch ||
 			certificate.Effect() != effect
 		node.methods = append(node.methods, profileBoundaryMethod{
@@ -441,6 +430,28 @@ func (a *profileBoundaryAnalyzer) affectedInterfaces() map[string]struct{} {
 		}
 	}
 	return affected
+}
+
+func includeProfileInterfaceDescendants(
+	nodes map[string]*profileBoundaryInterface,
+	identities map[string]struct{},
+) {
+	queue := sortedIdentitySet(identities)
+	for len(queue) != 0 {
+		identity := queue[0]
+		queue = queue[1:]
+		node := nodes[identity]
+		if node == nil {
+			continue
+		}
+		for _, child := range sortedIdentitySet(node.children) {
+			if _, found := identities[child]; found {
+				continue
+			}
+			identities[child] = struct{}{}
+			queue = append(queue, child)
+		}
+	}
 }
 
 func affectedRoots(

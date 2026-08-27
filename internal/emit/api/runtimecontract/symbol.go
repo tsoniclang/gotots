@@ -87,9 +87,7 @@ const (
 	RuntimeSendChannel                RuntimeSymbol = 1102
 	RuntimeSelectCase                 RuntimeSymbol = 1103
 	RuntimeSelect                     RuntimeSymbol = 1104
-	RuntimeScheduler                  RuntimeSymbol = 1105
 	RuntimeSelectReady                RuntimeSymbol = 1106
 	RuntimeSelectAttempt              RuntimeSymbol = 1107
 	RuntimeUnsafeString               RuntimeSymbol = 1210
-	RuntimeAwaitable                  RuntimeSymbol = 1300
 )

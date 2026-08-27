@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	channeloperation "github.com/tsoniclang/gotots/internal/emit/concurrency/channel"
-	concurrencyprofile "github.com/tsoniclang/gotots/internal/emit/concurrency/profile"
 	runtimechannel "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
@@ -30,38 +29,17 @@ func Emit(
 		); !ok {
 			return api.ExpressionEmission{}, false, nil
 		}
-		if err := concurrencyprofile.Admit(
-			context,
-			api.CategoryExpression,
-			source,
-		); err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
 		target, err := emitMake(context, children, source, discarded)
 		return target, true, err
 	case types.Universe.Lookup("close"):
 		if !channelArgument(context, source) {
 			return api.ExpressionEmission{}, false, nil
 		}
-		if err := concurrencyprofile.Admit(
-			context,
-			api.CategoryExpression,
-			source,
-		); err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
 		target, err := emitClose(context, children, source, discarded)
 		return target, true, err
 	case types.Universe.Lookup("len"):
 		if !channelArgument(context, source) {
 			return api.ExpressionEmission{}, false, nil
-		}
-		if err := concurrencyprofile.Admit(
-			context,
-			api.CategoryExpression,
-			source,
-		); err != nil {
-			return api.ExpressionEmission{}, true, err
 		}
 		target, err := emitMeasure(
 			context,
@@ -74,13 +52,6 @@ func Emit(
 	case types.Universe.Lookup("cap"):
 		if !channelArgument(context, source) {
 			return api.ExpressionEmission{}, false, nil
-		}
-		if err := concurrencyprofile.Admit(
-			context,
-			api.CategoryExpression,
-			source,
-		); err != nil {
-			return api.ExpressionEmission{}, true, err
 		}
 		target, err := emitMeasure(
 			context,

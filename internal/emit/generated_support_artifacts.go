@@ -541,11 +541,9 @@ func (s *programSession) buildDeferredCallableRegistryRevision(
 			definitions++
 			continue
 		}
-		if _, cooperative := requirement.CooperativeCallable(); !cooperative {
-			return artifactRevision{}, &ScheduleError{
-				Object: artifact.TargetName(),
-				Reason: "deferred-callable registry received a foreign requirement",
-			}
+		return artifactRevision{}, &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "deferred-callable registry received a foreign requirement",
 		}
 	}
 	if definitions != 1 {

@@ -431,18 +431,6 @@ func (s *programSession) buildPackageInitializerRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	callableFacet, err := api.NewPackageInitializerCallableFacet(owner)
-	if err != nil {
-		return artifactRevision{}, err
-	}
-	observation, err := context.ObserveCooperativeCallable(callableFacet)
-	if err != nil {
-		return artifactRevision{}, err
-	}
-	context = context.WithCooperativeCallable(
-		callableFacet,
-		observation.Cooperative(),
-	)
 	emission, err := packagevariable.EmitInitializer(
 		context,
 		builder.emitter,
@@ -454,10 +442,7 @@ func (s *programSession) buildPackageInitializerRevision(
 	placement, dependencies, requestRoots, err :=
 		s.consumeArtifactRequests(
 			owner,
-			api.CombineRequests(
-				emission.Requests(),
-				observation.Requests(),
-			),
+			emission.Requests(),
 		)
 	if err != nil {
 		return artifactRevision{}, err

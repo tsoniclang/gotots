@@ -116,15 +116,13 @@ const testingSurface: Same<keyof typeof testing, "Testing"> = true;
 interface CanonicalReceiveChannel<T> {
   $length(): number;
   $capacity(): number;
-  receive(): Promise<[T, boolean]>;
+  $observeClose(observer: () => void): () => void;
+  receive(): [T, boolean];
   $selectReceive(
     accept: (value: T, ok: boolean) => void,
   ): {
     ready(): boolean;
     commit(): boolean | object;
-    subscribe(
-      claim: (failure: object | undefined) => boolean,
-    ): () => void;
   };
 }
 
@@ -158,12 +156,20 @@ test("provider channels satisfy the complete generated receive/select boundary",
   assert.deepEqual(received, [[7, true]]);
 
   const pending = new ProviderChannel<number>(() => 0, (value) => value, 0);
-  const subscribed: Array<[number, boolean]> = [];
-  const waiting = pending.$selectReceive(
-    (value, ok) => subscribed.push([value, ok]),
-  );
-  const unsubscribe = waiting.subscribe(() => true);
-  assert.equal(pending.offer(9), true);
-  assert.deepEqual(subscribed, [[9, true]]);
-  unsubscribe();
+  assert.equal(pending.offer(9), false);
+  let closeCount = 0;
+  pending.$observeClose(() => {
+    closeCount += 1;
+  });
+  pending.close();
+  pending.close();
+  assert.equal(closeCount, 1);
+
+  const removed = new ProviderChannel<number>(() => 0, (value) => value, 0);
+  const unobserve = removed.$observeClose(() => {
+    closeCount += 1;
+  });
+  unobserve();
+  removed.close();
+  assert.equal(closeCount, 1);
 });

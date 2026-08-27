@@ -51,7 +51,6 @@ func Build(
 	factory tsgo.Factory,
 	module api.RuntimeModule,
 	symbols []api.RuntimeSymbol,
-	concurrency api.ConcurrencySemantics,
 ) ([]Definition, error) {
 	if module == api.RuntimeModuleInvalid {
 		return nil, &AssemblyError{Reason: "runtime module is invalid"}
@@ -59,24 +58,10 @@ func Build(
 	if len(symbols) == 0 {
 		return nil, &AssemblyError{Reason: "runtime symbol set is empty"}
 	}
-	if !concurrency.Valid() {
-		return nil, &AssemblyError{Reason: "runtime concurrency profile is invalid"}
-	}
-	if module == api.RuntimeModuleScalar {
-		if len(symbols) != 1 || symbols[0] != api.RuntimeAwaitable {
-			return nil, &AssemblyError{
-				Module: module,
-				Reason: "scalar runtime requires its one exact symbol",
-			}
-		}
-		definition, err := NewDefinition(
-			api.RuntimeAwaitable,
-			awaitableType(factory),
-		)
-		if err != nil {
+	for _, symbol := range symbols {
+		if _, err := api.RuntimeContract(symbol); err != nil {
 			return nil, err
 		}
-		return []Definition{definition}, nil
 	}
 	if module == api.RuntimeModuleString {
 		panicContract, err := api.RuntimeContract(api.RuntimePanic)
@@ -328,7 +313,6 @@ func Build(
 				factory,
 				symbol,
 				contract.ExportedName(),
-				concurrency,
 			)
 			if err != nil {
 				return nil, err

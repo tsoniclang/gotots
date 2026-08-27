@@ -463,6 +463,23 @@ func validateProviderBinding(
 			Reason: "provider binding kind does not match the selected Go object",
 		}
 	}
+	if typeName, ok := object.(*types.TypeName); ok && !typeName.IsAlias() {
+		_, callable := typeName.Type().Underlying().(*types.Signature)
+		if binding.DefinedValueRepresentation() ==
+			gostdlib.DefinedValueRepresentationCanonical {
+			if callable != binding.Effect().Valid() {
+				return &api.NameError{
+					Name:   contract.Identity(),
+					Reason: "provider canonical callable effect does not match the selected Go type",
+				}
+			}
+		} else if binding.Effect() != gostdlib.EffectInvalid {
+			return &api.NameError{
+				Name:   contract.Identity(),
+				Reason: "provider non-canonical type binding carries a callable effect",
+			}
+		}
+	}
 	signature, method := object.Type().(*types.Signature)
 	method = method && signature.Recv() != nil
 	switch {
@@ -516,29 +533,4 @@ func providerBindingKind(
 			Reason: "provider object kind is unsupported",
 		}
 	}
-}
-
-func (r *Registry) ProviderCallableEffect(
-	owner *types.Func,
-) (gostdlib.EffectKind, bool, error) {
-	if r == nil || owner == nil {
-		return gostdlib.EffectInvalid, false, &api.NameError{
-			Reason: "provider callable identity is invalid",
-		}
-	}
-	owner = owner.Origin()
-	binding, ok := r.byObject[owner]
-	if !ok || binding.kind == targetBindingMissingProvider {
-		return gostdlib.EffectInvalid, false, nil
-	}
-	if binding.kind != targetBindingProvider {
-		return gostdlib.EffectInvalid, false, nil
-	}
-	if !binding.providerEffect.Valid() {
-		return gostdlib.EffectInvalid, true, &api.NameError{
-			Name:   owner.Name(),
-			Reason: "certified provider callable effect is absent",
-		}
-	}
-	return binding.providerEffect, true, nil
 }

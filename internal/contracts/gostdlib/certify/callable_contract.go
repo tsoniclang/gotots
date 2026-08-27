@@ -80,9 +80,17 @@ func providerEffect(source tsgo.CallableEffect) (gostdlib.EffectKind, error) {
 	case tsgo.CallableEffectSynchronous:
 		return gostdlib.EffectSynchronous, nil
 	case tsgo.CallableEffectAsynchronous:
-		return gostdlib.EffectAsynchronous, nil
+		return gostdlib.EffectInvalid, certifyError(
+			"inspect callable effect",
+			"target",
+			"Promise-only callable is not valid in the fixed synchronous execution contract",
+		)
 	case tsgo.CallableEffectAwaitable:
-		return gostdlib.EffectAwaitable, nil
+		return gostdlib.EffectInvalid, certifyError(
+			"inspect callable effect",
+			"target",
+			"T | Promise<T> callable is not valid in the fixed synchronous execution contract",
+		)
 	default:
 		return gostdlib.EffectInvalid, certifyError(
 			"inspect callable effect",
@@ -284,10 +292,9 @@ func callableParameterBindingMismatches(
 	}
 	for _, selected := range actual {
 		if sourceCallableTypeParameterCount(signature) == 0 &&
-			selected.Effect != gostdlib.EffectSynchronous &&
-			selected.Effect != gostdlib.EffectAwaitable {
+			selected.Effect != gostdlib.EffectSynchronous {
 			mismatches = append(mismatches, fmt.Sprintf(
-				"%s parameter %d: ordinary provider effect is %s, want sync or awaitable",
+				"%s parameter %d: provider effect is %s, want sync",
 				identity,
 				selected.Parameter,
 				selected.Effect,
@@ -363,105 +370,4 @@ func typeContainsCallableValue(
 		}
 	}
 	return false
-}
-
-func verifyCallableParameterProfileCoverage(
-	source goSurface,
-	modules []gostdlib.ModuleDocument,
-	facetModules []gostdlib.FacetModuleDocument,
-) error {
-	expected := make(map[string]int)
-	for _, module := range modules {
-		for _, binding := range module.Bindings {
-			if binding.Kind != gostdlib.BindingFunction ||
-				len(binding.CallableParameters) == 0 {
-				continue
-			}
-			evidence, ok := source.objects[binding.Identity]
-			if !ok {
-				continue
-			}
-			signature, ok := evidence.object.Type().(*types.Signature)
-			if !ok || sourceCallableTypeParameterCount(signature) != 0 {
-				continue
-			}
-			var cooperative []gostdlib.ProviderCallableParameterDocument
-			for _, selected := range binding.CallableParameters {
-				if selected.Effect == gostdlib.EffectSynchronous {
-					cooperative = append(
-						cooperative,
-						gostdlib.ProviderCallableParameterDocument{
-							Parameter: selected.Parameter,
-							Effect:    gostdlib.EffectAwaitable,
-						},
-					)
-				}
-			}
-			if len(cooperative) != 0 {
-				expected[callableParameterProfileObligation(
-					binding.Identity,
-					cooperative,
-				)]++
-			}
-		}
-	}
-	actual := make(map[string]int)
-	for _, module := range facetModules {
-		for _, profile := range module.CallableProfiles {
-			if len(profile.CallableParameters) == 0 {
-				continue
-			}
-			actual[callableParameterProfileObligation(
-				profile.SourceIdentity,
-				profile.CallableParameters,
-			)]++
-		}
-	}
-	var differences []string
-	for key, count := range expected {
-		if actual[key] != count {
-			differences = append(differences, fmt.Sprintf(
-				"%s expected %d profile(s), certified %d",
-				key,
-				count,
-				actual[key],
-			))
-		}
-	}
-	for key, count := range actual {
-		if expected[key] != count {
-			differences = append(differences, fmt.Sprintf(
-				"%s certified %d profile(s), expected %d",
-				key,
-				count,
-				expected[key],
-			))
-		}
-	}
-	if len(differences) == 0 {
-		return nil
-	}
-	sort.Strings(differences)
-	return certifyError(
-		"verify callable parameter profile coverage",
-		"provider surface",
-		strings.Join(differences, "; "),
-	)
-}
-
-func callableParameterProfileObligation(
-	identity string,
-	parameters []gostdlib.ProviderCallableParameterDocument,
-) string {
-	var result strings.Builder
-	result.WriteString(identity)
-	for _, selected := range parameters {
-		fmt.Fprintf(
-			&result,
-			"|parameter=%d|effect=%s",
-			selected.Parameter,
-			selected.Effect,
-		)
-	}
-	return result.String()
 }

@@ -42,17 +42,6 @@ func verifyProviderScalarContract(
 			)
 		}
 		seen[target.Name()] = struct{}{}
-		if target.Name() == "Awaitable" {
-			if target.TypeParameterCount() != 1 ||
-				target.DeclaredTypeString() != "Awaitable<T>" {
-				return certifyError(
-					"verify provider scalars",
-					target.Name(),
-					"awaitable declaration contract is invalid",
-				)
-			}
-			continue
-		}
 		carrier, ok := expected[target.Name()]
 		if !ok {
 			return certifyError(
@@ -76,13 +65,13 @@ func verifyProviderScalarContract(
 		delete(expected, target.Name())
 	}
 	if len(expected) != 0 || len(exports) != len(seen) ||
-		len(exports) != len(requirements.PrimitiveAliases())+1 {
+		len(exports) != len(requirements.PrimitiveAliases()) {
 		return certifyError(
 			"verify provider scalars",
 			providerScalarPath,
 			fmt.Sprintf(
 				"provider exports %d scalars with %d missing contract aliases",
-				len(exports)-1,
+				len(exports),
 				len(expected),
 			),
 		)

@@ -167,7 +167,6 @@ func RewindMapIterator(value reflect.Value) bool {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {
@@ -196,12 +195,12 @@ func RewindMapIterator(value reflect.Value) bool {
 		"named_time.TimeDurationValueOperations.$wrap(BigInt.asIntN(64, goNumberToBigInt(value)))",
 		"IterSeqValueOperations.$project",
 		"ReflectMapIterOperations.$assign",
-		"cancel: (() => Awaitable<void>) | undefined",
+		"cancel: (() => void) | undefined",
 		"callback: (($0: gostring, $1:",
 		"const __gotots_callee_0 = cancel;",
 		"const __gotots_callee_1 = callback;",
-		"await (__gotots_callee_0 ?? GoPanic.raiseRuntime(\"call of nil function\"))();",
-		"return await (__gotots_callee_1 ?? GoPanic.raiseRuntime(\"call of nil function\"))(",
+		"(__gotots_callee_0 ?? GoPanic.raiseRuntime(\"call of nil function\"))();",
+		"return (__gotots_callee_1 ?? GoPanic.raiseRuntime(\"call of nil function\"))(",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("provider defined-value artifact lacks %q:\n%s", required, printed)
@@ -216,6 +215,10 @@ func RewindMapIterator(value reflect.Value) bool {
 		"fs__from_gostdlib.WalkDirFunc",
 		"new Duration(",
 		"GoMapHash.number(named_time.TimeDurationValueOperations.$project",
+		"async ",
+		"await ",
+		"Promise<",
+		"Awaitable<",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("provider defined-value artifact contains %q:\n%s", forbidden, printed)
@@ -231,6 +234,59 @@ func RewindMapIterator(value reflect.Value) bool {
 			printed,
 		)
 	}
+}
+
+func TestProviderSequenceUsesExactSynchronousCallable(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/providersequence\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package providersequence
+
+import "slices"
+
+func Values(yield func(int) bool) {
+	yield(1)
+}
+
+func Collect() []int {
+	return slices.Collect(Values)
+}
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := emit.DefaultOptions()
+	options.StandardLibrary = linkedProviderCertificate(t)
+	emission, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{mustProviderRoot(
+			t,
+			program.Roots()[0].Types().Scope().Lookup("Collect"),
+		)},
+		options,
+	)
+	if err != nil {
+		t.Fatalf("synchronous sequence compile: %v", err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	if !strings.Contains(artifacts.printed, "SlicesCollectKernel") {
+		t.Fatalf("synchronous sequence kernel is absent:\n%s", artifacts.printed)
+	}
+	for _, forbidden := range []string{"async ", "await ", "Promise<", "Awaitable<"} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("synchronous sequence output contains %q", forbidden)
+		}
+	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }
 
 func TestAtomicComparableFacetsMatchGo(t *testing.T) {
@@ -274,7 +330,6 @@ func Facts() string {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -318,7 +373,7 @@ func Facts() string {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Facts"},
-		"console.log(await Facts());\n",
+		"console.log(Facts());\n",
 	)
 }
 
@@ -408,7 +463,6 @@ func Facts() string {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -454,6 +508,6 @@ func Facts() string {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Facts"},
-		"console.log(await Facts());\n",
+		"console.log(Facts());\n",
 	)
 }

@@ -16,15 +16,15 @@ func (b builder) staticSendMethod() tsgo.MethodDeclaration {
 			),
 			b.parameter("value", typeT),
 		},
-		b.promiseType(b.voidType()),
+		b.voidType(),
 		b.factory.IfStatement(
 			b.strictUndefined(b.id("channel")),
 			b.factory.Block([]tsgo.Statement{
-				b.returnStatement(b.neverPromise(b.voidType())),
+				b.expression(b.panic("serial channel send would block")),
 			}, true),
 			nil,
 		),
-		b.returnStatement(b.methodCall(
+		b.expression(b.methodCall(
 			b.id("channel"),
 			MemberSend,
 			b.id("value"),
@@ -44,11 +44,11 @@ func (b builder) staticReceiveMethod() tsgo.MethodDeclaration {
 				b.undefinedType(),
 			),
 		)},
-		b.promiseType(result),
+		result,
 		b.factory.IfStatement(
 			b.strictUndefined(b.id("channel")),
 			b.factory.Block([]tsgo.Statement{
-				b.returnStatement(b.neverPromise(result)),
+				b.expression(b.panic("serial channel receive would block")),
 			}, true),
 			nil,
 		),
@@ -195,17 +195,7 @@ func (b builder) staticGenericMethod(
 	)
 }
 
-func (b builder) neverPromise(
-	result tsgo.TypeNode,
-) tsgo.NewExpression {
-	return b.newPromise(
-		result,
-		b.arrow(nil, b.voidType(), b.factory.Block(nil, true)),
-	)
-}
-
 func (b builder) inertSelectCase() tsgo.ObjectLiteralExpression {
-	emptyCancel := b.arrow(nil, b.voidType(), b.factory.Block(nil, true))
 	return b.factory.ObjectLiteralExpression(
 		[]tsgo.ObjectLiteralElementLike{
 			b.propertyFunction(
@@ -219,14 +209,6 @@ func (b builder) inertSelectCase() tsgo.ObjectLiteralExpression {
 				nil,
 				b.booleanType(),
 				b.factory.FalseLiteral(),
-			),
-			b.propertyFunction(
-				"subscribe",
-				[]tsgo.ParameterDeclaration{
-					b.parameter("claim", b.selectClaimType()),
-				},
-				b.functionType(nil, b.voidType()),
-				emptyCancel,
 			),
 		},
 		true,

@@ -1,15 +1,12 @@
 import { GoMapHash } from "@gotots/runtime/map.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable } from "@gotots/gostdlib/internal/scalars.js";
 
 export class Once {
   #state: "idle" | "running" | "done" = "idle";
-  #completion: Promise<void> = Promise.resolve();
 
   static $copy(source: Once): Once {
     const result = new Once();
     result.#state = source.#state;
-    result.#completion = source.#completion;
     return result;
   }
 
@@ -21,10 +18,10 @@ export class Once {
     return GoMapHash.string(source.#state);
   }
 
-  static async Do(
+  static Do(
     receiver: Once | undefined,
-    f: (() => Awaitable<void>) | undefined,
-  ): Promise<void> {
+    f: (() => void) | undefined,
+  ): void {
     if (receiver === undefined) {
       throw new TypeError("Once.Do called with nil receiver");
     }
@@ -32,44 +29,86 @@ export class Once {
       return;
     }
     if (receiver.#state === "running") {
-      await receiver.#completion.catch(() => undefined);
-      return;
+      GoPanic.raiseRuntime(
+        "sync: Once.Do would block under serial execution",
+      );
     }
     receiver.#state = "running";
-    receiver.#completion = (async (): Promise<void> => {
-      try {
-        if (f === undefined) {
-          GoPanic.raiseRuntime("sync.Once.Do called with nil function");
-        }
-        await f();
-      } finally {
-        receiver.#state = "done";
+    try {
+      if (f === undefined) {
+        GoPanic.raiseRuntime("sync.Once.Do called with nil function");
       }
-    })();
-    await receiver.#completion;
+      f();
+    } finally {
+      receiver.#state = "done";
+    }
   }
 }
 
 export function OnceFunc(
-  f: (() => Awaitable<void>) | undefined,
-): () => Promise<void> {
-  let result: Promise<void> | undefined;
-  return (): Promise<void> => {
-    result ??= f === undefined
-      ? Promise.reject(GoPanic.createRuntime("sync.OnceFunc called with nil function"))
-      : Promise.resolve(f());
-    return result;
+  f: (() => void) | undefined,
+): () => void {
+  let state: "idle" | "running" | "done" | "panicked" = "idle";
+  let panicValue: unknown;
+  return (): void => {
+    if (state === "panicked") {
+      throw panicValue;
+    }
+    if (state === "done") {
+      return;
+    }
+    if (state === "running") {
+      GoPanic.raiseRuntime(
+        "sync: OnceFunc would block under serial execution",
+      );
+    }
+    state = "running";
+    try {
+      if (f === undefined) {
+        GoPanic.raiseRuntime("sync.OnceFunc called with nil function");
+      }
+      f();
+      state = "done";
+    } catch (failure) {
+      panicValue = failure;
+      state = "panicked";
+      throw failure;
+    }
   };
 }
 
 export function OnceValue<T>(
-  f: (() => Awaitable<T>) | undefined,
-): () => Promise<T> {
-  let result: Promise<T> | undefined;
-  return (): Promise<T> => {
-    result ??= f === undefined
-      ? Promise.reject(GoPanic.createRuntime("sync.OnceValue called with nil function"))
-      : Promise.resolve().then(f);
-    return result;
+  f: (() => T) | undefined,
+): () => T {
+  type Outcome =
+    | { readonly kind: "idle" }
+    | { readonly kind: "running" }
+    | { readonly kind: "done"; readonly value: T }
+    | { readonly kind: "panicked"; readonly value: unknown };
+  let outcome: Outcome = { kind: "idle" };
+  return (): T => {
+    if (outcome.kind === "panicked") {
+      throw outcome.value;
+    }
+    if (outcome.kind === "done") {
+      return outcome.value;
+    }
+    if (outcome.kind === "running") {
+      GoPanic.raiseRuntime(
+        "sync: OnceValue would block under serial execution",
+      );
+    }
+    outcome = { kind: "running" };
+    try {
+      if (f === undefined) {
+        GoPanic.raiseRuntime("sync.OnceValue called with nil function");
+      }
+      const value = f();
+      outcome = { kind: "done", value };
+      return value;
+    } catch (failure) {
+      outcome = { kind: "panicked", value: failure };
+      throw failure;
+    }
   };
 }

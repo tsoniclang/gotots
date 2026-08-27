@@ -297,10 +297,7 @@ func providerProfileMethodName(identity string) (string, error) {
 }
 
 func providerProfileEffectName(effect gostdlib.EffectKind) string {
-	if effect == gostdlib.EffectSynchronous {
-		return "Direct"
-	}
-	return "Awaitable"
+	return "Direct"
 }
 
 func providerProfileInterfaceSemanticPart(

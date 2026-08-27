@@ -61,7 +61,7 @@ func validateFacet(facet FacetDocument, field string) error {
 		if len(facet.Capabilities) != 2 ||
 			facet.Capabilities[0] != FacetCapabilityProject ||
 			facet.Capabilities[1] != FacetCapabilityWrap ||
-			facet.Effect != EffectInvalid ||
+			(facet.Effect != EffectInvalid && !facet.Effect.Valid()) ||
 			len(facet.CallableParameters) != 0 ||
 			len(facet.GenericTypeArguments) != 0 ||
 			facet.ResultExport != "" || facet.ResultImplementationOwner != "" ||
@@ -87,8 +87,7 @@ func validateFacet(facet FacetDocument, field string) error {
 		}
 	case FacetGenericCallableKernel:
 		if len(facet.Capabilities) != 1 ||
-			(facet.Capabilities[0] != FacetCapabilityKernel &&
-				facet.Capabilities[0] != FacetCapabilitySynchronousKernel) ||
+			facet.Capabilities[0] != FacetCapabilityKernel ||
 			!facet.Effect.Valid() ||
 			len(facet.GenericTypeArguments) == 0 ||
 			facet.ResultExport != "" || facet.ResultImplementationOwner != "" ||
@@ -97,10 +96,6 @@ func validateFacet(facet FacetDocument, field string) error {
 			facet.StorageImplementationOwner != "" ||
 			facet.StorageTargetFingerprint != "" {
 			return manifestError(field, "generic-kernel facet shape is invalid")
-		}
-		if facet.Capabilities[0] == FacetCapabilitySynchronousKernel &&
-			facet.Effect != EffectSynchronous {
-			return manifestError(field, "synchronous generic-kernel effect is invalid")
 		}
 		if err := validateGenericTypeArguments(
 			facet.GenericTypeArguments,
@@ -111,7 +106,6 @@ func validateFacet(facet FacetDocument, field string) error {
 		if err := validateCallableParameters(
 			facet.CallableParameters,
 			field+".callableParameters",
-			true,
 		); err != nil {
 			return err
 		}

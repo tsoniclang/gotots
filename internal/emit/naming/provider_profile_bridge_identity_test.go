@@ -34,6 +34,21 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 	if len(callable) != 1 || len(stateful) != 1 {
 		t.Fatalf("gzip profiles = callable %d, stateful %d", len(callable), len(stateful))
 	}
+	var callableDirect gostdlib.ProviderCallableProfile
+	for _, profile := range callable {
+		if profile.Export() == "GzipNewReaderDirect" {
+			callableDirect = profile
+		}
+	}
+	var statefulDirect gostdlib.ProviderStatefulProfile
+	for _, profile := range stateful {
+		if profile.Export() == "DirectGzipReader" {
+			statefulDirect = profile
+		}
+	}
+	if !callableDirect.Valid() || !statefulDirect.Valid() {
+		t.Fatal("direct gzip profile pair is absent")
+	}
 	errorName, ok := types.Universe.Lookup("error").(*types.TypeName)
 	if !ok {
 		t.Fatal("predeclared error type is absent")
@@ -48,7 +63,7 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 		"go:universe|error",
 		errorType,
 		"$goProviderProfileBridge$Named_error",
-		callable[0].Interfaces(),
+		callableDirect.Interfaces(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +72,7 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 		"go:universe|error",
 		errorType,
 		"$goProviderProfileBridge$Named_error",
-		stateful[0].Interfaces(),
+		statefulDirect.Interfaces(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +107,15 @@ func TestProviderProfileBridgeIdentityIncludesReachableInterfaceABI(
 	if len(profiles) != 1 {
 		t.Fatalf("gzip NewReader profiles = %d", len(profiles))
 	}
+	var direct gostdlib.ProviderCallableProfile
+	for _, profile := range profiles {
+		if profile.Export() == "GzipNewReaderDirect" {
+			direct = profile
+		}
+	}
+	if !direct.Valid() {
+		t.Fatal("direct gzip NewReader profile is absent")
+	}
 	ioPackage, err := importer.Default().Import("io")
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +130,7 @@ func TestProviderProfileBridgeIdentityIncludesReachableInterfaceABI(
 	}
 	closure, err := providerProfileBridgeClosure(
 		reader,
-		profiles[0].Interfaces(),
+		direct.Interfaces(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -163,125 +187,68 @@ func TestProviderProfileBridgeIdentityIgnoresEquivalentProviderReexports(
 		t.Fatal("context.Context type is not named")
 	}
 
-	registry := NewRegistry()
-	first, err := registry.internProviderProfileInterfaceBridge(
-		"std::context|Context",
-		contextType,
-		"$goProviderProfileBridge$Named_context_Context",
-		contextProfiles[0].Interfaces(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := registry.internProviderProfileInterfaceBridge(
-		"std::context|Context",
-		contextType,
-		"$goProviderProfileBridge$Named_context_Context",
-		signalProfiles[0].Interfaces(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first.owner != second.owner || first.name != second.name || first.key != second.key {
-		t.Fatalf(
-			"equivalent context reexports created distinct bridges: %q/%q and %q/%q",
-			first.key,
-			first.name,
-			second.key,
-			second.name,
-		)
-	}
-	const want = "$goProviderProfileBridge$Named_context_Context$Using$" +
-		"context_Context$Awaitable$And$Error$Awaitable"
-	if first.name != want {
-		t.Fatalf("context bridge name = %q, want %q", first.name, want)
-	}
-}
-
-func TestProviderProfileBridgeIdentityDistinguishesMethodEffects(t *testing.T) {
-	payload, err := os.ReadFile(filepath.Join(
-		"..", "..", "..", "gostdlib", "contract", "manifest.json",
-	))
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest, err := gostdlib.Parse(payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	awaitableProfiles := manifest.ProviderCallableProfiles(
-		"bufio|kind=4|receiver=|name=NewReader",
-	)
-	synchronousProfiles := manifest.ProviderCallableProfiles(
-		"errors|kind=4|receiver=|name=Unwrap",
-	)
-	if len(awaitableProfiles) != 1 || len(synchronousProfiles) != 2 {
-		t.Fatalf(
-			"profiles = awaitable %d, errors %d",
-			len(awaitableProfiles),
-			len(synchronousProfiles),
-		)
-	}
-	var synchronous gostdlib.ProviderCallableProfile
-	for _, profile := range synchronousProfiles {
-		selected, ok := profile.Interface(gostdlib.LanguageErrorInterfaceIdentity)
-		if !ok {
-			continue
-		}
-		methods := selected.ProviderInterface().Methods()
-		if len(methods) == 1 && methods[0].Effect() == gostdlib.EffectSynchronous {
-			synchronous = profile
-			break
-		}
-	}
-	if !synchronous.Valid() {
-		t.Fatal("synchronous error profile is absent")
-	}
-	errorName, ok := types.Universe.Lookup("error").(*types.TypeName)
-	if !ok {
-		t.Fatal("predeclared error type is absent")
-	}
-	errorType, ok := types.Unalias(errorName.Type()).(*types.Named)
-	if !ok {
-		t.Fatal("predeclared error type is not named")
-	}
-
-	registry := NewRegistry()
-	awaitable, err := registry.internProviderProfileInterfaceBridge(
-		"go:universe|error",
-		errorType,
-		"$goProviderProfileBridge$Named_error",
-		awaitableProfiles[0].Interfaces(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	direct, err := registry.internProviderProfileInterfaceBridge(
-		"go:universe|error",
-		errorType,
-		"$goProviderProfileBridge$Named_error",
-		synchronous.Interfaces(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if awaitable.owner == direct.owner || awaitable.name == direct.name ||
-		awaitable.key == direct.key {
-		t.Fatalf(
-			"different error effects shared a bridge: %q/%q and %q/%q",
-			awaitable.key,
-			awaitable.name,
-			direct.key,
-			direct.name,
-		)
-	}
-	if !strings.HasSuffix(awaitable.name, "$Error$Awaitable") ||
-		!strings.HasSuffix(direct.name, "$Error$Direct") {
-		t.Fatalf(
-			"effect names are not readable: awaitable=%q direct=%q",
-			awaitable.name,
-			direct.name,
-		)
+	for _, testCase := range []struct {
+		name          string
+		contextExport string
+		signalExport  string
+		want          string
+	}{
+		{
+			name:          "direct",
+			contextExport: "ContextWithCancelDirect",
+			signalExport:  "OsSignalNotifyContextDirect",
+			want: "$goProviderProfileBridge$Named_context_Context$Using$" +
+				"context_Context$Direct$And$Error$Direct",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			contextProfile := providerCallableProfileByExport(
+				t,
+				contextProfiles,
+				testCase.contextExport,
+			)
+			signalProfile := providerCallableProfileByExport(
+				t,
+				signalProfiles,
+				testCase.signalExport,
+			)
+			registry := NewRegistry()
+			first, err := registry.internProviderProfileInterfaceBridge(
+				"std::context|Context",
+				contextType,
+				"$goProviderProfileBridge$Named_context_Context",
+				contextProfile.Interfaces(),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			second, err := registry.internProviderProfileInterfaceBridge(
+				"std::context|Context",
+				contextType,
+				"$goProviderProfileBridge$Named_context_Context",
+				signalProfile.Interfaces(),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if first.owner != second.owner || first.name != second.name ||
+				first.key != second.key {
+				t.Fatalf(
+					"equivalent context reexports created distinct bridges: %q/%q and %q/%q",
+					first.key,
+					first.name,
+					second.key,
+					second.name,
+				)
+			}
+			if first.name != testCase.want {
+				t.Fatalf(
+					"context bridge name = %q, want %q",
+					first.name,
+					testCase.want,
+				)
+			}
+		})
 	}
 }
 
@@ -300,7 +267,7 @@ func TestProviderProfileBridgeNameIsBoundedBySemanticShape(t *testing.T) {
 		"io/fs|kind=4|receiver=|name=ReadDir",
 	)
 	if len(profiles) != 1 {
-		t.Fatalf("io/fs.ReadDir profiles = %d", len(profiles))
+		t.Fatalf("io/fs.ReadDir profiles = %d, want 1", len(profiles))
 	}
 	fileSystemPackage, err := importer.Default().Import("io/fs")
 	if err != nil {
@@ -315,18 +282,58 @@ func TestProviderProfileBridgeNameIsBoundedBySemanticShape(t *testing.T) {
 		t.Fatal("io/fs.ReadDirFS type is not named")
 	}
 
-	registry := NewRegistry()
-	binding, err := registry.internProviderProfileInterfaceBridge(
-		"std::io/fs|ReadDirFS",
-		readDirType,
-		"$goProviderProfileBridge$Named_io_u2f_fs_ReadDirFS",
-		profiles[0].Interfaces(),
-	)
-	if err != nil {
-		t.Fatal(err)
+	expected := map[string]bool{"IoFsReadDirDirect": false}
+	for _, profile := range profiles {
+		if _, ok := expected[profile.Export()]; !ok {
+			t.Fatalf("unexpected io/fs.ReadDir profile %q", profile.Export())
+		}
+		expected[profile.Export()] = true
+		t.Run(profile.Export(), func(t *testing.T) {
+			registry := NewRegistry()
+			binding, err := registry.internProviderProfileInterfaceBridge(
+				"std::io/fs|ReadDirFS",
+				readDirType,
+				"$goProviderProfileBridge$Named_io_u2f_fs_ReadDirFS",
+				profile.Interfaces(),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(binding.name) > 320 ||
+				strings.Contains(binding.name, "$Method$") ||
+				strings.Contains(binding.name, "_u7c_kind") {
+				t.Fatalf(
+					"provider bridge name is not bounded and readable: %q",
+					binding.name,
+				)
+			}
+		})
 	}
-	if len(binding.name) > 320 || strings.Contains(binding.name, "$Method$") ||
-		strings.Contains(binding.name, "_u7c_kind") {
-		t.Fatalf("provider bridge name is not bounded and readable: %q", binding.name)
+	for export, found := range expected {
+		if !found {
+			t.Fatalf("io/fs.ReadDir profile %q is absent", export)
+		}
 	}
+}
+
+func providerCallableProfileByExport(
+	t *testing.T,
+	profiles []gostdlib.ProviderCallableProfile,
+	export string,
+) gostdlib.ProviderCallableProfile {
+	t.Helper()
+	var selected gostdlib.ProviderCallableProfile
+	for _, profile := range profiles {
+		if profile.Export() != export {
+			continue
+		}
+		if selected.Valid() {
+			t.Fatalf("provider callable profile %q is duplicated", export)
+		}
+		selected = profile
+	}
+	if !selected.Valid() {
+		t.Fatalf("provider callable profile %q is absent", export)
+	}
+	return selected
 }

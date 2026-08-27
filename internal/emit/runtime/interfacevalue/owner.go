@@ -30,7 +30,6 @@ func BuildValue(
 	factory tsgo.Factory,
 	symbol api.RuntimeSymbol,
 	valueName string,
-	concurrency api.ConcurrencySemantics,
 ) (tsgo.Statement, error) {
 	switch symbol {
 	case api.RuntimeInterfaceValue:
@@ -48,13 +47,13 @@ func BuildValue(
 	case api.RuntimeRuntimeErrorToken:
 		return methodToken(factory, "GoRuntimeErrorMethodToken"), nil
 	case api.RuntimeBuiltinErrorType:
-		return errorTypeDefinition(factory, false, concurrency)
+		return errorTypeDefinition(factory, false)
 	case api.RuntimeBuiltinErrorContract:
 		return errorContractDefinition(factory, false)
 	case api.RuntimeBuiltinErrorGuard:
 		return errorGuardDefinition(factory, false)
 	case api.RuntimeErrorType:
-		return errorTypeDefinition(factory, true, concurrency)
+		return errorTypeDefinition(factory, true)
 	case api.RuntimeErrorContract:
 		return errorContractDefinition(factory, true)
 	case api.RuntimeErrorGuard:
@@ -67,11 +66,7 @@ func BuildValue(
 func errorTypeDefinition(
 	factory tsgo.Factory,
 	runtimeError bool,
-	concurrency api.ConcurrencySemantics,
 ) (tsgo.Statement, error) {
-	if !concurrency.Valid() {
-		return nil, &api.RuntimeSymbolError{Symbol: api.RuntimeBuiltinErrorType}
-	}
 	symbol := api.RuntimeBuiltinErrorType
 	if runtimeError {
 		symbol = api.RuntimeErrorType
@@ -89,7 +84,6 @@ func errorTypeDefinition(
 		name,
 		valueName,
 		runtimeError,
-		concurrency == api.ConcurrencySemanticsCooperative,
 	), nil
 }
 

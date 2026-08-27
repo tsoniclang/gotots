@@ -26,7 +26,7 @@ func Describe() string {
 	return described
 }
 `
-	typescriptRunner := `const facts = await Describe();
+	typescriptRunner := `const facts = Describe();
 console.log(facts);
 `
 	goRunner := `package main

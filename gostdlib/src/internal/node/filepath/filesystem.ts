@@ -5,7 +5,11 @@ import type { GoError } from "@gotots/runtime/interface-value.js";
 import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { providerError } from "../../runtime/error.js";
-import { fromHostString } from "../../portable/utf8/codec.js";
+import {
+  fromHostBytes,
+  fromHostString,
+  toHostBytes,
+} from "../../portable/utf8/codec.js";
 import {
   Clean,
   IsAbs,
@@ -42,17 +46,9 @@ export function EvalSymlinks(path: gostring): [gostring, GoError | undefined] {
 }
 
 function goPathBuffer(path: gostring): Buffer {
-  const bytes = Buffer.allocUnsafe(path.length);
-  for (let index = 0; index < path.length; index += 1) {
-    bytes[index] = path.charCodeAt(index);
-  }
-  return bytes;
+  return Buffer.from(toHostBytes(path));
 }
 
 function bufferPath(path: Buffer): gostring {
-  let result = "";
-  for (const byte of path) {
-    result += String.fromCharCode(byte);
-  }
-  return result;
+  return fromHostBytes(path);
 }

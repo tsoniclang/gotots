@@ -38,7 +38,63 @@ func EmitAdapter(
 	)
 }
 
-func EmitAdapterWithSynchronousParameters(
+func EmitAdapterWithRootInterfaceParameter(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+) (SignatureEmission, error) {
+	if signature == nil || signature.Params().Len() != 1 {
+		return SignatureEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "root-interface adapter requires exactly one parameter",
+		}
+	}
+	if _, ok := signature.Params().At(0).Type().Underlying().(*types.Interface); !ok {
+		return SignatureEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "root-interface adapter parameter is not an interface",
+		}
+	}
+	return emitRepresentedWithParameterType(
+		context,
+		children,
+		source,
+		signature,
+		api.RoleCallableParameter,
+		api.RoleCallableResult,
+		func(_ *types.Var, index int) (string, error) {
+			return "$argument" + strconv.Itoa(index), nil
+		},
+		false,
+		func(_ *types.Var, index int) (api.TypeEmission, bool, error) {
+			if index != 0 {
+				return api.TypeEmission{}, false, nil
+			}
+			runtimeValue, err := context.Names().Runtime(
+				api.RuntimeInterfaceValue,
+				api.ImportPhaseType,
+			)
+			if err != nil {
+				return api.TypeEmission{}, false, err
+			}
+			return api.DirectType(
+				context.Factory().UnionTypeNode([]tsgo.TypeNode{
+					context.Factory().TypeReferenceNode(
+						runtimeValue.EntityName(context.Factory()),
+						nil,
+					),
+					context.Factory().KeywordTypeNode(
+						tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+					),
+				}),
+				runtimeValue.Requests()...,
+			), true, nil
+		},
+	)
+}
+
+func EmitAdapterWithProviderCallableParameters(
 	context api.Context,
 	children api.ChildEmitter,
 	source ast.Node,
@@ -50,7 +106,7 @@ func EmitAdapterWithSynchronousParameters(
 		if index < 0 || signature == nil || index >= signature.Params().Len() {
 			return SignatureEmission{}, &api.InvariantError{
 				Role:   context.Role(),
-				Reason: "synchronous callable parameter index is invalid",
+				Reason: "provider callable parameter index is invalid",
 			}
 		}
 		selected[index] = struct{}{}
@@ -73,14 +129,14 @@ func EmitAdapterWithSynchronousParameters(
 			if signature.Variadic() && index == signature.Params().Len()-1 {
 				return api.TypeEmission{}, false, &api.InvariantError{
 					Role:   context.Role(),
-					Reason: "synchronous callable parameter is variadic",
+					Reason: "provider callable parameter is variadic",
 				}
 			}
 			callableSignature, ok := Signature(parameter.Type())
 			if !ok {
 				return api.TypeEmission{}, false, &api.InvariantError{
 					Role:   context.Role(),
-					Reason: "synchronous parameter is not callable",
+					Reason: "provider callable parameter is not callable",
 				}
 			}
 			target, err := EmitInlineNonNilType(
@@ -88,7 +144,6 @@ func EmitAdapterWithSynchronousParameters(
 				children,
 				source,
 				callableSignature,
-				false,
 			)
 			if err != nil {
 				return api.TypeEmission{}, false, err
@@ -287,7 +342,7 @@ func EmitType(
 	return optionalCallableType(context, target), nil
 }
 
-func EmitSynchronousType(
+func EmitProviderCallableType(
 	context api.Context,
 	children api.ChildEmitter,
 	source ast.Node,
@@ -301,12 +356,11 @@ func EmitSynchronousType(
 			source,
 		)
 	}
-	target, err := EmitInlineAwaitableType(
+	target, err := EmitInlineNonNilType(
 		context,
 		children,
 		source,
 		signature,
-		false,
 	)
 	if err != nil {
 		return api.TypeEmission{}, err
@@ -335,13 +389,11 @@ func emitEnvironmentNonNilType(
 	source ast.Node,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
-	return EmitInlineAwaitableType(
+	return EmitInlineNonNilType(
 		context,
 		children,
 		source,
 		signature,
-		context.ConcurrencySemantics() ==
-			api.ConcurrencySemanticsCooperative,
 	)
 }
 
@@ -351,13 +403,11 @@ func EmitNonNilType(
 	source ast.Node,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
-	return EmitInlineAwaitableType(
+	return EmitInlineNonNilType(
 		context,
 		children,
 		source,
 		signature,
-		context.ConcurrencySemantics() ==
-			api.ConcurrencySemanticsCooperative,
 	)
 }
 
@@ -382,7 +432,6 @@ func EmitInternalNonNilType(
 		children,
 		source,
 		signature,
-		false,
 	)
 }
 
@@ -391,7 +440,6 @@ func emitInternalNonNilType(
 	children api.ChildEmitter,
 	source ast.Node,
 	signature *types.Signature,
-	cooperative bool,
 ) (api.TypeEmission, error) {
 	target, err := emitRepresented(
 		context,
@@ -408,15 +456,11 @@ func emitInternalNonNilType(
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
-	result := target.Result()
-	if cooperative {
-		result = PromiseResult(context.Factory(), result)
-	}
 	return api.DirectType(
 		context.Factory().FunctionTypeNode(
 			nil,
 			target.Parameters(),
-			result,
+			target.Result(),
 		),
 		target.Requests()...,
 	), nil

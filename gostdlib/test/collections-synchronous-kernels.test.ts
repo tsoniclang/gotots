@@ -10,23 +10,15 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import {
   MapsEqualFuncKernel as MapsEqualFunc,
-  MapsEqualFuncSynchronousKernel as MapsEqualFuncSynchronous,
 } from "../src/internal/facets/generic-maps-kernel.js";
 import {
   SlicesBinarySearchFuncKernel as BinarySearchFunc,
-  SlicesBinarySearchFuncSynchronousKernel as BinarySearchFuncSynchronous,
   SlicesCompactFuncKernel as CompactFunc,
-  SlicesCompactFuncSynchronousKernel as CompactFuncSynchronous,
   SlicesCompareFuncKernel as CompareFunc,
-  SlicesCompareFuncSynchronousKernel as CompareFuncSynchronous,
   SlicesContainsFuncKernel as ContainsFunc,
-  SlicesContainsFuncSynchronousKernel as ContainsFuncSynchronous,
   SlicesDeleteFuncKernel as DeleteFunc,
-  SlicesDeleteFuncSynchronousKernel as DeleteFuncSynchronous,
   SlicesEqualFuncKernel as EqualFunc,
-  SlicesEqualFuncSynchronousKernel as EqualFuncSynchronous,
   SlicesIndexFuncKernel as IndexFunc,
-  SlicesIndexFuncSynchronousKernel as IndexFuncSynchronous,
 } from "../src/internal/facets/generic-slices-kernel.js";
 import { sliceValues } from "../src/internal/runtime/slice.js";
 
@@ -57,22 +49,21 @@ const mapValue = <K, V>(source: GoMapValue<K, V>): GoMapValue<K, V> => source;
 const zeroNumber = (): number => 0;
 const zeroString = (): string => "";
 
-test("synchronous callback kernels agree with Go and canonical kernels", async (): Promise<void> => {
+test("canonical callback kernels agree with Go", (): void => {
   const expected = goResults();
-  assert.deepEqual(await canonicalResults(), expected);
-  assert.deepEqual(synchronousResults(), expected);
+  assert.deepEqual(canonicalResults(), expected);
 });
 
-test("synchronous callback kernels preserve canonical nil-call behavior", async (): Promise<void> => {
-  const canonicalFailures = await Promise.all([
-    captureAsyncFailure(() => ContainsFunc(
+test("canonical callback kernels preserve nil-call behavior", (): void => {
+  const failures = [
+    captureFailure(() => ContainsFunc(
       sliceValue,
       copyValue,
       copyValue,
       RuntimeSlice.literal([1]),
       undefined,
     )),
-    captureAsyncFailure(() => CompactFunc(
+    captureFailure(() => CompactFunc(
       sliceValue,
       sliceValue,
       copyValue,
@@ -82,35 +73,7 @@ test("synchronous callback kernels preserve canonical nil-call behavior", async 
       RuntimeSlice.literal([1, 2]),
       undefined,
     )),
-    captureAsyncFailure(() => MapsEqualFunc(
-      mapValue,
-      mapValue,
-      copyValue,
-      copyValue,
-      GoMap.make<string, number>(0, 0, [["a", 1]]),
-      GoMap.make<string, number>(0, 0, [["a", 1]]),
-      undefined,
-    )),
-  ]);
-  const synchronousFailures = [
-    captureFailure(() => ContainsFuncSynchronous(
-      sliceValue,
-      copyValue,
-      copyValue,
-      RuntimeSlice.literal([1]),
-      undefined,
-    )),
-    captureFailure(() => CompactFuncSynchronous(
-      sliceValue,
-      sliceValue,
-      copyValue,
-      copyValue,
-      copyValue,
-      zeroNumber,
-      RuntimeSlice.literal([1, 2]),
-      undefined,
-    )),
-    captureFailure(() => MapsEqualFuncSynchronous(
+    captureFailure(() => MapsEqualFunc(
       mapValue,
       mapValue,
       copyValue,
@@ -120,13 +83,12 @@ test("synchronous callback kernels preserve canonical nil-call behavior", async 
       undefined,
     )),
   ];
-  assert.deepEqual(synchronousFailures, canonicalFailures);
-  assert.equal(synchronousFailures.every((failure): boolean => failure !== ""), true);
+  assert.equal(failures.every((failure): boolean => failure !== ""), true);
 });
 
-async function canonicalResults(): Promise<CollectionResults> {
+function canonicalResults(): CollectionResults {
   const binaryTrace: string[] = [];
-  const binary = await BinarySearchFunc<RuntimeSlice<number>, number, number, number>(
+  const binary = BinarySearchFunc<RuntimeSlice<number>, number, number, number>(
     sliceValue,
     copyValue,
     copyValue,
@@ -138,7 +100,7 @@ async function canonicalResults(): Promise<CollectionResults> {
     },
   );
   const compareTrace: string[] = [];
-  const compare = await CompareFunc(
+  const compare = CompareFunc(
     sliceValue,
     sliceValue,
     copyValue,
@@ -153,7 +115,7 @@ async function canonicalResults(): Promise<CollectionResults> {
     },
   );
   const containsTrace: number[] = [];
-  const contains = await ContainsFunc(
+  const contains = ContainsFunc(
     sliceValue,
     copyValue,
     copyValue,
@@ -164,7 +126,7 @@ async function canonicalResults(): Promise<CollectionResults> {
     },
   );
   const equalTrace: string[] = [];
-  const equal = await EqualFunc(
+  const equal = EqualFunc(
     sliceValue,
     sliceValue,
     copyValue,
@@ -179,7 +141,7 @@ async function canonicalResults(): Promise<CollectionResults> {
     },
   );
   const indexTrace: number[] = [];
-  const index = await IndexFunc(
+  const index = IndexFunc(
     sliceValue,
     copyValue,
     copyValue,
@@ -191,7 +153,7 @@ async function canonicalResults(): Promise<CollectionResults> {
   );
   const compactTrace: string[] = [];
   const compactSource = RuntimeSlice.literal(["A", "a", "B", "b"]);
-  const compact = await CompactFunc(
+  const compact = CompactFunc(
     sliceValue,
     sliceValue,
     copyValue,
@@ -206,7 +168,7 @@ async function canonicalResults(): Promise<CollectionResults> {
   );
   const deleteTrace: number[] = [];
   const deleteSource = RuntimeSlice.literal([1, 2, 3, 4]);
-  const deleted = await DeleteFunc(
+  const deleted = DeleteFunc(
     sliceValue,
     sliceValue,
     copyValue,
@@ -220,137 +182,7 @@ async function canonicalResults(): Promise<CollectionResults> {
     },
   );
   let mapsEqualCalls = 0;
-  const mapsEqual = await MapsEqualFunc(
-    mapValue,
-    mapValue,
-    copyValue,
-    copyValue,
-    GoMap.make<string, number>(0, 0, [["a", 1], ["b", 2]]),
-    GoMap.make<string, number>(0, 0, [["a", 1], ["b", 2]]),
-    (left, right): boolean => {
-      mapsEqualCalls += 1;
-      return left === right;
-    },
-  );
-  return result(
-    binary,
-    binaryTrace,
-    compare,
-    compareTrace,
-    contains,
-    containsTrace,
-    equal,
-    equalTrace,
-    index,
-    indexTrace,
-    compact,
-    compactSource,
-    compactTrace,
-    deleted,
-    deleteSource,
-    deleteTrace,
-    mapsEqual,
-    mapsEqualCalls,
-  );
-}
-
-function synchronousResults(): CollectionResults {
-  const binaryTrace: string[] = [];
-  const binary = BinarySearchFuncSynchronous<RuntimeSlice<number>, number, number, number>(
-    sliceValue,
-    copyValue,
-    copyValue,
-    RuntimeSlice.literal([1, 3, 3, 8]),
-    3,
-    (left, right): bigint => {
-      binaryTrace.push(`${left}:${right}`);
-      return BigInt(left - right);
-    },
-  );
-  const compareTrace: string[] = [];
-  const compare = CompareFuncSynchronous(
-    sliceValue,
-    sliceValue,
-    copyValue,
-    copyValue,
-    copyValue,
-    copyValue,
-    RuntimeSlice.literal([1, 3, 5]),
-    RuntimeSlice.literal([1, 4, 0]),
-    (left: number, right: number): bigint => {
-      compareTrace.push(`${left}:${right}`);
-      return BigInt(left - right);
-    },
-  );
-  const containsTrace: number[] = [];
-  const contains = ContainsFuncSynchronous(
-    sliceValue,
-    copyValue,
-    copyValue,
-    RuntimeSlice.literal([1, 3, 8]),
-    (value: number): boolean => {
-      containsTrace.push(value);
-      return value > 5;
-    },
-  );
-  const equalTrace: string[] = [];
-  const equal = EqualFuncSynchronous(
-    sliceValue,
-    sliceValue,
-    copyValue,
-    copyValue,
-    copyValue,
-    copyValue,
-    RuntimeSlice.literal([1, 3, 8]),
-    RuntimeSlice.literal(["1", "x", "8"]),
-    (left: number, right: string): boolean => {
-      equalTrace.push(`${left}:${right}`);
-      return String(left) === right;
-    },
-  );
-  const indexTrace: number[] = [];
-  const index = IndexFuncSynchronous(
-    sliceValue,
-    copyValue,
-    copyValue,
-    RuntimeSlice.literal([1, 3, 8]),
-    (value: number): boolean => {
-      indexTrace.push(value);
-      return value % 2 === 0;
-    },
-  );
-  const compactTrace: string[] = [];
-  const compactSource = RuntimeSlice.literal(["A", "a", "B", "b"]);
-  const compact = CompactFuncSynchronous(
-    sliceValue,
-    sliceValue,
-    copyValue,
-    copyValue,
-    copyValue,
-    zeroString,
-    compactSource,
-    (left, right): boolean => {
-      compactTrace.push(`${left}:${right}`);
-      return left.toLowerCase() === right.toLowerCase();
-    },
-  );
-  const deleteTrace: number[] = [];
-  const deleteSource = RuntimeSlice.literal([1, 2, 3, 4]);
-  const deleted = DeleteFuncSynchronous(
-    sliceValue,
-    sliceValue,
-    copyValue,
-    copyValue,
-    copyValue,
-    zeroNumber,
-    deleteSource,
-    (value): boolean => {
-      deleteTrace.push(value);
-      return value % 2 === 0;
-    },
-  );
-  let mapsEqualCalls = 0;
-  const mapsEqual = MapsEqualFuncSynchronous(
+  const mapsEqual = MapsEqualFunc(
     mapValue,
     mapValue,
     copyValue,
@@ -436,15 +268,6 @@ function goResults(): CollectionResults {
     return JSON.parse(completed.stdout) as CollectionResults;
   } finally {
     rmSync(directory, { force: true, recursive: true });
-  }
-}
-
-async function captureAsyncFailure(operation: () => Promise<unknown>): Promise<string> {
-  try {
-    await operation();
-    return "";
-  } catch (failure: unknown) {
-    return String(failure);
   }
 }
 

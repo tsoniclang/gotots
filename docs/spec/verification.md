@@ -176,10 +176,10 @@ this boundary.
 An adversarial target-intrinsic fixture declares a Go `String` object while a
 conversion in the same module requires the target `String.fromCharCode`.
 Strict artifacts retain the Go name and qualify the host value through
-`globalThis`. A second fixture declares a Go generic type named `Promise` while
-emitting a cooperative callable: the Go type is target-renamed, while the
-callable retains idiomatic global `Promise<T>`. A closed contract test
-enumerates every supported host value and reserved host type identity.
+`globalThis`. A second fixture declares a Go generic type named `Promise` and
+proves that the closed target-intrinsic owner applies its deterministic target
+rename without making the source callable Promise-bearing. A closed contract
+test enumerates every supported host value and reserved host type identity.
 Replacing a qualified host value with a bare identifier, or removing the host
 type reservation, must fail strict typechecking or the intrinsic-shape gate.
 The same artifact inspection declares a Go `Object` type: the declaration is
@@ -225,8 +225,8 @@ heritage entry, add an unrelated entry, collapse distinct source-owned
 surfaces, change one type argument, or omit one reached provider capability;
 each must fail before output is sealed.
 
-The adapter-shape gate separately partitions adapters by their exact demanded
-Go method set. A zero-method adapter must be one typed call to the canonical
+The adapter-shape gate separately partitions ordinary adapters by their exact
+demanded Go method set. A zero-method ordinary adapter must be one typed call to the canonical
 interface-value adapter factory plus its concrete equality/hash/format
 operations; it must contain no repeated class body or per-adapter method-token
 set. A method-bearing adapter must remain a concrete class and contain exactly
@@ -237,6 +237,14 @@ the class path, drop one concrete operation, or route a method-bearing type
 through the zero-method factory; each fails the shape, strict-typecheck,
 differential, or method-demand join before output is sealed.
 
+Reflection-created adapters use the same demanded-method shape, but their
+requirements are released by the quiescent reflection-interface join. A
+fixture presents many matching assertion contracts before and after one
+exposure and proves one reconstruction per quiescent wave, one requirement per
+distinct matched contract, no unasserted concrete methods, and output growth
+linear in selected methods. A foil reflected `*sync.Mutex` must not demand
+`TryLock` when no reached assertion contains it.
+
 For each function, literal, concrete method, interface method, function type,
 method value/expression, provider/environment callable, and generic
 concretization, record:
@@ -246,7 +254,7 @@ concretization, record:
 - ordered value parameters and variadic bit;
 - ordered results;
 - ordered source type parameters;
-- selected cooperative result mapping;
+- direct synchronous result mapping;
 - target declaration identity.
 
 The gate asserts:
@@ -257,7 +265,7 @@ The gate asserts:
 - every source call supplies exactly the source argument cardinality;
 - package exports expose each demanded cross-package representation binding
   exactly once and expose no private or undemanded support declaration;
-- indirect callable/interface ABI changes only result Awaitability;
+- indirect callable/interface ABI preserves the direct result contract;
 - private deferred/concretized/facade helpers claim no source identity.
 
 Static searches reject source-facing occurrences of:
@@ -267,7 +275,7 @@ Static searches reject source-facing occurrences of:
   parameters;
 - provider policy/bridge/capability arguments;
 - public `$Value`/storage/effect type parameters;
-- digest-named cooperative/profile exports.
+- digest-named effect/profile exports.
 
 Required mutations append each forbidden parameter/type parameter, publish a
 private helper, alter receiver placement, duplicate a variadic slot, or select
@@ -325,7 +333,7 @@ Each type/value family has focused differentials and mutations:
 | pointers | canonical marker facts, nil, alias, read/store, equality, local/field/index addresses, target flow lowering |
 | unsafe pointers | opaque bind/nil/copy/interface/equality/hash/map identity; reinterpretation, arithmetic, pointer/integer, and provider-input boundaries |
 | maps | nil, set/get/comma-ok/delete/clear, key equality/hash, zero-on-miss, iteration |
-| strings | bytes/runes, indexing, range, slicing, conversions |
+| strings | bytes/runes, indexing, range, slicing, conversions, host text/raw-byte boundaries |
 | defined types | identity, native fixed-width numerics with value/pointer methods, projection/wrap, method calls/expressions/values, interfaces, nil-capable families |
 
 Large-static-array proof includes a keyed sparse literal above the 4096-entry
@@ -360,6 +368,14 @@ collapse or change those keys and fail before product runtime certification.
 The same fixture under `number` is recorded as profile boundary evidence,
 never as parity.
 
+Host-boundary string proof writes valid multibyte UTF-8, NUL, and invalid UTF-8
+through the selected `os.File.WriteString` provider and exact-compares the raw
+file bytes and reported byte count with Go. A direct codec round trip proves
+the one-code-unit-per-byte representation. Passing the canonical Go string to
+Node's string-writing overload must fail this gate by double-encoding the
+multibyte bytes; conversion by decoded host text must fail the invalid-UTF-8
+case.
+
 Embed fixtures exact-join parsed directives, selected toolchain patterns,
 selected files, variable identities, and immutable payload bytes. They cover
 quoted names, ordinary versus overlapping `all:` trees, string, byte-slice,
@@ -371,6 +387,16 @@ or leak hidden files through an ordinary pattern; each fails at its owner.
 Every test inspects generated source and reports bytes/AST nodes. A mutation
 that always emits copy carriers/helpers, uses JavaScript identity for Go map
 keys, drops nil checks, or restores a target non-null assertion must fail.
+
+An open-generic address fixture takes `&box.Value` where the canonical field
+has storage type `GoStorage<T>`. The generated artifact must address that exact
+slot and project it bidirectionally to `Pointer<T>` before any assignment,
+call, or interface adaptation; generated-AST shape and strict typechecking
+prove that the logical and storage contracts cannot be conflated. The pointer
+runtime differential separately proves that a bidirectional projection keeps
+the same mutable location. A mutation returning the raw
+`Pointer<GoStorage<T>>`, projecting only one direction, or treating an open type
+parameter as identity storage must fail at these owners.
 
 Map proof additionally requires the common `GoMapValue<K,V>` surface to be one
 nominal abstract class with the canonical private Promise-assimilation
@@ -505,13 +531,13 @@ comparability panic, map keys, and method values.
 Scaling fixtures hold one call site constant while implementer count grows.
 Call-site bytes/AST nodes must remain constant. Adapter growth is attributed by
 exact concrete type and demanded contract. Mutations restore implementer
-switches, duplicate adapters, emit complete concrete method sets, use
+switches, duplicate adapters, emit complete concrete method sets for ordinary
+conversion adapters, use
 constructor identity, erase payloads, or bypass selected method ownership.
 
-Under cooperative mode, synchronous and blocking concrete methods both satisfy
-one `Awaitable` interface declaration. Indirect calls are awaited without
-thenable tests. A mutation creating method-profile variants or widening
-source type arity fails.
+Every concrete method and generated interface declaration uses the same direct
+synchronous result contract. A mutation that makes either side Promise-bearing,
+creates method-effect variants, or widens source type arity fails.
 
 ## Reflection Proof
 
@@ -524,12 +550,48 @@ ESM for:
 - field count/index/name/tag/embedding/export and recursive field types;
 - `ValueOf`, nil/invalid/addressable/settable state, pointer `Elem`, fields,
   indexes, maps, scalar projections, mutation, zero, and interface recovery;
+- pointer `Elem` over interface, pointer, array, named and unnamed aggregate,
+  function, channel, container, and scalar pointees, including nil pointers,
+  direct mutation of the original location, interface dynamic-box replacement,
+  aggregate copy isolation, repeated pointer depth, and `New` from the same
+  canonical zero owner; deleting one pointee class or restoring an empty
+  registration must fail before product replay;
+- `Addr` over pointer elements, struct fields, and slice elements, including
+  exact pointer-interface assertion, repeated-address equality, `Type`/`Elem`
+  identity, `ValueOf(Addr().Interface())` type recovery, and mutation of the
+  original storage without eager pointer-reflection closure; an address-only
+  instantiated generic child whose pointer implements an asserted interface
+  must carry that exact method contract and dispatch against the original
+  location;
 - reflective map/slice/pointer construction and iterator behavior;
+- pointer and aggregate slice index/append/make/grow behavior, including
+  capacity reuse versus reallocation, fresh aggregate zeros, value-copy
+  isolation, pointer nilness, and no writes when grow reuses capacity;
+- pointer and aggregate map key/value lookup, assignment, deletion,
+  construction, key iteration, and value-copy isolation through each selected
+  canonical map representation;
+- interface map keys and values, including nil keys, present nil values,
+  absent entries, explicit deletion, mutation, and iterator key/value typing;
 - dynamic `PointerTo` composition with no source-level `*T`, canonical repeated
   lookup, repeated pointer depth, and value-versus-pointer method-set
   implementation checks;
 - open generic `TypeFor[T]` through exact private capability or
   concretization, with unchanged source value arity.
+
+Mutating an address callback to omit reflection-interface exposure must
+remove the address-only interface method and fail artifact inspection before
+runtime. Mutating it to ordinary empty-interface membership, eager per-contract
+reconstruction, complete concrete-method-set emission, or eager pointer-
+descriptor demand must fail the bounded-closure gate. Registry proof covers
+both discovery orders, exact-joins only implemented reached contracts, and
+asserts that exposure itself yields zero contract, reflection-descriptor, or
+value-operation requests before quiescence.
+
+Constructor proof covers value- and pointer-method contracts on values created
+by `Zero` and `New`, where no concrete source value previously crossed the
+empty-interface boundary. Removing reflection exposure from a
+value-operation registration must leave the constructed adapter without its
+asserted method and fail artifact inspection before runtime.
 
 Provider-facet tests independently certify the metadata operation target and
 its concrete result target. The checked return type of `$create` must
@@ -588,6 +650,14 @@ the descriptor-shape, strict-typecheck, native-Go differential, or generated-
 size gate must fail before output is sealed. Broad artifact searches prove
 that each migrated semantic family has one typed registration route and no
 superseded direct `$registerValue` registration.
+
+Container-operation mutations restore the former basic-scalar whitelist,
+reuse one aggregate zero object across slots, move aggregate storage without a
+Go value copy, make every append reallocate, overwrite a latent tail during
+`Value.Grow`, or bypass the canonical map representation. Each must fail at the
+source-ownership wall, generated descriptor inspection, strict typecheck, or
+Go differential. Broad source searches prove the reduced-slice route and
+map/slice-local scalar-zero selection are absent.
 
 Struct, opaque-struct, and pointer registration fixtures prove that adapter
 resolvers are not evaluated at registration, are evaluated exactly once at
@@ -716,126 +786,71 @@ strict typechecking and nil-call behavior. A pinned-checker fixture proves the
 nullish expression narrows the callable without a helper call. Broad artifact
 search rejects the former conditional and assertion paths.
 
-## Cooperative-Concurrency Proof
+## Serial-Execution Proof
 
-The selected race-free cooperative profile exits only with:
+The fixed execution contract proves immediate goroutine evaluation, ready
+buffered channel send/receive, ready and default select, close/len/cap, closed
+receive, and a loud typed boundary for every operation that would suspend.
+Generated artifacts must contain no `Promise`, `async`, `await`, awaitable
+union, execution scheduler, host task dispatch, blocked sender/receiver queue,
+or callable-effect variant. Mutations that restore any one of those paths,
+admit a silent unready operation, or fabricate an unbuffered rendezvous fail
+the shape and differential gates.
 
-- unbuffered/buffered/nil/closed channel cases;
-- send/receive/range and element copy;
-- direct/select waiter FIFO interaction;
-- ready/default/blocking select, fair choice, cancellation, same-channel and
-  select-to-select rendezvous;
-- goroutine argument capture, main return, panic, deadlock, and settlement;
-- provider-spawned task failure reaching its typed wait/settlement owner rather
-  than becoming a discarded Promise rejection;
-- direct calls, first-class values, interfaces, callbacks, generic callables,
-  package initializers, and deferred calls.
+The direct-callable proof covers every generated source function, method,
+literal, callable value, interface method, named callable, package initializer,
+deferred entry, provider facade, stateful provider profile, and generic kernel.
+Declaration, storage, ordinary and detached invocation, interface transport,
+defer capture, callback arguments, and nested callable parameters/results must
+all exact-join the same synchronous source signature. Mutations that make only
+one surface Promise-bearing, add an effect type parameter, create a second
+callable profile, or defer incompatibility to target typechecking fail before
+publication.
 
-Callable shape proof requires:
+Provider source inspection and certification prove that every selected export,
+method, projection, facade, kernel, callback, and nested callable contract is
+synchronous. A Go identity admits at most one callable certificate. Mutations
+return `Promise<T>`, return `T | Promise<T>`, mark a declaration `async`, add a
+second effect certificate, mix effects within one profile, or substitute a
+suspending stateful member; each fails at source inspection or exact contract
+selection before generated source is sealed.
 
-- direct synchronous callables remain synchronous;
-- direct blocking callables become Promise-bearing;
-- all transported values of one exact Go signature use one
-  `Awaitable` ABI;
-- all generated interface methods use the equivalent canonical ABI;
-- indirect calls unconditionally await;
-- no per-method/combinatorial profile variants, hidden effect type parameters,
-  result runtime tests, or transport/dataflow graph.
+Channel and goroutine fixtures cover:
 
-Provider contract validation separately proves that every boundary certificate
-is uniform: all transported methods are synchronous for direct mode or all are
-`Awaitable` for cooperative mode. A Go identity admits at most one certificate
-per mode. Mutations adding a second certificate in either mode or mixing the
-two effects inside one certificate fail before emission.
+- argument evaluation/copy and immediate `go` invocation;
+- buffered FIFO send/receive, range, element copy, close, len, and cap;
+- nil, unbuffered, empty, full, closed, and double-close boundaries;
+- one-case, multi-case, same-channel, ready, and default `select`, including
+  one evaluation per operand and fair choice among ready alternatives;
+- absence of blocked-operation storage and cancellation registration; and
+- close-observer registration, unregistration, already-closed observation, and
+  proof that the observer cannot transfer a value or wait for readiness.
 
-Portable cooperative sorting is exercised with both synchronous and genuinely
-asynchronous comparators, stable equal-key ordering, empty input with a nil
-comparator, and a comparison-count bound proportional to `n log n`. The
-separately certified synchronous kernel must produce the same values, panic,
-and comparison trace as the canonical kernel for synchronous comparators while
-returning no Promise. A generated fixture exact-joins a direct synchronous
-callback to the synchronous concretization and retains the canonical path for
-an unresolved, interface-method, open-field, function-variable, or cooperative
-callback. A concrete synchronous method value selects the synchronous path.
-A private function-valued field selects it only when the checker-map index and
-loader-owned exact parent relation account for every selected write and prove
-all possible values synchronous. An architecture mutation that restores a
-second recursive emission walk fails before behavioral tests;
-mutations export the field, take its address, add an unknown or cooperative
-write, add an opaque non-Go package file, or replace the concrete method with
-an interface method, and each must restore the canonical path. A stored
-cooperative function literal created by another artifact also remains
-canonical rather than borrowing the consumer's effect owner. A direct
-synchronous callback containing defer/recover remains on the synchronous
-ordinary-entry path while its emitted callable retains the recovery envelope.
-The closed-field fixture additionally strict-typechecks the field declaration,
-storage projection, ordinary invocation, detached invocation, deferred
-capture, and synchronous generic argument as one artifact. It proves that all
-source-value surfaces use the same non-`Awaitable` signature while deferred
-recovery transport remains independently canonical. Mutations leave only the
-declaration or only one invocation form canonical, or change one assignment to
-an open value; the first two fail artifact/strict-typecheck/effect gates and
-the last restores the canonical path everywhere. The open-field fixture proves
-the converse.
-Broad search rejects a second field-effect resolver, a callable cast, a
-Promise-result test, and a target-owned repair.
-Mutations swap either kernel, change a callback effect, omit the effect from
-concretization identity, or classify a function variable as direct; each fails
-at certification, identity, artifact, strict-typecheck, or differential gates.
-Provider source inspection rejects
-recursive subarray sorting, iterator-per-merge allocation, native sorting of
-an `Awaitable` comparator, and runtime Promise inspection.
+Generic provider kernels including `slices.BinarySearchFunc`, `CompareFunc`,
+`ContainsFunc`, `EqualFunc`, `IndexFunc`, `CompactFunc`, `DeleteFunc`, and
+`maps.EqualFunc` are compared with the selected Go toolchain for values,
+callback order, short-circuiting, nil-call panic behavior, and observable
+mutation. `CompactFunc` additionally proves current-before-previous callback
+order, in-place backing-store mutation, returned reslice, and zeroed tail. An
+absent or suspending kernel fails closed. Changing projection, callback index,
+source identity, capability, or direct effect fails contract certification.
 
-The same proof closes every selected generic provider kernel whose only
-possible suspension source is its callback: `slices.BinarySearchFunc`,
-`CompareFunc`, `ContainsFunc`, `EqualFunc`, `IndexFunc`, `CompactFunc`,
-`DeleteFunc`, and `maps.EqualFunc`. For each identity, the synchronous kernel
-is compared with both the canonical kernel and the selected Go toolchain for
-result values, callback order and short-circuiting, nil-call panic behavior,
-and observable mutation. `CompactFunc` additionally proves Go's current-before-
-previous callback order, in-place backing-store mutation, returned reslice,
-and zeroed tail. Direct synchronous callbacks must select each synchronous
-kernel; an open callback must retain its canonical kernel. Removing one pair
-is caught by the generated-artifact join, while changing projection, callback
-index, effect, source identity, or capability is caught by contract
-certification. Iterator/sequence APIs remain canonical because their sequence,
-not only their callback, may suspend; a synchronous callback alone is not
-evidence for a synchronous outer kernel.
+The certifier independently derives the total directional obligation multiset
+for every provider callable. It recursively records inward synchronous
+interface-method and callable-value contracts by source parameter root,
+including nested callbacks, and exact-joins them to ordinary bindings and
+private facade certificates. Result roots remain outward conversions. Mutations
+remove a required facade, add an unneeded result-only facade, reverse a
+direction, omit a nested callable, or duplicate a certificate; each fails with
+the exact Go callable and root identity.
 
-The certifier independently derives a total directional obligation multiset
-over every provider callable. It recursively records inward interface-method and
-callable-value effects by source parameter root, including nested callbacks,
-then exact-joins that multiset to ordinary bindings and private facade
-certificates. Result roots are verified as conversions on the selected target
-but do not enter the inward obligation set. Mutations remove `sort.Sort`'s
-interface facade, remove `sort.Search`'s callback facade, change a callback from
-`Awaitable` to synchronous, add an unneeded result-only facade, or add a second
-certificate for one effect; each must fail certification with the exact Go
-callable and root identity.
-
-The same gate distinguishes unnamed direct callbacks from named function-value
-representations. A mutation that inserts a nested callable below a direct
-callback must either produce a typed nested-path certificate or fail at contract
-generation; observing only the outer function result is not sufficient proof.
-
-Callable-field proof combines one closed unnamed field, one generic field
-initialized from an open function parameter, one defined function-typed field,
-one cooperative provider, one addressed field, and one reflection-demanded
-private field. The closed field's declaration, storage, ordinary/detached call,
-deferred capture, and synchronous generic-kernel argument all use the same
-non-`Awaitable` transport. The generic selected write exact-joins its generic
-declaration and keeps that declaration canonical; the defined function type
-keeps its named wrapper and payload call. Reflection reports the private field
-as non-settable and emits a panic-only setter with no field assignment. The
-combined generated project must strict-typecheck. Mutations that key generic
-writes by selected identity, admit a defined function type, narrow only a call
-site, or restore the unreachable private reflection assignment fail at the
-write-index, artifact-shape, or strict-typecheck owner.
-
-Mutations split direct/select queues, use historical queue storage, omit
-cancellation, bias source order, treat nil as ready, settle before pending
-Promises, globalize all functions as async, restore callable-profile variants,
-or test a result for Promise shape.
+Callable-field proof combines unnamed, defined, generic, addressed, and
+reflection-demanded function-valued fields. Every declaration, storage
+projection, ordinary/detached call, deferred capture, and generic-kernel
+argument keeps the same direct function type. Reflection reports an unexported
+field as non-settable and emits a panic-only setter with no assignment. A cast,
+runtime result test, target-owned repair, or field-specific effect resolver is
+forbidden.
 
 An architecture wall permits production class construction only through the
 one generated-class owner, and a non-vacuous mutation restores a raw factory
@@ -849,12 +864,12 @@ restores one production raw class-factory call, omits the root member, adds it
 again to a derived class, or stops reserving the authored field must fail at
 the architecture, AST-shape, strict-typecheck, or runtime differential gate.
 
-A target differential removes the nominal member and must retain an otherwise
-synchronous generated-value result flow because structural TypeScript permits
-a hidden callable `then`; restoring the member must settle the same flow
-without runtime Promise inspection.
+A target differential removes the nominal member and demonstrates that a host
+Promise may assimilate an otherwise ordinary generated Go value with a hidden
+callable `then`; restoring the member prevents that assimilation without
+runtime result inspection.
 
-Measurements report queue storage, runtime bytes, call-site AST size,
+Measurements report channel storage, runtime bytes, call-site AST size,
 typecheck time/RSS, and representative runtime.
 
 ## Provider Proof
@@ -870,8 +885,8 @@ package must fail the wall.
 
 Required source and artifact fixtures include ordinary functions, value/pointer
 methods, interfaces in both directions, callbacks, nested containers,
-provider-created values, constants, package state, generic operations,
-cooperative calls, and deferred recovery.
+provider-created values, constants, package state, generic operations, direct
+callback calls, and deferred recovery.
 
 Nested-container proof mutates a provider slice and its generated projection in
 both directions, then reslices, appends with and without reallocation, and uses
@@ -880,6 +895,15 @@ Go. Artifact inspection proves equal-representation slices remain direct and a
 differing element emits one `RuntimeSliceProjection<F,T>` with reciprocal typed
 element conversions. Replacing the projection with an eager copy, omitting the
 reverse conversion, or projecting an equal carrier must fail.
+
+Generic slice-assignment proof uses aggregate elements with mutable fields and
+exercises clone, concatenation, deletion, insertion, repetition, replacement,
+and reversal, including overlapping source/replacement slices and both
+capacity-preserving and reallocating paths. It exact-compares values, nilness,
+length, capacity-envelope behavior, tail zeroing, and backing aliases with Go.
+A mutation that removes logical copy, swaps raw storage references, omits tail
+zeroing, or always reallocates must fail at the provider differential or the
+generated-kernel artifact gate.
 Projected contiguous-region proof verifies that nil stays nil and a non-nil
 request reaches the projection's explicit typed unsupported boundary rather
 than inheriting the direct slice's raw-backing implementation.
@@ -900,6 +924,14 @@ transported method effect or member and require distinct artifacts. A broad
 artifact inspection also bounds the readable bridge export name by its compact
 semantic shape; restoring the complete certificate descriptor to every
 identifier must fail the source-size gate.
+
+Callable-profile selection is exercised across compilation profiles that make
+different proper subsets of one source signature ABI-incompatible. One target
+may certify the union, but the generated crossing projection must equal the
+currently affected subset. Mutations remove a needed certified root, convert
+an unaffected root, remove a transitive interface certificate, or make a
+second target match; each must fail at profile selection or artifact inspection
+with the source callable and exact root/interface evidence.
 
 Scalar-boundary fixtures cross every signedness, fixed-width, and native-width
 class in both directions. Equal product/provider carriers must produce no
@@ -931,7 +963,7 @@ escape. Mutations alter the section schema, declaration path, target type, or
 write index; duplicate a member; remove a provider body; use the same spelling
 from another declaration; or introduce one unaccounted carrier reference. Each
 must fail at certification, exact declaration selection, or closed-carrier
-admission before cooperative effects are removed.
+admission.
 
 Provider-created dynamic-interface proof additionally exact-joins every
 configured capability view to its base Go interface, target Go interface,
@@ -955,8 +987,8 @@ proves provider-internal views never enter generated bridges and each demanded
 generated-bridge view is evaluated once per provider crossing. Mutating the
 usage, substituting a direct-profile view for a canonical-profile view, or
 removing the sole ABI-compatible candidate must fail before printing generated
-source. Direct and cooperative differential fixtures inspect the emitted view
-calls and reject the opposite ABI even when its Go method contract is identical.
+source. Differential fixtures inspect the emitted direct view calls and reject
+an asynchronous ABI even when its Go method contract is otherwise identical.
 
 Mutations remove a view, change its base or target type, return the target
 unconditionally, drop or add a method token, omit delegated result conversion,
@@ -969,7 +1001,7 @@ each demanded call remains constant-size as provider implementer count grows.
 The source-shape gate verifies facade arity. Artifact inspection proves calls
 contain only source arguments and support is imported at module scope.
 Provider-owned named-callable fixtures prove that generated annotations retain
-the source type-parameter arity and canonical `Awaitable` result recursively.
+the source type-parameter arity and direct synchronous result recursively.
 They also inspect the provider facade and prove that a differing provider
 callback ABI is adapted there, not exposed as a public type parameter, default,
 constraint, profile alias, or generated call argument. Removing the bridge or
@@ -982,14 +1014,12 @@ provider-to-generated bridges. Mutations swap two support classes, substitute
 one structurally similar marker, omit one dependency, or add a policy-object
 parameter; each fails contract generation at the exact parameter identity.
 
-For every generic provider kernel, certification also exact-joins the kernel's
-outer effect and callback-parameter effects to the public binding document.
-An optional synchronous narrowing exact-joins the same source identity, type
-projection, operations, source arity, and callback indexes while requiring a
-synchronous outer effect and synchronous callback effects. Mutations change
-either side between synchronous and `Awaitable`, pair non-identical callback
-indexes, duplicate either capability, or expose a capability as a public source
-parameter; each fails before emission.
+For every generic provider kernel, certification exact-joins its synchronous
+outer effect and synchronous callback-parameter effects to the public binding
+document together with source identity, type projection, operations, source
+arity, and callback indexes. Mutations make either side asynchronous, pair
+non-identical callback indexes, duplicate the capability, or expose it as a
+public source parameter; each fails before emission.
 
 Generic-boundary differentials include concrete and open instances. A
 `cmp.Or[int]` fixture proves that generic-owned `[]T` remains
@@ -1020,12 +1050,13 @@ emission, or silently fall back to ambient mode.
 independently. Generated product linkage proves the same physical runtime
 module is used by provider and generated code.
 
-Provider-source strict typechecking uses the generated direct-profile runtime
-harness. Runtime generation tests separately inspect direct and cooperative
-contracts, and the linked cooperative product must strict-typecheck provider
-declarations against its own generated cooperative runtime. Mutating either
-profile selection, or substituting the direct harness into the cooperative
-product, must fail at the exact interface method effect.
+Provider-source strict typechecking uses the one generated synchronous
+provider-certification harness. Runtime generation tests inspect that exact
+contract and the demand-closed linked product runtime. Mutating an interface
+method, callback, facade, kernel, channel surface, or stateful method to become
+Promise-bearing must fail at the exact effect. A generated product must not
+demand `Awaitable<T>` or any execution scheduler/waiter symbol; restoring such
+a demand fails the runtime-assembly and generated-artifact shape gates.
 
 Provider packaging begins from an empty emitted-output tree. A package
 artifact contains exactly current source-owned outputs; deleting a source
@@ -1132,11 +1163,26 @@ manifest gate. It emits neither a target `tsconfig` nor a fabricated
 that exact immutable source using its authoritative virtual marker modules and
 exact-join every selected marker to one finalized fact before a target runs.
 The selected target must then strict-typecheck its complete executable output;
-removing `type: module` makes a cooperative top-level-await artifact fail at
-that target gate. Rebuilding over a populated output directory must replace the
+removing `type: module` makes an ESM-only generated artifact fail at that target
+gate. Rebuilding over a populated output directory must replace the
 complete compiler-owned artifact set: a seeded obsolete source file and an old
 target `tsconfig` must both disappear, and the sorted manifest membership
 (including the manifest itself) must exact-join the physical file set.
+
+The output-lifecycle gate proves the compiler seals and officially encodes the
+complete TS-Go AST before starting the printer. The post-compilation print plan
+may retain only output identities, official encoded protocol payload locations,
+the flattened runtime manifest, package dependencies, and semantic digest; a
+structural reachability audit rejects source AST, `go/types`, loader,
+certificate, emitter-session, mutable TS-Go node, or callback state. A focused
+round trip exact-compares direct `PrintNode` output with printing the staged
+official encoding, including multiple files, payload mutation, and a printer failure. Successful
+publication contains no protocol scratch. The guarded whole-product gate runs
+compiler and printer under one process-tree ceiling and records both phase
+peaks. Mutations that start the printer before the release boundary, retain one
+target node in the print plan, omit the explicit release, publish protocol
+scratch, or accumulate every printed file in memory fail at the lifecycle,
+membership, or resource gate.
 
 For each source implementation, GoToTS certification independently inspects the
 selected Go package, the ordinary generated package assembly, and the authored
@@ -1153,6 +1199,17 @@ target then lowers and strict-typechecks both complete executable sets with one
 final module-resolution configuration. The installed check proves all selected
 consumer requirements; TSTS exact-joins callable source signatures in that
 canonical check.
+
+The lifecycle fixture prepares authored projects before loading its Go program,
+then proves that package identity, build profile, and every private Go-file
+claim are still checked by the post-load join. Missing packages, changed module
+identity, build drift, and missing private files fail only at that join with
+the exact claimed identity. The prepared type exposes no emission certificate
+and retains no loader/checker object. The guarded whole-product resource gate
+is the mutation proof for phase ordering: moving TS-Go preparation after the
+provider certificate or whole-product load must exceed the frozen process-tree
+peak bound, while the prerequisite-first transaction stays below it with
+identical sealed evidence.
 
 The final-artifact gate additionally proves session isolation. A fixture with
 a public package value and an unrelated private type must retain the public

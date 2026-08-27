@@ -49,7 +49,6 @@ func Wait(values <-chan int32) int32 {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {
 		t.Fatal(err)
@@ -60,7 +59,7 @@ func Wait(values <-chan int32) int32 {
 		"export class Promise__shadow_1<T>",
 		"export class Object__shadow_1",
 		"export function Wrap(value: int32): Promise__shadow_1<int32>",
-		"export async function Wait(values: GoReceiveChannel<int32> | undefined): Promise<int32>",
+		"export function Wait(values: GoReceiveChannel<int32> | undefined): int32",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("Promise target-type boundary lacks %q:\n%s", required, artifacts.printed)

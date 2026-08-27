@@ -19,7 +19,7 @@ import (
 func TestRunPrintsResolvedConfigWithoutBuilding(t *testing.T) {
 	root := t.TempDir()
 	writeCommandFixture(t, filepath.Join(root, "gotots.json"), `{
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "distribution": {"root": "`+filepath.ToSlash(repositoryRoot(t))+`"},
   "source": {"root": ".", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
@@ -43,11 +43,11 @@ func TestRunBuildsSimpleProgramThroughPinnedTSGo(t *testing.T) {
 	writeCommandFixture(t, filepath.Join(root, "go.mod"), "module example.test/app\n\ngo 1.26.4\n")
 	writeCommandFixture(t, filepath.Join(root, "main.go"), "package main\nfunc main() {}\n")
 	writeCommandFixture(t, filepath.Join(root, "gotots.json"), `{
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "distribution": {"root": "`+filepath.ToSlash(repositoryRoot(t))+`"},
   "source": {"root": ".", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
-  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
   "implementations": {"bundles": []},
   "output": {"directory": "generated"}
@@ -93,11 +93,11 @@ func Increment(value int32) int32 {
 }
 `)
 	writeCommandFixture(t, filepath.Join(root, "gotots.json"), `{
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "distribution": {"root": "`+filepath.ToSlash(repositoryRoot(t))+`"},
   "source": {"root": ".", "package": ".", "mode": "exported"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
-  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
   "implementations": {"bundles": []},
   "output": {"directory": "generated"}
@@ -241,10 +241,18 @@ func assertManifestMatchesOutput(t *testing.T, root string) {
 		t.Fatal(err)
 	}
 	var manifest struct {
-		Files []string `json:"files"`
+		SchemaVersion int      `json:"schemaVersion"`
+		Files         []string `json:"files"`
 	}
 	if err := json.Unmarshal(payload, &manifest); err != nil {
 		t.Fatal(err)
+	}
+	if manifest.SchemaVersion != buildManifestSchemaVersion {
+		t.Fatalf(
+			"build manifest schema = %d, want %d",
+			manifest.SchemaVersion,
+			buildManifestSchemaVersion,
+		)
 	}
 	actual := make([]string, 0, len(manifest.Files))
 	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {

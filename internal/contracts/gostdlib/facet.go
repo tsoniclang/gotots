@@ -27,22 +27,21 @@ func (k FacetKind) Valid() bool {
 type FacetCapability string
 
 const (
-	FacetCapabilityInvalid           FacetCapability = ""
-	FacetCapabilityMake              FacetCapability = "make"
-	FacetCapabilityZero              FacetCapability = "zero"
-	FacetCapabilityCopy              FacetCapability = "copy"
-	FacetCapabilityEqual             FacetCapability = "equal"
-	FacetCapabilityHash              FacetCapability = "hash"
-	FacetCapabilityConvert           FacetCapability = "convert"
-	FacetCapabilityStorage           FacetCapability = "storage"
-	FacetCapabilityAssign            FacetCapability = "assign"
-	FacetCapabilityRepresentation    FacetCapability = "representation"
-	FacetCapabilityRecovery          FacetCapability = "recovery"
-	FacetCapabilityKernel            FacetCapability = "kernel"
-	FacetCapabilitySynchronousKernel FacetCapability = "synchronous-kernel"
-	FacetCapabilityProject           FacetCapability = "project"
-	FacetCapabilityWrap              FacetCapability = "wrap"
-	FacetCapabilityMetadata          FacetCapability = "metadata"
+	FacetCapabilityInvalid        FacetCapability = ""
+	FacetCapabilityMake           FacetCapability = "make"
+	FacetCapabilityZero           FacetCapability = "zero"
+	FacetCapabilityCopy           FacetCapability = "copy"
+	FacetCapabilityEqual          FacetCapability = "equal"
+	FacetCapabilityHash           FacetCapability = "hash"
+	FacetCapabilityConvert        FacetCapability = "convert"
+	FacetCapabilityStorage        FacetCapability = "storage"
+	FacetCapabilityAssign         FacetCapability = "assign"
+	FacetCapabilityRepresentation FacetCapability = "representation"
+	FacetCapabilityRecovery       FacetCapability = "recovery"
+	FacetCapabilityKernel         FacetCapability = "kernel"
+	FacetCapabilityProject        FacetCapability = "project"
+	FacetCapabilityWrap           FacetCapability = "wrap"
+	FacetCapabilityMetadata       FacetCapability = "metadata"
 )
 
 func (c FacetCapability) NamedStructOperation() bool {
@@ -69,20 +68,12 @@ func (c FacetCapability) DefinedValueOperation() bool {
 type EffectKind string
 
 const (
-	EffectInvalid      EffectKind = ""
-	EffectSynchronous  EffectKind = "sync"
-	EffectAsynchronous EffectKind = "async"
-	EffectAwaitable    EffectKind = "awaitable"
+	EffectInvalid     EffectKind = ""
+	EffectSynchronous EffectKind = "sync"
 )
 
 func (k EffectKind) Valid() bool {
-	return k == EffectSynchronous ||
-		k == EffectAsynchronous ||
-		k == EffectAwaitable
-}
-
-func (k EffectKind) MaySuspend() bool {
-	return k == EffectAsynchronous || k == EffectAwaitable
+	return k == EffectSynchronous
 }
 
 type FacetModuleDocument struct {

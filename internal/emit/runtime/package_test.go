@@ -15,7 +15,6 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 	assembled, err := AssemblePackage(
 		tsgo.NewFactory(),
 		testScalarABI(t, api.IntegerRepresentationNumber),
-		api.ConcurrencySemanticsDisabled,
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeStringIndex: {},
 		},
@@ -91,7 +90,6 @@ func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
 	_, err := AssemblePackage(
 		tsgo.NewFactory(),
 		testScalarABI(t, api.IntegerRepresentationNumber),
-		api.ConcurrencySemanticsDisabled,
 		nil,
 		[]api.PrimitiveAlias{
 			api.PrimitiveInt32,
@@ -107,7 +105,6 @@ func TestSameModuleRuntimeDependenciesPrecedeConsumers(t *testing.T) {
 	assembled, err := AssemblePackage(
 		tsgo.NewFactory(),
 		testScalarABI(t, api.IntegerRepresentationNumber),
-		api.ConcurrencySemanticsDisabled,
 		map[api.RuntimeSymbol]struct{}{api.RuntimeMap: {}},
 		nil,
 	)
@@ -130,44 +127,72 @@ func TestSameModuleRuntimeDependenciesPrecedeConsumers(t *testing.T) {
 	}
 }
 
-func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
-	factory := tsgo.NewFactory()
-	without, err := AssemblePackage(
-		factory,
+func TestProviderCertificationRuntimeHasOneExactSynchronousContract(t *testing.T) {
+	assembled, err := AssembleProviderCertificationPackage(
+		tsgo.NewFactory(),
 		testScalarABI(t, api.IntegerRepresentationNumber),
-		api.ConcurrencySemanticsCooperative,
+		map[api.RuntimeSymbol]struct{}{
+			api.RuntimeBuiltinErrorType: {},
+			api.RuntimeReceiveChannel:   {},
+		},
 		nil,
-		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	withoutStatements := without.Files()[0].SourceFile().Statements()
-	if len(withoutStatements) != 1 ||
-		withoutStatements[0].(tsgo.TypeAliasDeclaration).Name().Text() != "int32" {
-		t.Fatalf("undemanded scalar support = %#v", withoutStatements)
+	var manifest struct {
+		GoToTS struct {
+			IntegerRepresentation string `json:"integerRepresentation"`
+			NativeIntegerBits     uint8  `json:"nativeIntegerBits"`
+		} `json:"gotots"`
+	}
+	if err := json.Unmarshal(assembled.Manifest(), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.GoToTS.IntegerRepresentation != "number" ||
+		manifest.GoToTS.NativeIntegerBits != 64 {
+		t.Fatalf(
+			"provider certification scalar ABI = %q/%d",
+			manifest.GoToTS.IntegerRepresentation,
+			manifest.GoToTS.NativeIntegerBits,
+		)
 	}
 
-	with, err := AssemblePackage(
-		factory,
-		testScalarABI(t, api.IntegerRepresentationNumber),
-		api.ConcurrencySemanticsCooperative,
-		map[api.RuntimeSymbol]struct{}{api.RuntimeAwaitable: {}},
-		[]api.PrimitiveAlias{api.PrimitiveInt32},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	withStatements := with.Files()[0].SourceFile().Statements()
-	if len(withStatements) != 2 {
-		t.Fatalf("demanded scalar support statements = %d, want two", len(withStatements))
-	}
-	wantNames := []string{"Awaitable", "int32"}
-	for index, statement := range withStatements {
-		declaration, ok := statement.(tsgo.TypeAliasDeclaration)
-		if !ok || declaration.Name().Text() != wantNames[index] {
-			t.Fatalf("scalar support statement %d = %#v, want %s", index, statement, wantNames[index])
+	var errorResult tsgo.TypeNode
+	var receiveResult tsgo.TypeNode
+	for _, file := range assembled.Files() {
+		for _, statement := range file.SourceFile().Statements() {
+			switch declaration := statement.(type) {
+			case tsgo.TypeAliasDeclaration:
+				if declaration.Name().Text() == "Awaitable" {
+					t.Fatal("provider certification runtime retained Awaitable")
+				}
+			case tsgo.InterfaceDeclaration:
+				for _, member := range declaration.Members() {
+					method, ok := member.(tsgo.MethodSignatureDeclaration)
+					if !ok {
+						continue
+					}
+					name, ok := method.Name().(tsgo.Identifier)
+					if !ok {
+						continue
+					}
+					switch {
+					case declaration.Name().Text() == "GoError" && name.Text() == "Error":
+						errorResult = method.Type()
+					case declaration.Name().Text() == "GoReceiveChannel" && name.Text() == "receive":
+						receiveResult = method.Type()
+					}
+				}
+			}
 		}
+	}
+	if errorResult == nil ||
+		errorResult.Kind() != tsgo.SyntaxKindStringKeyword {
+		t.Fatalf("provider GoError result = %T", errorResult)
+	}
+	if _, ok := receiveResult.(tsgo.TupleTypeNode); !ok {
+		t.Fatalf("provider receive result = %T", receiveResult)
 	}
 }
 

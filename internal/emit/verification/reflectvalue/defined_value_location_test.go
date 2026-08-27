@@ -33,7 +33,7 @@ func DefinedScalarFacts() string {
 	return fmt.Sprintf("%s %d %d", text.Elem().Interface().(DefinedText), count.Elem().Interface().(DefinedCount), holder.count)
 }
 `
-	typescriptRunner := `const facts = await DefinedScalarFacts();
+	typescriptRunner := `const facts = DefinedScalarFacts();
 console.log(facts);
 `
 	goRunner := `package main

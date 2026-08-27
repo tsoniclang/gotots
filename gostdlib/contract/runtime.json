@@ -142,10 +142,6 @@
     {
       "id": 1101,
       "export": "GoReceiveChannel"
-    },
-    {
-      "id": 1300,
-      "export": "Awaitable"
     }
   ]
 }

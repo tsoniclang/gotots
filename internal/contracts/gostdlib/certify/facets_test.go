@@ -356,7 +356,7 @@ func TestGenericCallableKernelRejectsProviderArityDrift(t *testing.T) {
 	}
 	mutated := bytes.Replace(
 		source,
-		[]byte(`"sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}]`),
+		[]byte(`"sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}]`),
 		[]byte(`"sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}]`),
 		1,
 	)
@@ -551,7 +551,7 @@ func TestStatefulNamedStructProfileRejectsAbsentCapabilityMember(t *testing.T) {
 		MaximumGoVersion:    "go1.26.4",
 	})
 	if err == nil ||
-		!strings.Contains(err.Error(), "CanonicalPathError.$zero") ||
+		!strings.Contains(err.Error(), "DirectPathError.$zero") ||
 		!strings.Contains(err.Error(), "absent") {
 		t.Fatalf("wrong absent capability error = %v", err)
 	}

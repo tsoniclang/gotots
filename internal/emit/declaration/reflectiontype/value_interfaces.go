@@ -61,9 +61,11 @@ func interfaceFieldCallbacks(
 	error,
 ) {
 	factory := scaffold.factory
-	assigned, requests, err := admittedInterfaceFieldValue(
+	assigned, requests, err := admittedInterfaceValue(
 		context,
-		field,
+		field.Type(),
+		factory.Identifier("value"),
+		"Value.Set",
 		scaffold,
 	)
 	if err != nil {
@@ -81,13 +83,14 @@ func interfaceFieldCallbacks(
 	return fieldAccess, set, requests, nil
 }
 
-func admittedInterfaceFieldValue(
+func admittedInterfaceValue(
 	context api.Context,
-	field *types.Var,
+	targetType types.Type,
+	value tsgo.Expression,
+	operation string,
 	scaffold *locationScaffold,
 ) (tsgo.Expression, []api.RootRequest, error) {
 	factory := scaffold.factory
-	value := factory.Identifier("value")
 	nilValue := factory.BinaryExpression(
 		nil,
 		value,
@@ -99,7 +102,7 @@ func admittedInterfaceFieldValue(
 	)
 	implements, err := interfacevalue.ContractTest(
 		context,
-		field.Type(),
+		targetType,
 		value,
 	)
 	if err != nil {
@@ -119,7 +122,7 @@ func admittedInterfaceFieldValue(
 		factory.ColonToken(),
 		runtimePanic(
 			scaffold,
-			"reflect: Value.Set received a value outside the interface contract",
+			"reflect: "+operation+" received a value outside the interface contract",
 		),
 	)
 	return assigned, implements.Requests(), nil

@@ -159,7 +159,6 @@ func Exercise() int32 {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {
 		t.Fatal(err)
@@ -184,10 +183,7 @@ func Exercise() int32 {
 
 	runnerPath := filepath.Join(targetDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import * as values from "`+artifacts.apiModule+`";
-import { GoScheduler } from "./runtime/channel.js";
-await GoScheduler.run(async () => {
-    console.log(String(await values.Exercise()));
-});
+console.log(String(values.Exercise()));
 `)
 	writeFile(
 		t,
