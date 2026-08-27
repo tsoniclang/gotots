@@ -65,6 +65,11 @@ func TestRunBuildsSimpleProgramThroughPinnedTSGo(t *testing.T) {
 	if len(entries) == 0 {
 		t.Fatal("build emitted no target artifacts")
 	}
+	for _, name := range []string{compileWorkerDirectoryName, protocolScratchDirectoryName} {
+		if _, err := os.Stat(filepath.Join(generated, name)); !os.IsNotExist(err) {
+			t.Fatalf("successful build retained %s: %v", name, err)
+		}
+	}
 	manifest, err := os.ReadFile(filepath.Join(generated, "gotots-manifest.json"))
 	if err != nil {
 		t.Fatal(err)

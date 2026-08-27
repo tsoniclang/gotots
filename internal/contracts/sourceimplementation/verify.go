@@ -53,10 +53,7 @@ func PrepareAll(config Config) (
 	prepared = &Prepared{
 		buildProfile: config.BuildProfile,
 		certificate: Certificate{
-			byPath:     make(map[string]Implementation),
-			repository: config.RepositoryRoot,
-			scratch:    config.ScratchRoot,
-			tsgoTool:   config.TSGoTool,
+			byPath: make(map[string]Implementation),
 		},
 	}
 	if err := prepared.certificate.bindCompilation(config.Compilation); err != nil {

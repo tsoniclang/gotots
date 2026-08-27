@@ -60,6 +60,13 @@ Names are reserved by exact `types.Object` identity in deterministic package
 and source order. Target-only collision suffixes are stable and readable.
 Source spelling never acts as semantic identity.
 
+When declarations originating in different Go files share one target file,
+their canonical order is the semantic source path followed by position within
+that file, then declaration identity. A raw `token.Pos` never orders across
+files: its numeric base reflects parser allocation timing rather than source
+semantics. Relocated receiver methods therefore remain byte-stable regardless
+of package-loading concurrency.
+
 Every generated binding inserted into a source-bearing lexical scope is
 allocated by the file name owner. The owner reserves the portable target
 spellings of every explicit and implicit Go binding in the complete package,

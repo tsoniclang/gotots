@@ -51,10 +51,11 @@ func programDigest(program *load.Program) (string, error) {
 
 func writePrintPlanTo(
 	project config.Project,
-	plan printPlan,
+	verified verifiedPrintPlan,
 	semanticDigest string,
 	outputDirectory string,
 ) (int, error) {
+	plan := verified.plan
 	if err := plan.validate(outputDirectory); err != nil {
 		return 0, err
 	}

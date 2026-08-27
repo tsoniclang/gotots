@@ -220,6 +220,9 @@ Every substantial construct family closes before dependent work begins:
 Heavy jobs run one at a time with bounded concurrency, timeout, disk-backed
 output, and an OS memory ceiling. Preserve failure artifacts. Never retry an
 OOM with the same unbounded command.
+Whole-product compilation and TS-Go printing are distinct process lifetimes;
+the compilation worker must exit before the printer starts. An in-process heap
+release is not evidence that their memory peaks cannot overlap.
 
 Passing tests alone is insufficient. Behavior must be exact within the
 explicitly selected compilation profile; every intentional profile boundary

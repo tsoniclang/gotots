@@ -1169,20 +1169,29 @@ complete compiler-owned artifact set: a seeded obsolete source file and an old
 target `tsconfig` must both disappear, and the sorted manifest membership
 (including the manifest itself) must exact-join the physical file set.
 
-The output-lifecycle gate proves the compiler seals and officially encodes the
-complete TS-Go AST before starting the printer. The post-compilation print plan
-may retain only output identities, official encoded protocol payload locations,
-the flattened runtime manifest, package dependencies, and semantic digest; a
-structural reachability audit rejects source AST, `go/types`, loader,
-certificate, emitter-session, mutable TS-Go node, or callback state. A focused
+The output-lifecycle gate proves a distinct compilation worker seals and
+officially encodes the complete TS-Go AST, writes its validated handoff, and
+exits before the parent starts any TS-Go consumer. The post-compilation plan may
+retain only output identities, official encoded protocol payload locations and
+digests, flattened source-implementation package/export contracts, the runtime
+manifest, package dependencies, and semantic digest; a structural reachability
+audit rejects source AST, `go/types`, loader, certificate, emitter-session,
+mutable TS-Go node, or callback state. When source implementations are selected,
+the parent first streams the staged ordinary and installed sets through a fresh
+pinned generated-contract verifier, exact-joins their exports, closes that
+process, and only then promotes the plan to the printer-only type. The printer
+then streams one encoded final file at a time from a fresh process. A focused
 round trip exact-compares direct `PrintNode` output with printing the staged
-official encoding, including multiple files, payload mutation, and a printer failure. Successful
-publication contains no protocol scratch. The guarded whole-product gate runs
-compiler and printer under one process-tree ceiling and records both phase
-peaks. Mutations that start the printer before the release boundary, retain one
-target node in the print plan, omit the explicit release, publish protocol
-scratch, or accumulate every printed file in memory fail at the lifecycle,
-membership, or resource gate.
+official encoding, including multiple files, payload mutation, and a printer
+failure. Successful publication contains no worker, verification, or protocol
+scratch. The handoff rejects the parent PID, unknown fields, path escape,
+malformed digests, payload mutation, and a missing or duplicate file. The
+guarded whole-product gate runs compiler, generated-contract verifier, and
+printer under one process-tree ceiling and proves their three phase peaks do
+not overlap. Mutations that compile in the parent, verify before worker exit,
+bypass verifier-to-printer type-state promotion, retain one target node in the
+plan, publish scratch, or accumulate every printed file in memory fail at the
+lifecycle, contract, membership, or resource gate.
 
 For each source implementation, GoToTS certification independently inspects the
 selected Go package, the ordinary generated package assembly, and the authored
@@ -1193,6 +1202,9 @@ private contract module body-free and exact by imported name, and inspects the
 final canonical file set. It does not invoke raw TS-Go to check canonical marker
 imports. GoToTS strict-typechecks the authored implementation project and
 structurally exact-joins the complete ordinary and installed canonical sets.
+That final join consumes only the compiler worker's official encoded protocol
+and flattened expected exports after the worker has exited; no live TS-Go
+process or certificate crosses the compilation lifetime boundary.
 Before checker evidence is trusted, TSTS independently checks both sets with
 its authoritative marker modules and exact-joins marker facts. The selected
 target then lowers and strict-typechecks both complete executable sets with one
@@ -1379,6 +1391,13 @@ Every material checkpoint reports absolute values and parent deltas for:
 Aggregate improvement cannot hide a worsening tail. A material increase
 without typed necessity reopens the owner; thresholds are not raised to absorb
 it.
+
+The declaration-order gate places declarations from two source files into one
+target module, deliberately reverses their raw `token.Pos` allocation order,
+and requires canonical source-path order. Removing the source-path key makes
+the reversed raw positions win and fails the gate. Whole-product regeneration
+exact-joins every target-manifest member against the committed product so a
+relocated method cannot drift between runs.
 
 ## Completion Language
 

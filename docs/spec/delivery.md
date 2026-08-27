@@ -253,11 +253,14 @@ For each acceptance corpus, including TS-Go:
    unresolved obligations;
 11. preserve exact failure artifacts.
 
-Step 4 is a strict lifecycle transition: seal and encode the complete official
-TS-Go AST, end the load/type/emitter/target-node lifetime, release that heap
-under the shared process-tree budget, and only then start the pinned printer.
-Printing streams one encoded file at a time and protocol scratch is absent from
-the published product.
+Step 4 is a strict three-phase process transition. A compilation worker seals
+and encodes the complete official TS-Go AST plus any source-implementation
+contract set, writes the validated handoff, and exits. The parent then runs the
+pinned generated-contract verifier from that immutable protocol and closes it.
+Only a verified plan can enter the final pinned printer, which streams one
+encoded file at a time. Compiler, contract verifier, and printer peaks never
+overlap; worker, verification, and protocol scratch are absent from the
+published product.
 
 Compile-only is not runtime completion. Runtime completion requires an actual
 generated entry point to execute with expected observable output and error

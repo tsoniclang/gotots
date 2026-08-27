@@ -48,6 +48,62 @@ func TestOrderRejectsEagerCycles(t *testing.T) {
 	}
 }
 
+func TestOrderUsesCanonicalSourcePathAcrossFiles(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/order", "order")
+	earlierFileObject := types.NewVar(
+		token.Pos(200),
+		sourcePackage,
+		"EarlierFile",
+		types.Typ[types.Int],
+	)
+	laterFileObject := types.NewVar(
+		token.Pos(10),
+		sourcePackage,
+		"LaterFile",
+		types.Typ[types.Int],
+	)
+	declarations := []Declaration{
+		{
+			Owner:      api.MustSourceArtifactOwner(earlierFileObject),
+			Name:       earlierFileObject.Name(),
+			Position:   earlierFileObject.Pos(),
+			SourcePath: "module/earlier.ts",
+		},
+		{
+			Owner:      api.MustSourceArtifactOwner(laterFileObject),
+			Name:       laterFileObject.Name(),
+			Position:   laterFileObject.Pos(),
+			SourcePath: "module/later.ts",
+		},
+	}
+
+	ordered, err := Indices(declarations)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ordered[0] != 0 || ordered[1] != 1 {
+		t.Fatalf("ordered declaration indices = %v, want [0 1]", ordered)
+	}
+}
+
+func TestOrderRejectsSourceDeclarationWithoutCanonicalPosition(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/order", "order")
+	object := types.NewVar(
+		token.Pos(10),
+		sourcePackage,
+		"MissingPosition",
+		types.Typ[types.Int],
+	)
+	_, err := Indices([]Declaration{{
+		Owner:    api.MustSourceArtifactOwner(object),
+		Name:     object.Name(),
+		Position: object.Pos(),
+	}})
+	if _, ok := err.(*SourcePositionError); !ok {
+		t.Fatalf("missing source position error = %T %v", err, err)
+	}
+}
+
 func testDeclarations() (Declaration, Declaration) {
 	sourcePackage := types.NewPackage("example.com/order", "order")
 	typeName := types.NewTypeName(
@@ -66,15 +122,17 @@ func testDeclarations() (Declaration, Declaration) {
 	)
 	typeOwner := api.MustSourceArtifactOwner(typeName)
 	return Declaration{
-			Owner:    api.MustSourceArtifactOwner(constantObject),
-			Name:     constantObject.Name(),
-			Position: constantObject.Pos(),
+			Owner:      api.MustSourceArtifactOwner(constantObject),
+			Name:       constantObject.Name(),
+			SourcePath: "module/source.ts",
+			Position:   constantObject.Pos(),
 			EagerDependencies: []api.ArtifactOwner{
 				typeOwner,
 			},
 		}, Declaration{
-			Owner:    typeOwner,
-			Name:     typeName.Name(),
-			Position: typeName.Pos(),
+			Owner:      typeOwner,
+			Name:       typeName.Name(),
+			SourcePath: "module/source.ts",
+			Position:   typeName.Pos(),
 		}
 }

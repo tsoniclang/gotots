@@ -19,9 +19,9 @@ import (
 func (s *programSession) replaceSourceImplementations(
 	files []TargetFile,
 	generatedContracts []sourceimplementation.Target,
-) ([]TargetFile, error) {
+) ([]TargetFile, sourceimplementation.GeneratedContractPlan, error) {
 	if s.sourceImplementations == nil {
-		return nil, &ScheduleError{
+		return nil, sourceimplementation.GeneratedContractPlan{}, &ScheduleError{
 			Reason: "source implementation replacement has no certificate",
 		}
 	}
@@ -42,14 +42,14 @@ func (s *programSession) replaceSourceImplementations(
 		sourcePackage := s.source.PackageByPath(implementation.PackagePath())
 		paths, err := sourcepackage.ResolvePaths(sourcePackage)
 		if err != nil {
-			return nil, sourceImplementationError(implementation.PackagePath(), err)
+			return nil, sourceimplementation.GeneratedContractPlan{}, sourceImplementationError(implementation.PackagePath(), err)
 		}
 		contractPackage, err := sourceimplementation.NewPackageTarget(
 			implementation.PackagePath(),
 			paths.AssemblyPath(),
 		)
 		if err != nil {
-			return nil, sourceImplementationError(implementation.PackagePath(), err)
+			return nil, sourceimplementation.GeneratedContractPlan{}, sourceImplementationError(implementation.PackagePath(), err)
 		}
 		contractPackages = append(contractPackages, contractPackage)
 		assemblyPaths[implementation.PackagePath()] = paths.AssemblyPath()
@@ -60,7 +60,7 @@ func (s *programSession) replaceSourceImplementations(
 		})
 		for _, outputPath := range paths.OwnedPaths() {
 			if owner := ownedPaths[outputPath]; owner != "" {
-				return nil, sourceImplementationError(
+				return nil, sourceimplementation.GeneratedContractPlan{}, sourceImplementationError(
 					implementation.PackagePath(),
 					fmt.Errorf("target path %q is also owned by %q", outputPath, owner),
 				)
@@ -85,7 +85,7 @@ func (s *programSession) replaceSourceImplementations(
 			consumers,
 		)
 		if err != nil {
-			return nil, sourceImplementationError(
+			return nil, sourceimplementation.GeneratedContractPlan{}, sourceImplementationError(
 				replacement.implementation.PackagePath(),
 				err,
 			)
@@ -106,7 +106,7 @@ func (s *programSession) replaceSourceImplementations(
 			continue
 		}
 		if assemblyFound[packagePath] || file.kind != TargetFilePackageAssembly {
-			return nil, sourceImplementationError(
+			return nil, sourceimplementation.GeneratedContractPlan{}, sourceImplementationError(
 				packagePath,
 				fmt.Errorf("generated package assembly ownership is invalid"),
 			)
@@ -116,7 +116,7 @@ func (s *programSession) replaceSourceImplementations(
 	for _, replacement := range selected {
 		implementation := replacement.implementation
 		if !assemblyFound[implementation.PackagePath()] {
-			return nil, sourceImplementationError(
+			return nil, sourceimplementation.GeneratedContractPlan{}, sourceImplementationError(
 				implementation.PackagePath(),
 				fmt.Errorf("generated package assembly is absent"),
 			)
@@ -130,7 +130,7 @@ func (s *programSession) replaceSourceImplementations(
 		for _, module := range implementation.PrivateModules() {
 			outputPath, ok := replacement.paths.SourcePath(module.GoFile())
 			if !ok {
-				return nil, sourceImplementationError(
+				return nil, sourceimplementation.GeneratedContractPlan{}, sourceImplementationError(
 					implementation.PackagePath(),
 					fmt.Errorf("private module %q lost its source identity", module.GoFile()),
 				)
@@ -146,16 +146,17 @@ func (s *programSession) replaceSourceImplementations(
 	replaced = filtered
 	installedContracts, err := sourceImplementationTargets(replaced)
 	if err != nil {
-		return nil, err
+		return nil, sourceimplementation.GeneratedContractPlan{}, err
 	}
-	if err := s.sourceImplementations.VerifyGeneratedContracts(
+	verification, err := s.sourceImplementations.PlanGeneratedContracts(
 		generatedContracts,
 		installedContracts,
 		contractPackages,
-	); err != nil {
-		return nil, sourceImplementationError("generated contract", err)
+	)
+	if err != nil {
+		return nil, sourceimplementation.GeneratedContractPlan{}, sourceImplementationError("generated contract", err)
 	}
-	return replaced, nil
+	return replaced, verification, nil
 }
 
 func sourceImplementationTargets(

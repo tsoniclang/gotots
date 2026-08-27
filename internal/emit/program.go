@@ -26,6 +26,7 @@ import (
 
 type ProgramEmission struct {
 	files                       []TargetFile
+	sourceImplementationPlan    sourceimplementation.GeneratedContractPlan
 	environmentObligations      []EnvironmentObligation
 	environmentProfile          EnvironmentProfile
 	externalFunctionObligations []ExternalFunctionObligation
@@ -74,6 +75,7 @@ type programSession struct {
 	externalFunctionBindings      map[*types.Func]api.ExternalFunctionTarget
 	sourceImplementationContracts map[api.ArtifactOwner]sourceImplementationContract
 	sourceImplementationTargets   []sourceimplementation.Target
+	sourceImplementationPlan      sourceimplementation.GeneratedContractPlan
 	preparedDeclarationRequests   map[api.RootRequest]struct{}
 	preparedRequirements          map[api.DeclarationRequirement]struct{}
 	sealed                        bool
@@ -82,6 +84,7 @@ type programSession struct {
 type targetDeclaration struct {
 	owner             api.ArtifactOwner
 	name              string
+	sourcePath        string
 	position          token.Pos
 	statements        []tsgo.Statement
 	placement         *targetplacement.Owner
@@ -470,6 +473,7 @@ func (s *programSession) emit(object types.Object) error {
 	builder.declarations = append(builder.declarations, targetDeclaration{
 		owner:             owner,
 		name:              object.Name(),
+		sourcePath:        site.OutputPath,
 		position:          object.Pos(),
 		statements:        revision.statements,
 		placement:         revision.placement,
