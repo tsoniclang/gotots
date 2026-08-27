@@ -1383,6 +1383,13 @@ Aggregate improvement cannot hide a worsening tail. A material increase
 without typed necessity reopens the owner; thresholds are not raised to absorb
 it.
 
+The declaration-order gate places declarations from two source files into one
+target module, deliberately reverses their raw `token.Pos` allocation order,
+and requires canonical source-path order. Removing the source-path key makes
+the reversed raw positions win and fails the gate. Whole-product regeneration
+exact-joins every target-manifest member against the committed product so a
+relocated method cannot drift between runs.
+
 ## Completion Language
 
 Evidence binds to an exact clean pushed compiler revision, schema/toolchain

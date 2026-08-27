@@ -12,8 +12,18 @@ import (
 type Declaration struct {
 	Owner             api.ArtifactOwner
 	Name              string
+	SourcePath        string
 	Position          token.Pos
 	EagerDependencies []api.ArtifactOwner
+}
+
+type SourcePositionError struct {
+	Declaration string
+}
+
+func (e *SourcePositionError) Error() string {
+	return "order target declaration " + e.Declaration +
+		": source declaration has no canonical source position"
 }
 
 type CycleError struct {
@@ -28,6 +38,13 @@ func (e *CycleError) Error() string {
 func Indices(declarations []Declaration) ([]int, error) {
 	indexByOwner := make(map[api.ArtifactOwner]int, len(declarations))
 	for index := range declarations {
+		if _, sourceOwned := declarations[index].Owner.Source(); sourceOwned &&
+			(declarations[index].SourcePath == "" ||
+				declarations[index].Position == token.NoPos) {
+			return nil, &SourcePositionError{
+				Declaration: declarations[index].Name,
+			}
+		}
 		indexByOwner[declarations[index].Owner] = index
 	}
 	dependents := make([][]int, len(declarations))
@@ -90,6 +107,9 @@ func (h declarationHeap) Len() int {
 func (h declarationHeap) Less(left, right int) bool {
 	leftDeclaration := h.declarations[h.indices[left]]
 	rightDeclaration := h.declarations[h.indices[right]]
+	if leftDeclaration.SourcePath != rightDeclaration.SourcePath {
+		return leftDeclaration.SourcePath < rightDeclaration.SourcePath
+	}
 	if leftDeclaration.Position != rightDeclaration.Position {
 		return leftDeclaration.Position < rightDeclaration.Position
 	}

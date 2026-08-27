@@ -237,6 +237,7 @@ func (s *programSession) assembleTargetFiles() ([]TargetFile, error) {
 			orderInput[index] = declarationorder.Declaration{
 				Owner:             declaration.owner,
 				Name:              declaration.name,
+				SourcePath:        declaration.sourcePath,
 				Position:          declaration.position,
 				EagerDependencies: declaration.eagerDependencies,
 			}

@@ -82,6 +82,7 @@ type programSession struct {
 type targetDeclaration struct {
 	owner             api.ArtifactOwner
 	name              string
+	sourcePath        string
 	position          token.Pos
 	statements        []tsgo.Statement
 	placement         *targetplacement.Owner
@@ -470,6 +471,7 @@ func (s *programSession) emit(object types.Object) error {
 	builder.declarations = append(builder.declarations, targetDeclaration{
 		owner:             owner,
 		name:              object.Name(),
+		sourcePath:        site.OutputPath,
 		position:          object.Pos(),
 		statements:        revision.statements,
 		placement:         revision.placement,
