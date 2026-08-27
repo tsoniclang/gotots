@@ -79,7 +79,7 @@ func TestCallableImplementationRejectsWrongVariantAndUnconsumedClaim(t *testing.
 		[]callableimplementation.CallableDocument{wrongVariant},
 	)
 	if _, err := CompileWithOptions(fixture.program, fixture.roots(t), options); err == nil ||
-		!strings.Contains(err.Error(), "variant differs") {
+		!strings.Contains(err.Error(), "kernel variant requires a generic declaration") {
 		t.Fatalf("wrong callable variant error = %v", err)
 	}
 
@@ -93,6 +93,51 @@ func TestCallableImplementationRejectsWrongVariantAndUnconsumedClaim(t *testing.
 	if _, err := CompileWithOptions(fixture.program, fixture.roots(t), options); err == nil ||
 		!strings.Contains(err.Error(), "not every selected callable") {
 		t.Fatalf("unconsumed callable error = %v", err)
+	}
+}
+
+func TestCallableImplementationSelectsExactKernelVariant(t *testing.T) {
+	fixture := loadCallableImplementationFixture(t)
+	claim := fixture.callable(t, fixture.method("NumberBox", "Twice"), "numberBoxTwiceFast")
+	claim.Variant = callableimplementation.VariantKernel
+	options := DefaultOptions()
+	options.CallableImplementations = fixture.certificate(
+		t,
+		[]callableimplementation.CallableDocument{claim},
+	)
+	emission, err := CompileWithOptions(fixture.program, fixture.roots(t), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, ok := emission.CallableImplementationPlan()
+	if !ok || len(plan.Targets()) != 1 ||
+		plan.Targets()[0].Variant() != callableimplementation.VariantKernel {
+		t.Fatal("kernel callable implementation plan did not close exactly")
+	}
+
+	repository, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := tsgo.StartClientWithTool(
+		sourceImplementationTestTool(t, repository),
+		fixture.root,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	var generated strings.Builder
+	for _, file := range emission.Files() {
+		printed, printErr := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if printErr != nil {
+			t.Fatal(printErr)
+		}
+		generated.WriteString(printed)
+	}
+	actual := generated.String()
+	if !strings.Contains(actual, "numberBoxTwiceFast") || strings.Contains(actual, "5009") {
+		t.Fatalf("kernel body replacement is incomplete:\n%s", actual)
 	}
 }
 
@@ -117,10 +162,13 @@ func Add(value int) int { return value + 7003 }
 import "example.test/app/other"
 
 type Box struct { Offset int }
+type NumberBox[T ~int] struct{}
 
 func Add(value int) int { return value + 8001 }
 func (box *Box) Add(value int) int { return value + box.Offset + 9001 }
+func (box *NumberBox[T]) Twice(value T) T { if false { panic(5009) }; return value + value }
 func Bind(box *Box) func(int) int { return box.Add }
+func UseNumberBox(box *NumberBox[int], value int) int { return box.Twice(value) }
 func UseOther(value int) int { return other.Add(value) }
 func dead(value int) int { return value + 6007 }
 func _() { panic("blank declarations are not callable") }
@@ -198,7 +246,8 @@ func (f callableImplementationFixture) certificate(
 		filepath.Join(implementationRoot, "hot.ts"),
 		"export function addFast(value: number): number { return value + 1; }\n"+
 			"export function boxAddFast(box: object, value: number): number { return value + 2; }\n"+
-			"export function deadFast(value: number): number { return value + 3; }\n",
+			"export function deadFast(value: number): number { return value + 3; }\n"+
+			"export function numberBoxTwiceFast(box: object, operation: object, value: number): number { return value; }\n",
 	)
 	profile := f.program.BuildProfile()
 	document := callableimplementation.Document{

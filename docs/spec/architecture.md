@@ -1679,7 +1679,15 @@ printing.
 
 The initial callable contract admits only ordinary synchronous variants that
 emit as module functions or static class methods, plus explicit generic
-kernel variants. Instance value-receiver bodies and recovery-aware deferred
+kernel variants. A declaration may be visited through more than one internal
+representation. Before body replacement, the callable owner settles the
+contract-selected private target ABI once and reuses that decision across
+artifact reconstruction; a kernel selection requires a genuinely generic Go
+declaration. Removing the translated body therefore cannot flip source versus
+kernel ABI. Generated callers and the staged exact type join certify the
+selected private ABI while the source-facing declaration remains unchanged.
+The final exact-consumption gate rejects an absent or second selected target. Instance
+value-receiver bodies and recovery-aware deferred
 entries remain unsupported until their private implementation ABI is specified
 and certified; they never fall back to a dynamic adapter. A package selected
 for atomic replacement cannot also own a callable-body replacement. Every

@@ -32,6 +32,10 @@ func emitCallableVariants(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
+	kernel, err = context.SettleCallableImplementationVariant(function, kernel)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
 	target, err := emitCallableVariant(
 		context,
 		children,

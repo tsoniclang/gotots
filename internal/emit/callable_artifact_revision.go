@@ -380,6 +380,44 @@ func (s *programSession) ResolveCallableImplementation(
 	return selection, err == nil, err
 }
 
+func (s *programSession) SettleCallableImplementationVariant(
+	context api.Context,
+	owner *types.Func,
+	inferredKernel bool,
+) (bool, error) {
+	if s == nil || s.callableImplementations == nil {
+		return inferredKernel, nil
+	}
+	current, ok := context.FunctionArtifactOwner()
+	if !ok || current != owner || owner == nil || owner.Origin() != owner {
+		return false, &ScheduleError{
+			Object: ownerName(owner),
+			Reason: "callable implementation consumer has a foreign artifact owner",
+		}
+	}
+	selected, ok := s.callableImplementations.ForFunction(owner)
+	if !ok {
+		return inferredKernel, nil
+	}
+	if previous, exists := s.callableImplementationVariants[selected.SourceIdentity()]; exists {
+		return previous == api.CallableImplementationVariantKernel, nil
+	}
+	settled := api.CallableImplementationVariantSource
+	kernel := false
+	if selected.Variant() == callableimplementation.VariantKernel {
+		if len(api.GenericDeclarationParameters(owner)) == 0 {
+			return false, &ScheduleError{
+				Object: selected.SourceIdentity(),
+				Reason: "callable implementation kernel variant requires a generic declaration",
+			}
+		}
+		settled = api.CallableImplementationVariantKernel
+		kernel = true
+	}
+	s.callableImplementationVariants[selected.SourceIdentity()] = settled
+	return kernel, nil
+}
+
 func (s *programSession) AcceptCallableImplementation(
 	selection api.CallableImplementationSelection,
 	target api.CallableImplementationTarget,

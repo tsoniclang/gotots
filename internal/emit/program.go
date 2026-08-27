@@ -48,42 +48,43 @@ type RuntimePackage struct {
 type declarationSite = declarationindex.Site
 
 type programSession struct {
-	source                        *load.Program
-	factory                       tsgo.Factory
-	scalar                        api.ScalarABI
-	providerScalar                api.ScalarABI
-	evaluationOrder               api.EvaluationOrder
-	registry                      *emitnaming.Registry
-	scheduler                     *scheduler
-	requirements                  *declarationRequirementScheduler
-	artifacts                     *artifactstate.Graph
-	sites                         map[types.Object]declarationSite
-	emitters                      map[*load.Package]*emitter
-	builders                      map[string]*targetFileBuilder
-	packageBuilders               map[*load.Package]*packageTargetBuilder
-	packageExports                *packageExportScheduler
-	environmentBuilders           map[*load.Package]*environmentContractBuilder
-	packageInitializations        *packageInitializationScheduler
-	genericOperations             map[genericOperationIdentity]*api.GenericOperationContract
-	genericConcretizations        map[genericConcretizationIdentity]*api.GenericConcretization
-	classMembers                  map[*types.Func]classMemberContribution
-	goRuntime                     *gocontract.Contract
-	runtimePackage                RuntimePackage
-	compareArtifactOwners         func(api.ArtifactOwner, api.ArtifactOwner) int
-	requirementRemovalOwner       api.ArtifactOwner
-	standardLibrary               *gostdlibcertify.Certificate
-	sourceImplementations         *sourceimplementation.Certificate
-	callableImplementations       *callableimplementation.Certificate
-	callableImplementationTargets map[string]api.CallableImplementationTarget
-	callableImplementationPlan    callableimplementation.GeneratedContractPlan
-	externalFunctions             map[*types.Func]ExternalFunctionObligation
-	externalFunctionBindings      map[*types.Func]api.ExternalFunctionTarget
-	sourceImplementationContracts map[api.ArtifactOwner]sourceImplementationContract
-	sourceImplementationTargets   []sourceimplementation.Target
-	sourceImplementationPlan      sourceimplementation.GeneratedContractPlan
-	preparedDeclarationRequests   map[api.RootRequest]struct{}
-	preparedRequirements          map[api.DeclarationRequirement]struct{}
-	sealed                        bool
+	source                         *load.Program
+	factory                        tsgo.Factory
+	scalar                         api.ScalarABI
+	providerScalar                 api.ScalarABI
+	evaluationOrder                api.EvaluationOrder
+	registry                       *emitnaming.Registry
+	scheduler                      *scheduler
+	requirements                   *declarationRequirementScheduler
+	artifacts                      *artifactstate.Graph
+	sites                          map[types.Object]declarationSite
+	emitters                       map[*load.Package]*emitter
+	builders                       map[string]*targetFileBuilder
+	packageBuilders                map[*load.Package]*packageTargetBuilder
+	packageExports                 *packageExportScheduler
+	environmentBuilders            map[*load.Package]*environmentContractBuilder
+	packageInitializations         *packageInitializationScheduler
+	genericOperations              map[genericOperationIdentity]*api.GenericOperationContract
+	genericConcretizations         map[genericConcretizationIdentity]*api.GenericConcretization
+	classMembers                   map[*types.Func]classMemberContribution
+	goRuntime                      *gocontract.Contract
+	runtimePackage                 RuntimePackage
+	compareArtifactOwners          func(api.ArtifactOwner, api.ArtifactOwner) int
+	requirementRemovalOwner        api.ArtifactOwner
+	standardLibrary                *gostdlibcertify.Certificate
+	sourceImplementations          *sourceimplementation.Certificate
+	callableImplementations        *callableimplementation.Certificate
+	callableImplementationVariants map[string]api.CallableImplementationVariant
+	callableImplementationTargets  map[string]api.CallableImplementationTarget
+	callableImplementationPlan     callableimplementation.GeneratedContractPlan
+	externalFunctions              map[*types.Func]ExternalFunctionObligation
+	externalFunctionBindings       map[*types.Func]api.ExternalFunctionTarget
+	sourceImplementationContracts  map[api.ArtifactOwner]sourceImplementationContract
+	sourceImplementationTargets    []sourceimplementation.Target
+	sourceImplementationPlan       sourceimplementation.GeneratedContractPlan
+	preparedDeclarationRequests    map[api.RootRequest]struct{}
+	preparedRequirements           map[api.DeclarationRequirement]struct{}
+	sealed                         bool
 }
 
 type targetDeclaration struct {
@@ -319,21 +320,24 @@ func newProgramSessionWithRegistry(
 		artifacts: artifactstate.NewGraph(
 			compareArtifactOwners,
 		),
-		sites:                         sites,
-		emitters:                      make(map[*load.Package]*emitter),
-		builders:                      make(map[string]*targetFileBuilder),
-		packageBuilders:               make(map[*load.Package]*packageTargetBuilder),
-		packageExports:                newPackageExportScheduler(),
-		environmentBuilders:           make(map[*load.Package]*environmentContractBuilder),
-		packageInitializations:        newPackageInitializationScheduler(),
-		genericOperations:             make(map[genericOperationIdentity]*api.GenericOperationContract),
-		genericConcretizations:        make(map[genericConcretizationIdentity]*api.GenericConcretization),
-		classMembers:                  make(map[*types.Func]classMemberContribution),
-		goRuntime:                     goRuntime,
-		compareArtifactOwners:         compareArtifactOwners,
-		standardLibrary:               options.StandardLibrary,
-		sourceImplementations:         options.SourceImplementations,
-		callableImplementations:       options.CallableImplementations,
+		sites:                   sites,
+		emitters:                make(map[*load.Package]*emitter),
+		builders:                make(map[string]*targetFileBuilder),
+		packageBuilders:         make(map[*load.Package]*packageTargetBuilder),
+		packageExports:          newPackageExportScheduler(),
+		environmentBuilders:     make(map[*load.Package]*environmentContractBuilder),
+		packageInitializations:  newPackageInitializationScheduler(),
+		genericOperations:       make(map[genericOperationIdentity]*api.GenericOperationContract),
+		genericConcretizations:  make(map[genericConcretizationIdentity]*api.GenericConcretization),
+		classMembers:            make(map[*types.Func]classMemberContribution),
+		goRuntime:               goRuntime,
+		compareArtifactOwners:   compareArtifactOwners,
+		standardLibrary:         options.StandardLibrary,
+		sourceImplementations:   options.SourceImplementations,
+		callableImplementations: options.CallableImplementations,
+		callableImplementationVariants: make(
+			map[string]api.CallableImplementationVariant,
+		),
 		callableImplementationTargets: make(map[string]api.CallableImplementationTarget),
 		externalFunctions:             make(map[*types.Func]ExternalFunctionObligation),
 		externalFunctionBindings:      externalBindings,

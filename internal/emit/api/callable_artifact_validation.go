@@ -515,6 +515,11 @@ func NewCallableImplementationStaticMethodTarget(
 }
 
 type CallableImplementationResolver interface {
+	SettleCallableImplementationVariant(
+		Context,
+		*types.Func,
+		bool,
+	) (bool, error)
 	ResolveCallableImplementation(
 		Context,
 		*types.Func,
@@ -557,6 +562,25 @@ func (c Context) ResolveCallableImplementation(
 		c,
 		owner,
 		kernel,
+	)
+}
+
+func (c Context) SettleCallableImplementationVariant(
+	owner *types.Func,
+	inferredKernel bool,
+) (bool, error) {
+	if c.callableImplementationResolver == nil {
+		return inferredKernel, nil
+	}
+	if owner == nil || owner.Origin() != owner {
+		return false, &ContextError{
+			Reason: "callable implementation owner is not canonical",
+		}
+	}
+	return c.callableImplementationResolver.SettleCallableImplementationVariant(
+		c,
+		owner,
+		inferredKernel,
 	)
 }
 
