@@ -398,10 +398,13 @@ func (s *programSession) AcceptCallableImplementation(
 			Reason: "callable implementation selection differs from its certificate",
 		}
 	}
-	if _, duplicate := s.callableImplementationTargets[selection.SourceIdentity()]; duplicate {
+	if previous, duplicate := s.callableImplementationTargets[selection.SourceIdentity()]; duplicate {
+		if previous == target {
+			return nil
+		}
 		return &ScheduleError{
 			Object: selection.SourceIdentity(),
-			Reason: "callable implementation target was accepted more than once",
+			Reason: "callable implementation target identity changed across revisions",
 		}
 	}
 	s.callableImplementationTargets[selection.SourceIdentity()] = target
