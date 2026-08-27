@@ -1663,7 +1663,9 @@ exports, callers, state, and initialization are unchanged. Its body contains
 one static import and direct call to the authored export; the translated Go
 body is absent. The final staged TypeScript project independently exact-joins
 the checked generated callable and checked authored export before either can
-be printed.
+be printed. The join compares generic arity, parameter cardinality and checked
+parameter/result types; local TypeScript parameter names are implementation
+detail and are not ABI evidence.
 
 An authored callable module may name sorted, contract-owned `.d.ts`
 certification sources needed only to typecheck its imports. Preparation hashes

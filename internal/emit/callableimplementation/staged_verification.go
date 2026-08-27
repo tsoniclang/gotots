@@ -423,9 +423,6 @@ func compareCallableExports(
 	generated tsgo.ProjectExport,
 	manual tsgo.ProjectExport,
 ) error {
-	if generated.TypeString() != manual.TypeString() {
-		return callableTypeError(subject, generated.TypeString(), manual.TypeString())
-	}
 	generatedTypes, err := project.CallableTypeParameterCount(generated)
 	if err != nil {
 		return err
@@ -443,9 +440,6 @@ func compareCallableMember(
 	generated tsgo.ProjectMember,
 	manual tsgo.ProjectExport,
 ) error {
-	if generated.TypeString() != manual.TypeString() {
-		return callableTypeError(subject, generated.TypeString(), manual.TypeString())
-	}
 	generatedTypes, err := project.CallableTypeParameterCount(generated)
 	if err != nil {
 		return err

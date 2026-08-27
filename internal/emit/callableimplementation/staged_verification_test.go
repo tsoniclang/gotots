@@ -16,7 +16,7 @@ func TestStagedVerificationExactJoinsGeneratedAndManualCallables(t *testing.T) {
 	fixture := newStagedVerificationFixture(t)
 	verified, err := VerifyStagedGeneratedContracts(fixture.config(
 		t,
-		"export function addFast(value: number): number { return value + 1; }\n",
+		"export function addFast(candidate: number): number { return candidate + 1; }\n",
 		[]string{"addFast"},
 	))
 	if err != nil {
