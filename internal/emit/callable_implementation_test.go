@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	callableimplementationcontract "github.com/tsoniclang/gotots/internal/contracts/callableimplementation"
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/emit/callableimplementation"
@@ -240,7 +241,7 @@ func (f callableImplementationFixture) callable(
 			if !ok || f.source.TypesInfo().Defs[functionDeclaration.Name] != function {
 				continue
 			}
-			bodyDigest, err = callableimplementation.SourceBodyDigest(
+			bodyDigest, err = callableimplementationcontract.SourceBodyDigest(
 				f.source.FileSet(),
 				functionDeclaration.Body,
 			)

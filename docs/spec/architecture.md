@@ -1660,7 +1660,9 @@ signature, the SHA-256 digest of the canonically formatted selected Go body,
 selected generated variant, authored module/export, authored source digest,
 and equivalence envelope. A same-signature Go body change therefore fails the
 post-load join and requires the manual equivalence proof to be renewed. The
-generated declaration remains the sole
+source-contract layer owns canonical body formatting and hashing; emission
+consumes that digest and never imports a Go formatter. The generated
+declaration remains the sole
 source-facing owner: its name, generic shape, parameters, result, placement,
 exports, callers, state, and initialization are unchanged. Its body contains
 one static import and direct call to the authored export; the translated Go

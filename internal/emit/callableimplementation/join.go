@@ -1,14 +1,10 @@
 package callableimplementation
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"go/ast"
-	"go/format"
-	"go/token"
 	"go/types"
 
+	callableimplementationcontract "github.com/tsoniclang/gotots/internal/contracts/callableimplementation"
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/load"
 )
@@ -111,7 +107,7 @@ func sourceCallables(sourcePackage *load.Package) (map[string]sourceCallable, er
 					Reason: err.Error(),
 				}
 			}
-			bodyDigest, err := SourceBodyDigest(
+			bodyDigest, err := callableimplementationcontract.SourceBodyDigest(
 				sourcePackage.FileSet(),
 				functionDeclaration.Body,
 			)
@@ -133,18 +129,6 @@ func sourceCallables(sourcePackage *load.Package) (map[string]sourceCallable, er
 		}
 	}
 	return result, nil
-}
-
-func SourceBodyDigest(fileSet *token.FileSet, body *ast.BlockStmt) (string, error) {
-	if fileSet == nil || body == nil || !body.Pos().IsValid() || !body.End().IsValid() {
-		return "", &Error{Operation: "digest source body", Reason: "source body is invalid"}
-	}
-	var canonical bytes.Buffer
-	if err := format.Node(&canonical, fileSet, body); err != nil {
-		return "", &Error{Operation: "digest source body", Reason: err.Error()}
-	}
-	digest := sha256.Sum256(canonical.Bytes())
-	return hex.EncodeToString(digest[:]), nil
 }
 
 func sameBuildProfile(left load.BuildProfile, right load.BuildProfile) bool {
