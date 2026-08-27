@@ -122,6 +122,7 @@ func Add(value int) int { return value + 8001 }
 func (box *Box) Add(value int) int { return value + box.Offset + 9001 }
 func UseOther(value int) int { return other.Add(value) }
 func dead(value int) int { return value + 6007 }
+func _() { panic("blank declarations are not callable") }
 `)
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: root,

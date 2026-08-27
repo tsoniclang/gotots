@@ -80,7 +80,8 @@ func sourceCallables(sourcePackage *load.Package) (map[string]sourceCallable, er
 	for _, file := range sourcePackage.Files() {
 		for _, declaration := range file.Syntax().Decls {
 			functionDeclaration, ok := declaration.(*ast.FuncDecl)
-			if !ok || functionDeclaration.Body == nil || functionDeclaration.Name.Name == "init" {
+			if !ok || functionDeclaration.Body == nil ||
+				functionDeclaration.Name.Name == "init" || functionDeclaration.Name.Name == "_" {
 				continue
 			}
 			function, ok := sourcePackage.TypesInfo().Defs[functionDeclaration.Name].(*types.Func)
