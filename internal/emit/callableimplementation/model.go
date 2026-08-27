@@ -1,9 +1,13 @@
 package callableimplementation
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"go/types"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -66,15 +70,16 @@ type CallableDocument struct {
 }
 
 type Module struct {
-	packagePath    string
-	modulePath     string
-	moduleVersion  string
-	sourcePath     string
-	outputPath     string
-	sourceDigest   string
-	digest         string
-	envelope       implementationcontract.EnvelopeKind
-	callableClaims []CallableDocument
+	packagePath          string
+	modulePath           string
+	moduleVersion        string
+	sourcePath           string
+	outputPath           string
+	sourceDigest         string
+	digest               string
+	envelope             implementationcontract.EnvelopeKind
+	callableClaims       []CallableDocument
+	certificationSources []CertificationSource
 }
 
 func (m Module) PackagePath() string                           { return m.packagePath }
@@ -87,6 +92,41 @@ func (m Module) Digest() string                                { return m.digest
 func (m Module) Envelope() implementationcontract.EnvelopeKind { return m.envelope }
 func (m Module) CallableClaims() []CallableDocument {
 	return slices.Clone(m.callableClaims)
+}
+func (m Module) CertificationSources() []CertificationSource {
+	return slices.Clone(m.certificationSources)
+}
+
+type CertificationSource struct {
+	sourcePath   string
+	sourceDigest string
+}
+
+func NewCertificationSource(
+	sourcePath string,
+	sourceDigest string,
+) (CertificationSource, error) {
+	decoded, err := hex.DecodeString(sourceDigest)
+	if !filepath.IsAbs(sourcePath) || filepath.Clean(sourcePath) != sourcePath ||
+		!strings.HasSuffix(sourcePath, ".d.ts") || err != nil || len(decoded) != sha256.Size {
+		return CertificationSource{}, &Error{
+			Operation: "admit certification source",
+			Subject:   sourcePath,
+			Reason:    "source evidence is invalid",
+		}
+	}
+	return CertificationSource{
+		sourcePath: sourcePath, sourceDigest: sourceDigest,
+	}, nil
+}
+
+func (s CertificationSource) SourcePath() string   { return s.sourcePath }
+func (s CertificationSource) SourceDigest() string { return s.sourceDigest }
+
+func (s CertificationSource) Valid() bool {
+	decoded, err := hex.DecodeString(s.sourceDigest)
+	return filepath.IsAbs(s.sourcePath) && filepath.Clean(s.sourcePath) == s.sourcePath &&
+		strings.HasSuffix(s.sourcePath, ".d.ts") && err == nil && len(decoded) == sha256.Size
 }
 
 type Implementation struct {
@@ -110,6 +150,13 @@ type Prepared struct {
 	compilation  CompilationDocument
 	modules      []Module
 	digest       string
+}
+
+func (p *Prepared) Modules() []Module {
+	if p == nil {
+		return nil
+	}
+	return slicesCloneModules(p.modules)
 }
 
 type Certificate struct {

@@ -36,10 +36,11 @@ func NewStagedTarget(
 }
 
 type StagedModule struct {
-	sourcePath   string
-	outputPath   string
-	sourceDigest string
-	exports      []string
+	sourcePath           string
+	outputPath           string
+	sourceDigest         string
+	exports              []string
+	certificationSources []CertificationSource
 }
 
 func NewStagedModule(
@@ -47,12 +48,19 @@ func NewStagedModule(
 	outputPath string,
 	sourceDigest string,
 	exports []string,
+	certificationSources []CertificationSource,
 ) (StagedModule, error) {
 	selectedExports := slices.Clone(exports)
+	selectedCertificationSources := slices.Clone(certificationSources)
 	digest, digestErr := hex.DecodeString(sourceDigest)
-	if !filepath.IsAbs(sourcePath) || !validTargetPath(outputPath) ||
+	if !filepath.IsAbs(sourcePath) || filepath.Clean(sourcePath) != sourcePath ||
+		!validTargetPath(outputPath) ||
 		digestErr != nil || len(digest) != sha256.Size || len(selectedExports) == 0 ||
-		!sort.StringsAreSorted(selectedExports) {
+		!sort.StringsAreSorted(selectedExports) ||
+		!sort.SliceIsSorted(selectedCertificationSources, func(left, right int) bool {
+			return selectedCertificationSources[left].sourcePath <
+				selectedCertificationSources[right].sourcePath
+		}) {
 		return StagedModule{}, &Error{
 			Operation: "stage module",
 			Subject:   outputPath,
@@ -68,9 +76,19 @@ func NewStagedModule(
 			}
 		}
 	}
+	for index, source := range selectedCertificationSources {
+		if !source.Valid() || source.sourcePath == sourcePath ||
+			index > 0 && selectedCertificationSources[index-1].sourcePath == source.sourcePath {
+			return StagedModule{}, &Error{
+				Operation: "stage module",
+				Subject:   outputPath,
+				Reason:    "certification sources are invalid",
+			}
+		}
+	}
 	return StagedModule{
-		sourcePath: sourcePath, outputPath: outputPath,
-		sourceDigest: sourceDigest, exports: selectedExports,
+		sourcePath: sourcePath, outputPath: outputPath, sourceDigest: sourceDigest,
+		exports: selectedExports, certificationSources: selectedCertificationSources,
 	}, nil
 }
 

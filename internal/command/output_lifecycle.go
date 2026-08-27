@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/emit/callableimplementation"
@@ -70,10 +71,16 @@ type callableImplementationPrintPlan struct {
 }
 
 type callableImplementationModule struct {
+	sourcePath           string
+	outputPath           string
+	sourceDigest         string
+	exports              []string
+	certificationSources []callableImplementationCertificationSource
+}
+
+type callableImplementationCertificationSource struct {
 	sourcePath   string
-	outputPath   string
 	sourceDigest string
-	exports      []string
 }
 
 type callableImplementationTargetKind uint8
@@ -217,7 +224,12 @@ func stagePrintPlan(
 		claims := make(map[string]callableImplementationTarget)
 		for index, module := range modules {
 			callableClaims := module.CallableClaims()
+			certificationSources := module.CertificationSources()
 			exports := make([]string, len(callableClaims))
+			stagedCertificationSources := make(
+				[]callableImplementationCertificationSource,
+				len(certificationSources),
+			)
 			for claimIndex, claim := range callableClaims {
 				exports[claimIndex] = claim.Export
 				claims[claim.SourceIdentity] = callableImplementationTarget{
@@ -228,12 +240,17 @@ func stagePrintPlan(
 					implementationExport: claim.Export,
 				}
 			}
+			for sourceIndex, source := range certificationSources {
+				stagedCertificationSources[sourceIndex] =
+					callableImplementationCertificationSource{
+						sourcePath: source.SourcePath(), sourceDigest: source.SourceDigest(),
+					}
+			}
 			sort.Strings(exports)
 			plan.callableImplementation.modules[index] = callableImplementationModule{
-				sourcePath:   module.SourcePath(),
-				outputPath:   module.OutputPath(),
-				sourceDigest: module.SourceDigest(),
-				exports:      exports,
+				sourcePath: module.SourcePath(), outputPath: module.OutputPath(),
+				sourceDigest: module.SourceDigest(), exports: exports,
+				certificationSources: stagedCertificationSources,
 			}
 		}
 		generatedTargets := verification.Targets()
@@ -412,6 +429,22 @@ func (p printPlan) validate(outputDirectory string) error {
 						"callable-implementation exports are invalid",
 					)
 				}
+			}
+			previousCertificationPath := ""
+			for _, source := range module.certificationSources {
+				sourceDigest, sourceDigestErr := hex.DecodeString(source.sourceDigest)
+				if !filepath.IsAbs(source.sourcePath) ||
+					filepath.Clean(source.sourcePath) != source.sourcePath ||
+					!strings.HasSuffix(source.sourcePath, ".d.ts") ||
+					source.sourcePath == module.sourcePath ||
+					sourceDigestErr != nil || len(sourceDigest) != sha256.Size ||
+					previousCertificationPath >= source.sourcePath {
+					return commandError(
+						"validate print plan",
+						"callable-implementation certification source is invalid",
+					)
+				}
+				previousCertificationPath = source.sourcePath
 			}
 			if _, duplicate := modules[module.outputPath]; duplicate {
 				return commandError(

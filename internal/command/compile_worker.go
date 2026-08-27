@@ -62,10 +62,16 @@ type compileWorkerCallableImplementation struct {
 }
 
 type compileWorkerCallableImplementationModule struct {
-	SourcePath   string   `json:"sourcePath"`
-	OutputPath   string   `json:"outputPath"`
-	SourceDigest string   `json:"sourceDigest"`
-	Exports      []string `json:"exports"`
+	SourcePath           string                                      `json:"sourcePath"`
+	OutputPath           string                                      `json:"outputPath"`
+	SourceDigest         string                                      `json:"sourceDigest"`
+	Exports              []string                                    `json:"exports"`
+	CertificationSources []compileWorkerCallableImplementationSource `json:"certificationSources,omitempty"`
+}
+
+type compileWorkerCallableImplementationSource struct {
+	SourcePath   string `json:"sourcePath"`
+	SourceDigest string `json:"sourceDigest"`
 }
 
 type compileWorkerCallableImplementationTarget struct {
@@ -289,11 +295,19 @@ func readCompileWorkerDocument(
 			len(document.CallableImplementation.Modules),
 		)
 		for index, module := range document.CallableImplementation.Modules {
+			certificationSources := make(
+				[]callableImplementationCertificationSource,
+				len(module.CertificationSources),
+			)
+			for sourceIndex, source := range module.CertificationSources {
+				certificationSources[sourceIndex] = callableImplementationCertificationSource{
+					sourcePath: source.SourcePath, sourceDigest: source.SourceDigest,
+				}
+			}
 			plan.callableImplementation.modules[index] = callableImplementationModule{
-				sourcePath:   module.SourcePath,
-				outputPath:   module.OutputPath,
-				sourceDigest: module.SourceDigest,
-				exports:      slices.Clone(module.Exports),
+				sourcePath: module.SourcePath, outputPath: module.OutputPath,
+				sourceDigest: module.SourceDigest, exports: slices.Clone(module.Exports),
+				certificationSources: certificationSources,
 			}
 		}
 		plan.callableImplementation.targets = make(
@@ -386,12 +400,20 @@ func encodeCompileWorkerDocument(
 			),
 		}
 		for index, module := range plan.callableImplementation.modules {
+			certificationSources := make(
+				[]compileWorkerCallableImplementationSource,
+				len(module.certificationSources),
+			)
+			for sourceIndex, source := range module.certificationSources {
+				certificationSources[sourceIndex] = compileWorkerCallableImplementationSource{
+					SourcePath: source.sourcePath, SourceDigest: source.sourceDigest,
+				}
+			}
 			document.CallableImplementation.Modules[index] =
 				compileWorkerCallableImplementationModule{
-					SourcePath:   module.sourcePath,
-					OutputPath:   module.outputPath,
-					SourceDigest: module.sourceDigest,
-					Exports:      slices.Clone(module.exports),
+					SourcePath: module.sourcePath, OutputPath: module.outputPath,
+					SourceDigest: module.sourceDigest, Exports: slices.Clone(module.exports),
+					CertificationSources: certificationSources,
 				}
 		}
 		for index, target := range plan.callableImplementation.targets {

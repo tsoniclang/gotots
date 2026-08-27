@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/config"
@@ -16,8 +17,27 @@ func verifyCallableImplementationContracts(
 	plan printPlan,
 	outputDirectory string,
 ) (printPlan, error) {
-	if !plan.hasCallableImplementation {
+	prepared, err := prepareCallableImplementations(project)
+	if err != nil {
+		return printPlan{}, err
+	}
+	if prepared == nil {
+		if plan.hasCallableImplementation {
+			return printPlan{}, commandError(
+				"verify callable implementation",
+				"unconfigured callable evidence survived compilation",
+			)
+		}
 		return plan, nil
+	}
+	if !plan.hasCallableImplementation {
+		return printPlan{}, commandError(
+			"verify callable implementation",
+			"configured callable evidence is absent from compilation",
+		)
+	}
+	if err := exactJoinPreparedCallablePlan(prepared, plan.callableImplementation); err != nil {
+		return printPlan{}, err
 	}
 	existing := make(map[string]struct{}, len(plan.files))
 	for _, file := range plan.files {
@@ -35,11 +55,26 @@ func verifyCallableImplementationContracts(
 			)
 		}
 		var err error
+		certificationSources := make(
+			[]callableimplementation.CertificationSource,
+			len(module.certificationSources),
+		)
+		for sourceIndex, source := range module.certificationSources {
+			certificationSources[sourceIndex], err =
+				callableimplementation.NewCertificationSource(
+					source.sourcePath,
+					source.sourceDigest,
+				)
+			if err != nil {
+				return printPlan{}, err
+			}
+		}
 		modules[index], err = callableimplementation.NewStagedModule(
 			module.sourcePath,
 			module.outputPath,
 			module.sourceDigest,
 			module.exports,
+			certificationSources,
 		)
 		if err != nil {
 			return printPlan{}, err
@@ -127,6 +162,93 @@ func verifyCallableImplementationContracts(
 		})
 	}
 	return plan, nil
+}
+
+func exactJoinPreparedCallablePlan(
+	prepared *callableimplementation.Prepared,
+	plan callableImplementationPrintPlan,
+) error {
+	expectedModules := prepared.Modules()
+	if len(expectedModules) != len(plan.modules) {
+		return commandError(
+			"join callable implementation handoff",
+			"module denominator differs",
+		)
+	}
+	actualModules := make(map[string]callableImplementationModule, len(plan.modules))
+	for _, module := range plan.modules {
+		actualModules[module.outputPath] = module
+	}
+	expectedTargets := make(map[string]callableImplementationTarget)
+	for _, expected := range expectedModules {
+		actual, ok := actualModules[expected.OutputPath()]
+		claims := expected.CallableClaims()
+		exports := make([]string, len(claims))
+		for index, claim := range claims {
+			exports[index] = claim.Export
+			expectedTargets[claim.SourceIdentity] = callableImplementationTarget{
+				sourceIdentity: claim.SourceIdentity, sourceSignature: claim.SourceSignature,
+				variant: string(claim.Variant), implementationOutput: expected.OutputPath(),
+				implementationExport: claim.Export,
+			}
+		}
+		sort.Strings(exports)
+		if !ok || actual.sourcePath != expected.SourcePath() ||
+			actual.sourceDigest != expected.SourceDigest() ||
+			!slices.Equal(actual.exports, exports) ||
+			!sameCallableCertificationSources(
+				actual.certificationSources,
+				expected.CertificationSources(),
+			) {
+			return commandError(
+				"join callable implementation handoff",
+				fmt.Sprintf("module %q differs from prepared evidence", expected.OutputPath()),
+			)
+		}
+		delete(actualModules, expected.OutputPath())
+	}
+	if len(actualModules) != 0 || len(expectedTargets) != len(plan.targets) {
+		return commandError(
+			"join callable implementation handoff",
+			"callable denominator differs",
+		)
+	}
+	for _, actual := range plan.targets {
+		expected, ok := expectedTargets[actual.sourceIdentity]
+		if !ok || actual.sourceSignature != expected.sourceSignature ||
+			actual.variant != expected.variant ||
+			actual.implementationOutput != expected.implementationOutput ||
+			actual.implementationExport != expected.implementationExport {
+			return commandError(
+				"join callable implementation handoff",
+				fmt.Sprintf("callable %q differs from prepared evidence", actual.sourceIdentity),
+			)
+		}
+		delete(expectedTargets, actual.sourceIdentity)
+	}
+	if len(expectedTargets) != 0 {
+		return commandError(
+			"join callable implementation handoff",
+			"prepared callable is absent from compilation",
+		)
+	}
+	return nil
+}
+
+func sameCallableCertificationSources(
+	actual []callableImplementationCertificationSource,
+	expected []callableimplementation.CertificationSource,
+) bool {
+	if len(actual) != len(expected) {
+		return false
+	}
+	for index, source := range expected {
+		if actual[index].sourcePath != source.SourcePath() ||
+			actual[index].sourceDigest != source.SourceDigest() {
+			return false
+		}
+	}
+	return true
 }
 
 func stagedCallableImplementationTargets(

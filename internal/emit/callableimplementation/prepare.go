@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
@@ -114,25 +115,35 @@ func prepareOne(config Config, contractPath string) (Module, error) {
 	digest.Write(canonical)
 	digest.Write([]byte{0})
 	digest.Write(source)
-	for _, path := range certificationPaths {
+	certificationSources := make([]CertificationSource, len(certificationPaths))
+	for index, path := range certificationPaths {
 		evidence, readErr := os.ReadFile(path)
 		if readErr != nil {
 			return Module{}, contractError("read certification source", path, readErr)
+		}
+		evidenceHash := sha256.Sum256(evidence)
+		certificationSources[index], readErr = NewCertificationSource(
+			path,
+			hex.EncodeToString(evidenceHash[:]),
+		)
+		if readErr != nil {
+			return Module{}, readErr
 		}
 		digest.Write([]byte{0})
 		digest.Write(evidence)
 	}
 	sourceHash := sha256.Sum256(source)
 	return Module{
-		packagePath:    document.Package.ImportPath,
-		modulePath:     document.Package.ModulePath,
-		moduleVersion:  document.Package.ModuleVersion,
-		sourcePath:     sourcePath,
-		outputPath:     document.Output,
-		sourceDigest:   hex.EncodeToString(sourceHash[:]),
-		digest:         hex.EncodeToString(digest.Sum(nil)),
-		envelope:       document.Envelope.Kind,
-		callableClaims: slices.Clone(document.Callables),
+		packagePath:          document.Package.ImportPath,
+		modulePath:           document.Package.ModulePath,
+		moduleVersion:        document.Package.ModuleVersion,
+		sourcePath:           sourcePath,
+		outputPath:           document.Output,
+		sourceDigest:         hex.EncodeToString(sourceHash[:]),
+		digest:               hex.EncodeToString(digest.Sum(nil)),
+		envelope:             document.Envelope.Kind,
+		callableClaims:       slices.Clone(document.Callables),
+		certificationSources: certificationSources,
 	}, nil
 }
 
@@ -170,6 +181,15 @@ func validateDocument(document Document) error {
 	}
 	if _, err := targetoutput.CallableImplementationPath(document.Output); err != nil {
 		return &Error{Operation: "validate output", Subject: document.Output, Reason: err.Error()}
+	}
+	if !sort.StringsAreSorted(document.CertificationSources) {
+		return &Error{Operation: "validate", Reason: "certification sources are not sorted"}
+	}
+	for index, source := range document.CertificationSources {
+		if source == "" || source == document.Source ||
+			index > 0 && document.CertificationSources[index-1] == source {
+			return &Error{Operation: "validate", Reason: "certification source is invalid"}
+		}
 	}
 	seenExports := make(map[string]struct{}, len(document.Callables))
 	previous := ""

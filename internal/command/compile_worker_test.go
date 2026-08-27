@@ -36,6 +36,12 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	callableDigest := sha256.Sum256(callablePayload)
+	certificationSource := filepath.Join(output, "runtime-contract.d.ts")
+	certificationPayload := []byte("declare module \"@fixture/runtime.js\" {}\n")
+	if err := os.WriteFile(certificationSource, certificationPayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	certificationDigest := sha256.Sum256(certificationPayload)
 	plan := printPlan{
 		files: []printPlanFile{{
 			outputPath:   "program.ts",
@@ -58,10 +64,13 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 		hasSourceImplementation: true,
 		callableImplementation: callableImplementationPrintPlan{
 			modules: []callableImplementationModule{{
-				sourcePath:   callableSource,
-				outputPath:   "implementations/hot.ts",
+				sourcePath: callableSource, outputPath: "implementations/hot.ts",
 				sourceDigest: hex.EncodeToString(callableDigest[:]),
 				exports:      []string{"valueFast"},
+				certificationSources: []callableImplementationCertificationSource{{
+					sourcePath:   certificationSource,
+					sourceDigest: hex.EncodeToString(certificationDigest[:]),
+				}},
 			}},
 			targets: []callableImplementationTarget{{
 				sourceIdentity:       "example.test/program|kind=5|receiver=|name=Value",
@@ -98,6 +107,9 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 		len(decoded.plan.sourceImplementation.packages) != 1 ||
 		!decoded.plan.hasCallableImplementation ||
 		len(decoded.plan.callableImplementation.modules) != 1 ||
+		len(decoded.plan.callableImplementation.modules[0].certificationSources) != 1 ||
+		decoded.plan.callableImplementation.modules[0].certificationSources[0].sourceDigest !=
+			hex.EncodeToString(certificationDigest[:]) ||
 		len(decoded.plan.callableImplementation.targets) != 1 {
 		t.Fatalf("decoded handoff = %#v", decoded)
 	}

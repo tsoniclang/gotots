@@ -66,6 +66,9 @@ func VerifyStagedGeneratedContracts(
 	if err := materializeImplementationModules(projectRoot, config.Modules); err != nil {
 		return nil, err
 	}
+	if err := materializeCertificationSources(projectRoot, config.Modules); err != nil {
+		return nil, err
+	}
 	if err := os.WriteFile(
 		filepath.Join(projectRoot, "package.json"),
 		[]byte("{\"type\":\"module\"}\n"),
@@ -167,6 +170,37 @@ func validateStagedModules(
 ) (map[string]StagedModule, error) {
 	seen := make(map[string]StagedModule, len(modules))
 	for _, module := range modules {
+		digest, digestErr := hex.DecodeString(module.sourceDigest)
+		if !filepath.IsAbs(module.sourcePath) || filepath.Clean(module.sourcePath) != module.sourcePath ||
+			!validTargetPath(module.outputPath) ||
+			digestErr != nil || len(digest) != sha256.Size || len(module.exports) == 0 ||
+			!sort.StringsAreSorted(module.exports) ||
+			!sort.SliceIsSorted(module.certificationSources, func(left, right int) bool {
+				return module.certificationSources[left].sourcePath <
+					module.certificationSources[right].sourcePath
+			}) {
+			return nil, &Error{
+				Operation: "validate staged module", Subject: module.outputPath,
+				Reason: "module is invalid",
+			}
+		}
+		for index, source := range module.certificationSources {
+			if !source.Valid() || source.sourcePath == module.sourcePath ||
+				index > 0 && module.certificationSources[index-1].sourcePath == source.sourcePath {
+				return nil, &Error{
+					Operation: "validate staged module", Subject: module.outputPath,
+					Reason: "certification source is invalid",
+				}
+			}
+		}
+		for index, name := range module.exports {
+			if name == "" || index > 0 && module.exports[index-1] == name {
+				return nil, &Error{
+					Operation: "validate staged module", Subject: module.outputPath,
+					Reason: "module exports are invalid",
+				}
+			}
+		}
 		if _, duplicate := seen[module.outputPath]; duplicate {
 			return nil, &Error{
 				Operation: "validate staged module", Subject: module.outputPath,
@@ -270,6 +304,46 @@ func materializeImplementationModules(root string, modules []StagedModule) error
 		}
 		if err := os.WriteFile(path, payload, 0o644); err != nil {
 			return contractError("write implementation source", path, err)
+		}
+	}
+	return nil
+}
+
+func materializeCertificationSources(root string, modules []StagedModule) error {
+	byDigest := make(map[string][]byte)
+	for _, module := range modules {
+		for _, source := range module.certificationSources {
+			payload, err := os.ReadFile(source.sourcePath)
+			if err != nil {
+				return contractError("read certification source", source.sourcePath, err)
+			}
+			digest := sha256.Sum256(payload)
+			if hex.EncodeToString(digest[:]) != source.sourceDigest {
+				return &Error{
+					Operation: "verify certification source", Subject: source.sourcePath,
+					Reason: "source digest changed",
+				}
+			}
+			byDigest[source.sourceDigest] = payload
+		}
+	}
+	if len(byDigest) == 0 {
+		return nil
+	}
+	digests := make([]string, 0, len(byDigest))
+	for digest := range byDigest {
+		digests = append(digests, digest)
+	}
+	sort.Strings(digests)
+	directory := filepath.Join(root, "certification")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return contractError("create certification directory", directory, err)
+	}
+	for index, digest := range digests {
+		payload := byDigest[digest]
+		path := filepath.Join(directory, fmt.Sprintf("%06d.d.ts", index))
+		if err := os.WriteFile(path, payload, 0o644); err != nil {
+			return contractError("write certification source", path, err)
 		}
 	}
 	return nil

@@ -1665,6 +1665,16 @@ body is absent. The final staged TypeScript project independently exact-joins
 the checked generated callable and checked authored export before either can
 be printed.
 
+An authored callable module may name sorted, contract-owned `.d.ts`
+certification sources needed only to typecheck its imports. Preparation hashes
+those declaration snapshots into the callable contract; their absolute paths
+and digests cross the compile-worker boundary as sealed evidence. Staged
+verification rechecks each digest and materializes one deterministic,
+content-deduplicated copy in verification scratch. Certification declarations
+never become generated output, runtime dependencies, or an alternate semantic
+owner. Missing, changed, executable, escaping, or unsealed sources fail before
+printing.
+
 The initial callable contract admits only ordinary synchronous variants that
 emit as module functions or static class methods, plus explicit generic
 kernel variants. Instance value-receiver bodies and recovery-aware deferred

@@ -1205,6 +1205,12 @@ structurally exact-joins the complete ordinary and installed canonical sets.
 That final join consumes only the compiler worker's official encoded protocol
 and flattened expected exports after the worker has exited; no live TS-Go
 process or certificate crosses the compilation lifetime boundary.
+For callable-body modules, mutate an admitted `.d.ts` certification source
+after preparation, omit it from the compile-worker handoff, duplicate it under
+a second contract, and replace it with executable TypeScript. Digest drift,
+unsealed evidence, and a non-declaration source must fail before the staged
+project is printed; byte-identical declarations from multiple modules are
+materialized once in scratch and never appear in final output.
 Before checker evidence is trusted, TSTS independently checks both sets with
 its authoritative marker modules and exact-joins marker facts. The selected
 target then lowers and strict-typechecks both complete executable sets with one

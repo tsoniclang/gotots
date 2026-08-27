@@ -136,6 +136,10 @@ func slicesCloneModules(source []Module) []Module {
 	result := make([]Module, len(source))
 	for index, module := range source {
 		module.callableClaims = append([]CallableDocument(nil), module.callableClaims...)
+		module.certificationSources = append(
+			[]CertificationSource(nil),
+			module.certificationSources...,
+		)
 		result[index] = module
 	}
 	return result
