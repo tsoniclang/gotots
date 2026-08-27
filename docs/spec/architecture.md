@@ -1742,6 +1742,16 @@ final requirement scheduler remains the sole liveness owner. Sharing either
 artifact graph, scheduler queue, builder, liveness ledger, or emitted
 declaration is forbidden.
 
+Generated-contract verification is a post-compilation transaction. The final
+compiler session emits the ordinary certification set, installed set, and
+expected package/export identities into the official encoded handoff and then
+exits. A fresh verifier process materializes and exact-joins those two sets,
+closes, and promotes the immutable plan to a printer-only type. The final
+printer starts only after that promotion. A source-implementation certificate,
+TS-Go client, source graph, target node, or callback cannot cross this boundary;
+GC, memory-limit tuning, and retries are not substitutes for lifecycle
+severance.
+
 Registry transfer preserves semantic identity, not allocation identity. A
 generated contract fact recreated by the final session exact-joins the
 registry's existing fact by stable key, source owner, type arguments,
@@ -1832,30 +1842,37 @@ external AST protocol. The encoder validates required fields and discriminants.
 Pinned TS-Go decodes, constructs real nodes, and prints. No target text exists
 before printing, and no post-print mutation is allowed.
 
-Compilation and printing are separate process lifetimes. The parent command
-owns one unpublished output transaction. A compilation worker loads and checks
-Go, settles the complete target file set, provider closure, source digest, and
-semantic digest, and encodes every file into the pinned official TS-Go
-external-AST protocol inside that transaction. The worker then exits. Only
-after its process has terminated may the parent start the external TS-Go
-printer. Consequently the compiler and printer memory peaks cannot overlap
-under their one hard process-tree budget.
+Compilation, source-implementation contract verification, and printing are
+separate process lifetimes. The parent command owns one unpublished output
+transaction. A compilation worker loads and checks Go, settles the complete
+target file set, provider closure, source digest, and semantic digest, and
+encodes every file into the pinned official TS-Go external-AST protocol inside
+that transaction. When a source implementation is selected, it also encodes
+the ordinary contract set and flattens the expected package/export identities.
+The worker then exits. Only after its process has terminated may the parent
+start a fresh external TS-Go generated-contract verifier. That verifier
+materializes and exact-joins the ordinary and installed sets, then exits. Only
+the resulting verified plan may start a fresh external TS-Go printer.
+Consequently the compiler, contract-verifier, and printer memory peaks cannot
+overlap under their one hard process-tree budget.
 
 The digest-sealed encoded protocol plus a constructor-validated handoff is the
-only state crossing that process boundary. Neither is a semantic IR, and
+only state crossing those process boundaries. Neither is a semantic IR, and
 neither contains a source AST, `go/types` object, emitter session, certificate,
 mutable TS-Go node, callback, or target text. The handoff records the distinct
-worker process identity; an in-process handoff is invalid. The printer consumes
-one bounded encoded file at a time. Temporary protocol and worker artifacts are
-removed before successful publication and never appear in the output manifest.
-Each payload is exact-checked immediately before it is sent to the printer.
+worker process identity; an in-process handoff is invalid. The verifier and
+printer each consume one bounded encoded file at a time. Temporary protocol,
+verification, and worker artifacts are removed before successful publication
+and never appear in the output manifest. Each payload is exact-checked before
+verification and again before final printing.
 
-Starting the printer before the compilation worker has exited is forbidden.
-So are retaining compilation state in the parent, printing during semantic settlement,
-retaining all printed text, using encoded bytes as a second decision model, or
-recovering semantics from the wire payload. Encoding failure produces no
-published output; printing failure leaves the previous completed output
-unchanged.
+Starting either TS-Go consumer before the compilation worker has exited,
+starting the printer before generated-contract verification has closed, or
+bypassing plan promotion is forbidden. So are retaining compilation state in
+the parent, printing during semantic settlement, retaining all printed text,
+using encoded bytes as a second decision model, or recovering semantics from
+the wire payload. Encoding, verification, or printing failure produces no
+published output and leaves the previous completed output unchanged.
 
 ## Complexity And Failure
 

@@ -125,9 +125,6 @@ type Certificate struct {
 	byPath      map[string]Implementation
 	compilation CompilationDocument
 	digest      string
-	repository  string
-	scratch     string
-	tsgoTool    tsgo.Tool
 }
 
 type Prepared struct {
@@ -137,7 +134,7 @@ type Prepared struct {
 
 func (c *Certificate) Valid() bool {
 	return c != nil && c.compilation.valid() && c.digest != "" &&
-		len(c.byPath) != 0 && c.tsgoTool.Valid()
+		len(c.byPath) != 0
 }
 
 func (c *Certificate) SupportsCompilation(

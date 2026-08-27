@@ -21,6 +21,18 @@ func TestPrintPlanSeversCompilationAndTargetGraphs(t *testing.T) {
 	}
 }
 
+func TestPrintPlanTypeStatesRequirePostCompilationVerification(t *testing.T) {
+	verify := reflect.TypeOf(verifySourceImplementationContracts)
+	if verify.In(1) != reflect.TypeFor[compiledPrintPlan]() ||
+		verify.Out(0) != reflect.TypeFor[verifiedPrintPlan]() {
+		t.Fatal("source-implementation gate does not own print-plan promotion")
+	}
+	write := reflect.TypeOf(writePrintPlanTo)
+	if write.In(1) != reflect.TypeFor[verifiedPrintPlan]() {
+		t.Fatal("printer accepts a plan that has not passed post-compilation verification")
+	}
+}
+
 func TestStagedProtocolPayloadRejectsMutation(t *testing.T) {
 	original := []byte("official protocol")
 	file := printPlanFile{protocolHash: sha256.Sum256(original)}

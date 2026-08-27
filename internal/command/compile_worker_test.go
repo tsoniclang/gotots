@@ -18,6 +18,17 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 	if err := os.WriteFile(protocolPath, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	generatedProtocol := filepath.Join(
+		protocol,
+		sourceImplementationProtocolDirectoryName,
+	)
+	if err := os.Mkdir(generatedProtocol, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	generatedProtocolPath := filepath.Join(generatedProtocol, "000000.ast")
+	if err := os.WriteFile(generatedProtocolPath, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	plan := printPlan{
 		files: []printPlanFile{{
 			outputPath:   "program.ts",
@@ -25,7 +36,20 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 			protocolHash: sha256.Sum256(payload),
 		}},
 		protocolDirectory: protocol,
-		packageDocument:   []byte("{\"private\":true}\n"),
+		sourceImplementation: sourceImplementationPrintPlan{
+			generated: []printPlanFile{{
+				outputPath:   "program.ts",
+				protocolPath: generatedProtocolPath,
+				protocolHash: sha256.Sum256(payload),
+			}},
+			packages: []sourceImplementationPackage{{
+				packagePath:  "example.test/program",
+				assemblyPath: "program.ts",
+				exports:      []string{"Value"},
+			}},
+		},
+		hasSourceImplementation: true,
+		packageDocument:         []byte("{\"private\":true}\n"),
 	}
 	digest := "a3a86944267e41877ab54f798340439bd80038e34687c5dedb5dc7dbc857565b"
 	handoff, err := encodeCompileWorkerDocument(plan, digest, os.Getpid()+1)
@@ -42,7 +66,10 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 	}
 	if decoded.semanticDigest != digest || len(decoded.plan.files) != 1 ||
 		decoded.plan.files[0].outputPath != "program.ts" ||
-		decoded.plan.files[0].protocolHash != plan.files[0].protocolHash {
+		decoded.plan.files[0].protocolHash != plan.files[0].protocolHash ||
+		!decoded.plan.hasSourceImplementation ||
+		len(decoded.plan.sourceImplementation.generated) != 1 ||
+		len(decoded.plan.sourceImplementation.packages) != 1 {
 		t.Fatalf("decoded handoff = %#v", decoded)
 	}
 

@@ -498,6 +498,13 @@ func (e ProgramEmission) Files() []TargetFile {
 	return slices.Clone(e.files)
 }
 
+func (e ProgramEmission) SourceImplementationPlan() (
+	sourceimplementation.GeneratedContractPlan,
+	bool,
+) {
+	return e.sourceImplementationPlan, e.sourceImplementationPlan.Valid()
+}
+
 // EnvironmentProfile is the complete exact identity of the settled
 // environment evidence: build, compilation, provider, and pinned-target
 // profiles, each content-addressed by a deterministic fingerprint.

@@ -85,6 +85,11 @@ func Value() int { return beta.Twice(alpha.Add(20, 1)) }
 	if err != nil {
 		t.Fatal(err)
 	}
+	verification, ok := emission.SourceImplementationPlan()
+	if !ok || len(verification.Generated()) == 0 ||
+		len(verification.Packages()) != 2 {
+		t.Fatal("source-implementation contract verification was not sealed")
+	}
 
 	assemblyPaths := make(map[string]struct{}, 2)
 	retiredPaths := make(map[string]struct{})

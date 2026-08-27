@@ -12,24 +12,26 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 
 	"github.com/tsoniclang/gotots/internal/config"
 )
 
 const (
-	compileWorkerCommand       = "__gotots_compile_worker_v1"
+	compileWorkerCommand       = "__gotots_compile_worker_v2"
 	compileWorkerDirectoryName = ".gotots-compile-worker"
-	compileWorkerSchemaVersion = 1
+	compileWorkerSchemaVersion = 2
 	compileWorkerLogLimit      = 64 * 1024
 )
 
 type compileWorkerDocument struct {
-	SchemaVersion   int                    `json:"schemaVersion"`
-	WorkerPID       int                    `json:"workerPid"`
-	SemanticDigest  string                 `json:"semanticDigest"`
-	Files           []compileWorkerFile    `json:"files"`
-	RuntimeManifest *compileWorkerArtifact `json:"runtimeManifest"`
-	PackageDocument string                 `json:"packageDocument"`
+	SchemaVersion        int                                `json:"schemaVersion"`
+	WorkerPID            int                                `json:"workerPid"`
+	SemanticDigest       string                             `json:"semanticDigest"`
+	Files                []compileWorkerFile                `json:"files"`
+	RuntimeManifest      *compileWorkerArtifact             `json:"runtimeManifest"`
+	SourceImplementation *compileWorkerSourceImplementation `json:"sourceImplementation,omitempty"`
+	PackageDocument      string                             `json:"packageDocument"`
 }
 
 type compileWorkerFile struct {
@@ -42,32 +44,43 @@ type compileWorkerArtifact struct {
 	Payload    string `json:"payload"`
 }
 
+type compileWorkerSourceImplementation struct {
+	Generated []compileWorkerFile                        `json:"generated"`
+	Packages  []compileWorkerSourceImplementationPackage `json:"packages"`
+}
+
+type compileWorkerSourceImplementationPackage struct {
+	PackagePath  string   `json:"packagePath"`
+	AssemblyPath string   `json:"assemblyPath"`
+	Exports      []string `json:"exports"`
+}
+
 func prepareBuildInWorker(
 	ctx context.Context,
 	project config.Project,
 	outputDirectory string,
-) (printPlan, string, error) {
+) (compiledPrintPlan, string, error) {
 	executable, err := os.Executable()
 	if err != nil {
-		return printPlan{}, "", commandError("locate compilation worker", err.Error())
+		return compiledPrintPlan{}, "", commandError("locate compilation worker", err.Error())
 	}
 	workerDirectory := filepath.Join(outputDirectory, compileWorkerDirectoryName)
 	if err := os.Mkdir(workerDirectory, 0o700); err != nil {
-		return printPlan{}, "", commandError("create compilation worker", err.Error())
+		return compiledPrintPlan{}, "", commandError("create compilation worker", err.Error())
 	}
 	configPath := filepath.Join(workerDirectory, "project.json")
 	handoffPath := filepath.Join(workerDirectory, "handoff.json")
 	logPath := filepath.Join(workerDirectory, "worker.log")
 	projectDocument, err := project.CanonicalJSON()
 	if err != nil {
-		return printPlan{}, "", err
+		return compiledPrintPlan{}, "", err
 	}
 	if err := writeExclusive(configPath, projectDocument); err != nil {
-		return printPlan{}, "", commandError("write compilation worker project", err.Error())
+		return compiledPrintPlan{}, "", commandError("write compilation worker project", err.Error())
 	}
 	log, err := os.OpenFile(logPath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
 	if err != nil {
-		return printPlan{}, "", commandError("create compilation worker log", err.Error())
+		return compiledPrintPlan{}, "", commandError("create compilation worker log", err.Error())
 	}
 	worker := exec.CommandContext(
 		ctx,
@@ -87,7 +100,7 @@ func prepareBuildInWorker(
 		if readErr != nil {
 			detail = "read worker log: " + readErr.Error()
 		}
-		return printPlan{}, "", commandError(
+		return compiledPrintPlan{}, "", commandError(
 			"run compilation worker",
 			fmt.Sprintf("%v; close log: %v\n%s", runErr, closeErr, detail),
 		)
@@ -98,21 +111,21 @@ func prepareBuildInWorker(
 		worker.Process.Pid,
 	)
 	if err != nil {
-		return printPlan{}, "", err
+		return compiledPrintPlan{}, "", err
 	}
 	if err := os.Remove(configPath); err != nil {
-		return printPlan{}, "", commandError("remove compilation worker project", err.Error())
+		return compiledPrintPlan{}, "", commandError("remove compilation worker project", err.Error())
 	}
 	if err := os.Remove(handoffPath); err != nil {
-		return printPlan{}, "", commandError("remove compilation worker handoff", err.Error())
+		return compiledPrintPlan{}, "", commandError("remove compilation worker handoff", err.Error())
 	}
 	if err := os.Remove(logPath); err != nil {
-		return printPlan{}, "", commandError("remove compilation worker log", err.Error())
+		return compiledPrintPlan{}, "", commandError("remove compilation worker log", err.Error())
 	}
 	if err := os.Remove(workerDirectory); err != nil {
-		return printPlan{}, "", commandError("remove compilation worker", err.Error())
+		return compiledPrintPlan{}, "", commandError("remove compilation worker", err.Error())
 	}
-	return document.plan, document.semanticDigest, nil
+	return compiledPrintPlan{plan: document.plan}, document.semanticDigest, nil
 }
 
 func runCompileWorker(ctx context.Context, arguments []string) error {
@@ -205,6 +218,45 @@ func readCompileWorkerDocument(
 		}
 		plan.hasRuntimeManifest = true
 	}
+	if document.SourceImplementation != nil {
+		generatedDirectory := filepath.Join(
+			protocolDirectory,
+			sourceImplementationProtocolDirectoryName,
+		)
+		plan.sourceImplementation.generated = make(
+			[]printPlanFile,
+			len(document.SourceImplementation.Generated),
+		)
+		for index, file := range document.SourceImplementation.Generated {
+			digest, decodeErr := hex.DecodeString(file.ProtocolHash)
+			if decodeErr != nil || len(digest) != sha256.Size {
+				return decodedCompileWorkerDocument{}, commandError(
+					"decode compilation worker handoff",
+					"source-implementation protocol digest is invalid",
+				)
+			}
+			plan.sourceImplementation.generated[index] = printPlanFile{
+				outputPath: file.OutputPath,
+				protocolPath: filepath.Join(
+					generatedDirectory,
+					fmt.Sprintf("%06d.ast", index),
+				),
+				protocolHash: [sha256.Size]byte(digest),
+			}
+		}
+		plan.sourceImplementation.packages = make(
+			[]sourceImplementationPackage,
+			len(document.SourceImplementation.Packages),
+		)
+		for index, selected := range document.SourceImplementation.Packages {
+			plan.sourceImplementation.packages[index] = sourceImplementationPackage{
+				packagePath:  selected.PackagePath,
+				assemblyPath: selected.AssemblyPath,
+				exports:      slices.Clone(selected.Exports),
+			}
+		}
+		plan.hasSourceImplementation = true
+	}
 	if err := plan.validate(outputDirectory); err != nil {
 		return decodedCompileWorkerDocument{}, err
 	}
@@ -236,6 +288,31 @@ func encodeCompileWorkerDocument(
 		document.RuntimeManifest = &compileWorkerArtifact{
 			OutputPath: plan.runtimeManifest.outputPath,
 			Payload:    base64.StdEncoding.EncodeToString(plan.runtimeManifest.payload),
+		}
+	}
+	if plan.hasSourceImplementation {
+		document.SourceImplementation = &compileWorkerSourceImplementation{
+			Generated: make(
+				[]compileWorkerFile,
+				len(plan.sourceImplementation.generated),
+			),
+			Packages: make(
+				[]compileWorkerSourceImplementationPackage,
+				len(plan.sourceImplementation.packages),
+			),
+		}
+		for index, file := range plan.sourceImplementation.generated {
+			document.SourceImplementation.Generated[index] = compileWorkerFile{
+				OutputPath:   file.outputPath,
+				ProtocolHash: hex.EncodeToString(file.protocolHash[:]),
+			}
+		}
+		for index, selected := range plan.sourceImplementation.packages {
+			document.SourceImplementation.Packages[index] = compileWorkerSourceImplementationPackage{
+				PackagePath:  selected.packagePath,
+				AssemblyPath: selected.assemblyPath,
+				Exports:      slices.Clone(selected.exports),
+			}
 		}
 	}
 	payload, err := json.Marshal(document)

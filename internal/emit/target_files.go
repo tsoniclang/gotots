@@ -130,7 +130,7 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 				Reason: "source-implementation certification inputs are absent",
 			}
 		}
-		files, err = s.replaceSourceImplementations(
+		files, s.sourceImplementationPlan, err = s.replaceSourceImplementations(
 			ordinary,
 			s.sourceImplementationTargets,
 		)
@@ -183,6 +183,7 @@ func compileProgramSession(
 	}
 	return ProgramEmission{
 		files:                       files,
+		sourceImplementationPlan:    session.sourceImplementationPlan,
 		environmentObligations:      obligations,
 		environmentProfile:          profile,
 		externalFunctionObligations: session.externalFunctionObligations(),

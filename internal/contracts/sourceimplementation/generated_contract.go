@@ -1,10 +1,6 @@
 package sourceimplementation
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -28,6 +24,9 @@ func NewTarget(outputPath string, sourceFile tsgo.SourceFile) (Target, error) {
 	return Target{outputPath: outputPath, sourceFile: sourceFile}, nil
 }
 
+func (t Target) OutputPath() string          { return t.outputPath }
+func (t Target) SourceFile() tsgo.SourceFile { return t.sourceFile }
+
 type PackageTarget struct {
 	packagePath  string
 	assemblyPath string
@@ -49,209 +48,191 @@ func NewPackageTarget(
 	}, nil
 }
 
-func (c *Certificate) VerifyGeneratedContracts(
+type ContractPackage struct {
+	packagePath  string
+	assemblyPath string
+	exports      []string
+}
+
+func NewContractPackage(
+	packagePath string,
+	assemblyPath string,
+	exports []string,
+) (ContractPackage, error) {
+	selected := slices.Clone(exports)
+	if packagePath == "" || !validTargetPath(assemblyPath) || len(selected) == 0 {
+		return ContractPackage{}, &Error{
+			Operation: "join generated contract",
+			Reason:    "package contract is invalid",
+		}
+	}
+	sort.Strings(selected)
+	for index, name := range selected {
+		if name == "" || index > 0 && selected[index-1] == name {
+			return ContractPackage{}, &Error{
+				Operation: "join generated contract",
+				Reason:    "package export identities are invalid",
+			}
+		}
+	}
+	return ContractPackage{
+		packagePath:  packagePath,
+		assemblyPath: assemblyPath,
+		exports:      selected,
+	}, nil
+}
+
+func (p ContractPackage) PackagePath() string  { return p.packagePath }
+func (p ContractPackage) AssemblyPath() string { return p.assemblyPath }
+func (p ContractPackage) Exports() []string    { return slices.Clone(p.exports) }
+
+type GeneratedContractPlan struct {
+	generated []Target
+	packages  []ContractPackage
+}
+
+func (p GeneratedContractPlan) Valid() bool {
+	if len(p.generated) == 0 || len(p.packages) == 0 {
+		return false
+	}
+	if _, err := targetPaths(p.generated); err != nil {
+		return false
+	}
+	seen := make(map[string]struct{}, len(p.packages))
+	for _, selected := range p.packages {
+		if !validContractPackage(selected) {
+			return false
+		}
+		if _, duplicate := seen[selected.packagePath]; duplicate {
+			return false
+		}
+		seen[selected.packagePath] = struct{}{}
+	}
+	return true
+}
+
+func (p GeneratedContractPlan) Generated() []Target {
+	return slices.Clone(p.generated)
+}
+
+func (p GeneratedContractPlan) Packages() []ContractPackage {
+	result := make([]ContractPackage, len(p.packages))
+	for index, selected := range p.packages {
+		result[index] = selected
+		result[index].exports = slices.Clone(selected.exports)
+	}
+	return result
+}
+
+func (c *Certificate) PlanGeneratedContracts(
 	generated []Target,
 	installed []Target,
 	packages []PackageTarget,
-) (resultErr error) {
-	if !c.Valid() || c.repository == "" || c.scratch == "" ||
-		len(generated) == 0 || len(installed) == 0 || len(packages) == 0 {
-		return &Error{
+) (GeneratedContractPlan, error) {
+	if !c.Valid() || len(generated) == 0 || len(installed) == 0 ||
+		len(packages) != len(c.byPath) {
+		return GeneratedContractPlan{}, &Error{
 			Operation: "join generated contract",
 			Reason:    "contract evidence is incomplete",
 		}
 	}
-	digest, err := targetSetDigest(generated, installed, packages)
+	generatedPaths, err := targetPaths(generated)
 	if err != nil {
-		return err
+		return GeneratedContractPlan{}, err
 	}
-	root := filepath.Join(c.scratch, "generated-contract-"+digest)
-	generatedRoot := filepath.Join(root, "generated")
-	installedRoot := filepath.Join(root, "installed")
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		return err
-	}
-	client, err := tsgo.StartClientWithTool(c.tsgoTool, root)
+	installedPaths, err := targetPaths(installed)
 	if err != nil {
-		return err
+		return GeneratedContractPlan{}, err
 	}
-	defer func() {
-		if err := client.Close(); resultErr == nil && err != nil {
-			resultErr = err
-		}
-	}()
-	generatedConfig, err := materializeTargetSet(
-		client,
-		c.repository,
-		generatedRoot,
-		generated,
-	)
-	if err != nil {
-		return err
-	}
-	installedConfig, err := materializeTargetSet(
-		client,
-		c.repository,
-		installedRoot,
-		installed,
-	)
-	if err != nil {
-		return err
-	}
-	generatedProject, err := client.OpenProject(generatedConfig)
-	if err != nil {
-		return err
-	}
-	installedProject, err := client.OpenProject(installedConfig)
-	if err != nil {
-		return err
-	}
+	contractPackages := make([]ContractPackage, 0, len(packages))
+	seenPackages := make(map[string]struct{}, len(packages))
 	for _, selected := range packages {
 		implementation, ok := c.byPath[selected.packagePath]
-		if !ok {
-			return &Error{
+		if !ok || !validTargetPath(selected.assemblyPath) {
+			return GeneratedContractPlan{}, &Error{
 				Operation: "join generated contract",
 				Subject:   selected.packagePath,
 				Reason:    "implementation owner is absent",
 			}
 		}
-		generatedExports, err := generatedProject.Exports(filepath.Join(
-			generatedRoot,
-			filepath.FromSlash(selected.assemblyPath),
-		))
+		if _, duplicate := seenPackages[selected.packagePath]; duplicate {
+			return GeneratedContractPlan{}, &Error{
+				Operation: "join generated contract",
+				Subject:   selected.packagePath,
+				Reason:    "package contract is duplicated",
+			}
+		}
+		if _, ok := generatedPaths[selected.assemblyPath]; !ok {
+			return GeneratedContractPlan{}, &Error{
+				Operation: "join generated contract",
+				Subject:   selected.packagePath,
+				Reason:    "ordinary generated package assembly is absent",
+			}
+		}
+		if _, ok := installedPaths[selected.assemblyPath]; !ok {
+			return GeneratedContractPlan{}, &Error{
+				Operation: "join generated contract",
+				Subject:   selected.packagePath,
+				Reason:    "installed package assembly is absent",
+			}
+		}
+		exports := implementation.Exports()
+		exportNames := make([]string, len(exports))
+		for index, selectedExport := range exports {
+			exportNames[index] = selectedExport.Name()
+		}
+		contractPackage, err := NewContractPackage(
+			selected.packagePath,
+			selected.assemblyPath,
+			exportNames,
+		)
 		if err != nil {
-			return err
+			return GeneratedContractPlan{}, err
 		}
-		installedExports, err := installedProject.Exports(filepath.Join(
-			installedRoot,
-			filepath.FromSlash(selected.assemblyPath),
-		))
-		if err != nil {
-			return err
-		}
-		if err := joinPackageExportIdentities(
-			implementation,
-			generatedExports,
-			installedExports,
-		); err != nil {
-			return err
-		}
+		seenPackages[selected.packagePath] = struct{}{}
+		contractPackages = append(contractPackages, contractPackage)
 	}
-	return nil
+	sort.Slice(contractPackages, func(left, right int) bool {
+		return contractPackages[left].packagePath < contractPackages[right].packagePath
+	})
+	return GeneratedContractPlan{
+		generated: slices.Clone(generated),
+		packages:  contractPackages,
+	}, nil
 }
 
-func joinPackageExportIdentities(
-	implementation Implementation,
-	generated []tsgo.ProjectExport,
-	installed []tsgo.ProjectExport,
-) error {
-	expected := implementation.Exports()
-	expectedIdentities := make([]string, len(expected))
-	for index, export := range expected {
-		expectedIdentities[index] = export.Name()
-	}
-	generatedIdentities := projectExportIdentities(generated)
-	installedIdentities := projectExportIdentities(installed)
-	if !slices.Equal(generatedIdentities, expectedIdentities) ||
-		!slices.Equal(installedIdentities, expectedIdentities) {
-		return &Error{
-			Operation: "join generated contract",
-			Subject:   implementation.PackagePath(),
-			Reason: fmt.Sprintf(
-				"generated export identities %v and installed export identities %v differ from %v",
-				generatedIdentities,
-				installedIdentities,
-				expectedIdentities,
-			),
-		}
-	}
-	return nil
-}
-
-func projectExportIdentities(selected []tsgo.ProjectExport) []string {
-	result := make([]string, len(selected))
-	for index, export := range selected {
-		result[index] = export.Name()
-	}
-	sort.Strings(result)
-	return result
-}
-
-func materializeTargetSet(
-	client *tsgo.Client,
-	distributionRoot string,
-	root string,
-	targets []Target,
-) (string, error) {
+func targetPaths(targets []Target) (map[string]struct{}, error) {
+	result := make(map[string]struct{}, len(targets))
 	for _, target := range targets {
 		if !validTargetPath(target.outputPath) || target.sourceFile == nil {
-			return "", &Error{
+			return nil, &Error{
 				Operation: "join generated contract",
 				Reason:    "target set contains an invalid artifact",
 			}
 		}
-		printed, err := client.PrintNode(target.sourceFile, tsgo.PrintOptions{})
-		if err != nil {
-			return "", err
+		if _, duplicate := result[target.outputPath]; duplicate {
+			return nil, &Error{
+				Operation: "join generated contract",
+				Subject:   target.outputPath,
+				Reason:    "target artifact is duplicated",
+			}
 		}
-		path := filepath.Join(root, filepath.FromSlash(target.outputPath))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return "", err
-		}
-		if err := os.WriteFile(path, []byte(printed), 0o644); err != nil {
-			return "", err
-		}
+		result[target.outputPath] = struct{}{}
 	}
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(
-		filepath.Join(root, "package.json"),
-		[]byte("{\"type\":\"module\"}\n"),
-		0o644,
-	); err != nil {
-		return "", err
-	}
-	config := filepath.Join(root, "tsconfig.json")
-	payload, err := tsgo.EncodeStrictProjectConfig(distributionRoot, root)
-	if err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(config, payload, 0o644); err != nil {
-		return "", err
-	}
-	return config, nil
+	return result, nil
 }
 
-func targetSetDigest(
-	generated []Target,
-	installed []Target,
-	packages []PackageTarget,
-) (string, error) {
-	digest := sha256.New()
-	for _, set := range [][]Target{generated, installed} {
-		ordered := slices.Clone(set)
-		sort.Slice(ordered, func(left, right int) bool {
-			return ordered[left].outputPath < ordered[right].outputPath
-		})
-		for _, target := range ordered {
-			encoded, err := tsgo.EncodeSourceFile(target.sourceFile)
-			if err != nil {
-				return "", err
-			}
-			digest.Write([]byte(target.outputPath))
-			digest.Write([]byte{0})
-			digest.Write(encoded)
+func validContractPackage(selected ContractPackage) bool {
+	if selected.packagePath == "" || !validTargetPath(selected.assemblyPath) ||
+		len(selected.exports) == 0 || !sort.StringsAreSorted(selected.exports) {
+		return false
+	}
+	for index, name := range selected.exports {
+		if name == "" || index > 0 && selected.exports[index-1] == name {
+			return false
 		}
-		digest.Write([]byte{0xff})
 	}
-	for _, selected := range packages {
-		digest.Write([]byte(selected.packagePath))
-		digest.Write([]byte{0})
-		digest.Write([]byte(selected.assemblyPath))
-		digest.Write([]byte{0})
-	}
-	return hex.EncodeToString(digest.Sum(nil)), nil
+	return true
 }
 
 func validTargetPath(path string) bool {

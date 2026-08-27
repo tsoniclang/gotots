@@ -2,6 +2,7 @@ package sourceimplementation
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -142,6 +143,14 @@ export type DigestView = { value: Digest };
 		privateModules[0].SourceFile() == nil {
 		t.Fatalf("private modules = %#v", privateModules)
 	}
+	assertStagedGeneratedContractLifecycle(
+		t,
+		root,
+		repository,
+		selectedTSGo,
+		certificate,
+		implementationRecord,
+	)
 
 	wrongPackage := clonePrepared(prepared)
 	wrongPackageRecord := wrongPackage.certificate.byPath["example.test/app/fast"]
@@ -197,6 +206,91 @@ export const Marker = 1;
 		TSGoTool: selectedTSGo,
 	}); err == nil || !strings.Contains(err.Error(), "is executable or unsupported") {
 		t.Fatalf("executable private-module error = %v", err)
+	}
+}
+
+func assertStagedGeneratedContractLifecycle(
+	t *testing.T,
+	root string,
+	repository string,
+	selectedTSGo tsgo.Tool,
+	certificate *Certificate,
+	implementation Implementation,
+) {
+	t.Helper()
+	const assemblyPath = "fast/package.ts"
+	target, err := NewTarget(assemblyPath, implementation.SourceFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	packageTarget, err := NewPackageTarget(implementation.PackagePath(), assemblyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := certificate.PlanGeneratedContracts(
+		[]Target{target},
+		[]Target{target},
+		[]PackageTarget{packageTarget},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Valid() || len(plan.Generated()) != 1 || len(plan.Packages()) != 1 {
+		t.Fatal("generated-contract plan is incomplete")
+	}
+	payload, err := tsgo.EncodeSourceFile(implementation.SourceFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	generatedProtocol := filepath.Join(root, "generated.ast")
+	installedProtocol := filepath.Join(root, "installed.ast")
+	writeFixture(t, generatedProtocol, string(payload))
+	writeFixture(t, installedProtocol, string(payload))
+	generated, err := NewStagedTarget(
+		assemblyPath,
+		generatedProtocol,
+		sha256.Sum256(payload),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	installed, err := NewStagedTarget(
+		assemblyPath,
+		installedProtocol,
+		sha256.Sum256(payload),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratch := filepath.Join(root, "staged-contract-verification")
+	if err := VerifyStagedGeneratedContracts(StagedVerificationConfig{
+		RepositoryRoot: repository,
+		ScratchRoot:    scratch,
+		TSGoTool:       selectedTSGo,
+		Generated:      []StagedTarget{generated},
+		Installed:      []StagedTarget{installed},
+		Packages:       plan.Packages(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(scratch); !os.IsNotExist(err) {
+		t.Fatalf("successful verification scratch survived: %v", err)
+	}
+
+	mutated := append([]byte(nil), payload...)
+	mutated[len(mutated)-1] ^= 1
+	writeFixture(t, generatedProtocol, string(mutated))
+	mutationScratch := filepath.Join(root, "staged-contract-mutation")
+	err = VerifyStagedGeneratedContracts(StagedVerificationConfig{
+		RepositoryRoot: repository,
+		ScratchRoot:    mutationScratch,
+		TSGoTool:       selectedTSGo,
+		Generated:      []StagedTarget{generated},
+		Installed:      []StagedTarget{installed},
+		Packages:       plan.Packages(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "protocol payload digest changed") {
+		t.Fatalf("staged-payload mutation error = %v", err)
 	}
 }
 
