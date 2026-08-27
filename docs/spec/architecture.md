@@ -775,6 +775,19 @@ closures is a source-size and typecheck regression even when behavior remains
 correct. Erasing callback payloads or recovering their types dynamically is
 equally invalid.
 
+Pointer location registration is total over every statically representable
+pointee kind. The canonical value-transfer owner decides whether extracting or
+assigning the pointee copies an aggregate or preserves a reference value; the
+reflection owner does not maintain a second kind whitelist. An interface
+pointee reads and writes the existing canonical dynamic box directly and uses
+the interface contract's exact admission predicate. Arrays, pointers,
+interfaces, functions, channels, named and unnamed structs, containers, and
+scalars cannot receive an empty registration for a language-valid `Elem`
+operation. A selected pointer-construction callback obtains the pointee zero
+from the same value owner. A silent `{}` registration, product-specific
+pointee exception, or
+runtime recovery of the omitted static type is forbidden.
+
 Every addressable reflected location carries one exact callback that returns
 the canonical non-nil pointer interface box for that same storage. Pointer
 elements return their existing pointer box; struct fields and slice elements

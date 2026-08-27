@@ -542,6 +542,12 @@ ESM for:
 - field count/index/name/tag/embedding/export and recursive field types;
 - `ValueOf`, nil/invalid/addressable/settable state, pointer `Elem`, fields,
   indexes, maps, scalar projections, mutation, zero, and interface recovery;
+- pointer `Elem` over interface, pointer, array, named and unnamed aggregate,
+  function, channel, container, and scalar pointees, including nil pointers,
+  direct mutation of the original location, interface dynamic-box replacement,
+  aggregate copy isolation, repeated pointer depth, and `New` from the same
+  canonical zero owner; deleting one pointee class or restoring an empty
+  registration must fail before product replay;
 - `Addr` over pointer elements, struct fields, and slice elements, including
   exact pointer-interface assertion, repeated-address equality, `Type`/`Elem`
   identity, `ValueOf(Addr().Interface())` type recovery, and mutation of the

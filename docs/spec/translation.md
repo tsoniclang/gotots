@@ -795,6 +795,24 @@ descriptor. `TypeOf` returns that descriptor and `ValueOf` creates a typed
 reflective value view whose field/index/element operations delegate to
 generated typed accessors. No host object inspection occurs.
 
+Pointer element locations remain exact when the pointee is itself an interface
+or another non-scalar kind:
+
+```go
+var slot any = "before"
+element := reflect.ValueOf(&slot).Elem()
+element.Set(reflect.ValueOf(int64(7)))
+```
+
+The `*any` registration loads the existing interface box from `slot`, records
+the static element descriptor as `any`, admits writes through the canonical
+empty-interface contract, and stores the selected dynamic box back into the
+same location. It does not wrap that box in a fabricated interface adapter or
+fall back to JavaScript shape inspection. The same location path delegates
+array copies and pointer/function/channel reference values to the ordinary
+value-transfer owner rather than selecting pointee behavior from a reflection
+kind whitelist.
+
 Container operations retain the same assignment algebra as ordinary Go:
 
 ```go
