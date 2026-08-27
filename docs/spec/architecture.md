@@ -1665,7 +1665,11 @@ body is absent. The final staged TypeScript project independently exact-joins
 the checked generated callable and checked authored export before either can
 be printed. The join compares generic arity, parameter cardinality and checked
 parameter/result types; local TypeScript parameter names are implementation
-detail and are not ABI evidence.
+detail at every nested callable depth and are not ABI evidence. The semantic
+join requires bidirectional checked assignability after exact generic arity and
+parameter cardinality checks. Authored callable modules and their certification
+declarations containing explicit `any` or `unknown` type syntax fail before the
+join, so dynamic top types cannot manufacture equivalence.
 
 An authored callable module may name sorted, contract-owned `.d.ts`
 certification sources needed only to typecheck its imports. Preparation hashes

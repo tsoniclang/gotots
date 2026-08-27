@@ -66,7 +66,8 @@ func VerifyStagedGeneratedContracts(
 	if err := materializeImplementationModules(projectRoot, config.Modules); err != nil {
 		return nil, err
 	}
-	if err := materializeCertificationSources(projectRoot, config.Modules); err != nil {
+	certificationPaths, err := materializeCertificationSources(projectRoot, config.Modules)
+	if err != nil {
 		return nil, err
 	}
 	if err := os.WriteFile(
@@ -98,6 +99,20 @@ func VerifyStagedGeneratedContracts(
 	project, err := client.OpenProject(configPath)
 	if err != nil {
 		return nil, err
+	}
+	for _, module := range config.Modules {
+		path := filepath.Join(
+			projectRoot,
+			filepath.FromSlash(module.outputPath),
+		)
+		if err := rejectForbiddenDynamicTypes(project, path, module.outputPath); err != nil {
+			return nil, err
+		}
+	}
+	for _, path := range certificationPaths {
+		if err := rejectForbiddenDynamicTypes(project, path, path); err != nil {
+			return nil, err
+		}
 	}
 	moduleExports, err := inspectModuleExports(project, projectRoot, config.Modules)
 	if err != nil {
@@ -309,17 +324,20 @@ func materializeImplementationModules(root string, modules []StagedModule) error
 	return nil
 }
 
-func materializeCertificationSources(root string, modules []StagedModule) error {
+func materializeCertificationSources(
+	root string,
+	modules []StagedModule,
+) ([]string, error) {
 	byDigest := make(map[string][]byte)
 	for _, module := range modules {
 		for _, source := range module.certificationSources {
 			payload, err := os.ReadFile(source.sourcePath)
 			if err != nil {
-				return contractError("read certification source", source.sourcePath, err)
+				return nil, contractError("read certification source", source.sourcePath, err)
 			}
 			digest := sha256.Sum256(payload)
 			if hex.EncodeToString(digest[:]) != source.sourceDigest {
-				return &Error{
+				return nil, &Error{
 					Operation: "verify certification source", Subject: source.sourcePath,
 					Reason: "source digest changed",
 				}
@@ -328,7 +346,7 @@ func materializeCertificationSources(root string, modules []StagedModule) error 
 		}
 	}
 	if len(byDigest) == 0 {
-		return nil
+		return nil, nil
 	}
 	digests := make([]string, 0, len(byDigest))
 	for digest := range byDigest {
@@ -337,16 +355,40 @@ func materializeCertificationSources(root string, modules []StagedModule) error 
 	sort.Strings(digests)
 	directory := filepath.Join(root, "certification")
 	if err := os.MkdirAll(directory, 0o755); err != nil {
-		return contractError("create certification directory", directory, err)
+		return nil, contractError("create certification directory", directory, err)
 	}
+	paths := make([]string, len(digests))
 	for index, digest := range digests {
 		payload := byDigest[digest]
 		path := filepath.Join(directory, fmt.Sprintf("%06d.d.ts", index))
 		if err := os.WriteFile(path, payload, 0o644); err != nil {
-			return contractError("write certification source", path, err)
+			return nil, contractError("write certification source", path, err)
 		}
+		paths[index] = path
 	}
-	return nil
+	return paths, nil
+}
+
+func rejectForbiddenDynamicTypes(
+	project *tsgo.ProjectInspection,
+	path string,
+	subject string,
+) error {
+	forbidden, err := project.SourceForbiddenDynamicTypes(path)
+	if err != nil {
+		return err
+	}
+	if len(forbidden) == 0 {
+		return nil
+	}
+	return &Error{
+		Operation: "verify staged module",
+		Subject:   subject,
+		Reason: fmt.Sprintf(
+			"authored contract uses forbidden dynamic type syntax %v",
+			forbidden,
+		),
+	}
 }
 
 func inspectModuleExports(
@@ -431,7 +473,28 @@ func compareCallableExports(
 	if err != nil {
 		return err
 	}
-	return compareCallableComponents(project, subject, generated, manual, generatedTypes, manualTypes)
+	generatedCount, err := project.CallableParameterCount(generated)
+	if err != nil {
+		return err
+	}
+	manualCount, err := project.CallableParameterCount(manual)
+	if err != nil {
+		return err
+	}
+	equivalent, err := project.CallableTypesEquivalent(generated, manual)
+	if err != nil {
+		return err
+	}
+	return compareCallableComponents(
+		subject,
+		generatedTypes,
+		manualTypes,
+		generatedCount,
+		manualCount,
+		equivalent,
+		generated.TypeString(),
+		manual.TypeString(),
+	)
 }
 
 func compareCallableMember(
@@ -448,9 +511,6 @@ func compareCallableMember(
 	if err != nil {
 		return err
 	}
-	if generatedTypes != manualTypes {
-		return callableTypeError(subject, fmt.Sprint(generatedTypes), fmt.Sprint(manualTypes))
-	}
 	generatedCount, err := project.CallableParameterCount(generated)
 	if err != nil {
 		return err
@@ -459,81 +519,40 @@ func compareCallableMember(
 	if err != nil {
 		return err
 	}
-	if generatedCount != manualCount {
-		return callableTypeError(subject, fmt.Sprint(generatedCount), fmt.Sprint(manualCount))
-	}
-	for index := 0; index < generatedCount; index++ {
-		generatedType, typeErr := project.CallableParameterTypeString(generated, index)
-		if typeErr != nil {
-			return typeErr
-		}
-		manualType, typeErr := project.CallableParameterTypeString(manual, index)
-		if typeErr != nil {
-			return typeErr
-		}
-		if generatedType != manualType {
-			return callableTypeError(subject, generatedType, manualType)
-		}
-	}
-	generatedReturn, err := project.CallableReturnTypeString(generated)
+	equivalent, err := project.CallableTypesEquivalent(generated, manual)
 	if err != nil {
 		return err
 	}
-	manualReturn, err := project.CallableReturnTypeString(manual)
-	if err != nil {
-		return err
-	}
-	if generatedReturn != manualReturn {
-		return callableTypeError(subject, generatedReturn, manualReturn)
-	}
-	return nil
+	return compareCallableComponents(
+		subject,
+		generatedTypes,
+		manualTypes,
+		generatedCount,
+		manualCount,
+		equivalent,
+		generated.TypeString(),
+		manual.TypeString(),
+	)
 }
 
 func compareCallableComponents(
-	project *tsgo.ProjectInspection,
 	subject string,
-	generated tsgo.ProjectExport,
-	manual tsgo.ProjectExport,
 	generatedTypes int,
 	manualTypes int,
+	generatedCount int,
+	manualCount int,
+	equivalent bool,
+	generatedType string,
+	manualType string,
 ) error {
 	if generatedTypes != manualTypes {
 		return callableTypeError(subject, fmt.Sprint(generatedTypes), fmt.Sprint(manualTypes))
 	}
-	generatedCount, err := project.CallableParameterCount(generated)
-	if err != nil {
-		return err
-	}
-	manualCount, err := project.CallableParameterCount(manual)
-	if err != nil {
-		return err
-	}
 	if generatedCount != manualCount {
 		return callableTypeError(subject, fmt.Sprint(generatedCount), fmt.Sprint(manualCount))
 	}
-	for index := 0; index < generatedCount; index++ {
-		generatedType, typeErr := project.CallableParameterTypeString(generated, index)
-		if typeErr != nil {
-			return typeErr
-		}
-		manualType, typeErr := project.CallableParameterTypeString(manual, index)
-		if typeErr != nil {
-			return typeErr
-		}
-		if generatedType != manualType {
-			return callableTypeError(subject, generatedType, manualType)
-		}
-	}
-	generatedReturn, err := project.CallableReturnTypeString(generated)
-	if err != nil {
-		return err
-	}
-	manualReturn, err := project.CallableReturnTypeString(manual)
-	if err != nil {
-		return err
-	}
-	if generatedReturn != manualReturn {
-		return callableTypeError(subject, generatedReturn, manualReturn)
+	if !equivalent {
+		return callableTypeError(subject, generatedType, manualType)
 	}
 	return nil
 }

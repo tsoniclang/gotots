@@ -339,6 +339,14 @@ func (p *ProjectInspection) singleCallSignature(
 	target projectCallable,
 	subject string,
 ) (signatureResponse, error) {
+	_, signature, err := p.singleCallableType(target, subject)
+	return signature, err
+}
+
+func (p *ProjectInspection) singleCallableType(
+	target projectCallable,
+	subject string,
+) (uint32, signatureResponse, error) {
 	seen := make(map[uint32]struct{})
 	for _, candidate := range target.callableTypeIDs() {
 		if candidate == 0 {
@@ -350,7 +358,7 @@ func (p *ProjectInspection) singleCallSignature(
 		seen[candidate] = struct{}{}
 		nonNullable, err := p.nonNullableType(candidate)
 		if err != nil {
-			return signatureResponse{}, err
+			return 0, signatureResponse{}, err
 		}
 		var signatures []signatureResponse
 		if err := requestProjectJSON(
@@ -364,13 +372,13 @@ func (p *ProjectInspection) singleCallSignature(
 			},
 			&signatures,
 		); err != nil {
-			return signatureResponse{}, err
+			return 0, signatureResponse{}, err
 		}
 		if len(signatures) == 0 {
 			continue
 		}
 		if len(signatures) != 1 || signatures[0].ID == 0 {
-			return signatureResponse{}, &ProjectInspectionError{
+			return 0, signatureResponse{}, &ProjectInspectionError{
 				Operation: "callable effect",
 				Reason: fmt.Sprintf(
 					"%s has %d call signatures, want one",
@@ -379,12 +387,53 @@ func (p *ProjectInspection) singleCallSignature(
 				),
 			}
 		}
-		return signatures[0], nil
+		return nonNullable, signatures[0], nil
 	}
-	return signatureResponse{}, &ProjectInspectionError{
+	return 0, signatureResponse{}, &ProjectInspectionError{
 		Operation: "callable effect",
 		Reason:    subject + " has no call signature",
 	}
+}
+
+func (p *ProjectInspection) CallableTypesEquivalent(
+	left projectCallable,
+	right projectCallable,
+) (bool, error) {
+	if p == nil || left == nil || right == nil {
+		return false, &ProjectInspectionError{
+			Operation: "callable type equivalence",
+			Reason:    "target is absent",
+		}
+	}
+	leftType, _, err := p.singleCallableType(left, left.callableSubject())
+	if err != nil {
+		return false, err
+	}
+	rightType, _, err := p.singleCallableType(right, right.callableSubject())
+	if err != nil {
+		return false, err
+	}
+	leftToRight, err := p.typeAssignable(leftType, rightType)
+	if err != nil || !leftToRight {
+		return false, err
+	}
+	return p.typeAssignable(rightType, leftType)
+}
+
+func (p *ProjectInspection) typeAssignable(source uint32, target uint32) (bool, error) {
+	var result bool
+	err := requestProjectJSON(
+		p.client,
+		"isTypeAssignableTo",
+		isTypeAssignableToParams{
+			Snapshot: p.snapshot,
+			Project:  p.project,
+			Source:   source,
+			Target:   target,
+		},
+		&result,
+	)
+	return result, err
 }
 
 func (p *ProjectInspection) nonNullableType(source uint32) (uint32, error) {
@@ -459,6 +508,13 @@ type getTypePropertyParams struct {
 	Snapshot uint64 `json:"snapshot"`
 	Project  string `json:"project"`
 	Type     uint32 `json:"type"`
+}
+
+type isTypeAssignableToParams struct {
+	Snapshot uint64 `json:"snapshot"`
+	Project  string `json:"project"`
+	Source   uint32 `json:"source"`
+	Target   uint32 `json:"target"`
 }
 
 type signatureResponse struct {

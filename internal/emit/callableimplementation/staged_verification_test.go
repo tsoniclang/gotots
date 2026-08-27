@@ -31,6 +31,37 @@ func TestStagedVerificationExactJoinsGeneratedAndManualCallables(t *testing.T) {
 	}
 }
 
+func TestStagedVerificationIgnoresNestedCallableParameterNames(t *testing.T) {
+	fixture := newStagedVerificationFixtureWithProtocol(
+		t,
+		stagedGeneratedCallbackFunction(t),
+	)
+	verified, err := VerifyStagedGeneratedContracts(fixture.config(
+		t,
+		"export function addFast(callback: (candidate: number) => number): number { return callback(1); }\n",
+		[]string{"addFast"},
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(verified) != 1 {
+		t.Fatalf("verified modules = %d, want 1", len(verified))
+	}
+
+	fixture = newStagedVerificationFixtureWithProtocol(
+		t,
+		stagedGeneratedCallbackFunction(t),
+	)
+	_, err = VerifyStagedGeneratedContracts(fixture.config(
+		t,
+		"export function addFast(callback: (candidate: string) => number): number { return callback(\"1\"); }\n",
+		[]string{"addFast"},
+	))
+	if err == nil || !strings.Contains(err.Error(), "differs from implementation") {
+		t.Fatalf("nested callable type mutation error = %v", err)
+	}
+}
+
 func TestStagedVerificationRejectsCallableAndModuleMutations(t *testing.T) {
 	t.Run("wrong checked signature", func(t *testing.T) {
 		fixture := newStagedVerificationFixture(t)
@@ -56,6 +87,20 @@ func TestStagedVerificationRejectsCallableAndModuleMutations(t *testing.T) {
 			t.Fatalf("extra export error = %v", err)
 		}
 	})
+
+	for _, dynamicType := range []string{"any", "unknown"} {
+		t.Run("forbidden "+dynamicType, func(t *testing.T) {
+			fixture := newStagedVerificationFixture(t)
+			_, err := VerifyStagedGeneratedContracts(fixture.config(
+				t,
+				"export function addFast(value: "+dynamicType+"): number { return 0; }\n",
+				[]string{"addFast"},
+			))
+			if err == nil || !strings.Contains(err.Error(), "forbidden dynamic type") {
+				t.Fatalf("forbidden %s error = %v", dynamicType, err)
+			}
+		})
+	}
 
 	t.Run("source digest drift", func(t *testing.T) {
 		fixture := newStagedVerificationFixture(t)
@@ -129,6 +174,14 @@ type stagedVerificationFixture struct {
 
 func newStagedVerificationFixture(t *testing.T) *stagedVerificationFixture {
 	t.Helper()
+	return newStagedVerificationFixtureWithProtocol(t, stagedGeneratedFunction(t))
+}
+
+func newStagedVerificationFixtureWithProtocol(
+	t *testing.T,
+	protocol []byte,
+) *stagedVerificationFixture {
+	t.Helper()
 	repository, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
@@ -145,7 +198,6 @@ func newStagedVerificationFixture(t *testing.T) *stagedVerificationFixture {
 		t.Fatal(err)
 	}
 	root := t.TempDir()
-	protocol := stagedGeneratedFunction(t)
 	protocolPath := filepath.Join(root, "generated.ast")
 	if err := os.WriteFile(protocolPath, protocol, 0o600); err != nil {
 		t.Fatal(err)
@@ -164,6 +216,65 @@ func newStagedVerificationFixture(t *testing.T) *stagedVerificationFixture {
 		tool:       tool,
 		generated:  generated,
 	}
+}
+
+func stagedGeneratedCallbackFunction(t *testing.T) []byte {
+	t.Helper()
+	factory := tsgo.NewFactory()
+	numberType := factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword)
+	callbackParameter := factory.ParameterDeclaration(
+		nil,
+		nil,
+		factory.Identifier("generated"),
+		nil,
+		numberType,
+		nil,
+	)
+	parameter := factory.ParameterDeclaration(
+		nil,
+		nil,
+		factory.Identifier("callback"),
+		nil,
+		factory.FunctionTypeNode(
+			nil,
+			[]tsgo.ParameterDeclaration{callbackParameter},
+			numberType,
+		),
+		nil,
+	)
+	declaration := factory.FunctionDeclaration(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		nil,
+		factory.Identifier("Add"),
+		nil,
+		[]tsgo.ParameterDeclaration{parameter},
+		numberType,
+		factory.Block(
+			[]tsgo.Statement{factory.ReturnStatement(
+				factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+			)},
+			true,
+		),
+	)
+	path, err := tsgo.NewPath("/modules/app.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := factory.SourceFile(
+		[]tsgo.Statement{declaration},
+		factory.EndOfFile(),
+		tsgo.SourceFileData{
+			FileName:        path,
+			Path:            path,
+			LanguageVariant: tsgo.LanguageVariantStandard,
+			ScriptKind:      tsgo.ScriptKindTS,
+		},
+	)
+	payload, err := tsgo.EncodeSourceFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return payload
 }
 
 func (f *stagedVerificationFixture) config(
