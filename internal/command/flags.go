@@ -21,7 +21,8 @@ func (i Invocation) ConfigPath() string { return i.configPath }
 func (i Invocation) Overrides() config.Overrides {
 	result := i.overrides
 	result.BuildTags = slices.Clone(result.BuildTags)
-	result.ImplementationBundles = slices.Clone(result.ImplementationBundles)
+	result.PackageImplementations = slices.Clone(result.PackageImplementations)
+	result.CallableImplementations = slices.Clone(result.CallableImplementations)
 	return result
 }
 func (i Invocation) PrintResolvedConfig() bool { return i.printResolved }
@@ -97,8 +98,10 @@ func bindDescriptor(
 		flags.Var(newStringValue(&overrides.GOOS), descriptor.Flag(), description)
 	case config.OptionTags:
 		flags.Var(&listValue{target: &overrides.BuildTags, selected: &overrides.BuildTagsSet}, descriptor.Flag(), description)
-	case config.OptionImplementationBundles:
-		flags.Var(&listValue{target: &overrides.ImplementationBundles, selected: &overrides.ImplementationSet}, descriptor.Flag(), description)
+	case config.OptionPackageImplementations:
+		flags.Var(&listValue{target: &overrides.PackageImplementations, selected: &overrides.PackageImplementationsSet}, descriptor.Flag(), description)
+	case config.OptionCallableImplementations:
+		flags.Var(&listValue{target: &overrides.CallableImplementations, selected: &overrides.CallableImplementationsSet}, descriptor.Flag(), description)
 	case config.OptionOutputDirectory:
 		flags.Var(newStringValue(&overrides.OutputDirectory), descriptor.Flag(), description)
 	case config.OptionExternals:

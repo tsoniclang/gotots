@@ -12,6 +12,7 @@ import (
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callableimplementation"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
@@ -358,11 +359,12 @@ const (
 )
 
 type Options struct {
-	IntegerRepresentation IntegerRepresentation
-	EvaluationOrder       EvaluationOrder
-	StandardLibrary       *gostdlibcertify.Certificate
-	ExternalProvider      *externalcertify.Certificate
-	SourceImplementations *sourceimplementation.Certificate
+	IntegerRepresentation   IntegerRepresentation
+	EvaluationOrder         EvaluationOrder
+	StandardLibrary         *gostdlibcertify.Certificate
+	ExternalProvider        *externalcertify.Certificate
+	SourceImplementations   *sourceimplementation.Certificate
+	CallableImplementations *callableimplementation.Certificate
 }
 
 func DefaultOptions() Options {
@@ -445,6 +447,21 @@ func (o Options) validate() error {
 			Reason: "certificate compilation profile differs",
 		}
 	}
+	if o.CallableImplementations != nil && !o.CallableImplementations.Valid() {
+		return &OptionsError{
+			Field:  "callable implementations",
+			Reason: "certificate is invalid",
+		}
+	}
+	if o.CallableImplementations != nil && !o.CallableImplementations.SupportsCompilation(
+		o.IntegerRepresentation.String(),
+		o.EvaluationOrder.String(),
+	) {
+		return &OptionsError{
+			Field:  "callable implementations",
+			Reason: "certificate compilation profile differs",
+		}
+	}
 	return nil
 }
 
@@ -503,6 +520,13 @@ func (e ProgramEmission) SourceImplementationPlan() (
 	bool,
 ) {
 	return e.sourceImplementationPlan, e.sourceImplementationPlan.Valid()
+}
+
+func (e ProgramEmission) CallableImplementationPlan() (
+	callableimplementation.GeneratedContractPlan,
+	bool,
+) {
+	return e.callableImplementationPlan, e.callableImplementationPlan.Valid()
 }
 
 // EnvironmentProfile is the complete exact identity of the settled

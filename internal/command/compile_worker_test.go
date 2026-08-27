@@ -2,6 +2,7 @@ package command
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,6 +30,12 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 	if err := os.WriteFile(generatedProtocolPath, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	callableSource := filepath.Join(output, "hot.ts")
+	callablePayload := []byte("export function valueFast(): number { return 1; }\n")
+	if err := os.WriteFile(callableSource, callablePayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	callableDigest := sha256.Sum256(callablePayload)
 	plan := printPlan{
 		files: []printPlanFile{{
 			outputPath:   "program.ts",
@@ -49,7 +56,26 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 			}},
 		},
 		hasSourceImplementation: true,
-		packageDocument:         []byte("{\"private\":true}\n"),
+		callableImplementation: callableImplementationPrintPlan{
+			modules: []callableImplementationModule{{
+				sourcePath:   callableSource,
+				outputPath:   "implementations/hot.ts",
+				sourceDigest: hex.EncodeToString(callableDigest[:]),
+				exports:      []string{"valueFast"},
+			}},
+			targets: []callableImplementationTarget{{
+				sourceIdentity:       "example.test/program|kind=5|receiver=|name=Value",
+				sourceSignature:      "func() int|params=|results=",
+				variant:              "source",
+				implementationOutput: "implementations/hot.ts",
+				implementationExport: "valueFast",
+				generatedOutput:      "program.ts",
+				kind:                 callableImplementationTargetModuleFunction,
+				generatedExport:      "Value",
+			}},
+		},
+		hasCallableImplementation: true,
+		packageDocument:           []byte("{\"private\":true}\n"),
 	}
 	digest := "a3a86944267e41877ab54f798340439bd80038e34687c5dedb5dc7dbc857565b"
 	handoff, err := encodeCompileWorkerDocument(plan, digest, os.Getpid()+1)
@@ -69,7 +95,10 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 		decoded.plan.files[0].protocolHash != plan.files[0].protocolHash ||
 		!decoded.plan.hasSourceImplementation ||
 		len(decoded.plan.sourceImplementation.generated) != 1 ||
-		len(decoded.plan.sourceImplementation.packages) != 1 {
+		len(decoded.plan.sourceImplementation.packages) != 1 ||
+		!decoded.plan.hasCallableImplementation ||
+		len(decoded.plan.callableImplementation.modules) != 1 ||
+		len(decoded.plan.callableImplementation.targets) != 1 {
 		t.Fatalf("decoded handoff = %#v", decoded)
 	}
 

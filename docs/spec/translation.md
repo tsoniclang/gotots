@@ -1347,6 +1347,51 @@ name, or call-site heuristics. Unused entries in a certified provider catalog ar
 not compilation overrides. A selected matching source declaration must consume
 exactly one entry or remain an explicit obligation.
 
+### Certified Source-Callable Implementations
+
+Measured hot paths may occur inside packages whose remaining generated code is
+already the correct implementation. Copying such a package into a product
+implementation would create a second package owner merely to change one body.
+Instead, a project may certify one exact source-callable body replacement.
+
+For example, given:
+
+```go
+func (c *Checker) compareNodes(left, right *Node) int {
+    // source algorithm
+}
+```
+
+the canonical generated declaration retains its exact ABI and placement:
+
+```ts
+import { compareNodes as compareNodesImplementation }
+  from "../../../../implementations/checker-hotpaths.js";
+
+static compareNodes(
+  checker: Pointer<Checker> | undefined,
+  left: Pointer<Node> | undefined,
+  right: Pointer<Node> | undefined,
+): int {
+  return compareNodesImplementation(checker, left, right);
+}
+```
+
+The product-owned module exports that exact checked callable. Generated callers
+still call `Checker.compareNodes`; no caller, package assembly, class shape, or
+source-visible signature changes. The original translated body is deleted, not
+retained behind a runtime branch. Selection is made once from the canonical Go
+declaration identity and stable signature joined to the selected build and
+compilation profiles. Emission never asks whether a package or function name
+appears in configuration.
+
+An explicit `kernel` variant may replace the one generated generic kernel while
+leaving all finite facades and callers intact. Ordinary and kernel variants are
+distinct closed identities. A selected value-receiver instance method,
+deferred/recovery entry, missing target export, extra authored export,
+incompatible checked signature, duplicate owner, unconsumed contract, or
+package/callable ownership overlap fails before output is sealed.
+
 ### Certified Source-Package Implementations
 
 A project-selected source implementation replaces a coherent package contract,

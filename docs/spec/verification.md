@@ -1291,6 +1291,21 @@ type, nil shape, method/callback adapter, or signature dependency; each fails at
 the TSTS join or strict target consumer. A body-only authored change changes the
 implementation digest without changing generated callers.
 
+Callable-body implementation proof uses a source package containing ordinary,
+pointer-receiver, generic-kernel, and adversarial same-spelled declarations.
+The generated wrapper and authored export are inspected in one strict staged
+project and must have the same checked callable shape. The final artifact must
+contain one static import and direct call, preserve every generated caller and
+declaration signature, contain the authored module exactly once, and contain no
+node from the translated source body. Required mutations alter canonical Go
+identity or signature, select the wrong ordinary/kernel variant, change one
+checked parameter/result/type-parameter shape, add or omit an authored export,
+duplicate or leave a contract unconsumed, collide an output path, retain the
+translated body, or select both package and callable ownership. Each fails at
+its owning join before printing. A differential executes the Go body, ordinary
+generated body, and selected authored body over representative and adversarial
+inputs; an equivalence envelope bounds every intentional algorithmic difference.
+
 The final broad search rejects treating GoToTS's export-identity join as final
 surface acceptance, any second name-only signature gate, package/function
 projection condition, pointer-scalarization config field, caller allowlist,

@@ -22,7 +22,7 @@ func TestPrintPlanSeversCompilationAndTargetGraphs(t *testing.T) {
 }
 
 func TestPrintPlanTypeStatesRequirePostCompilationVerification(t *testing.T) {
-	verify := reflect.TypeOf(verifySourceImplementationContracts)
+	verify := reflect.TypeOf(verifyImplementationContracts)
 	if verify.In(1) != reflect.TypeFor[compiledPrintPlan]() ||
 		verify.Out(0) != reflect.TypeFor[verifiedPrintPlan]() {
 		t.Fatal("source-implementation gate does not own print-plan promotion")

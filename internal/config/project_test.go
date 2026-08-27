@@ -19,14 +19,17 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
 	root := t.TempDir()
 	configDirectory := filepath.Join(root, "project")
 	writeProjectConfig(t, filepath.Join(configDirectory, "gotots.json"), `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "distribution": {"root": "../distribution"},
   "source": {"root": "../source", "package": "./cmd/app", "mode": "main"},
   "go": {"goos": "linux", "goarch": "amd64", "cgo": false, "tags": ["noasm"]},
   "tools": `+testToolsDocument(t)+`,
   "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": true, "externals": false},
-  "implementations": {"bundles": ["implementations/fast/contract.json"]},
+  "implementations": {
+    "packages": ["implementations/fast/contract.json"],
+    "callables": ["implementations/hot/contract.json"]
+  },
   "output": {"directory": "generated"}
 }
 `)
@@ -63,10 +66,15 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
 	if project.ToolCacheRoot() != filepath.Join(configDirectory, toolCache) {
 		t.Fatalf("tool cache = %q", project.ToolCacheRoot())
 	}
-	if got := project.ImplementationBundles(); !slices.Equal(got, []string{
+	if got := project.PackageImplementations(); !slices.Equal(got, []string{
 		filepath.Join(configDirectory, "implementations", "fast", "contract.json"),
 	}) {
-		t.Fatalf("implementation bundles = %v", got)
+		t.Fatalf("package implementations = %v", got)
+	}
+	if got := project.CallableImplementations(); !slices.Equal(got, []string{
+		filepath.Join(configDirectory, "implementations", "hot", "contract.json"),
+	}) {
+		t.Fatalf("callable implementations = %v", got)
 	}
 	if !project.StandardLibraryEnabled() || project.ExternalsEnabled() {
 		t.Fatal("provider selection differs")
@@ -80,13 +88,13 @@ func TestLoadDefaultsToolsAndBuildProfileFromSelectedGo(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "distribution": {"root": `+quoteJSON(t, repository)+`},
   "source": {"root": ".", "package": ".", "mode": "main"},
   "go": {"cgo": false, "tags": []},
   "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
-  "implementations": {"bundles": []},
+  "implementations": {"packages": [], "callables": []},
   "output": {"directory": "generated"}
 }
 `)
@@ -111,13 +119,13 @@ func TestLoadRejectsCgoWithoutSelectedExternalToolContract(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "distribution": {"root": `+quoteJSON(t, repository)+`},
   "source": {"root": ".", "package": ".", "mode": "main"},
   "go": {"cgo": true, "tags": []},
   "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
-  "implementations": {"bundles": []},
+  "implementations": {"packages": [], "callables": []},
   "output": {"directory": "generated"}
 }
 `)
@@ -127,41 +135,49 @@ func TestLoadRejectsCgoWithoutSelectedExternalToolContract(t *testing.T) {
 	}
 }
 
-func TestLoadSelectsExternalImplementationBundlesFromCLI(t *testing.T) {
+func TestLoadSelectsExternalImplementationContractsFromCLI(t *testing.T) {
 	projectDirectory := t.TempDir()
 	externalBundle := filepath.Join(t.TempDir(), "fast", "contract.json")
 	path := filepath.Join(projectDirectory, "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
   "tools": `+testToolsDocument(t)+`,
   "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
-  "implementations": {"bundles": ["local/contract.json"]},
+  "implementations": {
+    "packages": ["local/package.json"],
+    "callables": ["local/callable.json"]
+  },
   "output": {"directory": "output"}
 }
 `)
 	project, err := Load(Request{
 		ConfigPath: path,
 		Overrides: Overrides{
-			ImplementationSet:     true,
-			ImplementationBundles: []string{externalBundle},
+			PackageImplementationsSet:  true,
+			PackageImplementations:     []string{externalBundle},
+			CallableImplementationsSet: true,
+			CallableImplementations:    []string{externalBundle + ".callable"},
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := project.ImplementationBundles(); !slices.Equal(got, []string{externalBundle}) {
-		t.Fatalf("implementation bundles = %v", got)
+	if got := project.PackageImplementations(); !slices.Equal(got, []string{externalBundle}) {
+		t.Fatalf("package implementations = %v", got)
+	}
+	if got := project.CallableImplementations(); !slices.Equal(got, []string{externalBundle + ".callable"}) {
+		t.Fatalf("callable implementations = %v", got)
 	}
 }
 
 func TestLoadRejectsUnknownFieldAndVersion(t *testing.T) {
 	for name, source := range map[string]string{
-		"unknown": `{"schemaVersion":2,"surprise":true}`,
-		"version": `{"schemaVersion":1}`,
+		"unknown": `{"schemaVersion":3,"surprise":true}`,
+		"version": `{"schemaVersion":2}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "gotots.json")
@@ -177,8 +193,9 @@ func TestSemanticDigestIgnoresOperationalRelocation(t *testing.T) {
 	first := loadMinimalProject(t, filepath.Join(t.TempDir(), "one"), "out-a")
 	second := loadMinimalProject(t, filepath.Join(t.TempDir(), "two"), "out-b")
 	evidence := EvidenceDigests{
-		Source:                "source-digest",
-		SourceImplementations: "implementation-digest",
+		Source:                  "source-digest",
+		PackageImplementations:  "package-implementation-digest",
+		CallableImplementations: "callable-implementation-digest",
 	}
 	firstDigest, err := first.SemanticDigest(evidence)
 	if err != nil {
@@ -192,8 +209,9 @@ func TestSemanticDigestIgnoresOperationalRelocation(t *testing.T) {
 		t.Fatalf("relocation changed semantic digest: %s != %s", firstDigest, secondDigest)
 	}
 	changed, err := second.SemanticDigest(EvidenceDigests{
-		Source:                "source-digest",
-		SourceImplementations: "changed",
+		Source:                  "source-digest",
+		PackageImplementations:  "changed",
+		CallableImplementations: "callable-implementation-digest",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -324,14 +342,17 @@ func loadMinimalProject(t *testing.T, directory string, output string) Project {
 	t.Helper()
 	path := filepath.Join(directory, "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
   "tools": `+testToolsDocument(t)+`,
   "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
-  "implementations": {"bundles": ["implementation.json"]},
+  "implementations": {
+    "packages": ["package-implementation.json"],
+    "callables": ["callable-implementation.json"]
+  },
   "output": {"directory": "`+output+`"}
 }
 `)
@@ -346,14 +367,14 @@ func loadProjectWithTools(t *testing.T, directory, goPath, tsgoPath string) Proj
 	t.Helper()
 	path := filepath.Join(directory, "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
   "tools": {"go": `+quoteJSON(t, goPath)+`, "tsgo": `+quoteJSON(t, tsgoPath)+`},
   "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
-  "implementations": {"bundles": []},
+  "implementations": {"packages": [], "callables": []},
   "output": {"directory": "generated"}
 }
 `)

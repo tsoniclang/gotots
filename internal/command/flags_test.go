@@ -45,8 +45,10 @@ func TestParseArgumentsBindsSemanticAndRepeatedOverrides(t *testing.T) {
 		"--integer", "fixed64-bigint",
 		"--tag", "noasm",
 		"--tag", "purego",
-		"--implementation-bundle", "one.json",
-		"--implementation-bundle", "two.json",
+		"--package-implementation", "package-one.json",
+		"--package-implementation", "package-two.json",
+		"--callable-implementation", "callable-one.json",
+		"--callable-implementation", "callable-two.json",
 		"--go", "/tools/go-selected",
 		"--tsgo", "/tools/tsgo-selected",
 		"--tool-cache", "/project/.temp/cache/tools",
@@ -61,7 +63,8 @@ func TestParseArgumentsBindsSemanticAndRepeatedOverrides(t *testing.T) {
 	if overrides.IntegerRepresentation == nil ||
 		*overrides.IntegerRepresentation != "fixed64-bigint" ||
 		!overrides.BuildTagsSet || len(overrides.BuildTags) != 2 ||
-		!overrides.ImplementationSet || len(overrides.ImplementationBundles) != 2 ||
+		!overrides.PackageImplementationsSet || len(overrides.PackageImplementations) != 2 ||
+		!overrides.CallableImplementationsSet || len(overrides.CallableImplementations) != 2 ||
 		overrides.StandardLibrary == nil || *overrides.StandardLibrary ||
 		overrides.Externals == nil || !*overrides.Externals ||
 		overrides.GoExecutable == nil || *overrides.GoExecutable != "/tools/go-selected" ||

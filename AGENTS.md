@@ -161,6 +161,11 @@ standard-library packages, toolchain packages, and true external boundaries.
 - Source-available packages are translated normally unless one exact package
   contract has a project-selected certified source implementation; that
   implementation becomes the sole final target owner.
+- A project may instead select an exact certified source-callable body
+  implementation. The generated declaration, callable ABI, placement, and
+  callers remain compiler-owned; only the selected body is replaced by one
+  static import and direct call before sealing. Selection uses canonical Go
+  declaration identity and signature, never package/name matching at emission.
 - Every load resolves and records one explicit Go build profile; ambient shell
   `GOOS`, `GOARCH`, `CGO_ENABLED`, `GOFLAGS`, and tags never select source.
 - The selected `GOROOT` defines the standard-library declarations.

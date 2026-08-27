@@ -74,20 +74,21 @@ import (
 )
 
 type emitter struct {
-	source                 *load.Package
-	factory                tsgo.Factory
-	names                  *emitnaming.Owner
-	values                 api.Values
-	scalar                 api.ScalarABI
-	providerScalar         api.ScalarABI
-	order                  api.EvaluationOrder
-	observer               emitnaming.EnvironmentObserver
-	generic                api.GenericCallableResolver
-	declarationDemands     api.DeclarationDemandResolver
-	recovery               api.RecoveryCallableResolver
-	external               api.ExternalFunctionResolver
-	goRuntime              api.GoRuntimeContract
-	implementationContract bool
+	source                  *load.Package
+	factory                 tsgo.Factory
+	names                   *emitnaming.Owner
+	values                  api.Values
+	scalar                  api.ScalarABI
+	providerScalar          api.ScalarABI
+	order                   api.EvaluationOrder
+	observer                emitnaming.EnvironmentObserver
+	generic                 api.GenericCallableResolver
+	declarationDemands      api.DeclarationDemandResolver
+	recovery                api.RecoveryCallableResolver
+	external                api.ExternalFunctionResolver
+	callableImplementations api.CallableImplementationResolver
+	goRuntime               api.GoRuntimeContract
+	implementationContract  bool
 }
 
 func newEmitter(
@@ -102,6 +103,7 @@ func newEmitter(
 	declarationDemands api.DeclarationDemandResolver,
 	recovery api.RecoveryCallableResolver,
 	external api.ExternalFunctionResolver,
+	callableImplementations api.CallableImplementationResolver,
 	goRuntime api.GoRuntimeContract,
 	implementationContract bool,
 ) *emitter {
@@ -112,19 +114,20 @@ func newEmitter(
 		packageScope = source.Types().Scope()
 	}
 	target := &emitter{
-		source:                 source,
-		factory:                factory,
-		names:                  emitnaming.NewOwner(packageScope, typesInfo, registry),
-		scalar:                 scalar,
-		providerScalar:         providerScalar,
-		order:                  order,
-		observer:               observer,
-		generic:                generic,
-		declarationDemands:     declarationDemands,
-		recovery:               recovery,
-		external:               external,
-		goRuntime:              goRuntime,
-		implementationContract: implementationContract,
+		source:                  source,
+		factory:                 factory,
+		names:                   emitnaming.NewOwner(packageScope, typesInfo, registry),
+		scalar:                  scalar,
+		providerScalar:          providerScalar,
+		order:                   order,
+		observer:                observer,
+		generic:                 generic,
+		declarationDemands:      declarationDemands,
+		recovery:                recovery,
+		external:                external,
+		callableImplementations: callableImplementations,
+		goRuntime:               goRuntime,
+		implementationContract:  implementationContract,
 	}
 	target.values = representation.NewOwner(target)
 	return target

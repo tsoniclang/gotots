@@ -28,7 +28,8 @@ func (p Project) CanonicalJSON() ([]byte, error) {
 			Externals       bool `json:"externals"`
 		} `json:"providers"`
 		Implementations struct {
-			Bundles []string `json:"bundles"`
+			Packages  []string `json:"packages"`
+			Callables []string `json:"callables"`
 		} `json:"implementations"`
 		Output struct {
 			Directory string `json:"directory"`
@@ -51,7 +52,8 @@ func (p Project) CanonicalJSON() ([]byte, error) {
 	document.Semantics.EvaluationOrder = p.evaluation.String()
 	document.Providers.StandardLibrary = p.standardLibrary
 	document.Providers.Externals = p.externals
-	document.Implementations.Bundles = p.ImplementationBundles()
+	document.Implementations.Packages = p.PackageImplementations()
+	document.Implementations.Callables = p.CallableImplementations()
 	document.Output.Directory = p.outputDirectory
 	document.Tools.Go = p.goTool.Path()
 	document.Tools.TSGo = p.tsgoTool.Path()

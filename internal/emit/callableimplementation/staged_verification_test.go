@@ -1,0 +1,223 @@
+package callableimplementation
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
+)
+
+func TestStagedVerificationExactJoinsGeneratedAndManualCallables(t *testing.T) {
+	fixture := newStagedVerificationFixture(t)
+	verified, err := VerifyStagedGeneratedContracts(fixture.config(
+		t,
+		"export function addFast(value: number): number { return value + 1; }\n",
+		[]string{"addFast"},
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(verified) != 1 || verified[0].OutputPath() != "implementations/hot.ts" ||
+		verified[0].SourceFile() == nil {
+		t.Fatal("verified implementation module is incomplete")
+	}
+	if _, err := os.Stat(fixture.lastScratch); !os.IsNotExist(err) {
+		t.Fatalf("successful verification scratch survived: %v", err)
+	}
+}
+
+func TestStagedVerificationRejectsCallableAndModuleMutations(t *testing.T) {
+	t.Run("wrong checked signature", func(t *testing.T) {
+		fixture := newStagedVerificationFixture(t)
+		_, err := VerifyStagedGeneratedContracts(fixture.config(
+			t,
+			"export function addFast(value: string): number { return value.length; }\n",
+			[]string{"addFast"},
+		))
+		if err == nil || !strings.Contains(err.Error(), "differs from implementation") {
+			t.Fatalf("wrong callable signature error = %v", err)
+		}
+	})
+
+	t.Run("extra authored export", func(t *testing.T) {
+		fixture := newStagedVerificationFixture(t)
+		_, err := VerifyStagedGeneratedContracts(fixture.config(
+			t,
+			"export function addFast(value: number): number { return value; }\n"+
+				"export function extra(): number { return 0; }\n",
+			[]string{"addFast"},
+		))
+		if err == nil || !strings.Contains(err.Error(), "exports") {
+			t.Fatalf("extra export error = %v", err)
+		}
+	})
+
+	t.Run("source digest drift", func(t *testing.T) {
+		fixture := newStagedVerificationFixture(t)
+		config := fixture.config(
+			t,
+			"export function addFast(value: number): number { return value; }\n",
+			[]string{"addFast"},
+		)
+		if err := os.WriteFile(
+			config.Modules[0].sourcePath,
+			[]byte("export function addFast(value: number): number { return value + 1; }\n"),
+			0o600,
+		); err != nil {
+			t.Fatal(err)
+		}
+		_, err := VerifyStagedGeneratedContracts(config)
+		if err == nil || !strings.Contains(err.Error(), "source digest changed") {
+			t.Fatalf("source digest mutation error = %v", err)
+		}
+	})
+}
+
+type stagedVerificationFixture struct {
+	repository  string
+	root        string
+	tool        tsgo.Tool
+	generated   StagedTarget
+	lastScratch string
+}
+
+func newStagedVerificationFixture(t *testing.T) *stagedVerificationFixture {
+	t.Helper()
+	repository, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(repository, ".temp", "cache", "toolchain-tests"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tool, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	protocol := stagedGeneratedFunction(t)
+	protocolPath := filepath.Join(root, "generated.ast")
+	if err := os.WriteFile(protocolPath, protocol, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	generated, err := NewStagedTarget(
+		"modules/app.ts",
+		protocolPath,
+		sha256.Sum256(protocol),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &stagedVerificationFixture{
+		repository: repository,
+		root:       root,
+		tool:       tool,
+		generated:  generated,
+	}
+}
+
+func (f *stagedVerificationFixture) config(
+	t *testing.T,
+	source string,
+	exports []string,
+) StagedVerificationConfig {
+	t.Helper()
+	sourcePath := filepath.Join(f.root, "hot.ts")
+	payload := []byte(source)
+	if err := os.WriteFile(sourcePath, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(payload)
+	module, err := NewStagedModule(
+		sourcePath,
+		"implementations/hot.ts",
+		hex.EncodeToString(digest[:]),
+		exports,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	generated, err := NewGeneratedModuleTarget(
+		"example.test/app|kind=5|receiver=|name=Add",
+		VariantSource,
+		"modules/app.ts",
+		"Add",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	callable, err := NewStagedCallable(
+		generated.SourceIdentity(),
+		"func(value int) int|params=value|results=",
+		VariantSource,
+		module.outputPath,
+		"addFast",
+		generated,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.lastScratch = filepath.Join(f.root, "scratch-"+strings.ReplaceAll(t.Name(), "/", "-"))
+	return StagedVerificationConfig{
+		RepositoryRoot: f.repository,
+		ScratchRoot:    f.lastScratch,
+		TSGoTool:       f.tool,
+		Generated:      []StagedTarget{f.generated},
+		Modules:        []StagedModule{module},
+		Callables:      []StagedCallable{callable},
+	}
+}
+
+func stagedGeneratedFunction(t *testing.T) []byte {
+	t.Helper()
+	factory := tsgo.NewFactory()
+	numberType := factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword)
+	parameter := factory.ParameterDeclaration(
+		nil,
+		nil,
+		factory.Identifier("value"),
+		nil,
+		numberType,
+		nil,
+	)
+	declaration := factory.FunctionDeclaration(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		nil,
+		factory.Identifier("Add"),
+		nil,
+		[]tsgo.ParameterDeclaration{parameter},
+		numberType,
+		factory.Block(
+			[]tsgo.Statement{factory.ReturnStatement(factory.Identifier("value"))},
+			true,
+		),
+	)
+	path, err := tsgo.NewPath("/modules/app.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := factory.SourceFile(
+		[]tsgo.Statement{declaration},
+		factory.EndOfFile(),
+		tsgo.SourceFileData{
+			FileName:        path,
+			Path:            path,
+			LanguageVariant: tsgo.LanguageVariantStandard,
+			ScriptKind:      tsgo.ScriptKindTS,
+		},
+	)
+	payload, err := tsgo.EncodeSourceFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return payload
+}

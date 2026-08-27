@@ -4,9 +4,12 @@ import (
 	"go/types"
 	"sort"
 
+	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	"github.com/tsoniclang/gotots/internal/emit/callableimplementation"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
+	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -312,4 +315,167 @@ func (s *programSession) reconstructScheduledArtifact(
 		return s.reconstructPackageStorage(owner, variable)
 	}
 	return s.reconstructArtifact(source)
+}
+
+func validateImplementationOwnership(
+	program *load.Program,
+	packages *sourceimplementation.Certificate,
+	callables *callableimplementation.Certificate,
+) error {
+	if program == nil || packages == nil || callables == nil {
+		return nil
+	}
+	for _, module := range callables.Modules() {
+		sourcePackage := program.PackageByPath(module.PackagePath())
+		if sourcePackage == nil {
+			continue
+		}
+		if _, selected := packages.ForPackage(sourcePackage); selected {
+			return &ScheduleError{
+				Object: module.PackagePath(),
+				Reason: "package and callable implementations overlap",
+			}
+		}
+	}
+	return nil
+}
+
+func (s *programSession) ResolveCallableImplementation(
+	context api.Context,
+	owner *types.Func,
+	kernel bool,
+) (api.CallableImplementationSelection, bool, error) {
+	if s == nil || s.callableImplementations == nil {
+		return api.CallableImplementationSelection{}, false, nil
+	}
+	current, ok := context.FunctionArtifactOwner()
+	if !ok || current != owner || owner == nil || owner.Origin() != owner {
+		return api.CallableImplementationSelection{}, false, &ScheduleError{
+			Object: ownerName(owner),
+			Reason: "callable implementation consumer has a foreign artifact owner",
+		}
+	}
+	selected, ok := s.callableImplementations.ForFunction(owner)
+	if !ok {
+		return api.CallableImplementationSelection{}, false, nil
+	}
+	expected := callableimplementation.VariantSource
+	targetVariant := api.CallableImplementationVariantSource
+	if kernel {
+		expected = callableimplementation.VariantKernel
+		targetVariant = api.CallableImplementationVariantKernel
+	}
+	if selected.Variant() != expected {
+		return api.CallableImplementationSelection{}, false, &ScheduleError{
+			Object: selected.SourceIdentity(),
+			Reason: "callable implementation variant differs from emitted ABI",
+		}
+	}
+	selection, err := api.NewCallableImplementationSelection(
+		selected.SourceIdentity(),
+		selected.Module().OutputPath(),
+		selected.Export(),
+		targetVariant,
+	)
+	return selection, err == nil, err
+}
+
+func (s *programSession) AcceptCallableImplementation(
+	selection api.CallableImplementationSelection,
+	target api.CallableImplementationTarget,
+) error {
+	if s == nil || s.callableImplementations == nil ||
+		!selection.Valid() || !target.Valid() {
+		return &ScheduleError{Reason: "callable implementation target is invalid"}
+	}
+	selected, ok := s.callableImplementations.ImplementationByIdentity(
+		selection.SourceIdentity(),
+	)
+	if !ok || selected.Module().OutputPath() != selection.OutputPath() ||
+		selected.Export() != selection.Export() {
+		return &ScheduleError{
+			Object: selection.SourceIdentity(),
+			Reason: "callable implementation selection differs from its certificate",
+		}
+	}
+	if _, duplicate := s.callableImplementationTargets[selection.SourceIdentity()]; duplicate {
+		return &ScheduleError{
+			Object: selection.SourceIdentity(),
+			Reason: "callable implementation target was accepted more than once",
+		}
+	}
+	s.callableImplementationTargets[selection.SourceIdentity()] = target
+	return nil
+}
+
+func (s *programSession) planCallableImplementations() error {
+	if s.callableImplementations == nil {
+		if len(s.callableImplementationTargets) != 0 {
+			return &ScheduleError{Reason: "unselected callable implementation target survived"}
+		}
+		return nil
+	}
+	implementations := s.callableImplementations.Implementations()
+	if len(s.callableImplementationTargets) != len(implementations) {
+		return &ScheduleError{
+			Reason: "not every selected callable implementation was consumed exactly once",
+		}
+	}
+	targets := make([]callableimplementation.GeneratedTarget, 0, len(implementations))
+	for _, implementation := range implementations {
+		target, ok := s.callableImplementationTargets[implementation.SourceIdentity()]
+		if !ok {
+			return &ScheduleError{
+				Object: implementation.SourceIdentity(),
+				Reason: "selected callable implementation was not consumed",
+			}
+		}
+		variant := callableimplementation.VariantSource
+		if implementation.Variant() == callableimplementation.VariantKernel {
+			variant = callableimplementation.VariantKernel
+		}
+		var (
+			planned callableimplementation.GeneratedTarget
+			err     error
+		)
+		switch target.Kind() {
+		case api.CallableImplementationTargetModuleFunction:
+			planned, err = callableimplementation.NewGeneratedModuleTarget(
+				implementation.SourceIdentity(),
+				variant,
+				target.OutputPath(),
+				target.Export(),
+			)
+		case api.CallableImplementationTargetStaticMethod:
+			planned, err = callableimplementation.NewGeneratedStaticMethodTarget(
+				implementation.SourceIdentity(),
+				variant,
+				target.OutputPath(),
+				target.ClassName(),
+				target.MemberName(),
+			)
+		default:
+			err = &ScheduleError{
+				Object: implementation.SourceIdentity(),
+				Reason: "callable implementation target kind is invalid",
+			}
+		}
+		if err != nil {
+			return err
+		}
+		targets = append(targets, planned)
+	}
+	plan, err := s.callableImplementations.PlanGeneratedContracts(targets)
+	if err != nil {
+		return err
+	}
+	s.callableImplementationPlan = plan
+	return nil
+}
+
+func ownerName(owner *types.Func) string {
+	if owner == nil {
+		return ""
+	}
+	return owner.FullName()
 }

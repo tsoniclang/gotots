@@ -11,7 +11,8 @@ const (
 	OptionGOARCH
 	OptionGOOS
 	OptionTags
-	OptionImplementationBundles
+	OptionPackageImplementations
+	OptionCallableImplementations
 	OptionOutputDirectory
 	OptionExternals
 	OptionStandardLibrary
@@ -43,7 +44,8 @@ var descriptors = []Descriptor{
 	{OptionGOARCH, "go.goarch", "goarch", false},
 	{OptionGOOS, "go.goos", "goos", false},
 	{OptionTags, "go.tags", "tag", true},
-	{OptionImplementationBundles, "implementations.bundles", "implementation-bundle", true},
+	{OptionCallableImplementations, "implementations.callables", "callable-implementation", true},
+	{OptionPackageImplementations, "implementations.packages", "package-implementation", true},
 	{OptionOutputDirectory, "output.directory", "output", false},
 	{OptionExternals, "providers.externals", "externals", false},
 	{OptionStandardLibrary, "providers.standardLibrary", "standard-library", false},

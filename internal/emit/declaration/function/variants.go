@@ -215,8 +215,43 @@ func emitCallableVariant(
 	if err != nil {
 		return callableVariantEmission{}, err
 	}
+	moduleExport := false
+	if moduleFunction {
+		moduleExport = kernel
+		if !moduleExport {
+			moduleExport, err = context.Names().ModuleExport(function)
+			if err != nil {
+				return callableVariantEmission{}, err
+			}
+		}
+	}
+	deferred := !context.SourceImplementationContract() && source.Body != nil &&
+		context.CallableControlFor(source).Recovery()
 	var body api.BlockEmission
-	if context.SourceImplementationContract() {
+	implementationBody, implemented, implementationErr :=
+		emitCallableImplementationBody(
+			context,
+			function,
+			signature,
+			kernel,
+			moduleFunction,
+			moduleExport,
+			valueReceiver,
+			name,
+			parameters,
+		)
+	if implementationErr != nil {
+		return callableVariantEmission{}, implementationErr
+	}
+	if implemented && deferred {
+		return callableVariantEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "callable implementation cannot replace a recovery callable",
+		}
+	}
+	if implemented {
+		body = implementationBody
+	} else if context.SourceImplementationContract() {
 		body, err = sourceImplementationContractBody(context, function)
 	} else if source.Body == nil {
 		body, err = emitExternalBody(
@@ -240,8 +275,6 @@ func emitCallableVariant(
 		return callableVariantEmission{}, err
 	}
 	var deferredBody api.BlockEmission
-	deferred := !context.SourceImplementationContract() && source.Body != nil &&
-		context.CallableControlFor(source).Recovery()
 	if deferred {
 		deferredBody, err = callable.EmitBody(
 			deferredContext.WithRecoveryAuthority(
@@ -284,14 +317,6 @@ func emitCallableVariant(
 	}
 	var modifiers []tsgo.ModifierLike
 	if moduleFunction {
-		moduleExport := kernel
-		if !moduleExport {
-			var moduleErr error
-			moduleExport, moduleErr = context.Names().ModuleExport(function)
-			if moduleErr != nil {
-				return callableVariantEmission{}, moduleErr
-			}
-		}
 		if moduleExport {
 			modifiers = []tsgo.ModifierLike{
 				context.Factory().ExportKeyword(),
