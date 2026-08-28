@@ -251,19 +251,10 @@ func emitKeyedSlice(
 			return api.ExpressionEmission{}, err
 		}
 	} else {
-		zero, zeroErr := context.Values().Zero(
+		zero, zeroErr := context.ContainerStorage().ContainerStorageZero(
 			context.WithRole(api.RoleSliceElement),
 			source,
 			elementType,
-		)
-		if zeroErr != nil {
-			return api.ExpressionEmission{}, zeroErr
-		}
-		zero, zeroErr = context.ContainerStorage().ToContainerStorage(
-			context.WithRole(api.RoleSliceElement),
-			source,
-			elementType,
-			zero,
 		)
 		if zeroErr != nil {
 			return api.ExpressionEmission{}, zeroErr

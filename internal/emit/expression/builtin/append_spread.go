@@ -225,19 +225,10 @@ func ApplyAppendSpread(
 		wrapped, err := wrapDefinedSlice(context, resultType, emission)
 		return wrapped, true, err
 	} else {
-		zero, err := context.Values().Zero(
+		zero, err := context.ContainerStorage().ContainerStorageZero(
 			context.WithRole(api.RoleSliceElement),
 			source,
 			elementType,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
-		zero, err = context.ContainerStorage().ToContainerStorage(
-			context.WithRole(api.RoleSliceElement),
-			source,
-			elementType,
-			zero,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err

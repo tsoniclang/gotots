@@ -340,15 +340,10 @@ func sliceStorageZero(
 	context api.Context,
 	element types.Type,
 ) (api.ExpressionEmission, error) {
-	zero, err := context.Values().Zero(context, nil, element)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return context.ContainerStorage().ToContainerStorage(
+	return context.ContainerStorage().ContainerStorageZero(
 		context.WithRole(api.RoleSliceElement),
 		nil,
 		element,
-		zero,
 	)
 }
 

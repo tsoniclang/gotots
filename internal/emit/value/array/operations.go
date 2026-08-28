@@ -26,15 +26,10 @@ func (a RuntimeArray) Zero(
 			}
 			return a.wrap(context, api.DirectExpression(target, requests...))
 		}
-		loopZero, err := context.Values().Zero(
-			context,
+		loopZero, err := a.zeroElement(
+			context.WithRole(api.RoleArrayElement),
 			source,
-			a.ElementType(),
 		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		loopZero, err = a.storeElement(context, source, loopZero)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
@@ -100,15 +95,10 @@ func (a RuntimeArray) Zero(
 		}
 		return a.wrap(context, emission)
 	}
-	elementZero, err := context.Values().Zero(
-		context,
+	elementZero, err := a.zeroElement(
+		context.WithRole(api.RoleArrayElement),
 		source,
-		a.ElementType(),
 	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementZero, err = a.storeElement(context, source, elementZero)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

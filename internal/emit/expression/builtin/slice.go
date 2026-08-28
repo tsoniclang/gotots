@@ -77,19 +77,10 @@ func emitMake(
 		}
 		return wrapDefinedSlice(context, result, target)
 	}
-	zero, err := context.Values().Zero(
+	zero, err := context.ContainerStorage().ContainerStorageZero(
 		context.WithRole(api.RoleSliceElement),
 		source,
 		elementType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	zero, err = context.ContainerStorage().ToContainerStorage(
-		context.WithRole(api.RoleSliceElement),
-		source,
-		elementType,
-		zero,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -273,19 +264,10 @@ func emitAppend(
 		requests = append(requests, stored.Requests()...)
 		ordered[index] = stored.Value()
 	}
-	zero, err := context.Values().Zero(
+	zero, err := context.ContainerStorage().ContainerStorageZero(
 		context.WithRole(api.RoleSliceElement),
 		source,
 		elementType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	zero, err = context.ContainerStorage().ToContainerStorage(
-		context.WithRole(api.RoleSliceElement),
-		source,
-		elementType,
-		zero,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

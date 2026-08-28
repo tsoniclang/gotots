@@ -32,6 +32,28 @@ func (owner Owner) ContainerStorageType(
 	return owner.StorageType(context, source, sourceType)
 }
 
+func (owner Owner) ContainerStorageZero(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+) (api.ExpressionEmission, error) {
+	if _, generic := api.GenericTypeParameter(sourceType); generic {
+		zero, err := owner.Zero(context, source, sourceType)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return owner.ToContainerStorage(context, source, sourceType, zero)
+	}
+	required, err := owner.RequiresStorageProjection(context, sourceType)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if !required {
+		return owner.Zero(context, source, sourceType)
+	}
+	return owner.StorageZero(context, source, sourceType)
+}
+
 func (owner Owner) ToContainerStorage(
 	context api.Context,
 	source ast.Node,

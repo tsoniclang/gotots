@@ -24,19 +24,9 @@ func (a RuntimeArray) emitPackedLiteral(
 	if !selected {
 		return api.ExpressionEmission{}, false, nil
 	}
-	elementZero, err := context.Values().Zero(
+	elementZero, err := a.zeroElement(
 		context.WithRole(api.RoleCompositeElement),
 		source,
-		a.ElementType(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	elementZero, err = context.ContainerStorage().ToContainerStorage(
-		context.WithRole(api.RoleCompositeElement),
-		source,
-		a.ElementType(),
-		elementZero,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err

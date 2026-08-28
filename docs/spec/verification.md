@@ -281,7 +281,9 @@ Storage-backed struct fixtures additionally exact-check that nested named-struct
 zero values use the demanded `$zeroStorage` owner. A mutation restoring
 `$storageOf($zero())` must fail the generated-shape gate, while strict
 typechecking and Go/TypeScript differential execution prove identical field
-zeros for nested and generic structs.
+zeros for nested and generic structs. The same fixture initializes aggregate
+slice storage and rejects an outer `$storageOf($zero())` composition, proving
+that container initialization uses the same direct owner.
 
 Required mutations append each forbidden parameter/type parameter, publish a
 private helper, alter receiver placement, duplicate a variadic slot, or select

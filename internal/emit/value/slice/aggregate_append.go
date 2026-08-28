@@ -34,15 +34,7 @@ func AppendAggregate(
 	result := context.Factory().Identifier(resultName)
 	newLength := context.Factory().Identifier(lengthName)
 	index := context.Factory().Identifier(indexName)
-	tailZero, err := context.Values().Zero(
-		context.WithRole(api.RoleSliceElement),
-		source,
-		elementType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	tailZero, err = storeElement(context, source, elementType, tailZero)
+	tailZero, err := zeroElement(context, source, elementType)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

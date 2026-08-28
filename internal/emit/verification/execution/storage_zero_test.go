@@ -53,6 +53,7 @@ func Run() int32 {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, required := range []string{
 		"static $zeroStorage",
+		"Outer.$zeroStorage",
 		"Inner.$zeroStorage",
 		"Leaf.$zeroStorage",
 	} {
@@ -61,6 +62,7 @@ func Run() int32 {
 		}
 	}
 	for _, forbidden := range []string{
+		"Outer.$storageOf(Outer.$zero",
 		"Inner.$storageOf(Inner.$zero",
 		"Leaf.$storageOf(Leaf.$zero",
 	} {

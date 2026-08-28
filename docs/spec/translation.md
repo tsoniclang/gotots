@@ -557,7 +557,9 @@ Static `$zero`, `$copy`, `$equal`, `$hash`, `$convert`, `$storageOf`, `$fromStor
 requests them. `$zeroStorage` constructs canonical field storage directly; a
 storage consumer must not allocate `$zero()` and immediately discard its wrapper
 through `$storageOf(...)`. For example, a nested `Inner` field in `Outer{}` uses
-`Inner.$zeroStorage()`, not `Inner.$storageOf(Inner.$zero())`. A
+`Inner.$zeroStorage()`, not `Inner.$storageOf(Inner.$zero())`; array and slice
+storage initialization applies the same rule through the one container-storage
+zero owner. A
 certified provider may expose a positional `$make` operation; ordinary
 generated structs never gain that compatibility factory.
 
