@@ -1205,6 +1205,16 @@ structurally exact-joins the complete ordinary and installed canonical sets.
 That final join consumes only the compiler worker's official encoded protocol
 and flattened expected exports after the worker has exited; no live TS-Go
 process or certificate crosses the compilation lifetime boundary.
+For callable-body modules, mutate an admitted `.d.ts` certification source
+after preparation, omit it from the compile-worker handoff, duplicate it under
+a second contract, and replace it with executable TypeScript. Digest drift,
+unsealed evidence, and a non-declaration source must fail before the staged
+project is printed; byte-identical declarations from multiple modules are
+materialized once in scratch and never appear in final output.
+Mutate a selected Go callable body without changing its identity or signature.
+Its canonical body digest must fail the post-load join before emission; omit or
+change that digest across the compile-worker handoff and the parent exact join
+must fail before staged TypeScript verification.
 Before checker evidence is trusted, TSTS independently checks both sets with
 its authoritative marker modules and exact-joins marker facts. The selected
 target then lowers and strict-typechecks both complete executable sets with one
@@ -1291,7 +1301,45 @@ type, nil shape, method/callback adapter, or signature dependency; each fails at
 the TSTS join or strict target consumer. A body-only authored change changes the
 implementation digest without changing generated callers.
 
-The final broad search rejects treating GoToTS's export-identity join as final
+Callable-body implementation proof uses a source package containing ordinary,
+pointer-receiver, generic-kernel, and adversarial same-spelled declarations.
+The generated wrapper and authored export are inspected in one strict staged
+project and must have the same checked callable shape. The final artifact must
+contain one static import and direct call, preserve every generated caller and
+declaration signature, contain the authored module exactly once, and contain no
+node from the translated source body. Required source-snapshot mutations change
+a referenced constant or helper while leaving the selected body unchanged,
+change selected dependency source, change an effective per-file Go version,
+and change selected non-Go or embedded bytes. Each must invalidate the
+load-owned digest and fail the contract join before emission.
+
+Required authored-module mutations add a top-level call, side-effect-only
+import, executable top-level declaration, `as` assertion, angle-bracket
+assertion, non-null assertion, `@ts-ignore`, `@ts-nocheck`, or
+`@ts-expect-error`, explicit `any`/`unknown`, or checker-inferred semantic
+`any`/`unknown`, including a function-valued reference whose result is inferred
+as `any`. Each fails with its exact closed staged-source violation before
+the ABI join. A positive control directly invokes an ambient callable whose
+unused formal type is broad while its actual argument and selected result are
+exact; mutating the actual argument, selected result, or escaping the callable
+value restores the owning failure. Further mutations alter canonical Go
+identity or signature, select the wrong ordinary/kernel variant, change one checked
+parameter/result/type-parameter shape, add or omit an authored export,
+duplicate or leave a contract unconsumed, collide an output path, retain the
+translated body, or select both package and callable ownership. Each fails at
+its owning join before printing. A differential executes the Go body, ordinary
+generated body, and selected authored body over representative and adversarial
+inputs; an equivalence envelope bounds every intentional algorithmic
+difference.
+
+Configuration mutations select schema 2, `implementations.bundles`, and
+`--implementation-bundle`; all must fail with the current migration diagnostic.
+A no-callable-implementation control proves the ordinary source digest and
+output path remain singular and byte-stable.
+
+The final broad search rejects a command-layer source digest,
+`SourceForbiddenDynamicTypes`, a sibling callable-source policy file, schema-2
+aliases, treating GoToTS's export-identity join as final
 surface acceptance, any second name-only signature gate, package/function
 projection condition, pointer-scalarization config field, caller allowlist,
 text patch, unchecked cast, or duplicate signature store.

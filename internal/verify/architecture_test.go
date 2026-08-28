@@ -126,6 +126,7 @@ func verifyProductionFile(relative string, sourcePath string) error {
 		importAliases[importPath] = alias
 		if importPath == "go/ast" || importPath == "go/types" {
 			if !strings.HasPrefix(relative, "internal/load/") &&
+				!strings.HasPrefix(relative, "internal/contracts/callableimplementation/") &&
 				!strings.HasPrefix(relative, "internal/contracts/environment/") &&
 				!strings.HasPrefix(relative, "internal/contracts/externals/certify/") &&
 				!strings.HasPrefix(relative, "internal/contracts/gostdlib/certify/") &&
@@ -214,6 +215,12 @@ import _ "go/ast"
 			source: `package expression
 import "go/ast"
 func leak(node ast.Node) { ast.Inspect(node, func(ast.Node) bool { return true }) }
+`,
+		},
+		"source formatter inside emission": {
+			relative: "internal/emit/leak.go",
+			source: `package emit
+import _ "go/format"
 `,
 		},
 		"raw dynamic target fragment": {

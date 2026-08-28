@@ -50,7 +50,8 @@ type providersDocument struct {
 	Externals       *bool `json:"externals"`
 }
 type implementationsDocument struct {
-	Bundles []string `json:"bundles"`
+	Packages  []string `json:"packages"`
+	Callables []string `json:"callables"`
 }
 type outputDocument struct {
 	Directory *string `json:"directory"`
@@ -81,6 +82,9 @@ func Load(request Request) (Project, error) {
 }
 
 func decode(payload []byte) (document, error) {
+	if err := rejectRemovedConfiguration(payload); err != nil {
+		return document{}, err
+	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
 	var selected document
@@ -98,6 +102,31 @@ func decode(payload []byte) (document, error) {
 		return document{}, projectError("decode config", "", "schema version is unsupported")
 	}
 	return selected, nil
+}
+
+func rejectRemovedConfiguration(payload []byte) error {
+	var probe struct {
+		SchemaVersion   int                        `json:"schemaVersion"`
+		Implementations map[string]json.RawMessage `json:"implementations"`
+	}
+	if err := json.Unmarshal(payload, &probe); err != nil {
+		return projectError("decode config", "", err.Error())
+	}
+	if probe.SchemaVersion == 2 {
+		return projectError(
+			"migrate config",
+			"schemaVersion",
+			"schema 2 was replaced by schema 3; split implementations.bundles into implementations.packages and implementations.callables",
+		)
+	}
+	if _, removed := probe.Implementations["bundles"]; removed {
+		return projectError(
+			"migrate config",
+			"implementations.bundles",
+			"field was replaced by implementations.packages and implementations.callables",
+		)
+	}
+	return nil
 }
 
 func resolve(path string, selected document, overrides Overrides) (Project, error) {
@@ -157,7 +186,19 @@ func resolve(path string, selected document, overrides Overrides) (Project, erro
 	if err != nil {
 		return Project{}, err
 	}
-	bundles, err := resolvePaths(base, selected.Implementations.Bundles)
+	packageImplementations, err := resolvePaths(
+		base,
+		"implementations.packages",
+		selected.Implementations.Packages,
+	)
+	if err != nil {
+		return Project{}, err
+	}
+	callableImplementations, err := resolvePaths(
+		base,
+		"implementations.callables",
+		selected.Implementations.Callables,
+	)
 	if err != nil {
 		return Project{}, err
 	}
@@ -172,21 +213,22 @@ func resolve(path string, selected document, overrides Overrides) (Project, erro
 		)
 	}
 	return Project{
-		configPath:            path,
-		distributionRoot:      distributionRoot,
-		sourceRoot:            sourceRoot,
-		packagePattern:        *selected.Source.Package,
-		rootMode:              mode,
-		buildProfile:          build,
-		goTool:                selectedGo,
-		tsgoTool:              selectedTSGo,
-		toolCacheRoot:         toolCacheRoot,
-		integer:               integer,
-		evaluation:            evaluation,
-		standardLibrary:       *selected.Providers.StandardLibrary,
-		externals:             *selected.Providers.Externals,
-		implementationBundles: bundles,
-		outputDirectory:       outputDirectory,
+		configPath:              path,
+		distributionRoot:        distributionRoot,
+		sourceRoot:              sourceRoot,
+		packagePattern:          *selected.Source.Package,
+		rootMode:                mode,
+		buildProfile:            build,
+		goTool:                  selectedGo,
+		tsgoTool:                selectedTSGo,
+		toolCacheRoot:           toolCacheRoot,
+		integer:                 integer,
+		evaluation:              evaluation,
+		standardLibrary:         *selected.Providers.StandardLibrary,
+		externals:               *selected.Providers.Externals,
+		packageImplementations:  packageImplementations,
+		callableImplementations: callableImplementations,
+		outputDirectory:         outputDirectory,
 	}, nil
 }
 
@@ -236,8 +278,11 @@ func applyOverrides(selected *document, overrides Overrides) {
 	if overrides.Externals != nil {
 		selected.Providers.Externals = overrides.Externals
 	}
-	if overrides.ImplementationSet {
-		selected.Implementations.Bundles = slices.Clone(overrides.ImplementationBundles)
+	if overrides.PackageImplementationsSet {
+		selected.Implementations.Packages = slices.Clone(overrides.PackageImplementations)
+	}
+	if overrides.CallableImplementationsSet {
+		selected.Implementations.Callables = slices.Clone(overrides.CallableImplementations)
 	}
 	applyString(overrides.OutputDirectory, &selected.Output.Directory)
 }
@@ -246,8 +291,11 @@ func (p Project) SemanticDigest(evidence EvidenceDigests) (string, error) {
 	if evidence.Source == "" {
 		return "", projectError("digest", "source", "evidence is absent")
 	}
-	if len(p.implementationBundles) != 0 && evidence.SourceImplementations == "" {
-		return "", projectError("digest", "source implementations", "evidence is absent")
+	if len(p.packageImplementations) != 0 && evidence.PackageImplementations == "" {
+		return "", projectError("digest", "package implementations", "evidence is absent")
+	}
+	if len(p.callableImplementations) != 0 && evidence.CallableImplementations == "" {
+		return "", projectError("digest", "callable implementations", "evidence is absent")
 	}
 	if p.standardLibrary && evidence.StandardLibrary == "" {
 		return "", projectError("digest", "standard library", "evidence is absent")
@@ -256,30 +304,33 @@ func (p Project) SemanticDigest(evidence EvidenceDigests) (string, error) {
 		return "", projectError("digest", "externals", "evidence is absent")
 	}
 	document := struct {
-		Schema          int      `json:"schema"`
-		Package         string   `json:"package"`
-		Mode            RootMode `json:"mode"`
-		Toolchain       string   `json:"toolchain"`
-		GoTool          string   `json:"goTool"`
-		TSGoTool        string   `json:"tsgoTool"`
-		GOOS            string   `json:"goos"`
-		GOARCH          string   `json:"goarch"`
-		CGO             bool     `json:"cgo"`
-		Tags            []string `json:"tags"`
-		Integer         string   `json:"integer"`
-		Evaluation      string   `json:"evaluation"`
-		Source          string   `json:"source"`
-		Implementations string   `json:"implementations,omitempty"`
-		StandardLibrary string   `json:"standardLibrary,omitempty"`
-		Externals       string   `json:"externals,omitempty"`
+		Schema                  int      `json:"schema"`
+		Package                 string   `json:"package"`
+		Mode                    RootMode `json:"mode"`
+		Toolchain               string   `json:"toolchain"`
+		GoTool                  string   `json:"goTool"`
+		TSGoTool                string   `json:"tsgoTool"`
+		GOOS                    string   `json:"goos"`
+		GOARCH                  string   `json:"goarch"`
+		CGO                     bool     `json:"cgo"`
+		Tags                    []string `json:"tags"`
+		Integer                 string   `json:"integer"`
+		Evaluation              string   `json:"evaluation"`
+		Source                  string   `json:"source"`
+		PackageImplementations  string   `json:"packageImplementations,omitempty"`
+		CallableImplementations string   `json:"callableImplementations,omitempty"`
+		StandardLibrary         string   `json:"standardLibrary,omitempty"`
+		Externals               string   `json:"externals,omitempty"`
 	}{
 		Schema: SchemaVersion, Package: p.packagePattern, Mode: p.rootMode,
 		Toolchain: p.buildProfile.ToolchainVersion(), GOOS: p.buildProfile.GOOS(),
 		GoTool: p.goTool.Identity().String(), TSGoTool: p.tsgoTool.Identity().String(),
 		GOARCH: p.buildProfile.GOARCH(), CGO: p.buildProfile.CgoEnabled(), Tags: p.buildProfile.Tags(),
 		Integer: p.integer.String(), Evaluation: p.evaluation.String(),
-		Source: evidence.Source, Implementations: evidence.SourceImplementations,
-		StandardLibrary: evidence.StandardLibrary, Externals: evidence.Externals,
+		Source:                  evidence.Source,
+		PackageImplementations:  evidence.PackageImplementations,
+		CallableImplementations: evidence.CallableImplementations,
+		StandardLibrary:         evidence.StandardLibrary, Externals: evidence.Externals,
 	}
 	payload, err := json.Marshal(document)
 	if err != nil {
@@ -306,7 +357,7 @@ func resolveOptionalPath(base string, selected string) (string, error) {
 	return resolvePath(base, selected)
 }
 
-func resolvePaths(base string, selected []string) ([]string, error) {
+func resolvePaths(base string, field string, selected []string) ([]string, error) {
 	result := make([]string, len(selected))
 	for index, value := range selected {
 		resolved, err := resolvePath(base, value)
@@ -318,7 +369,7 @@ func resolvePaths(base string, selected []string) ([]string, error) {
 	slices.Sort(result)
 	for index := 1; index < len(result); index++ {
 		if result[index] == result[index-1] {
-			return nil, projectError("validate config", "implementations.bundles", "path is duplicated")
+			return nil, projectError("validate config", field, "path is duplicated")
 		}
 	}
 	return result, nil

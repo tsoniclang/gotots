@@ -138,6 +138,9 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 			return nil, err
 		}
 	}
+	if err := s.planCallableImplementations(); err != nil {
+		return nil, err
+	}
 	s.sealed = true
 	sort.Slice(files, func(left, right int) bool {
 		return files[left].outputPath < files[right].outputPath
@@ -184,6 +187,7 @@ func compileProgramSession(
 	return ProgramEmission{
 		files:                       files,
 		sourceImplementationPlan:    session.sourceImplementationPlan,
+		callableImplementationPlan:  session.callableImplementationPlan,
 		environmentObligations:      obligations,
 		environmentProfile:          profile,
 		externalFunctionObligations: session.externalFunctionObligations(),

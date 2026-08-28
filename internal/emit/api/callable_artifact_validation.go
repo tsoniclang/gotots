@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	callableimplementationcontract "github.com/tsoniclang/gotots/internal/emit/api/callableimplementation"
 )
 
 type CallableABIReference struct {
@@ -458,4 +459,141 @@ func (o *GeneratedArtifact) ProviderStatefulRepresentationType() (*types.Named, 
 	}
 	_, interfaceType := source.Underlying().(*types.Interface)
 	return source, !interfaceType
+}
+
+type CallableImplementationVariant = callableimplementationcontract.Variant
+
+const (
+	CallableImplementationVariantInvalid = callableimplementationcontract.VariantInvalid
+	CallableImplementationVariantSource  = callableimplementationcontract.VariantSource
+	CallableImplementationVariantKernel  = callableimplementationcontract.VariantKernel
+)
+
+type CallableImplementationSelection = callableimplementationcontract.Selection
+
+func NewCallableImplementationSelection(
+	sourceIdentity string,
+	outputPath string,
+	export string,
+	variant CallableImplementationVariant,
+) (CallableImplementationSelection, error) {
+	return callableimplementationcontract.NewSelection(
+		sourceIdentity,
+		outputPath,
+		export,
+		variant,
+	)
+}
+
+type CallableImplementationTargetKind = callableimplementationcontract.TargetKind
+
+const (
+	CallableImplementationTargetInvalid        = callableimplementationcontract.TargetInvalid
+	CallableImplementationTargetModuleFunction = callableimplementationcontract.TargetModuleFunction
+	CallableImplementationTargetStaticMethod   = callableimplementationcontract.TargetStaticMethod
+)
+
+type CallableImplementationTarget = callableimplementationcontract.Target
+
+func NewCallableImplementationModuleTarget(
+	outputPath string,
+	export string,
+) (CallableImplementationTarget, error) {
+	return callableimplementationcontract.NewModuleTarget(outputPath, export)
+}
+
+func NewCallableImplementationStaticMethodTarget(
+	outputPath string,
+	className string,
+	memberName string,
+) (CallableImplementationTarget, error) {
+	return callableimplementationcontract.NewStaticMethodTarget(
+		outputPath,
+		className,
+		memberName,
+	)
+}
+
+type CallableImplementationResolver interface {
+	SettleCallableImplementationVariant(
+		Context,
+		*types.Func,
+		bool,
+	) (bool, error)
+	ResolveCallableImplementation(
+		Context,
+		*types.Func,
+		bool,
+	) (CallableImplementationSelection, bool, error)
+	AcceptCallableImplementation(
+		CallableImplementationSelection,
+		CallableImplementationTarget,
+	) error
+}
+
+type CallableImplementationNames interface {
+	CallableImplementation(string, string) (NameReference, error)
+	TargetModulePath() string
+}
+
+func (c Context) WithCallableImplementationResolver(
+	resolver CallableImplementationResolver,
+) Context {
+	if resolver == nil {
+		panic("callable implementation resolver is nil")
+	}
+	c.callableImplementationResolver = resolver
+	return c
+}
+
+func (c Context) ResolveCallableImplementation(
+	owner *types.Func,
+	kernel bool,
+) (CallableImplementationSelection, bool, error) {
+	if c.callableImplementationResolver == nil {
+		return CallableImplementationSelection{}, false, nil
+	}
+	if owner == nil || owner.Origin() != owner {
+		return CallableImplementationSelection{}, false, &ContextError{
+			Reason: "callable implementation owner is not canonical",
+		}
+	}
+	return c.callableImplementationResolver.ResolveCallableImplementation(
+		c,
+		owner,
+		kernel,
+	)
+}
+
+func (c Context) SettleCallableImplementationVariant(
+	owner *types.Func,
+	inferredKernel bool,
+) (bool, error) {
+	if c.callableImplementationResolver == nil {
+		return inferredKernel, nil
+	}
+	if owner == nil || owner.Origin() != owner {
+		return false, &ContextError{
+			Reason: "callable implementation owner is not canonical",
+		}
+	}
+	return c.callableImplementationResolver.SettleCallableImplementationVariant(
+		c,
+		owner,
+		inferredKernel,
+	)
+}
+
+func (c Context) AcceptCallableImplementation(
+	selection CallableImplementationSelection,
+	target CallableImplementationTarget,
+) error {
+	if c.callableImplementationResolver == nil ||
+		!selection.Valid() || !target.Valid() {
+		return &ContextError{Reason: "callable implementation target is invalid"}
+	}
+	return c.callableImplementationResolver.AcceptCallableImplementation(
+		selection,
+		target,
+	)
 }

@@ -2,6 +2,7 @@ package command
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,6 +30,18 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 	if err := os.WriteFile(generatedProtocolPath, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	callableSource := filepath.Join(output, "hot.ts")
+	callablePayload := []byte("export function valueFast(): number { return 1; }\n")
+	if err := os.WriteFile(callableSource, callablePayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	callableDigest := sha256.Sum256(callablePayload)
+	certificationSource := filepath.Join(output, "runtime-contract.d.ts")
+	certificationPayload := []byte("declare module \"@fixture/runtime.js\" {}\n")
+	if err := os.WriteFile(certificationSource, certificationPayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	certificationDigest := sha256.Sum256(certificationPayload)
 	plan := printPlan{
 		files: []printPlanFile{{
 			outputPath:   "program.ts",
@@ -49,7 +62,31 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 			}},
 		},
 		hasSourceImplementation: true,
-		packageDocument:         []byte("{\"private\":true}\n"),
+		callableImplementation: callableImplementationPrintPlan{
+			sourceProgramDigest: "a3a86944267e41877ab54f798340439bd80038e34687c5dedb5dc7dbc857565b",
+			modules: []callableImplementationModule{{
+				sourcePath: callableSource, outputPath: "implementations/hot.ts",
+				sourceDigest: hex.EncodeToString(callableDigest[:]),
+				exports:      []string{"valueFast"},
+				certificationSources: []callableImplementationCertificationSource{{
+					sourcePath:   certificationSource,
+					sourceDigest: hex.EncodeToString(certificationDigest[:]),
+				}},
+			}},
+			targets: []callableImplementationTarget{{
+				sourceIdentity:       "example.test/program|kind=5|receiver=|name=Value",
+				sourceSignature:      "func() int|params=|results=",
+				sourceBodyDigest:     "a3a86944267e41877ab54f798340439bd80038e34687c5dedb5dc7dbc857565b",
+				variant:              "source",
+				implementationOutput: "implementations/hot.ts",
+				implementationExport: "valueFast",
+				generatedOutput:      "program.ts",
+				kind:                 callableImplementationTargetModuleFunction,
+				generatedExport:      "Value",
+			}},
+		},
+		hasCallableImplementation: true,
+		packageDocument:           []byte("{\"private\":true}\n"),
 	}
 	digest := "a3a86944267e41877ab54f798340439bd80038e34687c5dedb5dc7dbc857565b"
 	handoff, err := encodeCompileWorkerDocument(plan, digest, os.Getpid()+1)
@@ -69,7 +106,15 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 		decoded.plan.files[0].protocolHash != plan.files[0].protocolHash ||
 		!decoded.plan.hasSourceImplementation ||
 		len(decoded.plan.sourceImplementation.generated) != 1 ||
-		len(decoded.plan.sourceImplementation.packages) != 1 {
+		len(decoded.plan.sourceImplementation.packages) != 1 ||
+		!decoded.plan.hasCallableImplementation ||
+		len(decoded.plan.callableImplementation.modules) != 1 ||
+		decoded.plan.callableImplementation.sourceProgramDigest !=
+			plan.callableImplementation.sourceProgramDigest ||
+		len(decoded.plan.callableImplementation.modules[0].certificationSources) != 1 ||
+		decoded.plan.callableImplementation.modules[0].certificationSources[0].sourceDigest !=
+			hex.EncodeToString(certificationDigest[:]) ||
+		len(decoded.plan.callableImplementation.targets) != 1 {
 		t.Fatalf("decoded handoff = %#v", decoded)
 	}
 
@@ -82,6 +127,44 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 	}
 	if _, err := readCompileWorkerDocument(handoffPath, output, os.Getpid()+1); err == nil {
 		t.Fatal("same-process compilation handoff was accepted")
+	}
+
+	withoutBodyDigest := plan
+	withoutBodyDigest.callableImplementation.targets = append(
+		[]callableImplementationTarget(nil),
+		plan.callableImplementation.targets...,
+	)
+	withoutBodyDigest.callableImplementation.targets[0].sourceBodyDigest = ""
+	omittedBodyDigest, err := encodeCompileWorkerDocument(
+		withoutBodyDigest,
+		digest,
+		os.Getpid()+1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(handoffPath, omittedBodyDigest, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readCompileWorkerDocument(handoffPath, output, os.Getpid()+1); err == nil {
+		t.Fatal("omitted callable source body digest was accepted")
+	}
+
+	withoutSourceProgram := plan
+	withoutSourceProgram.callableImplementation.sourceProgramDigest = ""
+	omittedSourceProgram, err := encodeCompileWorkerDocument(
+		withoutSourceProgram,
+		digest,
+		os.Getpid()+1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(handoffPath, omittedSourceProgram, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readCompileWorkerDocument(handoffPath, output, os.Getpid()+1); err == nil {
+		t.Fatal("omitted callable source program digest was accepted")
 	}
 
 	duplicatePlan := plan

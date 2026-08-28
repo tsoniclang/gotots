@@ -577,12 +577,3 @@ func (s projectSourceEvidence) typePosition(
 	}
 	return false
 }
-
-func (s projectSourceEvidence) firstChild(parent uint32) uint32 {
-	for index := uint32(1); index < uint32(len(s.nodes)); index++ {
-		if s.nodes[index].parent == parent {
-			return index
-		}
-	}
-	return 0
-}

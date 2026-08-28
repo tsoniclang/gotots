@@ -9,7 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 type RootMode string
 
@@ -27,25 +27,27 @@ func (m RootMode) Valid() bool {
 }
 
 type Overrides struct {
-	DistributionRoot      *string
-	GoExecutable          *string
-	TSGoExecutable        *string
-	ToolCacheRoot         *string
-	SourceRoot            *string
-	PackagePattern        *string
-	RootMode              *string
-	GOOS                  *string
-	GOARCH                *string
-	CGOEnabled            *bool
-	BuildTags             []string
-	BuildTagsSet          bool
-	IntegerRepresentation *string
-	EvaluationOrder       *string
-	StandardLibrary       *bool
-	Externals             *bool
-	ImplementationBundles []string
-	ImplementationSet     bool
-	OutputDirectory       *string
+	DistributionRoot           *string
+	GoExecutable               *string
+	TSGoExecutable             *string
+	ToolCacheRoot              *string
+	SourceRoot                 *string
+	PackagePattern             *string
+	RootMode                   *string
+	GOOS                       *string
+	GOARCH                     *string
+	CGOEnabled                 *bool
+	BuildTags                  []string
+	BuildTagsSet               bool
+	IntegerRepresentation      *string
+	EvaluationOrder            *string
+	StandardLibrary            *bool
+	Externals                  *bool
+	PackageImplementations     []string
+	PackageImplementationsSet  bool
+	CallableImplementations    []string
+	CallableImplementationsSet bool
+	OutputDirectory            *string
 }
 
 type Request struct {
@@ -54,21 +56,22 @@ type Request struct {
 }
 
 type Project struct {
-	configPath            string
-	distributionRoot      string
-	sourceRoot            string
-	packagePattern        string
-	rootMode              RootMode
-	buildProfile          load.BuildProfile
-	goTool                toolchain.Go
-	tsgoTool              tsgo.Tool
-	toolCacheRoot         string
-	integer               emit.IntegerRepresentation
-	evaluation            emit.EvaluationOrder
-	standardLibrary       bool
-	externals             bool
-	implementationBundles []string
-	outputDirectory       string
+	configPath              string
+	distributionRoot        string
+	sourceRoot              string
+	packagePattern          string
+	rootMode                RootMode
+	buildProfile            load.BuildProfile
+	goTool                  toolchain.Go
+	tsgoTool                tsgo.Tool
+	toolCacheRoot           string
+	integer                 emit.IntegerRepresentation
+	evaluation              emit.EvaluationOrder
+	standardLibrary         bool
+	externals               bool
+	packageImplementations  []string
+	callableImplementations []string
+	outputDirectory         string
 }
 
 func (p Project) ConfigPath() string                                { return p.configPath }
@@ -84,16 +87,20 @@ func (p Project) IntegerRepresentation() emit.IntegerRepresentation { return p.i
 func (p Project) EvaluationOrder() emit.EvaluationOrder             { return p.evaluation }
 func (p Project) StandardLibraryEnabled() bool                      { return p.standardLibrary }
 func (p Project) ExternalsEnabled() bool                            { return p.externals }
-func (p Project) ImplementationBundles() []string {
-	return slices.Clone(p.implementationBundles)
+func (p Project) PackageImplementations() []string {
+	return slices.Clone(p.packageImplementations)
+}
+func (p Project) CallableImplementations() []string {
+	return slices.Clone(p.callableImplementations)
 }
 func (p Project) OutputDirectory() string { return p.outputDirectory }
 
 type EvidenceDigests struct {
-	Source                string
-	SourceImplementations string
-	StandardLibrary       string
-	Externals             string
+	Source                  string
+	PackageImplementations  string
+	CallableImplementations string
+	StandardLibrary         string
+	Externals               string
 }
 
 type Error struct {

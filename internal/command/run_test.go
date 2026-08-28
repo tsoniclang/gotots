@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,7 +20,7 @@ import (
 func TestRunPrintsResolvedConfigWithoutBuilding(t *testing.T) {
 	root := t.TempDir()
 	writeCommandFixture(t, filepath.Join(root, "gotots.json"), `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "distribution": {"root": "`+filepath.ToSlash(repositoryRoot(t))+`"},
   "source": {"root": ".", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
@@ -43,13 +44,13 @@ func TestRunBuildsSimpleProgramThroughPinnedTSGo(t *testing.T) {
 	writeCommandFixture(t, filepath.Join(root, "go.mod"), "module example.test/app\n\ngo 1.26.4\n")
 	writeCommandFixture(t, filepath.Join(root, "main.go"), "package main\nfunc main() {}\n")
 	writeCommandFixture(t, filepath.Join(root, "gotots.json"), `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "distribution": {"root": "`+filepath.ToSlash(repositoryRoot(t))+`"},
   "source": {"root": ".", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
   "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
-  "implementations": {"bundles": []},
+  "implementations": {"packages": [], "callables": []},
   "output": {"directory": "generated"}
 }
 `)
@@ -84,6 +85,18 @@ func TestRunBuildsSimpleProgramThroughPinnedTSGo(t *testing.T) {
 	if !bytes.Contains(packageDocument, []byte(`"type": "module"`)) {
 		t.Fatalf("project package = %s", packageDocument)
 	}
+	firstReport := output.String()
+	firstTree := readGeneratedTree(t, generated)
+	output.Reset()
+	if err := Run(context.Background(), root, []string{"build"}, &output, &output); err != nil {
+		t.Fatal(err)
+	}
+	if output.String() != firstReport {
+		t.Fatalf("ordinary build report changed:\nfirst: %s\nsecond: %s", firstReport, output.String())
+	}
+	if secondTree := readGeneratedTree(t, generated); !maps.Equal(firstTree, secondTree) {
+		t.Fatal("ordinary build artifacts changed across identical source snapshots")
+	}
 }
 
 func TestRunEmitsCanonicalMarkersWithoutFabricatingCorePackage(t *testing.T) {
@@ -98,13 +111,13 @@ func Increment(value int32) int32 {
 }
 `)
 	writeCommandFixture(t, filepath.Join(root, "gotots.json"), `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "distribution": {"root": "`+filepath.ToSlash(repositoryRoot(t))+`"},
   "source": {"root": ".", "package": ".", "mode": "exported"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
   "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
-  "implementations": {"bundles": []},
+  "implementations": {"packages": [], "callables": []},
   "output": {"directory": "generated"}
 }
 `)
@@ -237,6 +250,32 @@ func readGeneratedTypeScript(t *testing.T, root string) string {
 		t.Fatal(err)
 	}
 	return source.String()
+}
+
+func readGeneratedTree(t *testing.T, root string) map[string]string {
+	t.Helper()
+	result := make(map[string]string)
+	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		payload, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		result[filepath.ToSlash(relative)] = string(payload)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return result
 }
 
 func assertManifestMatchesOutput(t *testing.T, root string) {

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/config"
 )
@@ -21,7 +22,8 @@ func (i Invocation) ConfigPath() string { return i.configPath }
 func (i Invocation) Overrides() config.Overrides {
 	result := i.overrides
 	result.BuildTags = slices.Clone(result.BuildTags)
-	result.ImplementationBundles = slices.Clone(result.ImplementationBundles)
+	result.PackageImplementations = slices.Clone(result.PackageImplementations)
+	result.CallableImplementations = slices.Clone(result.CallableImplementations)
 	return result
 }
 func (i Invocation) PrintResolvedConfig() bool { return i.printResolved }
@@ -45,6 +47,12 @@ func ParseArguments(workingDirectory string, arguments []string) (Invocation, er
 	}
 	if len(arguments) == 0 || arguments[0] != "build" {
 		return Invocation{}, commandError("parse arguments", "expected build subcommand")
+	}
+	if removed := removedImplementationFlag(arguments[1:]); removed != "" {
+		return Invocation{}, commandError(
+			"migrate arguments",
+			removed+" was replaced by --package-implementation; callable bodies use --callable-implementation",
+		)
 	}
 	invocation := Invocation{
 		configPath: filepath.Join(absoluteWorkingDirectory, "gotots.json"),
@@ -80,6 +88,16 @@ func ParseArguments(workingDirectory string, arguments []string) (Invocation, er
 	return invocation, nil
 }
 
+func removedImplementationFlag(arguments []string) string {
+	for _, argument := range arguments {
+		name, _, _ := strings.Cut(argument, "=")
+		if name == "--implementation-bundle" || name == "-implementation-bundle" {
+			return name
+		}
+	}
+	return ""
+}
+
 func bindDescriptor(
 	flags *flag.FlagSet,
 	descriptor config.Descriptor,
@@ -97,8 +115,10 @@ func bindDescriptor(
 		flags.Var(newStringValue(&overrides.GOOS), descriptor.Flag(), description)
 	case config.OptionTags:
 		flags.Var(&listValue{target: &overrides.BuildTags, selected: &overrides.BuildTagsSet}, descriptor.Flag(), description)
-	case config.OptionImplementationBundles:
-		flags.Var(&listValue{target: &overrides.ImplementationBundles, selected: &overrides.ImplementationSet}, descriptor.Flag(), description)
+	case config.OptionPackageImplementations:
+		flags.Var(&listValue{target: &overrides.PackageImplementations, selected: &overrides.PackageImplementationsSet}, descriptor.Flag(), description)
+	case config.OptionCallableImplementations:
+		flags.Var(&listValue{target: &overrides.CallableImplementations, selected: &overrides.CallableImplementationsSet}, descriptor.Flag(), description)
 	case config.OptionOutputDirectory:
 		flags.Var(newStringValue(&overrides.OutputDirectory), descriptor.Flag(), description)
 	case config.OptionExternals:

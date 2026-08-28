@@ -27,6 +27,7 @@ const (
 	ProviderInterfaceBridgeSupportPath        = "support/provider-interface-bridges.ts"
 	ProviderStatefulRepresentationSupportPath = "support/provider-stateful-representations.ts"
 	DeferredCallableRegistrySupportPath       = "support/deferred-callables.ts"
+	CallableImplementationRootPath            = "implementations"
 )
 
 func EnvironmentContractPath(
@@ -285,6 +286,20 @@ func ModuleSpecifier(fromSourcePath string, toSourcePath string) (string, error)
 		relative = "./" + relative
 	}
 	return relative, nil
+}
+
+func CallableImplementationPath(selected string) (string, error) {
+	if err := validateSourcePath(selected); err != nil {
+		return "", err
+	}
+	prefix := CallableImplementationRootPath + "/"
+	if !strings.HasPrefix(selected, prefix) || len(selected) == len(prefix) {
+		return "", &PathError{
+			Source: selected,
+			Reason: "callable implementation is outside its owned root",
+		}
+	}
+	return selected, nil
 }
 
 func RuntimeModuleSpecifier(runtimeSourcePath string) (string, error) {

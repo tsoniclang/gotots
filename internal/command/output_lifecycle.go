@@ -2,29 +2,37 @@ package command
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/emit/callableimplementation"
+	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 const (
-	protocolScratchDirectoryName                  = ".gotots-protocol"
-	sourceImplementationProtocolDirectoryName     = "source-implementation-generated"
-	sourceImplementationVerificationDirectoryName = ".gotots-source-implementation-verify"
+	protocolScratchDirectoryName                    = ".gotots-protocol"
+	sourceImplementationProtocolDirectoryName       = "source-implementation-generated"
+	sourceImplementationVerificationDirectoryName   = ".gotots-source-implementation-verify"
+	callableImplementationVerificationDirectoryName = ".gotots-callable-implementation-verify"
 )
 
 type printPlan struct {
-	files                   []printPlanFile
-	protocolDirectory       string
-	sourceImplementation    sourceImplementationPrintPlan
-	hasSourceImplementation bool
-	runtimeManifest         printPlanArtifact
-	hasRuntimeManifest      bool
-	packageDocument         []byte
+	files                     []printPlanFile
+	protocolDirectory         string
+	sourceImplementation      sourceImplementationPrintPlan
+	hasSourceImplementation   bool
+	callableImplementation    callableImplementationPrintPlan
+	hasCallableImplementation bool
+	runtimeManifest           printPlanArtifact
+	hasRuntimeManifest        bool
+	packageDocument           []byte
 }
 
 type compiledPrintPlan struct {
@@ -55,6 +63,47 @@ type sourceImplementationPackage struct {
 	packagePath  string
 	assemblyPath string
 	exports      []string
+}
+
+type callableImplementationPrintPlan struct {
+	sourceProgramDigest string
+	modules             []callableImplementationModule
+	targets             []callableImplementationTarget
+}
+
+type callableImplementationModule struct {
+	sourcePath           string
+	outputPath           string
+	sourceDigest         string
+	exports              []string
+	certificationSources []callableImplementationCertificationSource
+}
+
+type callableImplementationCertificationSource struct {
+	sourcePath   string
+	sourceDigest string
+}
+
+type callableImplementationTargetKind uint8
+
+const (
+	callableImplementationTargetInvalid callableImplementationTargetKind = iota
+	callableImplementationTargetModuleFunction
+	callableImplementationTargetStaticMethod
+)
+
+type callableImplementationTarget struct {
+	sourceIdentity       string
+	sourceSignature      string
+	sourceBodyDigest     string
+	variant              string
+	implementationOutput string
+	implementationExport string
+	generatedOutput      string
+	kind                 callableImplementationTargetKind
+	generatedExport      string
+	className            string
+	memberName           string
 }
 
 type packageDependency struct {
@@ -168,6 +217,86 @@ func stagePrintPlan(
 		}
 		plan.hasSourceImplementation = true
 	}
+	if verification, ok := emission.CallableImplementationPlan(); ok {
+		plan.callableImplementation.sourceProgramDigest =
+			verification.SourceProgramDigest()
+		modules := verification.Modules()
+		plan.callableImplementation.modules = make(
+			[]callableImplementationModule,
+			len(modules),
+		)
+		claims := make(map[string]callableImplementationTarget)
+		for index, module := range modules {
+			callableClaims := module.CallableClaims()
+			certificationSources := module.CertificationSources()
+			exports := make([]string, len(callableClaims))
+			stagedCertificationSources := make(
+				[]callableImplementationCertificationSource,
+				len(certificationSources),
+			)
+			for claimIndex, claim := range callableClaims {
+				exports[claimIndex] = claim.Export
+				claims[claim.SourceIdentity] = callableImplementationTarget{
+					sourceIdentity:       claim.SourceIdentity,
+					sourceSignature:      claim.SourceSignature,
+					sourceBodyDigest:     claim.SourceBodyDigest,
+					variant:              string(claim.Variant),
+					implementationOutput: module.OutputPath(),
+					implementationExport: claim.Export,
+				}
+			}
+			for sourceIndex, source := range certificationSources {
+				stagedCertificationSources[sourceIndex] =
+					callableImplementationCertificationSource{
+						sourcePath: source.SourcePath(), sourceDigest: source.SourceDigest(),
+					}
+			}
+			sort.Strings(exports)
+			plan.callableImplementation.modules[index] = callableImplementationModule{
+				sourcePath: module.SourcePath(), outputPath: module.OutputPath(),
+				sourceDigest: module.SourceDigest(), exports: exports,
+				certificationSources: stagedCertificationSources,
+			}
+		}
+		generatedTargets := verification.Targets()
+		plan.callableImplementation.targets = make(
+			[]callableImplementationTarget,
+			len(generatedTargets),
+		)
+		for index, generated := range generatedTargets {
+			target, ok := claims[generated.SourceIdentity()]
+			if !ok || target.variant != string(generated.Variant()) {
+				return printPlan{}, commandError(
+					"stage callable implementation",
+					"generated target has no exact implementation claim",
+				)
+			}
+			target.generatedOutput = generated.OutputPath()
+			switch generated.Kind() {
+			case callableimplementation.GeneratedTargetModuleFunction:
+				target.kind = callableImplementationTargetModuleFunction
+				target.generatedExport = generated.Export()
+			case callableimplementation.GeneratedTargetStaticMethod:
+				target.kind = callableImplementationTargetStaticMethod
+				target.className = generated.ClassName()
+				target.memberName = generated.MemberName()
+			default:
+				return printPlan{}, commandError(
+					"stage callable implementation",
+					"generated target kind is invalid",
+				)
+			}
+			plan.callableImplementation.targets[index] = target
+			delete(claims, generated.SourceIdentity())
+		}
+		if len(claims) != 0 {
+			return printPlan{}, commandError(
+				"stage callable implementation",
+				"implementation claim was not consumed",
+			)
+		}
+		plan.hasCallableImplementation = true
+	}
 	if runtimePackage, ok := emission.RuntimePackage(); ok {
 		plan.runtimeManifest = printPlanArtifact{
 			outputPath: runtimePackage.ManifestPath(),
@@ -276,6 +405,112 @@ func (p printPlan) validate(outputDirectory string) error {
 		return commandError(
 			"validate print plan",
 			"unselected source-implementation verification survived",
+		)
+	}
+	if p.hasCallableImplementation {
+		if !isSHA256(p.callableImplementation.sourceProgramDigest) ||
+			len(p.callableImplementation.modules) == 0 ||
+			len(p.callableImplementation.targets) == 0 {
+			return commandError(
+				"validate print plan",
+				"callable-implementation verification is incomplete",
+			)
+		}
+		modules := make(map[string]callableImplementationModule)
+		for _, module := range p.callableImplementation.modules {
+			digest, digestErr := hex.DecodeString(module.sourceDigest)
+			_, pathErr := targetoutput.CallableImplementationPath(module.outputPath)
+			if !filepath.IsAbs(module.sourcePath) || pathErr != nil ||
+				digestErr != nil || len(digest) != sha256.Size ||
+				len(module.exports) == 0 || !sort.StringsAreSorted(module.exports) {
+				return commandError(
+					"validate print plan",
+					"callable-implementation module is invalid",
+				)
+			}
+			for exportIndex, export := range module.exports {
+				if export == "" || exportIndex != 0 && module.exports[exportIndex-1] == export {
+					return commandError(
+						"validate print plan",
+						"callable-implementation exports are invalid",
+					)
+				}
+			}
+			previousCertificationPath := ""
+			for _, source := range module.certificationSources {
+				sourceDigest, sourceDigestErr := hex.DecodeString(source.sourceDigest)
+				if !filepath.IsAbs(source.sourcePath) ||
+					filepath.Clean(source.sourcePath) != source.sourcePath ||
+					!strings.HasSuffix(source.sourcePath, ".d.ts") ||
+					source.sourcePath == module.sourcePath ||
+					sourceDigestErr != nil || len(sourceDigest) != sha256.Size ||
+					previousCertificationPath >= source.sourcePath {
+					return commandError(
+						"validate print plan",
+						"callable-implementation certification source is invalid",
+					)
+				}
+				previousCertificationPath = source.sourcePath
+			}
+			if _, duplicate := modules[module.outputPath]; duplicate {
+				return commandError(
+					"validate print plan",
+					"callable-implementation output is duplicated",
+				)
+			}
+			modules[module.outputPath] = module
+		}
+		identities := make(map[string]struct{}, len(p.callableImplementation.targets))
+		usedExports := make(map[string]map[string]struct{}, len(modules))
+		for _, target := range p.callableImplementation.targets {
+			module, moduleOK := modules[target.implementationOutput]
+			_, generatedOK := outputPaths[target.generatedOutput]
+			validTarget := target.sourceIdentity != "" && target.sourceSignature != "" &&
+				isSHA256(target.sourceBodyDigest) &&
+				(target.variant == "source" || target.variant == "kernel") &&
+				target.implementationExport != "" && moduleOK && generatedOK
+			switch target.kind {
+			case callableImplementationTargetModuleFunction:
+				validTarget = validTarget && target.generatedExport != "" &&
+					target.className == "" && target.memberName == ""
+			case callableImplementationTargetStaticMethod:
+				validTarget = validTarget && target.generatedExport == "" &&
+					target.className != "" && target.memberName != ""
+			default:
+				validTarget = false
+			}
+			if !validTarget || !slices.Contains(module.exports, target.implementationExport) {
+				return commandError(
+					"validate print plan",
+					"callable-implementation target is invalid",
+				)
+			}
+			if _, duplicate := identities[target.sourceIdentity]; duplicate {
+				return commandError(
+					"validate print plan",
+					"callable-implementation target is duplicated",
+				)
+			}
+			identities[target.sourceIdentity] = struct{}{}
+			if usedExports[module.outputPath] == nil {
+				usedExports[module.outputPath] = make(map[string]struct{})
+			}
+			usedExports[module.outputPath][target.implementationExport] = struct{}{}
+		}
+		for outputPath, module := range modules {
+			if len(usedExports[outputPath]) != len(module.exports) {
+				return commandError(
+					"validate print plan",
+					"callable-implementation export was not consumed exactly once",
+				)
+			}
+		}
+	} else if p.callableImplementation.sourceProgramDigest != "" ||
+		len(p.callableImplementation.modules) != 0 ||
+		len(p.callableImplementation.targets) != 0 {
+		return commandError(
+			"validate print plan",
+			"unselected callable-implementation verification survived",
 		)
 	}
 	if len(p.packageDocument) == 0 {

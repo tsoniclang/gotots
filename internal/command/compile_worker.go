@@ -18,20 +18,21 @@ import (
 )
 
 const (
-	compileWorkerCommand       = "__gotots_compile_worker_v2"
+	compileWorkerCommand       = "__gotots_compile_worker_v5"
 	compileWorkerDirectoryName = ".gotots-compile-worker"
-	compileWorkerSchemaVersion = 2
+	compileWorkerSchemaVersion = 5
 	compileWorkerLogLimit      = 64 * 1024
 )
 
 type compileWorkerDocument struct {
-	SchemaVersion        int                                `json:"schemaVersion"`
-	WorkerPID            int                                `json:"workerPid"`
-	SemanticDigest       string                             `json:"semanticDigest"`
-	Files                []compileWorkerFile                `json:"files"`
-	RuntimeManifest      *compileWorkerArtifact             `json:"runtimeManifest"`
-	SourceImplementation *compileWorkerSourceImplementation `json:"sourceImplementation,omitempty"`
-	PackageDocument      string                             `json:"packageDocument"`
+	SchemaVersion          int                                  `json:"schemaVersion"`
+	WorkerPID              int                                  `json:"workerPid"`
+	SemanticDigest         string                               `json:"semanticDigest"`
+	Files                  []compileWorkerFile                  `json:"files"`
+	RuntimeManifest        *compileWorkerArtifact               `json:"runtimeManifest"`
+	SourceImplementation   *compileWorkerSourceImplementation   `json:"sourceImplementation,omitempty"`
+	CallableImplementation *compileWorkerCallableImplementation `json:"callableImplementation,omitempty"`
+	PackageDocument        string                               `json:"packageDocument"`
 }
 
 type compileWorkerFile struct {
@@ -53,6 +54,39 @@ type compileWorkerSourceImplementationPackage struct {
 	PackagePath  string   `json:"packagePath"`
 	AssemblyPath string   `json:"assemblyPath"`
 	Exports      []string `json:"exports"`
+}
+
+type compileWorkerCallableImplementation struct {
+	SourceProgramDigest string                                      `json:"sourceProgramDigest"`
+	Modules             []compileWorkerCallableImplementationModule `json:"modules"`
+	Targets             []compileWorkerCallableImplementationTarget `json:"targets"`
+}
+
+type compileWorkerCallableImplementationModule struct {
+	SourcePath           string                                      `json:"sourcePath"`
+	OutputPath           string                                      `json:"outputPath"`
+	SourceDigest         string                                      `json:"sourceDigest"`
+	Exports              []string                                    `json:"exports"`
+	CertificationSources []compileWorkerCallableImplementationSource `json:"certificationSources,omitempty"`
+}
+
+type compileWorkerCallableImplementationSource struct {
+	SourcePath   string `json:"sourcePath"`
+	SourceDigest string `json:"sourceDigest"`
+}
+
+type compileWorkerCallableImplementationTarget struct {
+	SourceIdentity       string `json:"sourceIdentity"`
+	SourceSignature      string `json:"sourceSignature"`
+	SourceBodyDigest     string `json:"sourceBodyDigest"`
+	Variant              string `json:"variant"`
+	ImplementationOutput string `json:"implementationOutput"`
+	ImplementationExport string `json:"implementationExport"`
+	GeneratedOutput      string `json:"generatedOutput"`
+	Kind                 uint8  `json:"kind"`
+	GeneratedExport      string `json:"generatedExport,omitempty"`
+	ClassName            string `json:"className,omitempty"`
+	MemberName           string `json:"memberName,omitempty"`
 }
 
 func prepareBuildInWorker(
@@ -257,6 +291,50 @@ func readCompileWorkerDocument(
 		}
 		plan.hasSourceImplementation = true
 	}
+	if document.CallableImplementation != nil {
+		plan.callableImplementation.sourceProgramDigest =
+			document.CallableImplementation.SourceProgramDigest
+		plan.callableImplementation.modules = make(
+			[]callableImplementationModule,
+			len(document.CallableImplementation.Modules),
+		)
+		for index, module := range document.CallableImplementation.Modules {
+			certificationSources := make(
+				[]callableImplementationCertificationSource,
+				len(module.CertificationSources),
+			)
+			for sourceIndex, source := range module.CertificationSources {
+				certificationSources[sourceIndex] = callableImplementationCertificationSource{
+					sourcePath: source.SourcePath, sourceDigest: source.SourceDigest,
+				}
+			}
+			plan.callableImplementation.modules[index] = callableImplementationModule{
+				sourcePath: module.SourcePath, outputPath: module.OutputPath,
+				sourceDigest: module.SourceDigest, exports: slices.Clone(module.Exports),
+				certificationSources: certificationSources,
+			}
+		}
+		plan.callableImplementation.targets = make(
+			[]callableImplementationTarget,
+			len(document.CallableImplementation.Targets),
+		)
+		for index, target := range document.CallableImplementation.Targets {
+			plan.callableImplementation.targets[index] = callableImplementationTarget{
+				sourceIdentity:       target.SourceIdentity,
+				sourceSignature:      target.SourceSignature,
+				sourceBodyDigest:     target.SourceBodyDigest,
+				variant:              target.Variant,
+				implementationOutput: target.ImplementationOutput,
+				implementationExport: target.ImplementationExport,
+				generatedOutput:      target.GeneratedOutput,
+				kind:                 callableImplementationTargetKind(target.Kind),
+				generatedExport:      target.GeneratedExport,
+				className:            target.ClassName,
+				memberName:           target.MemberName,
+			}
+		}
+		plan.hasCallableImplementation = true
+	}
 	if err := plan.validate(outputDirectory); err != nil {
 		return decodedCompileWorkerDocument{}, err
 	}
@@ -313,6 +391,52 @@ func encodeCompileWorkerDocument(
 				AssemblyPath: selected.assemblyPath,
 				Exports:      slices.Clone(selected.exports),
 			}
+		}
+	}
+	if plan.hasCallableImplementation {
+		document.CallableImplementation = &compileWorkerCallableImplementation{
+			SourceProgramDigest: plan.callableImplementation.sourceProgramDigest,
+			Modules: make(
+				[]compileWorkerCallableImplementationModule,
+				len(plan.callableImplementation.modules),
+			),
+			Targets: make(
+				[]compileWorkerCallableImplementationTarget,
+				len(plan.callableImplementation.targets),
+			),
+		}
+		for index, module := range plan.callableImplementation.modules {
+			certificationSources := make(
+				[]compileWorkerCallableImplementationSource,
+				len(module.certificationSources),
+			)
+			for sourceIndex, source := range module.certificationSources {
+				certificationSources[sourceIndex] = compileWorkerCallableImplementationSource{
+					SourcePath: source.sourcePath, SourceDigest: source.sourceDigest,
+				}
+			}
+			document.CallableImplementation.Modules[index] =
+				compileWorkerCallableImplementationModule{
+					SourcePath: module.sourcePath, OutputPath: module.outputPath,
+					SourceDigest: module.sourceDigest, Exports: slices.Clone(module.exports),
+					CertificationSources: certificationSources,
+				}
+		}
+		for index, target := range plan.callableImplementation.targets {
+			document.CallableImplementation.Targets[index] =
+				compileWorkerCallableImplementationTarget{
+					SourceIdentity:       target.sourceIdentity,
+					SourceSignature:      target.sourceSignature,
+					SourceBodyDigest:     target.sourceBodyDigest,
+					Variant:              target.variant,
+					ImplementationOutput: target.implementationOutput,
+					ImplementationExport: target.implementationExport,
+					GeneratedOutput:      target.generatedOutput,
+					Kind:                 uint8(target.kind),
+					GeneratedExport:      target.generatedExport,
+					ClassName:            target.className,
+					MemberName:           target.memberName,
+				}
 		}
 	}
 	payload, err := json.Marshal(document)

@@ -12,6 +12,15 @@ func (source projectSourceEvidence) directChildren(parent uint32) []uint32 {
 	return children
 }
 
+func (source projectSourceEvidence) firstChild(parent uint32) uint32 {
+	for index := uint32(1); index < uint32(len(source.nodes)); index++ {
+		if source.nodes[index].parent == parent {
+			return index
+		}
+	}
+	return 0
+}
+
 func (source projectSourceEvidence) node(
 	index uint32,
 	kind uint32,

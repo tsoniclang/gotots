@@ -56,6 +56,8 @@ rerun the checker.
 | target declaration and later revisions | one declaration assembly keyed by exact Go identity |
 | imports, placement, sealing, and printing | root emitter |
 | callable ABI and execution | the callable owner, with one direct synchronous contract |
+| selected source-program snapshot | `internal/load`, derived once from selected source, module, file-version, non-Go/embed, and build-profile evidence |
+| project-selected source-callable body | certified callable-implementation contract exact-joined to the load-owned source snapshot, canonical Go declaration, and generated target callable |
 | panic carrier and deferred recovery entry | `runtime/panic.ts` plus the callable's private deferred entry |
 | provider boundary meaning of selected Go types | `internal/contracts/gostdlib/sourcecontract` |
 | immutable provider certificate documents | `internal/contracts/gostdlib` |
@@ -1571,12 +1573,13 @@ Relative source, implementation, output, and report paths resolve from the
 configuration file's directory. Resolution order is typed defaults, project
 file, then explicit CLI values. Unknown fields, versions, identities, and
 conflicting owners fail.
-Implementation bundles may live in the consuming project, a sibling checkout,
+Implementation contracts may live in the consuming project, a sibling checkout,
 or any explicitly selected absolute location. Their location conveys no
 semantic ownership: each contract owns source paths relative to its own
 directory and is selected only by canonical package, module/version, build,
-and compilation evidence. Repeated `--implementation-bundle` values replace
-the configured bundle set as one deterministic CLI override.
+and compilation evidence. Repeated `--package-implementation` or
+`--callable-implementation` values replace their respective configured sets as
+two deterministic CLI overrides.
 
 The resolved project is split before compilation into immutable loader,
 compilation, implementation, and output contracts. Emitters receive only the
@@ -1637,16 +1640,116 @@ Real path/name collisions add the shortest deterministic source-derived
 qualifier. This layout uses no runtime registry, dynamic import, bundler
 dependency, erased lookup, digest-sharded fallback, or hash-named support path.
 
-Schema version 2 has the closed top-level sections `distribution`, `source`,
+Schema version 3 has the closed top-level sections `distribution`, `source`,
 `go`, `semantics`, `providers`, `implementations`, `output`, and `tools`.
 `distribution.root` identifies the installed GoToTS distribution that owns the
 default pinned TS-Go module context and checked providers; it is operational
 path evidence and is excluded from semantic identity. `tools.go`,
 `tools.tsgo`, and `tools.cache` select the operational tools and cache root.
 `source` selects one package pattern and root mode.
-`implementations.bundles` contains exact package-contract paths. Every field
-except `schemaVersion` has one registered CLI counterpart, including
-repeatable `--tag` and `--implementation-bundle` flags.
+`implementations.packages` contains exact package-contract paths and
+`implementations.callables` contains exact callable-body-contract paths. Every
+field except `schemaVersion` has one registered CLI counterpart, including
+repeatable `--tag`, `--package-implementation`, and
+`--callable-implementation` flags. The two implementation classes are never
+inferred from a document's spelling or filesystem location.
+
+Schema 3 is a one-way replacement of schema 2. The removed
+`implementations.bundles` field and `--implementation-bundle` flag have no
+alias, compatibility decoder, or automatic rewrite. A schema-2 document or
+removed spelling fails at configuration ownership with a migration diagnostic;
+only `implementations.packages`, `implementations.callables`,
+`--package-implementation`, and `--callable-implementation` are current.
+
+The loader owns one immutable selected-source snapshot before emission starts.
+Its canonical digest covers every translated source package's stable package
+and module identity, selected Go syntax, checker-selected effective per-file Go
+version, selected non-Go source bytes, selected embedded-file bytes, and the
+explicit build profile. Inputs are ordered by stable logical identity; checkout,
+module-cache, and temporary paths are not identity. Provider and toolchain
+contracts retain their existing independent fingerprints. The command layer
+consumes the loader digest for output identity and never rereads source or
+constructs a second approximation.
+
+A certified source-callable implementation replaces only the executable body
+of one exact source declaration. Its contract joins the load-owned selected
+source-program digest, module/package/version, build and compilation profiles,
+canonical Go declaration identity, stable Go signature, the SHA-256 digest of
+the canonically formatted selected Go body, selected generated variant,
+authored module/export, authored source digest, and equivalence envelope. Any
+selected semantic-source change therefore fails the post-load join and
+requires the manual equivalence proof to be renewed. The declaration body
+digest remains localized diagnostic evidence; it is not complete freshness
+evidence. The source-contract layer owns canonical body formatting and hashing;
+emission consumes that digest and never imports a Go formatter. The generated
+declaration remains the sole
+source-facing owner: its name, generic shape, parameters, result, placement,
+exports, callers, state, and initialization are unchanged. Its body contains
+one static import and direct call to the authored export; the translated Go
+body is absent. The final staged TypeScript project independently exact-joins
+the checked generated callable and checked authored export before either can
+be printed. The join compares generic arity, parameter cardinality and checked
+parameter/result types; local TypeScript parameter names are implementation
+detail at every nested callable depth and are not ABI evidence. The semantic
+join requires bidirectional checked assignability after exact generic arity and
+parameter cardinality checks.
+
+An authored callable module is a body provider, not an independent
+initialization channel. Its source-file scope admits only bound imports,
+interface declarations, type-alias declarations, and function declarations,
+including private helper functions. Side-effect-only imports, executable
+top-level statements or
+declarations, unchecked `as` or angle-bracket assertions, non-null assertions,
+TypeScript diagnostic-suppression directives, and explicit or inferred
+semantic `any`/`unknown` fail in the one staged TS-Go project before the ABI
+join. The inspection uses checked AST/type evidence, returns closed violation
+kinds, and does not reparse, recheck, classify semantic meaning by spelling, or
+patch text. Its closed checked denominator includes value expressions and type
+nodes plus their union/intersection/template members, alias and reference type
+arguments, index types, and callable parameter, result, and constructor
+signatures for callable values that are stored, passed, or returned; a function
+value cannot hide a dynamic result. At a direct invocation (call,
+construction, or tagged template), the callee value, each authored argument,
+and the selected result are checked independently. An unused broad formal
+parameter on an ambient overload is not authored dynamic transport.
+Diagnostic-suppression lexemes are the single lexical denial: they
+are read from the exact immutable source text embedded in TS-Go's official AST
+evidence, never from a filesystem reread. Their presence anywhere in an
+authored contract is outside the admitted source envelope.
+
+An authored callable module may name sorted, contract-owned `.d.ts`
+certification sources needed only to typecheck its imports. Preparation hashes
+those declaration snapshots into the callable contract; their absolute paths
+and digests cross the compile-worker boundary as sealed evidence. Staged
+verification rechecks each digest and materializes one deterministic,
+content-deduplicated copy in verification scratch. Certification declarations
+never become generated output, runtime dependencies, or an alternate semantic
+owner. Missing, changed, executable, escaping, or unsealed sources fail before
+printing.
+
+The initial callable contract admits only ordinary synchronous variants that
+emit as module functions or static class methods, plus explicit generic
+kernel variants. A declaration may be visited through more than one internal
+representation. Before body replacement, the callable owner settles the
+contract-selected private target ABI once and reuses that decision across
+artifact reconstruction; a kernel selection requires a genuinely generic Go
+declaration. Removing the translated body therefore cannot flip source versus
+kernel ABI. Generated callers and the staged exact type join certify the
+selected private ABI while the source-facing declaration remains unchanged.
+For a generic replacement, the ordinary Go body is walked once to retain only
+its declaration-requirement requests; every translated statement and
+non-declaration request is discarded. This preserves canonical operation,
+representation, concretization, and caller coordination without retaining a
+second executable body. A source-variant contract cannot suppress a kernel ABI
+required by those retained source facts.
+The final exact-consumption gate rejects an absent or second selected target. Instance
+value-receiver bodies and recovery-aware deferred
+entries remain unsupported until their private implementation ABI is specified
+and certified; they never fall back to a dynamic adapter. A package selected
+for atomic replacement cannot also own a callable-body replacement. Every
+configured callable must be consumed exactly once, every authored module must
+export exactly its declared implementation set, and target paths must be
+disjoint from generated and package-implementation paths.
 
 A certified source implementation owns one exact source package's final target
 module set. GoToTS certification joins canonical Go module, package, version,

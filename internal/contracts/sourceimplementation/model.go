@@ -4,23 +4,20 @@ import (
 	"fmt"
 	"slices"
 
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 const SchemaVersion = 2
 
-type EnvelopeKind string
+type EnvelopeKind = implementationcontract.EnvelopeKind
 
 const (
-	EnvelopeInvalid           EnvelopeKind = ""
-	EnvelopeExact             EnvelopeKind = "exact"
-	EnvelopeInternalAlgorithm EnvelopeKind = "internal-algorithm"
+	EnvelopeInvalid           = implementationcontract.EnvelopeInvalid
+	EnvelopeExact             = implementationcontract.EnvelopeExact
+	EnvelopeInternalAlgorithm = implementationcontract.EnvelopeInternalAlgorithm
 )
-
-func (k EnvelopeKind) Valid() bool {
-	return k == EnvelopeExact || k == EnvelopeInternalAlgorithm
-}
 
 type Document struct {
 	SchemaVersion        int                     `json:"schemaVersion"`
@@ -64,12 +61,7 @@ type PrivateModuleDocument struct {
 	Exports []string `json:"exports"`
 }
 
-type EnvelopeDocument struct {
-	Kind                 EnvelopeKind `json:"kind"`
-	RelaxedBehavior      string       `json:"relaxedBehavior,omitempty"`
-	PreservedObservables []string     `json:"preservedObservables,omitempty"`
-	Evidence             []string     `json:"evidence,omitempty"`
-}
+type EnvelopeDocument = implementationcontract.Envelope
 
 type Export struct {
 	name        string

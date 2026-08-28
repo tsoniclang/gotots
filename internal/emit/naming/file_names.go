@@ -14,27 +14,28 @@ import (
 )
 
 type File struct {
-	owner           *Owner
-	sourceFile      *ast.File
-	packageScope    *types.Scope
-	factory         tsgo.Factory
-	targetPath      string
-	observer        EnvironmentObserver
-	temporaries     map[api.TemporaryKind]uint64
-	generatedNames  map[string]struct{}
-	importNames     map[string]struct{}
-	importAliases   map[types.Object]string
-	derivedImports  map[string]string
-	artifactImports map[generatedArtifactImport]string
-	projections     map[constantProjectionImport]string
-	primitives      map[api.PrimitiveAlias]string
-	tsonicCore      map[tsoniccore.Symbol]string
-	runtime         map[api.RuntimeSymbol]string
-	providerImports map[string]providerImport
-	artifactOwner   api.ArtifactOwner
-	artifactSource  ast.Node
-	artifactFile    *ast.File
-	artifactPath    string
+	owner                   *Owner
+	sourceFile              *ast.File
+	packageScope            *types.Scope
+	factory                 tsgo.Factory
+	targetPath              string
+	observer                EnvironmentObserver
+	temporaries             map[api.TemporaryKind]uint64
+	generatedNames          map[string]struct{}
+	importNames             map[string]struct{}
+	importAliases           map[types.Object]string
+	derivedImports          map[string]string
+	artifactImports         map[generatedArtifactImport]string
+	projections             map[constantProjectionImport]string
+	primitives              map[api.PrimitiveAlias]string
+	tsonicCore              map[tsoniccore.Symbol]string
+	runtime                 map[api.RuntimeSymbol]string
+	providerImports         map[string]providerImport
+	callableImplementations map[string]string
+	artifactOwner           api.ArtifactOwner
+	artifactSource          ast.Node
+	artifactFile            *ast.File
+	artifactPath            string
 }
 
 func (n *File) sourceReferencePath(
@@ -82,24 +83,70 @@ func (n *Owner) ForFile(
 		}
 	}
 	return &File{
-		owner:           n,
-		sourceFile:      sourceFile,
-		packageScope:    packageScope,
-		factory:         factory,
-		targetPath:      targetPath,
-		observer:        observer,
-		temporaries:     make(map[api.TemporaryKind]uint64),
-		generatedNames:  make(map[string]struct{}),
-		importNames:     make(map[string]struct{}),
-		importAliases:   make(map[types.Object]string),
-		derivedImports:  make(map[string]string),
-		artifactImports: make(map[generatedArtifactImport]string),
-		projections:     make(map[constantProjectionImport]string),
-		primitives:      make(map[api.PrimitiveAlias]string),
-		tsonicCore:      make(map[tsoniccore.Symbol]string),
-		runtime:         make(map[api.RuntimeSymbol]string),
-		providerImports: make(map[string]providerImport),
+		owner:                   n,
+		sourceFile:              sourceFile,
+		packageScope:            packageScope,
+		factory:                 factory,
+		targetPath:              targetPath,
+		observer:                observer,
+		temporaries:             make(map[api.TemporaryKind]uint64),
+		generatedNames:          make(map[string]struct{}),
+		importNames:             make(map[string]struct{}),
+		importAliases:           make(map[types.Object]string),
+		derivedImports:          make(map[string]string),
+		artifactImports:         make(map[generatedArtifactImport]string),
+		projections:             make(map[constantProjectionImport]string),
+		primitives:              make(map[api.PrimitiveAlias]string),
+		tsonicCore:              make(map[tsoniccore.Symbol]string),
+		runtime:                 make(map[api.RuntimeSymbol]string),
+		providerImports:         make(map[string]providerImport),
+		callableImplementations: make(map[string]string),
 	}, nil
+}
+
+func (n *File) TargetModulePath() string {
+	return n.targetPath
+}
+
+func (n *File) CallableImplementation(
+	targetPath string,
+	exportedName string,
+) (api.NameReference, error) {
+	if targetPath == "" || exportedName == "" || targetPath == n.targetPath {
+		return api.NameReference{}, &api.NameError{
+			Name:   exportedName,
+			Reason: "callable implementation import identity is invalid",
+		}
+	}
+	modulePath, err := output.ModuleSpecifier(n.targetPath, targetPath)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	key := modulePath + "\x00" + exportedName
+	localName := n.callableImplementations[key]
+	if localName == "" {
+		localName = exportedName
+		if n.lexicalNameExists(localName) {
+			localName = n.allocateImportName(
+				exportedName,
+				"implementation",
+			)
+		} else {
+			n.importNames[localName] = struct{}{}
+		}
+		n.callableImplementations[key] = localName
+	}
+	request, err := api.NewImportRequest(
+		n.factory,
+		api.ImportPhaseValue,
+		modulePath,
+		exportedName,
+		localName,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return api.NewNameReference(localName, request)
 }
 
 func (n *File) Declare(object types.Object) (string, error) {

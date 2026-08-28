@@ -10,6 +10,7 @@ import (
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/emit/callableimplementation"
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
@@ -42,7 +43,7 @@ func Build(ctx context.Context, project config.Project) (Report, error) {
 				return 0, prepareErr
 			}
 			semanticDigest = digest
-			verified, verifyErr := verifySourceImplementationContracts(
+			verified, verifyErr := verifyImplementationContracts(
 				project,
 				compiled,
 				outputDirectory,
@@ -84,6 +85,10 @@ func prepareBuild(
 	if err != nil {
 		return printPlan{}, "", err
 	}
+	preparedCallables, err := prepareCallableImplementations(project)
+	if err != nil {
+		return printPlan{}, "", err
+	}
 	standardLibrary, externalProvider, err := certifyProviders(project)
 	if err != nil {
 		return printPlan{}, "", err
@@ -115,18 +120,25 @@ func prepareBuild(
 		return printPlan{}, "", err
 	}
 	options.SourceImplementations = sourceImplementations
+	callableImplementations, err := joinCallableImplementations(
+		preparedCallables,
+		program,
+	)
+	if err != nil {
+		return printPlan{}, "", err
+	}
+	options.CallableImplementations = callableImplementations
 
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {
 		return printPlan{}, "", err
 	}
-	sourceDigest, err := programDigest(program)
-	if err != nil {
-		return printPlan{}, "", err
-	}
-	evidence := config.EvidenceDigests{Source: sourceDigest}
+	evidence := config.EvidenceDigests{Source: program.SourceDigest()}
 	if sourceImplementations != nil {
-		evidence.SourceImplementations = sourceImplementations.Digest()
+		evidence.PackageImplementations = sourceImplementations.Digest()
+	}
+	if callableImplementations != nil {
+		evidence.CallableImplementations = callableImplementations.Digest()
 	}
 	if standardLibrary != nil {
 		evidence.StandardLibrary = standardLibrary.ManifestDigest()
@@ -145,16 +157,33 @@ func prepareBuild(
 	return plan, semanticDigest, nil
 }
 
+func prepareCallableImplementations(
+	project config.Project,
+) (*callableimplementation.Prepared, error) {
+	contracts := project.CallableImplementations()
+	if len(contracts) == 0 {
+		return nil, nil
+	}
+	return callableimplementation.PrepareAll(callableimplementation.Config{
+		ContractPaths: contracts,
+		BuildProfile:  project.BuildProfile(),
+		Compilation: callableimplementation.CompilationDocument{
+			Integers:        project.IntegerRepresentation().String(),
+			EvaluationOrder: project.EvaluationOrder().String(),
+		},
+	})
+}
+
 func prepareSourceImplementations(
 	project config.Project,
 ) (*sourceimplementation.Prepared, error) {
-	bundles := project.ImplementationBundles()
-	if len(bundles) == 0 {
+	contracts := project.PackageImplementations()
+	if len(contracts) == 0 {
 		return nil, nil
 	}
 	return sourceimplementation.PrepareAll(sourceimplementation.Config{
 		RepositoryRoot: project.DistributionRoot(),
-		ContractPaths:  bundles,
+		ContractPaths:  contracts,
 		BuildProfile:   project.BuildProfile(),
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers:        project.IntegerRepresentation().String(),
@@ -173,6 +202,16 @@ func joinSourceImplementations(
 	prepared *sourceimplementation.Prepared,
 	program *load.Program,
 ) (*sourceimplementation.Certificate, error) {
+	if prepared == nil {
+		return nil, nil
+	}
+	return prepared.Join(program)
+}
+
+func joinCallableImplementations(
+	prepared *callableimplementation.Prepared,
+	program *load.Program,
+) (*callableimplementation.Certificate, error) {
 	if prepared == nil {
 		return nil, nil
 	}

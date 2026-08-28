@@ -212,6 +212,7 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 		WithDeclarationDemandResolver(e.declarationDemands).
 		WithRecoveryCallableResolver(e.recovery).
 		WithExternalFunctionResolver(e.external).
+		WithCallableImplementationResolver(e.callableImplementations).
 		WithGoRuntimeContract(e.goRuntime)
 	if e.implementationContract {
 		context = context.WithSourceImplementationContract()

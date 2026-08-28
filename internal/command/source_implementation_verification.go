@@ -7,7 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 )
 
-func verifySourceImplementationContracts(
+func verifyImplementationContracts(
 	project config.Project,
 	compiled compiledPrintPlan,
 	outputDirectory string,
@@ -16,18 +16,44 @@ func verifySourceImplementationContracts(
 	if err := plan.validate(outputDirectory); err != nil {
 		return verifiedPrintPlan{}, err
 	}
+	if err := verifySourceImplementationContracts(
+		project,
+		plan,
+		outputDirectory,
+	); err != nil {
+		return verifiedPrintPlan{}, err
+	}
+	plan, err := verifyCallableImplementationContracts(
+		project,
+		plan,
+		outputDirectory,
+	)
+	if err != nil {
+		return verifiedPrintPlan{}, err
+	}
+	if err := plan.validate(outputDirectory); err != nil {
+		return verifiedPrintPlan{}, err
+	}
+	return verifiedPrintPlan{plan: plan}, nil
+}
+
+func verifySourceImplementationContracts(
+	project config.Project,
+	plan printPlan,
+	outputDirectory string,
+) error {
 	if !plan.hasSourceImplementation {
-		return verifiedPrintPlan{plan: plan}, nil
+		return nil
 	}
 	generated, err := stagedSourceImplementationTargets(
 		plan.sourceImplementation.generated,
 	)
 	if err != nil {
-		return verifiedPrintPlan{}, err
+		return err
 	}
 	installed, err := stagedSourceImplementationTargets(plan.files)
 	if err != nil {
-		return verifiedPrintPlan{}, err
+		return err
 	}
 	packages := make(
 		[]sourceimplementation.ContractPackage,
@@ -40,7 +66,7 @@ func verifySourceImplementationContracts(
 			selected.exports,
 		)
 		if err != nil {
-			return verifiedPrintPlan{}, err
+			return err
 		}
 	}
 	if err := sourceimplementation.VerifyStagedGeneratedContracts(
@@ -56,9 +82,9 @@ func verifySourceImplementationContracts(
 			Packages:  packages,
 		},
 	); err != nil {
-		return verifiedPrintPlan{}, err
+		return err
 	}
-	return verifiedPrintPlan{plan: plan}, nil
+	return nil
 }
 
 func stagedSourceImplementationTargets(

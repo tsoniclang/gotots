@@ -367,6 +367,7 @@ func (s *programSession) requireEnvironmentPackage(
 		s,
 		s,
 		s,
+		s,
 		s.goRuntime,
 		false,
 	)
