@@ -259,20 +259,38 @@ func (p *ProjectInspection) sourceDynamicTypeFlags(
 	source projectSourceEvidence,
 ) (uint32, error) {
 	const batchSize = 512
-	locations := make([]string, 0, len(source.nodes))
+	type dynamicTypeLocation struct {
+		handle                    string
+		inspectCallableSignatures bool
+	}
+	locations := make([]dynamicTypeLocation, 0, len(source.nodes))
 	for index := 1; index < len(source.nodes); index++ {
 		if !source.callableDynamicTypeLocation(index) {
 			continue
 		}
 		locations = append(
 			locations,
-			projectNodeHandle(path, uint32(index), source.nodes[index].kind),
+			dynamicTypeLocation{
+				handle: projectNodeHandle(
+					path,
+					uint32(index),
+					source.nodes[index].kind,
+				),
+				inspectCallableSignatures: !source.directInvocationReference(index),
+			},
 		)
 	}
-	seen := make(map[uint32]struct{})
+	seen := [2]map[uint32]struct{}{
+		make(map[uint32]struct{}),
+		make(map[uint32]struct{}),
+	}
 	var result uint32
 	for start := 0; start < len(locations); start += batchSize {
 		end := min(start+batchSize, len(locations))
+		handles := make([]string, end-start)
+		for offset, location := range locations[start:end] {
+			handles[offset] = location.handle
+		}
 		var types []*typeResponse
 		if err := requestProjectJSON(
 			p.client,
@@ -280,7 +298,7 @@ func (p *ProjectInspection) sourceDynamicTypeFlags(
 			getTypesAtLocationsParams{
 				Snapshot:  p.snapshot,
 				Project:   p.project,
-				Locations: locations[start:end],
+				Locations: handles,
 			},
 			&types,
 		); err != nil {
@@ -293,11 +311,20 @@ func (p *ProjectInspection) sourceDynamicTypeFlags(
 				Reason:    "checker type denominator differs",
 			}
 		}
-		for _, selected := range types {
+		for offset, selected := range types {
 			if selected == nil || selected.ID == 0 {
 				continue
 			}
-			flags, err := p.dynamicTypeFlags(*selected, seen)
+			inspectCallableSignatures := locations[start+offset].inspectCallableSignatures
+			seenIndex := 0
+			if inspectCallableSignatures {
+				seenIndex = 1
+			}
+			flags, err := p.dynamicTypeFlags(
+				*selected,
+				seen[seenIndex],
+				inspectCallableSignatures,
+			)
 			if err != nil {
 				return 0, err
 			}
@@ -305,6 +332,37 @@ func (p *ProjectInspection) sourceDynamicTypeFlags(
 		}
 	}
 	return result, nil
+}
+
+func (source projectSourceEvidence) directInvocationReference(index int) bool {
+	current := uint32(index)
+	for current != 0 {
+		parent := source.nodes[current].parent
+		if parent == 0 || parent >= uint32(len(source.nodes)) {
+			return false
+		}
+		switch SyntaxKind(source.nodes[parent].kind) {
+		case SyntaxKindCallExpression,
+			SyntaxKindNewExpression,
+			SyntaxKindTaggedTemplateExpression:
+			return source.firstChild(parent) == current
+		case SyntaxKindPropertyAccessExpression:
+			current = parent
+		case SyntaxKindElementAccessExpression:
+			if source.firstChild(parent) != current {
+				return false
+			}
+			current = parent
+		case SyntaxKindParenthesizedExpression, SyntaxKindSatisfiesExpression:
+			if source.firstChild(parent) != current {
+				return false
+			}
+			current = parent
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 func (source projectSourceEvidence) callableDynamicTypeLocation(index int) bool {
@@ -340,6 +398,7 @@ func (source projectSourceEvidence) callableDynamicTypeLocation(index int) bool 
 func (p *ProjectInspection) dynamicTypeFlags(
 	selected typeResponse,
 	seen map[uint32]struct{},
+	inspectCallableSignatures bool,
 ) (uint32, error) {
 	result := selected.Flags & (typeFlagAny | typeFlagUnknown)
 	if selected.ID == 0 {
@@ -416,12 +475,14 @@ func (p *ProjectInspection) dynamicTypeFlags(
 		}
 		nested = append(nested, arguments...)
 	}
-	if selected.Flags&typeFlagObject != 0 {
+	if selected.Flags&typeFlagObject != 0 && inspectCallableSignatures {
 		callableTypes, err := p.dynamicCallableTypes(selected.ID)
 		if err != nil {
 			return 0, err
 		}
 		nested = append(nested, callableTypes...)
+	}
+	if selected.Flags&typeFlagObject != 0 {
 		indexTypes, err := p.dynamicIndexTypes(selected.ID)
 		if err != nil {
 			return 0, err
@@ -429,7 +490,7 @@ func (p *ProjectInspection) dynamicTypeFlags(
 		nested = append(nested, indexTypes...)
 	}
 	for _, child := range nested {
-		flags, err := p.dynamicTypeFlags(child, seen)
+		flags, err := p.dynamicTypeFlags(child, seen, inspectCallableSignatures)
 		if err != nil {
 			return 0, err
 		}

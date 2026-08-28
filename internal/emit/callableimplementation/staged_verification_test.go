@@ -203,6 +203,12 @@ func TestStagedVerificationRejectsEveryAuthoredSourceEscape(t *testing.T) {
 			violation: "inferred-any",
 		},
 		{
+			name: "direct broad call inferred any argument",
+			source: "export function addFast(value: number): number {\n" +
+				"  return globalThis.Number(JSON.parse(String(value)));\n}\n",
+			violation: "inferred-any",
+		},
+		{
 			name: "nested inferred any",
 			source: "type Dynamic = ReturnType<typeof JSON.parse>;\n" +
 				"export function addFast(values: Dynamic[]): number { return values.length; }\n",

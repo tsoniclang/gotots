@@ -1707,7 +1707,11 @@ kinds, and does not reparse, recheck, classify semantic meaning by spelling, or
 patch text. Its closed checked denominator includes value expressions and type
 nodes plus their union/intersection/template members, alias and reference type
 arguments, index types, and callable parameter, result, and constructor
-signatures; a function value cannot hide a dynamic result.
+signatures for callable values that are stored, passed, or returned; a function
+value cannot hide a dynamic result. At a direct invocation (call,
+construction, or tagged template), the callee value, each authored argument,
+and the selected result are checked independently. An unused broad formal
+parameter on an ambient overload is not authored dynamic transport.
 Diagnostic-suppression lexemes are the single lexical denial: they
 are read from the exact immutable source text embedded in TS-Go's official AST
 evidence, never from a filesystem reread. Their presence anywhere in an

@@ -1319,8 +1319,11 @@ assertion, non-null assertion, `@ts-ignore`, `@ts-nocheck`, or
 `@ts-expect-error`, explicit `any`/`unknown`, or checker-inferred semantic
 `any`/`unknown`, including a function-valued reference whose result is inferred
 as `any`. Each fails with its exact closed staged-source violation before
-the ABI join. Further mutations alter canonical Go identity or signature,
-select the wrong ordinary/kernel variant, change one checked
+the ABI join. A positive control directly invokes an ambient callable whose
+unused formal type is broad while its actual argument and selected result are
+exact; mutating the actual argument, selected result, or escaping the callable
+value restores the owning failure. Further mutations alter canonical Go
+identity or signature, select the wrong ordinary/kernel variant, change one checked
 parameter/result/type-parameter shape, add or omit an authored export,
 duplicate or leave a contract unconsumed, collide an output path, retain the
 translated body, or select both package and callable ownership. Each fails at

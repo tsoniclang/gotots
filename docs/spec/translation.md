@@ -1412,10 +1412,15 @@ The top-level call and unchecked assertion each fail as an exact staged-source
 violation before any generated or authored file is printed. Side-effect-only
 imports, non-null assertions, TypeScript suppression directives, and explicit
 or inferred semantic `any`/`unknown` fail at the same owner. Checked callable
-types are traversed through every parameter, result, and constructor
-signature, so merely assigning `JSON.parse` to a local function value does not
-hide its `any` result. Generic constraint/default
-TypeNodes are checked at their authored locations; TS-Go's internal fallback
+values that are stored, passed, or returned are traversed through every
+parameter, result, and constructor signature, so merely assigning `JSON.parse`
+to a local function value does not hide its `any` result. A direct invocation
+(call, construction, or tagged template) checks the callee value itself, every
+authored argument, and the selected result; it
+does not misclassify an unused broad parameter on an ambient overload as an
+authored dynamic value (for example, `Number(exactBigInt)`). Generic
+constraint/default TypeNodes are checked at their authored locations; TS-Go's
+internal fallback
 constraint for an unconstrained safe `T` is not misclassified as authored
 `any`. Explicit `this` parameter TypeNodes are checked at the same authored
 boundary; an implicit checker-only `this` fallback is not source evidence.
