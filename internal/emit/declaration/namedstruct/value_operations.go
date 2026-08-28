@@ -279,12 +279,22 @@ func copyMethod(
 	for _, field := range fields {
 		var copied api.ExpressionEmission
 		var err error
+		requiresConstructionConversion := true
 		if field.blank {
-			copied, err = context.Values().Zero(
-				context.WithRole(api.RoleStructCopyField),
-				field.source,
-				field.object.Type(),
-			)
+			if canonicalStorage {
+				copied, err = context.Values().StorageZero(
+					context.WithRole(api.RoleStructCopyField),
+					field.source,
+					field.object.Type(),
+				)
+				requiresConstructionConversion = false
+			} else {
+				copied, err = context.Values().Zero(
+					context.WithRole(api.RoleStructCopyField),
+					field.source,
+					field.object.Type(),
+				)
+			}
 		} else {
 			value, valueErr := operationFieldValue(
 				context.WithRole(api.RoleStructCopyField),
@@ -318,15 +328,17 @@ func copyMethod(
 		if err != nil {
 			return nil, nil, err
 		}
-		copied, err = operationConstructionValue(
-			context.WithRole(api.RoleStructCopyField),
-			field.source,
-			field,
-			copied,
-			canonicalStorage,
-		)
-		if err != nil {
-			return nil, nil, err
+		if requiresConstructionConversion {
+			copied, err = operationConstructionValue(
+				context.WithRole(api.RoleStructCopyField),
+				field.source,
+				field,
+				copied,
+				canonicalStorage,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		if len(copied.Before()) != 0 {
 			return nil, nil, api.Unsupported(

@@ -27,15 +27,24 @@ type Inner[T any] struct {
 	Leaf Leaf
 }
 type Outer[T any] struct { Inner Inner[T] }
+type WithBlank struct {
+	_ Leaf
+	Value int32
+}
 
 var Stored Outer[int32]
+
+func CopyBlank(value WithBlank) WithBlank { return value }
 
 func Run() int32 {
 	values := []Outer[int32]{{}, {}}
 	values[1].Inner.Value = 7
 	sparse := Outer[int32]{}
+	blankValues := []WithBlank{{Value: 3}}
+	blankValues[0].Value++
+	copied := CopyBlank(blankValues[0])
 	return Stored.Inner.Value + sparse.Inner.Leaf.Count +
-		values[0].Inner.Leaf.Count + values[1].Inner.Value
+		values[0].Inner.Leaf.Count + values[1].Inner.Value + copied.Value
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
