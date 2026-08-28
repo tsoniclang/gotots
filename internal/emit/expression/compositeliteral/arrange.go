@@ -79,7 +79,32 @@ func arrange(
 		if _, ok := present[fieldIndex]; ok {
 			continue
 		}
-		fieldType := structType.Field(fieldIndex).Type()
+		field := structType.Field(fieldIndex)
+		fieldType := field.Type()
+		providerOwned := false
+		if named != nil {
+			_, selectedProviderOwned, err := providerboundary.StructField(
+				context.WithRole(api.RoleStructZeroField),
+				named,
+				field,
+			)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			providerOwned = selectedProviderOwned
+		}
+		if canonicalStorage && !providerOwned {
+			zero, err := context.Values().StorageZero(
+				context.WithRole(api.RoleStructZeroField),
+				source,
+				fieldType,
+			)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			zeroByField[fieldIndex] = zero
+			continue
+		}
 		zero, err := context.Values().Zero(
 			context.WithRole(api.RoleStructZeroField),
 			source,
@@ -88,13 +113,13 @@ func arrange(
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		if named != nil {
+		if providerOwned {
 			zero, _, err = providerboundary.ToProviderStructField(
 				context.WithRole(api.RoleStructZeroField),
 				children,
 				source,
 				named,
-				structType.Field(fieldIndex),
+				field,
 				zero,
 			)
 			if err != nil {

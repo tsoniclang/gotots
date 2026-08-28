@@ -28,10 +28,14 @@ type Inner[T any] struct {
 }
 type Outer[T any] struct { Inner Inner[T] }
 
+var Stored Outer[int32]
+
 func Run() int32 {
-	values := make([]Outer[int32], 2)
+	values := []Outer[int32]{{}, {}}
 	values[1].Inner.Value = 7
-	return values[0].Inner.Leaf.Count + values[1].Inner.Value
+	sparse := Outer[int32]{}
+	return Stored.Inner.Value + sparse.Inner.Leaf.Count +
+		values[0].Inner.Leaf.Count + values[1].Inner.Value
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
