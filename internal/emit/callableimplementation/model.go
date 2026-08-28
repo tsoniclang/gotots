@@ -13,7 +13,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 type Variant string
 
@@ -29,6 +29,7 @@ func (v Variant) Valid() bool {
 
 type Document struct {
 	SchemaVersion        int                             `json:"schemaVersion"`
+	SourceProgramDigest  string                          `json:"sourceProgramDigest"`
 	Package              PackageDocument                 `json:"package"`
 	Build                BuildDocument                   `json:"build"`
 	Compilation          CompilationDocument             `json:"compilation"`
@@ -71,6 +72,7 @@ type CallableDocument struct {
 }
 
 type Module struct {
+	sourceProgramDigest  string
 	packagePath          string
 	modulePath           string
 	moduleVersion        string
@@ -149,10 +151,18 @@ func (i Implementation) Export() string           { return i.export }
 func (i Implementation) Module() Module           { return i.module }
 
 type Prepared struct {
-	buildProfile load.BuildProfile
-	compilation  CompilationDocument
-	modules      []Module
-	digest       string
+	buildProfile        load.BuildProfile
+	compilation         CompilationDocument
+	sourceProgramDigest string
+	modules             []Module
+	digest              string
+}
+
+func (p *Prepared) SourceProgramDigest() string {
+	if p == nil {
+		return ""
+	}
+	return p.sourceProgramDigest
 }
 
 func (p *Prepared) Modules() []Module {
@@ -163,16 +173,18 @@ func (p *Prepared) Modules() []Module {
 }
 
 type Certificate struct {
-	buildProfile load.BuildProfile
-	compilation  CompilationDocument
-	byFunction   map[*types.Func]Implementation
-	byIdentity   map[string]Implementation
-	modules      []Module
-	digest       string
+	buildProfile        load.BuildProfile
+	compilation         CompilationDocument
+	sourceProgramDigest string
+	byFunction          map[*types.Func]Implementation
+	byIdentity          map[string]Implementation
+	modules             []Module
+	digest              string
 }
 
 func (c *Certificate) Valid() bool {
 	return c != nil && c.buildProfile.Valid() && c.compilation.valid() &&
+		validSHA256(c.sourceProgramDigest) &&
 		len(c.byFunction) != 0 && len(c.byIdentity) == len(c.byFunction) &&
 		len(c.modules) != 0 && c.digest != ""
 }

@@ -3,6 +3,7 @@ package command
 import (
 	"flag"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/config"
@@ -80,6 +81,20 @@ func TestParseArgumentsRejectsAmbiguousConfigSelection(t *testing.T) {
 		"build", "-c", "one.json", "--config", "two.json",
 	}); err == nil {
 		t.Fatal("ambiguous config selection was accepted")
+	}
+}
+
+func TestParseArgumentsRejectsRemovedImplementationFlag(t *testing.T) {
+	for _, arguments := range [][]string{
+		{"build", "--implementation-bundle", "implementation.json"},
+		{"build", "--implementation-bundle=implementation.json"},
+		{"build", "-implementation-bundle", "implementation.json"},
+	} {
+		_, err := ParseArguments(t.TempDir(), arguments)
+		if err == nil || !strings.Contains(err.Error(), "migrate arguments") ||
+			!strings.Contains(err.Error(), "--package-implementation") {
+			t.Fatalf("removed flag error = %v", err)
+		}
 	}
 }
 

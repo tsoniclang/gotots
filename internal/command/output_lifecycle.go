@@ -66,8 +66,9 @@ type sourceImplementationPackage struct {
 }
 
 type callableImplementationPrintPlan struct {
-	modules []callableImplementationModule
-	targets []callableImplementationTarget
+	sourceProgramDigest string
+	modules             []callableImplementationModule
+	targets             []callableImplementationTarget
 }
 
 type callableImplementationModule struct {
@@ -217,6 +218,8 @@ func stagePrintPlan(
 		plan.hasSourceImplementation = true
 	}
 	if verification, ok := emission.CallableImplementationPlan(); ok {
+		plan.callableImplementation.sourceProgramDigest =
+			verification.SourceProgramDigest()
 		modules := verification.Modules()
 		plan.callableImplementation.modules = make(
 			[]callableImplementationModule,
@@ -405,7 +408,8 @@ func (p printPlan) validate(outputDirectory string) error {
 		)
 	}
 	if p.hasCallableImplementation {
-		if len(p.callableImplementation.modules) == 0 ||
+		if !isSHA256(p.callableImplementation.sourceProgramDigest) ||
+			len(p.callableImplementation.modules) == 0 ||
 			len(p.callableImplementation.targets) == 0 {
 			return commandError(
 				"validate print plan",
@@ -501,7 +505,8 @@ func (p printPlan) validate(outputDirectory string) error {
 				)
 			}
 		}
-	} else if len(p.callableImplementation.modules) != 0 ||
+	} else if p.callableImplementation.sourceProgramDigest != "" ||
+		len(p.callableImplementation.modules) != 0 ||
 		len(p.callableImplementation.targets) != 0 {
 		return commandError(
 			"validate print plan",

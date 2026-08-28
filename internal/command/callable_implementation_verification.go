@@ -169,6 +169,12 @@ func exactJoinPreparedCallablePlan(
 	prepared *callableimplementation.Prepared,
 	plan callableImplementationPrintPlan,
 ) error {
+	if prepared.SourceProgramDigest() != plan.sourceProgramDigest {
+		return commandError(
+			"join callable implementation handoff",
+			"source program digest differs",
+		)
+	}
 	expectedModules := prepared.Modules()
 	if len(expectedModules) != len(plan.modules) {
 		return commandError(

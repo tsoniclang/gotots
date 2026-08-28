@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/config"
 )
@@ -47,6 +48,12 @@ func ParseArguments(workingDirectory string, arguments []string) (Invocation, er
 	if len(arguments) == 0 || arguments[0] != "build" {
 		return Invocation{}, commandError("parse arguments", "expected build subcommand")
 	}
+	if removed := removedImplementationFlag(arguments[1:]); removed != "" {
+		return Invocation{}, commandError(
+			"migrate arguments",
+			removed+" was replaced by --package-implementation; callable bodies use --callable-implementation",
+		)
+	}
 	invocation := Invocation{
 		configPath: filepath.Join(absoluteWorkingDirectory, "gotots.json"),
 	}
@@ -79,6 +86,16 @@ func ParseArguments(workingDirectory string, arguments []string) (Invocation, er
 		)
 	}
 	return invocation, nil
+}
+
+func removedImplementationFlag(arguments []string) string {
+	for _, argument := range arguments {
+		name, _, _ := strings.Cut(argument, "=")
+		if name == "--implementation-bundle" || name == "-implementation-bundle" {
+			return name
+		}
+	}
+	return ""
 }
 
 func bindDescriptor(

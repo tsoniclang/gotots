@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	compileWorkerCommand       = "__gotots_compile_worker_v4"
+	compileWorkerCommand       = "__gotots_compile_worker_v5"
 	compileWorkerDirectoryName = ".gotots-compile-worker"
-	compileWorkerSchemaVersion = 4
+	compileWorkerSchemaVersion = 5
 	compileWorkerLogLimit      = 64 * 1024
 )
 
@@ -57,8 +57,9 @@ type compileWorkerSourceImplementationPackage struct {
 }
 
 type compileWorkerCallableImplementation struct {
-	Modules []compileWorkerCallableImplementationModule `json:"modules"`
-	Targets []compileWorkerCallableImplementationTarget `json:"targets"`
+	SourceProgramDigest string                                      `json:"sourceProgramDigest"`
+	Modules             []compileWorkerCallableImplementationModule `json:"modules"`
+	Targets             []compileWorkerCallableImplementationTarget `json:"targets"`
 }
 
 type compileWorkerCallableImplementationModule struct {
@@ -291,6 +292,8 @@ func readCompileWorkerDocument(
 		plan.hasSourceImplementation = true
 	}
 	if document.CallableImplementation != nil {
+		plan.callableImplementation.sourceProgramDigest =
+			document.CallableImplementation.SourceProgramDigest
 		plan.callableImplementation.modules = make(
 			[]callableImplementationModule,
 			len(document.CallableImplementation.Modules),
@@ -392,6 +395,7 @@ func encodeCompileWorkerDocument(
 	}
 	if plan.hasCallableImplementation {
 		document.CallableImplementation = &compileWorkerCallableImplementation{
+			SourceProgramDigest: plan.callableImplementation.sourceProgramDigest,
 			Modules: make(
 				[]compileWorkerCallableImplementationModule,
 				len(plan.callableImplementation.modules),

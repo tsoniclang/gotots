@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -83,6 +84,18 @@ func TestRunBuildsSimpleProgramThroughPinnedTSGo(t *testing.T) {
 	}
 	if !bytes.Contains(packageDocument, []byte(`"type": "module"`)) {
 		t.Fatalf("project package = %s", packageDocument)
+	}
+	firstReport := output.String()
+	firstTree := readGeneratedTree(t, generated)
+	output.Reset()
+	if err := Run(context.Background(), root, []string{"build"}, &output, &output); err != nil {
+		t.Fatal(err)
+	}
+	if output.String() != firstReport {
+		t.Fatalf("ordinary build report changed:\nfirst: %s\nsecond: %s", firstReport, output.String())
+	}
+	if secondTree := readGeneratedTree(t, generated); !maps.Equal(firstTree, secondTree) {
+		t.Fatal("ordinary build artifacts changed across identical source snapshots")
 	}
 }
 
@@ -237,6 +250,32 @@ func readGeneratedTypeScript(t *testing.T, root string) string {
 		t.Fatal(err)
 	}
 	return source.String()
+}
+
+func readGeneratedTree(t *testing.T, root string) map[string]string {
+	t.Helper()
+	result := make(map[string]string)
+	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		payload, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		result[filepath.ToSlash(relative)] = string(payload)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return result
 }
 
 func assertManifestMatchesOutput(t *testing.T, root string) {

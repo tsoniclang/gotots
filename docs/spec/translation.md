@@ -1381,9 +1381,44 @@ The product-owned module exports that exact checked callable. Generated callers
 still call `Checker.compareNodes`; no caller, package assembly, class shape, or
 source-visible signature changes. The original translated body is deleted, not
 retained behind a runtime branch. Selection is made once from the canonical Go
-declaration identity and stable signature joined to the selected build and
-compilation profiles. Emission never asks whether a package or function name
-appears in configuration.
+declaration identity and stable signature joined to the selected build,
+compilation, and load-owned selected-source snapshot. The localized canonical
+body digest identifies the selected declaration but is not treated as complete
+freshness evidence: changing a referenced constant, helper, selected
+dependency, embedded input, non-Go input, or effective per-file Go version
+invalidates the source snapshot even when this body's text is unchanged.
+Emission never asks whether a package or function name appears in
+configuration.
+
+The authored module may contain bound imports, interface declarations,
+type-alias declarations, and function declarations, including private helpers.
+It may not execute unrelated
+module initialization or bypass checked evidence. For example, this source is
+invalid:
+
+```ts
+recordStartup();
+
+export function compareNodesImplementation(
+  checker: Pointer<Checker> | undefined,
+  left: Pointer<Node> | undefined,
+  right: Pointer<Node> | undefined,
+): int {
+  return "not an int" as never;
+}
+```
+
+The top-level call and unchecked assertion each fail as an exact staged-source
+violation before any generated or authored file is printed. Side-effect-only
+imports, non-null assertions, TypeScript suppression directives, and explicit
+or inferred semantic `any`/`unknown` fail at the same owner. Checked callable
+types are traversed through every parameter, result, and constructor
+signature, so merely assigning `JSON.parse` to a local function value does not
+hide its `any` result. Generic constraint/default
+TypeNodes are checked at their authored locations; TS-Go's internal fallback
+constraint for an unconstrained safe `T` is not misclassified as authored
+`any`. Explicit `this` parameter TypeNodes are checked at the same authored
+boundary; an implicit checker-only `this` fallback is not source evidence.
 
 An explicit `kernel` variant may replace the one generated generic kernel while
 leaving all finite facades and callers intact. Ordinary and kernel variants are

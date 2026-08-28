@@ -1,8 +1,6 @@
 package command
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,7 +9,6 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/config"
-	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -21,33 +18,6 @@ const (
 )
 
 const projectPackageName = "package.json"
-
-func programDigest(program *load.Program) (string, error) {
-	hash := sha256.New()
-	for _, sourcePackage := range program.Packages() {
-		hash.Write([]byte(sourcePackage.ModulePath()))
-		hash.Write([]byte{0})
-		hash.Write([]byte(sourcePackage.ModuleVersion()))
-		hash.Write([]byte{0})
-		hash.Write([]byte(sourcePackage.Path()))
-		files := sourcePackage.Files()
-		sort.Slice(files, func(left, right int) bool {
-			return filepath.Base(files[left].Path()) < filepath.Base(files[right].Path())
-		})
-		for _, sourceFile := range files {
-			payload, err := os.ReadFile(sourceFile.Path())
-			if err != nil {
-				return "", commandError("digest source", err.Error())
-			}
-			hash.Write([]byte{0})
-			hash.Write([]byte(filepath.Base(sourceFile.Path())))
-			hash.Write([]byte{0})
-			hash.Write(payload)
-		}
-		hash.Write([]byte{0xff})
-	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
-}
 
 func writePrintPlanTo(
 	project config.Project,

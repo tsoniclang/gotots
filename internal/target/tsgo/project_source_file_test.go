@@ -9,10 +9,13 @@ import (
 func TestProjectSourceFileUsesOfficialASTForPrinting(t *testing.T) {
 	directory := t.TempDir()
 	sourcePath := filepath.Join(directory, "implementation.ts")
-	writeProjectFile(t, sourcePath, `export function twice(value: number): number {
+	sourceText := `export function twice(value: number): number {
+  const label = "λ";
+  void label;
   return value * 2;
 }
-`)
+`
+	writeProjectFile(t, sourcePath, sourceText)
 	writeProjectFile(t, filepath.Join(directory, "tsconfig.json"), `{
   "compilerOptions": {
     "target": "ES2022",
@@ -37,6 +40,13 @@ func TestProjectSourceFileUsesOfficialASTForPrinting(t *testing.T) {
 	project, err := client.OpenProject(filepath.Join(directory, "tsconfig.json"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	evidence, err := project.projectSourceEvidence(filepath.ToSlash(sourcePath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if evidence.text != sourceText {
+		t.Fatalf("official immutable source text differs:\n%q\nwant:\n%q", evidence.text, sourceText)
 	}
 	source, err := project.SourceFile(sourcePath)
 	if err != nil {

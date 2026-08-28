@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"go/ast"
 	"go/types"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -108,6 +109,66 @@ func TestCallableImplementationRejectsWrongVariantAndUnconsumedClaim(t *testing.
 	}
 }
 
+func TestCallableImplementationRejectsStaleProgramWithUnchangedSelectedBody(t *testing.T) {
+	fixture := loadCallableImplementationFixture(t)
+	claim := fixture.callable(t, fixture.function("Add"), "addFast")
+	prepared := fixture.prepared(t, []callableimplementation.CallableDocument{claim})
+	if err := os.WriteFile(
+		filepath.Join(fixture.root, "other", "other.go"),
+		[]byte("package other\nfunc Add(value int) int { return value + 7004 }\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	changed := reloadCallableImplementationFixture(t, fixture.root)
+	changedClaim := changed.callable(t, changed.function("Add"), "addFast")
+	if changedClaim.SourceBodyDigest != claim.SourceBodyDigest {
+		t.Fatal("unrelated source mutation changed the selected callable body digest")
+	}
+	if _, err := prepared.Join(changed.program); err == nil ||
+		!strings.Contains(err.Error(), "selected source snapshot differs") {
+		t.Fatalf("stale selected-source error = %v", err)
+	}
+}
+
+func TestCallableImplementationRejectsChangedGlobalOrHelperWithUnchangedSelectedBody(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		before      string
+		replacement string
+	}{
+		{name: "referenced global", before: "const scoreBias = 3001", replacement: "const scoreBias = 3002"},
+		{name: "referenced helper", before: "return value + 4001", replacement: "return value + 4002"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			fixture := loadCallableImplementationFixture(t)
+			claim := fixture.callable(t, fixture.function("score"), "scoreFast")
+			prepared := fixture.prepared(t, []callableimplementation.CallableDocument{claim})
+			sourcePath := filepath.Join(fixture.root, "app.go")
+			payload, err := os.ReadFile(sourcePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			changedPayload := strings.Replace(string(payload), testCase.before, testCase.replacement, 1)
+			if changedPayload == string(payload) {
+				t.Fatal("semantic-source mutation did not match the fixture")
+			}
+			if err := os.WriteFile(sourcePath, []byte(changedPayload), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			changed := reloadCallableImplementationFixture(t, fixture.root)
+			changedClaim := changed.callable(t, changed.function("score"), "scoreFast")
+			if changedClaim.SourceBodyDigest != claim.SourceBodyDigest {
+				t.Fatal("global/helper mutation changed the selected callable body digest")
+			}
+			if _, err := prepared.Join(changed.program); err == nil ||
+				!strings.Contains(err.Error(), "selected source snapshot differs") {
+				t.Fatalf("stale selected-source error = %v", err)
+			}
+		})
+	}
+}
+
 func TestCallableImplementationSelectsExactKernelVariant(t *testing.T) {
 	fixture := loadCallableImplementationFixture(t)
 	claim := fixture.callable(t, fixture.method("NumberBox", "Twice"), "numberBoxTwiceFast")
@@ -176,6 +237,11 @@ import "example.test/app/other"
 type Box struct { Offset int }
 type NumberBox[T ~int] struct{}
 
+const scoreBias = 3001
+
+func scoreHelper(value int) int { return value + 4001 }
+func score(value int) int { return scoreHelper(value) + scoreBias }
+
 func Add(value int) int { return value + 8001 }
 func (box *Box) Add(value int) int { return value + box.Offset + 9001 }
 func (box *NumberBox[T]) Twice(value T) T { if false { panic(5009) }; return value + value }
@@ -185,6 +251,14 @@ func UseOther(value int) int { return other.Add(value) }
 func dead(value int) int { return value + 6007 }
 func _() { panic("blank declarations are not callable") }
 `)
+	return reloadCallableImplementationFixture(t, root)
+}
+
+func reloadCallableImplementationFixture(
+	t *testing.T,
+	root string,
+) callableImplementationFixture {
+	t.Helper()
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: root,
 		Pattern:   ".",
@@ -296,7 +370,8 @@ func (f callableImplementationFixture) prepared(
 	)
 	profile := f.program.BuildProfile()
 	document := callableimplementation.Document{
-		SchemaVersion: callableimplementation.SchemaVersion,
+		SchemaVersion:       callableimplementation.SchemaVersion,
+		SourceProgramDigest: f.program.SourceDigest(),
 		Package: callableimplementation.PackageDocument{
 			ImportPath: "example.test/app",
 			ModulePath: "example.test/app",

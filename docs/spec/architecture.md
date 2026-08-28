@@ -56,7 +56,8 @@ rerun the checker.
 | target declaration and later revisions | one declaration assembly keyed by exact Go identity |
 | imports, placement, sealing, and printing | root emitter |
 | callable ABI and execution | the callable owner, with one direct synchronous contract |
-| project-selected source-callable body | certified callable-implementation contract joined to the canonical Go declaration and generated target callable |
+| selected source-program snapshot | `internal/load`, derived once from selected source, module, file-version, non-Go/embed, and build-profile evidence |
+| project-selected source-callable body | certified callable-implementation contract exact-joined to the load-owned source snapshot, canonical Go declaration, and generated target callable |
 | panic carrier and deferred recovery entry | `runtime/panic.ts` plus the callable's private deferred entry |
 | provider boundary meaning of selected Go types | `internal/contracts/gostdlib/sourcecontract` |
 | immutable provider certificate documents | `internal/contracts/gostdlib` |
@@ -1653,15 +1654,34 @@ repeatable `--tag`, `--package-implementation`, and
 `--callable-implementation` flags. The two implementation classes are never
 inferred from a document's spelling or filesystem location.
 
+Schema 3 is a one-way replacement of schema 2. The removed
+`implementations.bundles` field and `--implementation-bundle` flag have no
+alias, compatibility decoder, or automatic rewrite. A schema-2 document or
+removed spelling fails at configuration ownership with a migration diagnostic;
+only `implementations.packages`, `implementations.callables`,
+`--package-implementation`, and `--callable-implementation` are current.
+
+The loader owns one immutable selected-source snapshot before emission starts.
+Its canonical digest covers every translated source package's stable package
+and module identity, selected Go syntax, checker-selected effective per-file Go
+version, selected non-Go source bytes, selected embedded-file bytes, and the
+explicit build profile. Inputs are ordered by stable logical identity; checkout,
+module-cache, and temporary paths are not identity. Provider and toolchain
+contracts retain their existing independent fingerprints. The command layer
+consumes the loader digest for output identity and never rereads source or
+constructs a second approximation.
+
 A certified source-callable implementation replaces only the executable body
-of one exact source declaration. Its contract joins module/package/version,
-build and compilation profiles, canonical Go declaration identity, stable Go
-signature, the SHA-256 digest of the canonically formatted selected Go body,
-selected generated variant, authored module/export, authored source digest,
-and equivalence envelope. A same-signature Go body change therefore fails the
-post-load join and requires the manual equivalence proof to be renewed. The
-source-contract layer owns canonical body formatting and hashing; emission
-consumes that digest and never imports a Go formatter. The generated
+of one exact source declaration. Its contract joins the load-owned selected
+source-program digest, module/package/version, build and compilation profiles,
+canonical Go declaration identity, stable Go signature, the SHA-256 digest of
+the canonically formatted selected Go body, selected generated variant,
+authored module/export, authored source digest, and equivalence envelope. Any
+selected semantic-source change therefore fails the post-load join and
+requires the manual equivalence proof to be renewed. The declaration body
+digest remains localized diagnostic evidence; it is not complete freshness
+evidence. The source-contract layer owns canonical body formatting and hashing;
+emission consumes that digest and never imports a Go formatter. The generated
 declaration remains the sole
 source-facing owner: its name, generic shape, parameters, result, placement,
 exports, callers, state, and initialization are unchanged. Its body contains
@@ -1672,9 +1692,26 @@ be printed. The join compares generic arity, parameter cardinality and checked
 parameter/result types; local TypeScript parameter names are implementation
 detail at every nested callable depth and are not ABI evidence. The semantic
 join requires bidirectional checked assignability after exact generic arity and
-parameter cardinality checks. Authored callable modules and their certification
-declarations containing explicit `any` or `unknown` type syntax fail before the
-join, so dynamic top types cannot manufacture equivalence.
+parameter cardinality checks.
+
+An authored callable module is a body provider, not an independent
+initialization channel. Its source-file scope admits only bound imports,
+interface declarations, type-alias declarations, and function declarations,
+including private helper functions. Side-effect-only imports, executable
+top-level statements or
+declarations, unchecked `as` or angle-bracket assertions, non-null assertions,
+TypeScript diagnostic-suppression directives, and explicit or inferred
+semantic `any`/`unknown` fail in the one staged TS-Go project before the ABI
+join. The inspection uses checked AST/type evidence, returns closed violation
+kinds, and does not reparse, recheck, classify semantic meaning by spelling, or
+patch text. Its closed checked denominator includes value expressions and type
+nodes plus their union/intersection/template members, alias and reference type
+arguments, index types, and callable parameter, result, and constructor
+signatures; a function value cannot hide a dynamic result.
+Diagnostic-suppression lexemes are the single lexical denial: they
+are read from the exact immutable source text embedded in TS-Go's official AST
+evidence, never from a filesystem reread. Their presence anywhere in an
+authored contract is outside the admitted source envelope.
 
 An authored callable module may name sorted, contract-owned `.d.ts`
 certification sources needed only to typecheck its imports. Preparation hashes

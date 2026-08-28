@@ -40,6 +40,14 @@ func PrepareAll(config Config) (*Prepared, error) {
 		if err != nil {
 			return nil, err
 		}
+		if prepared.sourceProgramDigest == "" {
+			prepared.sourceProgramDigest = module.sourceProgramDigest
+		} else if prepared.sourceProgramDigest != module.sourceProgramDigest {
+			return nil, &Error{
+				Operation: "join source program",
+				Reason:    "contracts select different source snapshots",
+			}
+		}
 		if _, duplicate := outputs[module.outputPath]; duplicate {
 			return nil, &Error{
 				Operation: "admit output", Subject: module.outputPath,
@@ -134,6 +142,7 @@ func prepareOne(config Config, contractPath string) (Module, error) {
 	}
 	sourceHash := sha256.Sum256(source)
 	return Module{
+		sourceProgramDigest:  document.SourceProgramDigest,
 		packagePath:          document.Package.ImportPath,
 		modulePath:           document.Package.ModulePath,
 		moduleVersion:        document.Package.ModuleVersion,
@@ -168,7 +177,8 @@ func validateDocument(document Document) error {
 	if document.SchemaVersion != SchemaVersion {
 		return &Error{Operation: "validate", Reason: "schema version is unsupported"}
 	}
-	if document.Package.ImportPath == "" || document.Package.ModulePath == "" {
+	if !validSHA256(document.SourceProgramDigest) ||
+		document.Package.ImportPath == "" || document.Package.ModulePath == "" {
 		return &Error{Operation: "validate", Reason: "package identity is incomplete"}
 	}
 	if document.Build.GoVersion == "" || document.Build.GOOS == "" ||

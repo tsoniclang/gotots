@@ -547,9 +547,10 @@ type symbolResponse struct {
 }
 
 type typeResponse struct {
-	ID          uint32 `json:"id"`
-	Flags       uint32 `json:"flags"`
-	ObjectFlags uint32 `json:"objectFlags"`
-	Target      uint32 `json:"target"`
-	Symbol      uint64 `json:"symbol"`
+	ID                 uint32   `json:"id"`
+	Flags              uint32   `json:"flags"`
+	ObjectFlags        uint32   `json:"objectFlags"`
+	Target             uint32   `json:"target"`
+	AliasTypeArguments []uint32 `json:"aliasTypeArguments"`
+	Symbol             uint64   `json:"symbol"`
 }

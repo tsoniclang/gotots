@@ -82,6 +82,9 @@ func Load(request Request) (Project, error) {
 }
 
 func decode(payload []byte) (document, error) {
+	if err := rejectRemovedConfiguration(payload); err != nil {
+		return document{}, err
+	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
 	var selected document
@@ -99,6 +102,31 @@ func decode(payload []byte) (document, error) {
 		return document{}, projectError("decode config", "", "schema version is unsupported")
 	}
 	return selected, nil
+}
+
+func rejectRemovedConfiguration(payload []byte) error {
+	var probe struct {
+		SchemaVersion   int                        `json:"schemaVersion"`
+		Implementations map[string]json.RawMessage `json:"implementations"`
+	}
+	if err := json.Unmarshal(payload, &probe); err != nil {
+		return projectError("decode config", "", err.Error())
+	}
+	if probe.SchemaVersion == 2 {
+		return projectError(
+			"migrate config",
+			"schemaVersion",
+			"schema 2 was replaced by schema 3; split implementations.bundles into implementations.packages and implementations.callables",
+		)
+	}
+	if _, removed := probe.Implementations["bundles"]; removed {
+		return projectError(
+			"migrate config",
+			"implementations.bundles",
+			"field was replaced by implementations.packages and implementations.callables",
+		)
+	}
+	return nil
 }
 
 func resolve(path string, selected document, overrides Overrides) (Project, error) {

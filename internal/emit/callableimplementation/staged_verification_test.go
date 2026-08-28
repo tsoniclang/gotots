@@ -16,7 +16,9 @@ func TestStagedVerificationExactJoinsGeneratedAndManualCallables(t *testing.T) {
 	fixture := newStagedVerificationFixture(t)
 	verified, err := VerifyStagedGeneratedContracts(fixture.config(
 		t,
-		"export function addFast(candidate: number): number { return candidate + 1; }\n",
+		"function identity<T>(value: T): T { return value; }\n"+
+			"function increment(candidate: number): number { return candidate + 1; }\n"+
+			"export function addFast(candidate: number): number { return identity(increment(candidate)); }\n",
 		[]string{"addFast"},
 	))
 	if err != nil {
@@ -96,7 +98,7 @@ func TestStagedVerificationRejectsCallableAndModuleMutations(t *testing.T) {
 				"export function addFast(value: "+dynamicType+"): number { return 0; }\n",
 				[]string{"addFast"},
 			))
-			if err == nil || !strings.Contains(err.Error(), "forbidden dynamic type") {
+			if err == nil || !strings.Contains(err.Error(), "explicit-"+dynamicType) {
 				t.Fatalf("forbidden %s error = %v", dynamicType, err)
 			}
 		})
@@ -121,6 +123,134 @@ func TestStagedVerificationRejectsCallableAndModuleMutations(t *testing.T) {
 			t.Fatalf("source digest mutation error = %v", err)
 		}
 	})
+}
+
+func TestStagedVerificationRejectsEveryAuthoredSourceEscape(t *testing.T) {
+	for _, testCase := range []struct {
+		name      string
+		source    string
+		violation string
+	}{
+		{
+			name: "side effect import",
+			source: "import \"../modules/app.js\";\n" +
+				"export function addFast(value: number): number { return value; }\n",
+			violation: "side-effect-import",
+		},
+		{
+			name: "top level call",
+			source: "function initialize(): void {}\ninitialize();\n" +
+				"export function addFast(value: number): number { return value; }\n",
+			violation: "executable-top-level",
+		},
+		{
+			name: "top level variable",
+			source: "const seed = 1;\n" +
+				"export function addFast(value: number): number { return value + seed; }\n",
+			violation: "executable-top-level",
+		},
+		{
+			name: "bodyless function",
+			source: "declare function helper(value: number): number;\n" +
+				"export function addFast(value: number): number { return value; }\n",
+			violation: "bodyless-function",
+		},
+		{
+			name:      "as assertion",
+			source:    "export function addFast(value: number): number { return \"wrong\" as never; }\n",
+			violation: "unchecked-type-assertion",
+		},
+		{
+			name:      "angle assertion",
+			source:    "export function addFast(value: number): number { return <never>\"wrong\"; }\n",
+			violation: "unchecked-type-assertion",
+		},
+		{
+			name: "non-null assertion",
+			source: "export function addFast(value: number): number {\n" +
+				"  const candidate: number | undefined = value;\n" +
+				"  return candidate!;\n}\n",
+			violation: "non-null-assertion",
+		},
+		{
+			name: "ignore directive",
+			source: "export function addFast(value: number): number {\n" +
+				"  // @ts-ignore\n  return value.missing;\n}\n",
+			violation: "diagnostic-suppression",
+		},
+		{
+			name: "nocheck directive",
+			source: "// @ts-nocheck\n" +
+				"export function addFast(value: number): number { return value; }\n",
+			violation: "diagnostic-suppression",
+		},
+		{
+			name: "expect error directive",
+			source: "export function addFast(value: number): number {\n" +
+				"  // @ts-expect-error\n  return value.missing;\n}\n",
+			violation: "diagnostic-suppression",
+		},
+		{
+			name: "suppression lexeme envelope",
+			source: "function mention(): string { return \"@ts-ignore\"; }\n" +
+				"export function addFast(value: number): number { void mention; return value; }\n",
+			violation: "diagnostic-suppression",
+		},
+		{
+			name: "inferred any",
+			source: "export function addFast(value: number): number {\n" +
+				"  return JSON.parse(String(value));\n}\n",
+			violation: "inferred-any",
+		},
+		{
+			name: "nested inferred any",
+			source: "type Dynamic = ReturnType<typeof JSON.parse>;\n" +
+				"export function addFast(values: Dynamic[]): number { return values.length; }\n",
+			violation: "inferred-any",
+		},
+		{
+			name: "return-only inferred any",
+			source: "type Dynamic = ReturnType<typeof JSON.parse>;\n" +
+				"export function addFast(value: number): Dynamic { throw new Error(String(value)); }\n",
+			violation: "inferred-any",
+		},
+		{
+			name: "callable return inferred any",
+			source: "export function addFast(value: number): number {\n" +
+				"  const parser = JSON.parse; void parser; return value;\n}\n",
+			violation: "inferred-any",
+		},
+		{
+			name: "inferred unknown",
+			source: "export function addFast(value: number): number {\n" +
+				"  try { return value; } catch (failure) { void failure; return value; }\n}\n",
+			violation: "inferred-unknown",
+		},
+		{
+			name: "nested inferred unknown",
+			source: "type Dynamic = ReturnType<<T>() => T>;\n" +
+				"export function addFast(values: Dynamic[]): number { return values.length; }\n",
+			violation: "inferred-unknown",
+		},
+		{
+			name: "return-only inferred unknown",
+			source: "type Dynamic = ReturnType<<T>() => T>;\n" +
+				"export function addFast(value: number): Dynamic { throw new Error(String(value)); }\n",
+			violation: "inferred-unknown",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			fixture := newStagedVerificationFixture(t)
+			_, err := VerifyStagedGeneratedContracts(fixture.config(
+				t,
+				testCase.source,
+				[]string{"addFast"},
+			))
+			if err == nil || !strings.Contains(err.Error(), testCase.violation) {
+				t.Fatalf("%s error = %v", testCase.violation, err)
+			}
+		})
+	}
 }
 
 func TestStagedVerificationUsesOnlyCertifiedDeclarationSources(t *testing.T) {
@@ -160,6 +290,27 @@ func TestStagedVerificationUsesOnlyCertifiedDeclarationSources(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "certification source") ||
 			!strings.Contains(err.Error(), "source digest changed") {
 			t.Fatalf("certification source mutation error = %v", err)
+		}
+	})
+
+	t.Run("declaration source policy fails", func(t *testing.T) {
+		fixture := newStagedVerificationFixture(t)
+		config, certificationPath := fixture.configWithCertificationSource(t)
+		payload := []byte(
+			"// @ts-nocheck\n" +
+				"declare module \"@fixture/runtime.js\" {\n" +
+				"  export function identity(value: number): number;\n" +
+				"}\n",
+		)
+		if err := os.WriteFile(certificationPath, payload, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		digest := sha256.Sum256(payload)
+		config.Modules[0].certificationSources[0].sourceDigest =
+			hex.EncodeToString(digest[:])
+		_, err := VerifyStagedGeneratedContracts(config)
+		if err == nil || !strings.Contains(err.Error(), "diagnostic-suppression") {
+			t.Fatalf("certification source policy error = %v", err)
 		}
 	})
 }

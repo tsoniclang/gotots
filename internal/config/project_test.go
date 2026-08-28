@@ -189,6 +189,35 @@ func TestLoadRejectsUnknownFieldAndVersion(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsRemovedConfigurationWithMigrationDiagnostic(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		payload string
+		want    string
+	}{
+		{
+			name:    "schema two",
+			payload: `{"schemaVersion":2}`,
+			want:    "schema 2 was replaced by schema 3",
+		},
+		{
+			name:    "implementation bundles",
+			payload: `{"schemaVersion":3,"implementations":{"bundles":[]}}`,
+			want:    "implementations.bundles",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "gotots.json")
+			writeProjectConfig(t, path, testCase.payload)
+			_, err := Load(Request{ConfigPath: path})
+			if err == nil || !strings.Contains(err.Error(), "migrate config") ||
+				!strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("migration error = %v", err)
+			}
+		})
+	}
+}
+
 func TestSemanticDigestIgnoresOperationalRelocation(t *testing.T) {
 	first := loadMinimalProject(t, filepath.Join(t.TempDir(), "one"), "out-a")
 	second := loadMinimalProject(t, filepath.Join(t.TempDir(), "two"), "out-b")

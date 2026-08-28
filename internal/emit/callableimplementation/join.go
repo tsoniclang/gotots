@@ -17,19 +17,25 @@ type sourceCallable struct {
 
 func (p *Prepared) Join(program *load.Program) (*Certificate, error) {
 	if p == nil || program == nil || !p.buildProfile.Valid() ||
-		!p.compilation.valid() || len(p.modules) == 0 || p.digest == "" {
+		!p.compilation.valid() || !validSHA256(p.sourceProgramDigest) ||
+		len(p.modules) == 0 || p.digest == "" {
 		return nil, &Error{Operation: "join", Reason: "prepared evidence or selected program is invalid"}
 	}
 	if !sameBuildProfile(p.buildProfile, program.BuildProfile()) {
 		return nil, &Error{Operation: "join build profile", Reason: "selected profile differs"}
 	}
+	if p.sourceProgramDigest != program.SourceDigest() {
+		return nil, &Error{
+			Operation: "join source program",
+			Reason:    "selected source snapshot differs",
+		}
+	}
 	certificate := &Certificate{
-		buildProfile: p.buildProfile,
-		compilation:  p.compilation,
-		byFunction:   make(map[*types.Func]Implementation),
-		byIdentity:   make(map[string]Implementation),
-		modules:      slicesCloneModules(p.modules),
-		digest:       p.digest,
+		buildProfile: p.buildProfile, compilation: p.compilation,
+		sourceProgramDigest: p.sourceProgramDigest,
+		byFunction:          make(map[*types.Func]Implementation),
+		byIdentity:          make(map[string]Implementation),
+		modules:             slicesCloneModules(p.modules), digest: p.digest,
 	}
 	for _, module := range p.modules {
 		selectedPackage := program.PackageByPath(module.packagePath)

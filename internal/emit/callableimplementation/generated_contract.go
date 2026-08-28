@@ -97,12 +97,13 @@ func (t GeneratedTarget) ClassName() string         { return t.className }
 func (t GeneratedTarget) MemberName() string        { return t.memberName }
 
 type GeneratedContractPlan struct {
-	modules []Module
-	targets []GeneratedTarget
+	sourceProgramDigest string
+	modules             []Module
+	targets             []GeneratedTarget
 }
 
 func (p GeneratedContractPlan) Valid() bool {
-	if len(p.modules) == 0 || len(p.targets) == 0 {
+	if !validSHA256(p.sourceProgramDigest) || len(p.modules) == 0 || len(p.targets) == 0 {
 		return false
 	}
 	identities := make(map[string]struct{}, len(p.targets))
@@ -130,6 +131,10 @@ func (p GeneratedContractPlan) Valid() bool {
 		claims += len(module.callableClaims)
 	}
 	return claims == len(p.targets)
+}
+
+func (p GeneratedContractPlan) SourceProgramDigest() string {
+	return p.sourceProgramDigest
 }
 
 func (p GeneratedContractPlan) Modules() []Module {
@@ -173,8 +178,9 @@ func (c *Certificate) PlanGeneratedContracts(
 		seen[target.sourceIdentity] = struct{}{}
 	}
 	plan := GeneratedContractPlan{
-		modules: slicesCloneModules(c.modules),
-		targets: selected,
+		sourceProgramDigest: c.sourceProgramDigest,
+		modules:             slicesCloneModules(c.modules),
+		targets:             selected,
 	}
 	if !plan.Valid() {
 		return GeneratedContractPlan{}, &Error{

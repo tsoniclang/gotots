@@ -46,7 +46,8 @@ func TestPreparedCallablePlanExactJoinRejectsHandoffOmission(t *testing.T) {
 		Export:           "valueFast",
 	}
 	document := callableimplementation.Document{
-		SchemaVersion: callableimplementation.SchemaVersion,
+		SchemaVersion:       callableimplementation.SchemaVersion,
+		SourceProgramDigest: strings.Repeat("1", 64),
 		Package: callableimplementation.PackageDocument{
 			ImportPath: "example.test/program",
 			ModulePath: "example.test/program",
@@ -81,9 +82,34 @@ func TestPreparedCallablePlanExactJoinRejectsHandoffOmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	changedDocument := document
+	changedDocument.SourceProgramDigest = strings.Repeat("2", 64)
+	changedDocument.Output = "implementations/other.ts"
+	changedDocument.Callables = append(
+		[]callableimplementation.CallableDocument(nil),
+		document.Callables...,
+	)
+	changedDocument.Callables[0].SourceIdentity += ".other"
+	changedDocument.Callables[0].Export = "valueOther"
+	changedPayload, err := json.Marshal(changedDocument)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changedContractPath := filepath.Join(root, "changed-contract.json")
+	if err := os.WriteFile(changedContractPath, changedPayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := callableimplementation.PrepareAll(callableimplementation.Config{
+		ContractPaths: []string{contractPath, changedContractPath},
+		BuildProfile:  profile,
+		Compilation:   document.Compilation,
+	}); err == nil || !strings.Contains(err.Error(), "different source snapshots") {
+		t.Fatalf("mixed source snapshots error = %v", err)
+	}
 	module := prepared.Modules()[0]
 	certificationSource := module.CertificationSources()[0]
 	plan := callableImplementationPrintPlan{
+		sourceProgramDigest: document.SourceProgramDigest,
 		modules: []callableImplementationModule{{
 			sourcePath: module.SourcePath(), outputPath: module.OutputPath(),
 			sourceDigest: module.SourceDigest(), exports: []string{claim.Export},
@@ -124,5 +150,11 @@ func TestPreparedCallablePlanExactJoinRejectsHandoffOmission(t *testing.T) {
 	changedBodyDigest.targets[0].sourceBodyDigest = strings.Repeat("0", 64)
 	if err := exactJoinPreparedCallablePlan(prepared, changedBodyDigest); err == nil {
 		t.Fatal("changed callable source body digest was accepted")
+	}
+
+	changedSourceProgram := plan
+	changedSourceProgram.sourceProgramDigest = strings.Repeat("2", 64)
+	if err := exactJoinPreparedCallablePlan(prepared, changedSourceProgram); err == nil {
+		t.Fatal("changed source program digest was accepted")
 	}
 }

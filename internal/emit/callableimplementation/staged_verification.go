@@ -105,12 +105,22 @@ func VerifyStagedGeneratedContracts(
 			projectRoot,
 			filepath.FromSlash(module.outputPath),
 		)
-		if err := rejectForbiddenDynamicTypes(project, path, module.outputPath); err != nil {
+		if err := rejectCallableImplementationSource(
+			project,
+			path,
+			module.outputPath,
+			tsgo.CallableImplementationSourceModule,
+		); err != nil {
 			return nil, err
 		}
 	}
 	for _, path := range certificationPaths {
-		if err := rejectForbiddenDynamicTypes(project, path, path); err != nil {
+		if err := rejectCallableImplementationSource(
+			project,
+			path,
+			path,
+			tsgo.CallableImplementationSourceCertification,
+		); err != nil {
 			return nil, err
 		}
 	}
@@ -370,24 +380,25 @@ func materializeCertificationSources(
 	return paths, nil
 }
 
-func rejectForbiddenDynamicTypes(
+func rejectCallableImplementationSource(
 	project *tsgo.ProjectInspection,
 	path string,
 	subject string,
+	role tsgo.CallableImplementationSourceRole,
 ) error {
-	forbidden, err := project.SourceForbiddenDynamicTypes(path)
+	violations, err := project.CallableImplementationSourceViolations(path, role)
 	if err != nil {
 		return err
 	}
-	if len(forbidden) == 0 {
+	if len(violations) == 0 {
 		return nil
 	}
 	return &Error{
 		Operation: "verify staged module",
 		Subject:   subject,
 		Reason: fmt.Sprintf(
-			"authored contract uses forbidden dynamic type syntax %v",
-			forbidden,
+			"authored contract violates callable source policy %v",
+			violations,
 		),
 	}
 }

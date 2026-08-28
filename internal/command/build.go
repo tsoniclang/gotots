@@ -133,11 +133,7 @@ func prepareBuild(
 	if err != nil {
 		return printPlan{}, "", err
 	}
-	sourceDigest, err := programDigest(program)
-	if err != nil {
-		return printPlan{}, "", err
-	}
-	evidence := config.EvidenceDigests{Source: sourceDigest}
+	evidence := config.EvidenceDigests{Source: program.SourceDigest()}
 	if sourceImplementations != nil {
 		evidence.PackageImplementations = sourceImplementations.Digest()
 	}
@@ -181,13 +177,13 @@ func prepareCallableImplementations(
 func prepareSourceImplementations(
 	project config.Project,
 ) (*sourceimplementation.Prepared, error) {
-	bundles := project.PackageImplementations()
-	if len(bundles) == 0 {
+	contracts := project.PackageImplementations()
+	if len(contracts) == 0 {
 		return nil, nil
 	}
 	return sourceimplementation.PrepareAll(sourceimplementation.Config{
 		RepositoryRoot: project.DistributionRoot(),
-		ContractPaths:  bundles,
+		ContractPaths:  contracts,
 		BuildProfile:   project.BuildProfile(),
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers:        project.IntegerRepresentation().String(),

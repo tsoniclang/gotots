@@ -68,6 +68,7 @@ type Program struct {
 	environmentByTypes  map[*types.Package]*Package
 	buildProfile        BuildProfile
 	goTool              toolchain.Go
+	sourceDigest        string
 }
 
 type PackageKind uint8
@@ -280,6 +281,15 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 			}
 		}
 		program.roots = append(program.roots, sourcePackage)
+	}
+	program.sourceDigest, err = sealSourceSnapshot(
+		request.Pattern,
+		sourcePackages,
+		buildProfile,
+		selectedGo,
+	)
+	if err != nil {
+		return nil, err
 	}
 	return program, nil
 }
@@ -519,6 +529,13 @@ func (p *Program) GoTool() toolchain.Go {
 		return toolchain.Go{}
 	}
 	return p.goTool
+}
+
+func (p *Program) SourceDigest() string {
+	if p == nil {
+		return ""
+	}
+	return p.sourceDigest
 }
 
 func packageProblems(roots []*packages.Package) []string {

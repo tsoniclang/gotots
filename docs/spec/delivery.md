@@ -303,10 +303,11 @@ Performance delivery follows measured ownership rather than corpus rules:
    after independent contract/equivalence proof, with every translated body
    absent from the installed artifact;
 4. a certified source-callable implementation may replace one measured body
-   only when canonical Go identity/signature/body digest, generated variant,
-   checked target callable, authored export, and equivalence envelope
-   exact-join; the generated declaration and all callers remain unchanged and
-   the translated body is absent;
+   only when the load-owned selected-source digest, canonical Go
+   identity/signature/body digest, generated variant, checked target callable,
+   inert authored export module, and equivalence envelope exact-join; the
+   generated declaration and all callers remain unchanged and the translated
+   body is absent;
 5. executable-representation optimizations belong to the selected target and
    consume finalized exact-node facts plus complete-flow evidence; and
 6. the next change is selected from measured source-size, typecheck, memory,
@@ -317,6 +318,10 @@ shape, strict-typecheck, differential/equivalence, mutation, final-artifact,
 human-source, and cost evidence. Full generation and runtime jobs are batched
 at milestone boundaries under the repository memory guard. Faster runtime
 alone cannot accept a package implementation or representation change.
+
+Schema 3 is the only project-config delivery surface. Schema 2,
+`implementations.bundles`, and `--implementation-bundle` fail with an explicit
+migration diagnostic; delivery must not retain aliases or a dual decoder.
 
 ## Checkpoint Evidence
 

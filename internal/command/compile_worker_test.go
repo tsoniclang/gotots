@@ -63,6 +63,7 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 		},
 		hasSourceImplementation: true,
 		callableImplementation: callableImplementationPrintPlan{
+			sourceProgramDigest: "a3a86944267e41877ab54f798340439bd80038e34687c5dedb5dc7dbc857565b",
 			modules: []callableImplementationModule{{
 				sourcePath: callableSource, outputPath: "implementations/hot.ts",
 				sourceDigest: hex.EncodeToString(callableDigest[:]),
@@ -108,6 +109,8 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 		len(decoded.plan.sourceImplementation.packages) != 1 ||
 		!decoded.plan.hasCallableImplementation ||
 		len(decoded.plan.callableImplementation.modules) != 1 ||
+		decoded.plan.callableImplementation.sourceProgramDigest !=
+			plan.callableImplementation.sourceProgramDigest ||
 		len(decoded.plan.callableImplementation.modules[0].certificationSources) != 1 ||
 		decoded.plan.callableImplementation.modules[0].certificationSources[0].sourceDigest !=
 			hex.EncodeToString(certificationDigest[:]) ||
@@ -145,6 +148,23 @@ func TestCompileWorkerHandoffRequiresDistinctProcessAndExactPlan(t *testing.T) {
 	}
 	if _, err := readCompileWorkerDocument(handoffPath, output, os.Getpid()+1); err == nil {
 		t.Fatal("omitted callable source body digest was accepted")
+	}
+
+	withoutSourceProgram := plan
+	withoutSourceProgram.callableImplementation.sourceProgramDigest = ""
+	omittedSourceProgram, err := encodeCompileWorkerDocument(
+		withoutSourceProgram,
+		digest,
+		os.Getpid()+1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(handoffPath, omittedSourceProgram, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readCompileWorkerDocument(handoffPath, output, os.Getpid()+1); err == nil {
+		t.Fatal("omitted callable source program digest was accepted")
 	}
 
 	duplicatePlan := plan

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type projectNodeEvidence struct {
@@ -18,6 +19,7 @@ type projectNodeEvidence struct {
 
 type projectSourceEvidence struct {
 	nodes []projectNodeEvidence
+	text  string
 	wire  []byte
 }
 
@@ -177,7 +179,51 @@ func decodeProjectSourceEvidence(
 			)
 		}
 	}
-	return projectSourceEvidence{nodes: nodes, wire: raw}, nil
+	text, err := decodeOfficialSourceText(raw, nodes)
+	if err != nil {
+		return projectSourceEvidence{}, err
+	}
+	return projectSourceEvidence{nodes: nodes, text: text, wire: raw}, nil
+}
+
+func decodeOfficialSourceText(
+	raw []byte,
+	nodes []projectNodeEvidence,
+) (string, error) {
+	if len(nodes) < 2 || nodes[1].kind != uint32(SyntaxKindSourceFile) ||
+		nodes[1].data>>30 != 2 {
+		return "", fmt.Errorf("official AST source node has no extended data")
+	}
+	stringOffsets := int(binary.LittleEndian.Uint32(raw[headerOffsetStringTableOffsets:]))
+	stringData := int(binary.LittleEndian.Uint32(raw[headerOffsetStringTable:]))
+	extendedData := int(binary.LittleEndian.Uint32(raw[headerOffsetExtendedData:]))
+	structuredData := int(binary.LittleEndian.Uint32(raw[headerOffsetStructuredData:]))
+	nodesOffset := int(binary.LittleEndian.Uint32(raw[headerOffsetNodes:]))
+	if stringOffsets < headerSize || stringOffsets > stringData ||
+		stringData > extendedData || extendedData > structuredData ||
+		structuredData > nodesOffset || nodesOffset > len(raw) {
+		return "", fmt.Errorf("official AST source sections are invalid")
+	}
+	extendedOffset := extendedData + int(nodes[1].data&nodeExtendedDataMask)
+	if extendedOffset < extendedData || extendedOffset+4 > structuredData {
+		return "", fmt.Errorf("official AST source text evidence is outside extended data")
+	}
+	textIndex := int(binary.LittleEndian.Uint32(raw[extendedOffset:]))
+	offsetEntry := stringOffsets + textIndex*4
+	if offsetEntry < stringOffsets || offsetEntry+8 > stringData {
+		return "", fmt.Errorf("official AST source text index is invalid")
+	}
+	start := int(binary.LittleEndian.Uint32(raw[offsetEntry:]))
+	end := int(binary.LittleEndian.Uint32(raw[offsetEntry+4:]))
+	stringBytes := extendedData - stringData
+	if end < start || end > stringBytes {
+		return "", fmt.Errorf("official AST source text range is invalid")
+	}
+	text := raw[stringData+start : stringData+end]
+	if !utf8.Valid(text) {
+		return "", fmt.Errorf("official AST source text is not UTF-8")
+	}
+	return string(text), nil
 }
 
 func (p *ProjectInspection) projectMemberAccess(
@@ -315,4 +361,113 @@ func (s projectSourceEvidence) declarationTypeParameterCount(
 		}
 	}
 	return count, nil
+}
+
+func (p *ProjectInspection) dynamicCallableTypes(typeID uint32) ([]typeResponse, error) {
+	var result []typeResponse
+	for _, kind := range []int32{0, 1} {
+		var signatures []signatureResponse
+		if err := requestProjectJSON(
+			p.client,
+			"getSignaturesOfType",
+			getSignaturesOfTypeParams{
+				Snapshot: p.snapshot,
+				Project:  p.project,
+				Type:     typeID,
+				Kind:     kind,
+			},
+			&signatures,
+		); err != nil {
+			return nil, err
+		}
+		for _, signature := range signatures {
+			if signature.ID == 0 {
+				return nil, &ProjectInspectionError{
+					Operation: "callable implementation source",
+					Reason:    "checker callable signature is invalid",
+				}
+			}
+			for _, parameter := range signature.Parameters {
+				parameterType, err := p.projectSymbolType(
+					parameter,
+					"callable implementation source",
+				)
+				if err != nil {
+					return nil, err
+				}
+				result = append(result, parameterType)
+			}
+			returnType, err := p.signatureReturn(
+				signature.ID,
+				"authored callable type",
+			)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, returnType)
+		}
+	}
+	return result, nil
+}
+
+func (p *ProjectInspection) dynamicIndexTypes(typeID uint32) ([]typeResponse, error) {
+	var indexes []dynamicIndexInfo
+	if err := requestProjectJSON(
+		p.client,
+		"getIndexInfosOfType",
+		getTypePropertyParams{
+			Snapshot: p.snapshot,
+			Project:  p.project,
+			Type:     typeID,
+		},
+		&indexes,
+	); err != nil {
+		return nil, err
+	}
+	result := make([]typeResponse, 0, len(indexes)*2)
+	for _, index := range indexes {
+		result = append(result, index.KeyType, index.ValueType)
+	}
+	return result, nil
+}
+
+func (p *ProjectInspection) dynamicTypeProperty(
+	method string,
+	typeID uint32,
+) (*typeResponse, error) {
+	var selected *typeResponse
+	err := requestProjectJSON(
+		p.client,
+		method,
+		getTypePropertyParams{
+			Snapshot: p.snapshot,
+			Project:  p.project,
+			Type:     typeID,
+		},
+		&selected,
+	)
+	return selected, err
+}
+
+func (p *ProjectInspection) dynamicTypeArrayProperty(
+	method string,
+	typeID uint32,
+) ([]typeResponse, error) {
+	var selected []typeResponse
+	err := requestProjectJSON(
+		p.client,
+		method,
+		getTypePropertyParams{
+			Snapshot: p.snapshot,
+			Project:  p.project,
+			Type:     typeID,
+		},
+		&selected,
+	)
+	return selected, err
+}
+
+type dynamicIndexInfo struct {
+	KeyType   typeResponse `json:"keyType"`
+	ValueType typeResponse `json:"valueType"`
 }
