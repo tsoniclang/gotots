@@ -36,12 +36,17 @@ func TestNamedStructAssemblyMaterializesOnlyExactValueDemand(t *testing.T) {
 			operation: api.NamedStructOperationAssign,
 			want:      []string{"$assign"},
 		},
+		{
+			name:      "storage zero",
+			operation: api.NamedStructOperationStorageZero,
+			want:      []string{"$storageOf", "$fromStorage", "$zeroStorage"},
+		},
 	}
-	if got, want := len(tests)-1, int(api.NamedStructOperationAssign); got != want {
+	if got, want := len(tests)-1, int(api.NamedStructOperationStorageZero); got != want {
 		t.Fatalf("operation cases = %d, want complete enum denominator %d", got, want)
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+			t.Run(test.name, func(t *testing.T) {
 			program := loadDeclarationAssemblyFixture(t)
 			record := program.Roots()[0].Types().Scope().
 				Lookup("Item").(*types.TypeName)
@@ -57,6 +62,19 @@ func TestNamedStructAssemblyMaterializesOnlyExactValueDemand(t *testing.T) {
 				t.Fatal(err)
 			}
 			drainProgramSession(t, session)
+			if test.operation == api.NamedStructOperationStorageZero {
+				storage, err := api.NewNamedStructOperationRequirement(
+					record,
+					api.NamedStructOperationStorage,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := session.scheduleDeclarationRequirement(storage); err != nil {
+					t.Fatal(err)
+				}
+				drainProgramSession(t, session)
+			}
 			if test.operation.Valid() {
 				requirement, err := api.NewNamedStructOperationRequirement(
 					record,

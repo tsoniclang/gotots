@@ -553,7 +553,11 @@ return Point.$fromStorage({ X: field1, Y: field0 });
 An empty storage-backed value uses `Empty.$fromStorage({})`; neither source
 construction nor a package consumer calls a storage constructor directly.
 Static `$zero`, `$copy`, `$equal`, `$hash`, `$convert`, `$storageOf`, `$fromStorage`,
-and `$assign` members exist only when their exact semantic use requests them. A
+`$zeroStorage`, and `$assign` members exist only when their exact semantic use
+requests them. `$zeroStorage` constructs canonical field storage directly; a
+storage consumer must not allocate `$zero()` and immediately discard its wrapper
+through `$storageOf(...)`. For example, a nested `Inner` field in `Outer{}` uses
+`Inner.$zeroStorage()`, not `Inner.$storageOf(Inner.$zero())`. A
 certified provider may expose a positional `$make` operation; ordinary
 generated structs never gain that compatibility factory.
 

@@ -460,6 +460,14 @@ func (v staticSpecializationValues) ToStorage(
 	return value, nil
 }
 
+func (v staticSpecializationValues) StorageZero(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+) (api.ExpressionEmission, error) {
+	return v.Zero(context, source, sourceType)
+}
+
 func (v staticSpecializationValues) FromStorage(
 	_ api.Context,
 	_ ast.Node,

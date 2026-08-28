@@ -277,6 +277,12 @@ Static searches reject source-facing occurrences of:
 - public `$Value`/storage/effect type parameters;
 - digest-named effect/profile exports.
 
+Storage-backed struct fixtures additionally exact-check that nested named-struct
+zero values use the demanded `$zeroStorage` owner. A mutation restoring
+`$storageOf($zero())` must fail the generated-shape gate, while strict
+typechecking and Go/TypeScript differential execution prove identical field
+zeros for nested and generic structs.
+
 Required mutations append each forbidden parameter/type parameter, publish a
 private helper, alter receiver placement, duplicate a variadic slot, or select
 an unjoined provider signature. The signature gate must fail before printing.

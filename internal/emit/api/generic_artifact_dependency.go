@@ -2,9 +2,10 @@ package api
 
 import (
 	"fmt"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"go/types"
 	"slices"
+
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type GenericOperationConsumer uint8
@@ -19,6 +20,7 @@ const (
 	GenericOperationConsumerNamedStructConvert
 	GenericOperationConsumerNamedStructStorage
 	GenericOperationConsumerNamedStructAssign
+	GenericOperationConsumerNamedStructStorageZero
 )
 
 func GenericFunctionOperationConsumer() GenericOperationConsumer {
@@ -44,6 +46,8 @@ func GenericNamedStructOperationConsumer(
 		consumer = GenericOperationConsumerNamedStructStorage
 	case NamedStructOperationAssign:
 		consumer = GenericOperationConsumerNamedStructAssign
+	case NamedStructOperationStorageZero:
+		consumer = GenericOperationConsumerNamedStructStorageZero
 	default:
 		return GenericOperationConsumerInvalid, &InvariantError{
 			Role:   RoleFileDeclaration,
@@ -55,7 +59,7 @@ func GenericNamedStructOperationConsumer(
 
 func (c GenericOperationConsumer) Valid() bool {
 	return c >= GenericOperationConsumerFunction &&
-		c <= GenericOperationConsumerNamedStructAssign
+		c <= GenericOperationConsumerNamedStructStorageZero
 }
 
 func (c GenericOperationConsumer) NamedStructOperation() (
@@ -77,6 +81,8 @@ func (c GenericOperationConsumer) NamedStructOperation() (
 		return NamedStructOperationStorage, true
 	case GenericOperationConsumerNamedStructAssign:
 		return NamedStructOperationAssign, true
+	case GenericOperationConsumerNamedStructStorageZero:
+		return NamedStructOperationStorageZero, true
 	default:
 		return NamedStructOperationInvalid, false
 	}

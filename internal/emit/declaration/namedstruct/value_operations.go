@@ -16,6 +16,7 @@ func emitValueOperation(
 	source ast.Node,
 	className string,
 	classType tsgo.TypeNode,
+	storageType tsgo.TypeNode,
 	fields []layoutField,
 	assembly operationAssembly,
 	typeParameters []tsgo.TypeParameterDeclaration,
@@ -126,6 +127,21 @@ func emitValueOperation(
 			typeParameters,
 			canonicalStorage,
 		)
+	case api.NamedStructOperationStorageZero:
+		if !canonicalStorage || storageType == nil {
+			return nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "storage-zero operation has no canonical storage",
+			}
+		}
+		member, requests, err = storageZeroMethod(
+			context,
+			source,
+			storageType,
+			fields,
+			capabilities,
+			typeParameters,
+		)
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
@@ -200,21 +216,22 @@ func zeroMethod(
 	var body []tsgo.Statement
 	var requests []api.RootRequest
 	for _, field := range fields {
-		value, err := context.Values().Zero(
-			context.WithRole(api.RoleStructZeroField),
-			field.source,
-			field.object.Type(),
-		)
-		if err != nil {
-			return nil, nil, err
+		fieldContext := context.WithRole(api.RoleStructZeroField)
+		var value api.ExpressionEmission
+		var err error
+		if canonicalStorage {
+			value, err = context.Values().StorageZero(
+				fieldContext,
+				field.source,
+				field.object.Type(),
+			)
+		} else {
+			value, err = context.Values().Zero(
+				fieldContext,
+				field.source,
+				field.object.Type(),
+			)
 		}
-		value, err = operationConstructionValue(
-			context.WithRole(api.RoleStructZeroField),
-			field.source,
-			field,
-			value,
-			canonicalStorage,
-		)
 		if err != nil {
 			return nil, nil, err
 		}

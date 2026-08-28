@@ -131,6 +131,8 @@ func providerNamedStructCapability(
 		return gostdlib.FacetCapabilityStorage, nil
 	case api.NamedStructOperationAssign:
 		return gostdlib.FacetCapabilityAssign, nil
+	case api.NamedStructOperationStorageZero:
+		return gostdlib.FacetCapabilityStorage, nil
 	default:
 		return gostdlib.FacetCapabilityInvalid, &api.NameError{
 			Reason: "named-struct operation has no provider capability",

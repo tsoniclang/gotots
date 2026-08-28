@@ -17,6 +17,7 @@ type Values interface {
 	SupportsHash(Context, types.Type) bool
 	RequiresStorageProjection(Context, types.Type) (bool, error)
 	StorageType(Context, ast.Node, types.Type) (TypeEmission, error)
+	StorageZero(Context, ast.Node, types.Type) (ExpressionEmission, error)
 	ToStorage(
 		Context,
 		ast.Node,
