@@ -23,7 +23,28 @@ export interface RuntimeStructFieldOperations<T> {
   readonly address?: (value: T) => GoInterfaceValue;
 }
 
-export interface RuntimeStructFieldBuilder<T> {
+export type RuntimeStructStorageResolver<T, S> = (value: T) => S;
+
+export interface RuntimeStructFieldBuilder<T, S> {
+  readonly valueProperty: <K extends keyof S>(
+    type: () => Type,
+    resolveAdapter: RuntimeValueAdapterResolver<S[K]>,
+    key: K,
+    address?: (storage: S) => GoInterfaceValue,
+  ) => RuntimeStructFieldOperations<T>;
+  readonly copyingValueProperty: <K extends keyof S>(
+    type: () => Type,
+    resolveAdapter: RuntimeValueAdapterResolver<S[K]>,
+    key: K,
+    copy: (value: S[K]) => S[K],
+    address?: (storage: S) => GoInterfaceValue,
+  ) => RuntimeStructFieldOperations<T>;
+  readonly readonlyValueProperty: <K extends keyof S>(
+    type: () => Type,
+    resolveAdapter: RuntimeValueAdapterResolver<S[K]>,
+    key: K,
+    address?: (storage: S) => GoInterfaceValue,
+  ) => RuntimeStructFieldOperations<T>;
   readonly value: <F>(
     type: () => Type,
     resolveAdapter: RuntimeValueAdapterResolver<F>,
@@ -51,8 +72,8 @@ export interface RuntimeStructFieldBuilder<T> {
   ) => RuntimeStructFieldOperations<T>;
 }
 
-export type RuntimeStructFieldFactory<T> = (
-  fields: RuntimeStructFieldBuilder<T>,
+export type RuntimeStructFieldFactory<T, S> = (
+  fields: RuntimeStructFieldBuilder<T, S>,
 ) => readonly RuntimeStructFieldOperations<T>[];
 
 export interface RuntimePointerElementOperations<P> {
@@ -90,7 +111,74 @@ function unaddressableSetter(): void {
   );
 }
 
-export function createRuntimeStructFieldBuilder<T>(): RuntimeStructFieldBuilder<T> {
+export function createRuntimeStructFieldBuilder<T, S>(
+  resolveStorage: RuntimeStructStorageResolver<T, S>,
+): RuntimeStructFieldBuilder<T, S> {
+  const propertyAddress = (
+    address?: (storage: S) => GoInterfaceValue,
+  ): { readonly address?: (owner: T) => GoInterfaceValue } => address === undefined
+    ? {}
+    : { address: (owner: T): GoInterfaceValue => address(resolveStorage(owner)) };
+  const valueProperty = <K extends keyof S>(
+    type: () => Type,
+    resolveAdapter: RuntimeValueAdapterResolver<S[K]>,
+    key: K,
+    address?: (storage: S) => GoInterfaceValue,
+  ): RuntimeStructFieldOperations<T> => {
+    const adapter = resolveAdapter();
+    return {
+      type,
+      settable: true,
+      get: (owner: T): GoInterfaceValue => new adapter(resolveStorage(owner)[key]),
+      set: (owner, field): void => {
+        const admitted = adapter.$is(field)
+          ? field.$go$value
+          : GoPanic.raiseRuntime(
+            "reflect: Value.Set received a foreign interface box",
+          );
+        resolveStorage(owner)[key] = admitted;
+      },
+      ...propertyAddress(address),
+    };
+  };
+  const copyingValueProperty = <K extends keyof S>(
+    type: () => Type,
+    resolveAdapter: RuntimeValueAdapterResolver<S[K]>,
+    key: K,
+    copy: (value: S[K]) => S[K],
+    address?: (storage: S) => GoInterfaceValue,
+  ): RuntimeStructFieldOperations<T> => {
+    const adapter = resolveAdapter();
+    return {
+      type,
+      settable: true,
+      get: (owner: T): GoInterfaceValue => new adapter(resolveStorage(owner)[key]),
+      set: (owner, field): void => {
+        const admitted = adapter.$is(field)
+          ? field.$go$value
+          : GoPanic.raiseRuntime(
+            "reflect: Value.Set received a foreign interface box",
+          );
+        resolveStorage(owner)[key] = copy(admitted);
+      },
+      ...propertyAddress(address),
+    };
+  };
+  const readonlyValueProperty = <K extends keyof S>(
+    type: () => Type,
+    resolveAdapter: RuntimeValueAdapterResolver<S[K]>,
+    key: K,
+    address?: (storage: S) => GoInterfaceValue,
+  ): RuntimeStructFieldOperations<T> => {
+    const adapter = resolveAdapter();
+    return {
+      type,
+      settable: false,
+      get: (owner: T): GoInterfaceValue => new adapter(resolveStorage(owner)[key]),
+      set: unaddressableSetter,
+      ...propertyAddress(address),
+    };
+  };
   const value = <F>(
     type: () => Type,
     resolveAdapter: RuntimeValueAdapterResolver<F>,
@@ -155,7 +243,15 @@ export function createRuntimeStructFieldBuilder<T>(): RuntimeStructFieldBuilder<
     set: unaddressableSetter,
     ...(address === undefined ? {} : { address }),
   });
-  return { value, readonlyValue, interfaceValue, readonlyInterface };
+  return {
+    valueProperty,
+    copyingValueProperty,
+    readonlyValueProperty,
+    value,
+    readonlyValue,
+    interfaceValue,
+    readonlyInterface,
+  };
 }
 
 export function createRuntimePointerElementBuilder<P>(): RuntimePointerElementBuilder<P> {

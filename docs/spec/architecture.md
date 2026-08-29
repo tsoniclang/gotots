@@ -778,17 +778,23 @@ descriptor overrides are forbidden.
 
 Invariant reflection mechanics are emitted once at the portable provider
 owner, never repeated inside every descriptor. Generated code supplies only
-exact typed facts and callbacks: the concrete adapter, canonical relation
-descriptors, ordered struct-field accessors, pointer load/store operations,
-copy/zero operations, and explicit unsupported dispositions. For example, a
-struct registration supplies an ordered array of typed field accessors; the
-provider owns the single adapter guard, index bounds check, reflected-location
-construction, and clone guard. A pointer registration supplies its typed
-pointee descriptor and exact location callbacks; the provider owns the single
-nil/foreign-box decision. Moving common mechanics into generated per-type
-closures is a source-size and typecheck regression even when behavior remains
-correct. Erasing callback payloads or recovering their types dynamically is
-equally invalid.
+exact typed facts and irreducible callbacks: the concrete adapter, canonical
+relation descriptors, one represented-storage resolver, ordered struct-field
+property facts, pointer load/store operations, copy/zero operations, and
+explicit unsupported dispositions. A direct struct field contributes its
+target-name owner's exact property key; the provider's generic builder owns
+the read and write. A structural-copy field additionally contributes its
+ordinary typed copy callback. Blank, interface-valued, and representation-
+transforming fields contribute explicit callbacks because a property key alone
+cannot express their semantics. The key is statically checked against the
+resolver's inferred storage type and is never used to classify a source name
+or inspect a runtime shape. The provider owns the single adapter guard, index
+bounds check, reflected-location construction, and clone guard. A pointer
+registration supplies its typed pointee descriptor and exact location
+callbacks; the provider owns the single nil/foreign-box decision. Moving
+common mechanics into generated per-type closures is a source-size and
+typecheck regression even when behavior remains correct. Erasing callback
+payloads or recovering their types dynamically is equally invalid.
 
 Pointer location registration is total over every statically representable
 pointee kind. The canonical value-transfer owner decides whether extracting or

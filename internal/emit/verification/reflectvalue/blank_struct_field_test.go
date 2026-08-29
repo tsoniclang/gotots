@@ -74,7 +74,9 @@ func main() {
 			for _, required := range []string{
 				"fields.readonlyValue(",
 				"fields.readonlyInterface(",
-				".$storageOf(instance).Value",
+				"fields.valueProperty(",
+				".$storageOf(instance)), fields =>",
+				`"Value", storage =>`,
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					var storageLines []string

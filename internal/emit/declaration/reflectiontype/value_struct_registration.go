@@ -47,6 +47,7 @@ func structValueOperationsStatement(
 				"$registerOpaqueStruct",
 				descriptorName,
 				adapter,
+				nil,
 				factory.ArrayLiteralExpression(messages, true),
 				nil,
 			), api.CombineRequests(
@@ -59,6 +60,12 @@ func structValueOperationsStatement(
 		adapter:        adapter,
 		descriptorType: descriptorType,
 	}
+	accesses, storageResolver, storageRequests, propertyFacts, err :=
+		reflectedStructFieldAccesses(context, sourceType, structType)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	scaffold.requests = append(scaffold.requests, storageRequests...)
 	fields := make([]tsgo.Expression, 0, structType.NumFields())
 	for index := range structType.NumFields() {
 		field := structType.Field(index)
@@ -126,15 +133,44 @@ func structValueOperationsStatement(
 				}
 			}
 		} else {
-			target, targetErr := reflectedStructFieldTarget(
-				context.WithRole(api.RoleStructField),
-				sourceType,
-				field,
-				api.DirectExpression(factory.Identifier("instance")),
-			)
-			if targetErr != nil {
-				return nil, nil, false, targetErr
+			access := accesses[index]
+			if access == nil {
+				return nil, nil, false, &api.GeneratedArtifactShapeError{
+					Artifact: field.String(),
+					Reason:   "reflected struct field access is absent",
+				}
 			}
+			if !interfaceField && propertyFacts {
+				fieldAdapter, descriptorErr = context.Names().InterfaceAdapter(
+					field.Type(),
+					nil,
+				)
+				if descriptorErr != nil {
+					return nil, nil, false, descriptorErr
+				}
+				scaffold.requests = append(
+					scaffold.requests,
+					fieldAdapter.Requests()...,
+				)
+				property, selected, propertyErr := structValuePropertyFact(
+					context,
+					names,
+					field,
+					access,
+					descriptor,
+					fieldAdapter,
+					settable,
+					scaffold,
+				)
+				if propertyErr != nil {
+					return nil, nil, false, propertyErr
+				}
+				if selected {
+					fields = append(fields, property)
+					continue
+				}
+			}
+			target := access.target
 			var fieldRequests []api.RootRequest
 			getBody, setBlock, fieldRequests, descriptorErr =
 				storageStructFieldCallbacks(
@@ -251,6 +287,7 @@ func structValueOperationsStatement(
 			"$registerStruct",
 			descriptorName,
 			adapter,
+			storageResolver,
 			factory.ArrowFunction(
 				nil,
 				nil,
@@ -456,6 +493,7 @@ func structRegistrationCall(
 	member string,
 	descriptorName string,
 	adapter api.NameReference,
+	storage tsgo.Expression,
 	fields tsgo.Expression,
 	clone tsgo.Expression,
 ) tsgo.Statement {
@@ -469,8 +507,11 @@ func structRegistrationCall(
 			factory.EqualsGreaterThanToken(),
 			factory.ParenthesizedExpression(adapter.Expression(factory)),
 		),
-		fields,
 	}
+	if storage != nil {
+		arguments = append(arguments, storage)
+	}
+	arguments = append(arguments, fields)
 	if clone != nil {
 		arguments = append(arguments, clone)
 	}

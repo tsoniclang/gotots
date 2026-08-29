@@ -103,6 +103,17 @@ func main() {
 			).MatchString(artifacts.printed) {
 				t.Fatalf("struct reflection materializes field facts eagerly")
 			}
+			if fields := strings.Count(
+				artifacts.printed,
+				"fields.valueProperty(",
+			); fields != 3 {
+				t.Fatalf("direct reflected property facts = %d, want 3", fields)
+			}
+			if regexp.MustCompile(
+				`(?s)fields\.value\([^;]+instance\s*=>\s*\([^)]*\.(?:Name|Count|Verbose)\)`,
+			).MatchString(artifacts.printed) {
+				t.Fatal("direct reflected fields retain generated getter callbacks")
+			}
 		},
 	)
 }

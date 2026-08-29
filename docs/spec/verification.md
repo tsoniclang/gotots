@@ -586,6 +586,19 @@ ESM for:
 - open generic `TypeFor[T]` through exact private capability or
   concretization, with unchanged source value arity.
 
+Struct-field artifact proof partitions every field before inspecting output.
+A field whose selected storage needs no value projection must emit one exact
+property-key fact against the registration's typed storage resolver; a
+settable aggregate additionally emits its canonical copy callback. Blank,
+interface-valued, and representation-transforming fields must instead emit
+their explicit typed callback form. Focused fixtures exercise both sides with
+the same represented source types used by ordinary assignment.
+Mutating a key, restoring a direct getter/setter closure, dropping a copy, or
+forcing a transformed field through the property path must fail generated
+shape, strict typecheck, or differential behavior at this gate. Product proof
+reports the exact count and bytes of both dispositions and rejects a zero-row
+property path as vacuous.
+
 Mutating an address callback to omit reflection-interface exposure must
 remove the address-only interface method and fail artifact inspection before
 runtime. Mutating it to ordinary empty-interface membership, eager per-contract

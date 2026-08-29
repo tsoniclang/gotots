@@ -26,6 +26,7 @@ import {
   type RuntimePointerElementBuilder,
   type RuntimePointerValueOperations,
   type RuntimeStructFieldFactory,
+  type RuntimeStructStorageResolver,
   type RuntimeValueAdapterResolver,
   type RuntimeValueOperations,
 } from "../portable/reflect/runtime-value.js";
@@ -50,15 +51,17 @@ export class ReflectTypeMetadataOperations {
     registerRuntimeValueOperations(type, operations);
   }
 
-  static $registerStruct<T>(
+  static $registerStruct<T, S>(
     type: Type,
     resolveAdapter: RuntimeValueAdapterResolver<T>,
-    createFields: RuntimeStructFieldFactory<T>,
+    resolveStorage: RuntimeStructStorageResolver<T, S>,
+    createFields: RuntimeStructFieldFactory<T, S>,
     clone?: (value: T) => T,
   ): void {
     registerRuntimeStructValueOperations(
       type,
       resolveAdapter,
+      resolveStorage,
       createFields,
       clone,
     );

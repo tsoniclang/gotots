@@ -19,6 +19,7 @@ import {
   type RuntimePointerValueOperations,
   type RuntimeStructFieldFactory,
   type RuntimeStructFieldOperations,
+  type RuntimeStructStorageResolver,
   type RuntimeValueAdapterResolver,
 } from "./runtime-value-members.js";
 export type {
@@ -26,6 +27,7 @@ export type {
   RuntimePointerValueOperations,
   RuntimeStructFieldFactory,
   RuntimeStructFieldOperations,
+  RuntimeStructStorageResolver,
   RuntimeValueAdapter,
   RuntimeValueAdapterResolver,
 } from "./runtime-value-members.js";
@@ -171,15 +173,18 @@ export function registerRuntimeValueOperations(
   operationsByType.set(type, { factory });
 }
 
-export function registerRuntimeStructValueOperations<T>(
+export function registerRuntimeStructValueOperations<T, S>(
   type: Type,
   resolveAdapter: RuntimeValueAdapterResolver<T>,
-  createFields: RuntimeStructFieldFactory<T>,
+  resolveStorage: RuntimeStructStorageResolver<T, S>,
+  createFields: RuntimeStructFieldFactory<T, S>,
   clone?: (value: T) => T,
 ): void {
   registerRuntimeValueOperations(type, () => {
     const adapter = resolveAdapter();
-    const fields = createFields(createRuntimeStructFieldBuilder<T>());
+    const fields = createFields(
+      createRuntimeStructFieldBuilder<T, S>(resolveStorage),
+    );
     const fieldCount = BigInt(fields.length);
     const field = (
       box: GoInterfaceValue,

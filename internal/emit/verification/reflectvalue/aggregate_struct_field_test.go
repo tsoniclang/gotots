@@ -100,6 +100,8 @@ func main() {
 				".$copy(",
 				"storePointer(pointer,",
 				"fields.readonlyValue(",
+				"fields.copyingValueProperty(",
+				`"Inline", value =>`,
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf("aggregate reflection artifact lacks %q", required)

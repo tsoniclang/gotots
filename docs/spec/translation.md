@@ -867,19 +867,16 @@ typed registration equivalent to:
 ReflectTypeMetadataOperations.$registerStruct(
   $goReflectType_Entry,
   () => $goInterfaceAdapter_Entry,
-  [{
-    type: () => $goReflectType_string,
-    settable: true,
-    get: entry => new $goInterfaceAdapter_string(entry.Name),
-    set: (entry, field) => {
-      entry.Name = $goInterfaceAdapter_string.$is(field)
-        ? field.$go$value
-        : GoPanic.raiseRuntime(
-            "reflect: Value.Set received a foreign interface box",
-          );
-    },
-  }],
-  Entry.$copy,
+  entry => entry,
+  fields => [
+    fields.valueProperty(
+      () => $goReflectType_string,
+      () => $goInterfaceAdapter_string,
+      "Name",
+      storage => new $goInterfaceAdapter_ptr_string(addressOf(storage.Name)),
+    ),
+  ],
+  value => Entry.$copy(value),
 );
 ```
 
@@ -887,10 +884,17 @@ The portable provider owns the one adapter guard, field bounds check,
 location wrapper, and clone wrapper used by every such registration. The
 adapter resolver is retained lazily and evaluated only when reflection first
 materializes the operation record, after ESM module initialization. The
-generated callbacks stay statically typed from their concrete adapter; no
-payload cast, source-name lookup, or host reflection is permitted. Provider-
-represented structs use a distinct typed opaque-field registration whose
-only generated facts are field-order-preserving failure messages; they do not
+storage resolver is likewise typed: for a direct class it is the identity; for
+a selected canonical-storage class it is that class's exact `$storageOf`
+operation. A field requiring Go value-copy semantics uses
+`copyingValueProperty` with the existing canonical copy operation. A field
+whose storage requires projection retains an explicit typed getter and setter
+instead of pretending that a property key is sufficient. The emitted property
+key is the target-name owner's exact member identity and is checked against the
+inferred storage type; it is not a source-name lookup. No payload cast, runtime
+shape test, `any`, `unknown`, or host reflection is permitted. Provider-
+represented structs use a distinct typed opaque-field registration whose only
+generated facts are field-order-preserving failure messages; they do not
 retain the ordinary field-access path behind a fallback.
 
 An addressable registration also carries its canonical pointer box callback.

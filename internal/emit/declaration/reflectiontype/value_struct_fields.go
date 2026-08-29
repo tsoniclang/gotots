@@ -8,12 +8,19 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+type reflectedStructFieldAccess struct {
+	target        api.StoreTargetEmission
+	storage       api.ExpressionEmission
+	member        string
+	storageBacked bool
+}
+
 func reflectedStructFieldTarget(
 	context api.Context,
 	sourceType types.Type,
 	field *types.Var,
 	receiver api.ExpressionEmission,
-) (api.StoreTargetEmission, error) {
+) (reflectedStructFieldAccess, error) {
 	target, storageBacked, err := namedstructstorage.FieldTarget(
 		context,
 		nil,
@@ -21,8 +28,25 @@ func reflectedStructFieldTarget(
 		field,
 		receiver,
 	)
-	if err != nil || storageBacked {
-		return target, err
+	if err != nil {
+		return reflectedStructFieldAccess{}, err
+	}
+	if storageBacked {
+		owner, member, ownerErr := namedstructstorage.DemandFieldOwner(
+			context,
+			sourceType,
+			field,
+			receiver,
+		)
+		if ownerErr != nil {
+			return reflectedStructFieldAccess{}, ownerErr
+		}
+		return reflectedStructFieldAccess{
+			target:        target,
+			storage:       owner,
+			member:        member,
+			storageBacked: true,
+		}, nil
 	}
 	named, namedOK := types.Unalias(sourceType).(*types.Named)
 	if namedOK && named.Obj() != nil && !field.Exported() &&
@@ -34,25 +58,36 @@ func reflectedStructFieldTarget(
 			receiver,
 		)
 		if ownerErr != nil {
-			return api.StoreTargetEmission{}, ownerErr
+			return reflectedStructFieldAccess{}, ownerErr
 		}
-		return api.NewCanonicalStoragePropertyStoreTargetEmission(
+		target, targetErr := api.NewCanonicalStoragePropertyStoreTargetEmission(
 			context.Factory(),
 			owner,
 			member,
 			field.Type(),
 		)
+		return reflectedStructFieldAccess{
+			target:        target,
+			storage:       owner,
+			member:        member,
+			storageBacked: true,
+		}, targetErr
 	}
 	member, err := context.Names().Member(field)
 	if err != nil {
-		return api.StoreTargetEmission{}, err
+		return reflectedStructFieldAccess{}, err
 	}
-	return api.NewPropertyStoreTargetEmission(
+	target, err = api.NewPropertyStoreTargetEmission(
 		context.Factory(),
 		receiver,
 		member,
 		field.Type(),
 	)
+	return reflectedStructFieldAccess{
+		target:  target,
+		storage: receiver,
+		member:  member,
+	}, err
 }
 
 func storageStructFieldCallbacks(

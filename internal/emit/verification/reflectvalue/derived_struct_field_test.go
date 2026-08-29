@@ -67,7 +67,9 @@ func Make(value int64) Record {
 				"export type Derived$Storage = {",
 				"value: int64;",
 				"Derived.$fromStorage(",
-				".$storageOf(instance).value",
+				".$storageOf(instance)), fields =>",
+				"fields.readonlyValueProperty(",
+				`"value", storage =>`,
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf(

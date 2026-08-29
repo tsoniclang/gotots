@@ -123,7 +123,12 @@ import {
 } from ${JSON.stringify(runtimeValueModule)};
 
 const descriptor = {};
-registerRuntimeStructValueOperations(descriptor, () => CycleAdapter, () => []);
+registerRuntimeStructValueOperations(
+  descriptor,
+  () => CycleAdapter,
+  (value) => value,
+  () => [],
+);
 
 export function registeredOperations() {
   return runtimeValueOperations(descriptor);
@@ -192,6 +197,7 @@ test("typed struct registration owns common guards, locations, and copies", () =
     count: bigint;
     readonly secret: boolean;
     payload: GoInterfaceValue | undefined;
+    child: { label: string };
   };
   const stringDescriptor = createRuntimeType(
     () => metadata("string", 24n),
@@ -209,6 +215,9 @@ test("typed struct registration owns common guards, locations, and copies", () =
   const stringAdapter = valueAdapter<string>(Object.freeze({ comparable: true }));
   const intAdapter = valueAdapter<bigint>(Object.freeze({ comparable: true }));
   const boolAdapter = valueAdapter<boolean>(Object.freeze({ comparable: true }));
+  const childAdapter = valueAdapter<{ label: string }>(
+    Object.freeze({ comparable: false }),
+  );
   let adapterResolutionCount = 0;
   registerRuntimeStructValueOperations(
     recordDescriptor,
@@ -216,27 +225,23 @@ test("typed struct registration owns common guards, locations, and copies", () =
       adapterResolutionCount += 1;
       return recordAdapter;
     },
+    (record: Record): Record => record,
     (fields) => [
-      fields.value(
+      fields.valueProperty(
         () => stringDescriptor,
         () => stringAdapter,
-        (record: Record): string => record.name,
-        (record: Record, field: string): void => {
-          record.name = field;
-        },
+        "name",
+        (record: Record): GoInterfaceValue => new stringAdapter(record.name),
       ),
-      fields.value(
+      fields.valueProperty(
         () => intDescriptor,
         () => intAdapter,
-        (record: Record): bigint => record.count,
-        (record: Record, field: bigint): void => {
-          record.count = field;
-        },
+        "count",
       ),
-      fields.readonlyValue(
+      fields.readonlyValueProperty(
         () => intDescriptor,
         () => boolAdapter,
-        (record: Record): boolean => record.secret,
+        "secret",
       ),
       fields.interfaceValue(
         () => recordDescriptor,
@@ -250,6 +255,12 @@ test("typed struct registration owns common guards, locations, and copies", () =
           record.payload = field;
         },
       ),
+      fields.copyingValueProperty(
+        () => recordDescriptor,
+        () => childAdapter,
+        "child",
+        (child): { label: string } => ({ ...child }),
+      ),
     ],
     (record: Record): Record => ({ ...record }),
   );
@@ -260,12 +271,13 @@ test("typed struct registration owns common guards, locations, and copies", () =
     count: 3n,
     secret: true,
     payload: undefined,
+    child: { label: "before" },
   });
   const operations = runtimeValueOperations(recordDescriptor);
   assert.equal(adapterResolutionCount, 1);
   assert.equal(runtimeValueOperations(recordDescriptor), operations);
   assert.equal(adapterResolutionCount, 1);
-  assert.equal(operations?.numField, 4n);
+  assert.equal(operations?.numField, 5n);
   const location = operations?.field?.(source, 0n);
   assert.equal(location?.type(), stringDescriptor);
   assert.equal(location?.settable, true);
@@ -277,6 +289,8 @@ test("typed struct registration owns common guards, locations, and copies", () =
   assert.equal(before.$go$value, "before");
   location?.set(new stringAdapter("after"));
   assert.equal(source.$go$value.name, "after");
+  const address = location?.address?.();
+  assert.equal(stringAdapter.$is(address), true);
   const countLocation = operations?.field?.(source, 1n);
   assert.equal(countLocation?.type(), intDescriptor);
   const count = countLocation?.get();
@@ -304,6 +318,10 @@ test("typed struct registration owns common guards, locations, and copies", () =
     () => payloadLocation?.set(new stringAdapter("foreign")),
     panicWith(/outside the interface contract/),
   );
+  const child = { label: "after" };
+  operations?.field?.(source, 4n).set(new childAdapter(child));
+  assert.notEqual(source.$go$value.child, child);
+  assert.deepEqual(source.$go$value.child, child);
   const cloned = operations?.cloned?.(source);
   assert.equal(recordAdapter.$is(cloned), true);
   if (!recordAdapter.$is(cloned)) {
@@ -316,7 +334,7 @@ test("typed struct registration owns common guards, locations, and copies", () =
     panicWith(/foreign interface box/),
   );
   assert.throws(
-    () => operations?.field?.(source, 4n),
+    () => operations?.field?.(source, 5n),
     panicWith(/index out of range/),
   );
 });
