@@ -39,8 +39,8 @@ func TestAggregateMapGeneratedCostInventory(t *testing.T) {
 	)
 	artifacts := materialize(t, emission, t.TempDir())
 	inventory := mapExpansionCosts(t, emission, artifacts)
-	if len(inventory) != 6 {
-		t.Fatalf("map expansion inventory = %d, want six reached classes", len(inventory))
+	if len(inventory) != 7 {
+		t.Fatalf("map expansion inventory = %d, want seven reached classes", len(inventory))
 	}
 	for index, expansion := range inventory[:min(20, len(inventory))] {
 		t.Logf(

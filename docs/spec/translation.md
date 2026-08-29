@@ -600,18 +600,23 @@ recovery, filesystem artifact, text patch, or product-specific implementation.
 ### Maps
 
 Map representation is selected once from the exact closed key and value
-types. A map with an exact built-in boolean, integer, or string key and a
-runtime-basic value uses the canonical `GoMap<K,V>` owner. A map that needs
-static zero, copy, hash, or equality operations uses one deduplicated support
-specialization for its semantic shape, never one class per use site.
+types. A map whose key already has an identity boolean, integer, or string
+primitive representation and whose value is runtime-basic uses the canonical
+`GoMap<K,V>` owner. A map that needs an explicit key projection or static zero,
+copy, hash, or equality operations uses one deduplicated support specialization
+for its semantic shape, never one class per use site.
 
-When the selected key storage is an exact built-in boolean, integer, or string
-key, a specialized map stores tuple cells in a native JavaScript `Map`. The
-cell distinguishes a present `undefined` value from an absent key. Defined,
-floating-point, complex, pointer, interface, and aggregate keys retain the
-typed hash/equality bucket representation. Both paths preserve nil behavior,
-zero on miss, comma-ok, deletion, clear, assignment copy, and the iteration
-envelope through the same Go-shaped map contract.
+When the selected key storage is an exact boolean, integer, or string
+primitive, a specialized map stores tuple cells in a native JavaScript `Map`.
+This includes a defined key only when its canonical storage mapping is
+bijective: either the identity representation or an explicit projection.
+Public lookup/store/delete/keys operations apply and reverse any explicit
+projection at the specialization boundary. The cell
+distinguishes a present `undefined` value from an absent key. Floating-point,
+complex, pointer, interface, aggregate, and non-bijective defined keys retain
+the typed hash/equality bucket representation. Both paths preserve nil
+behavior, zero on miss, comma-ok, deletion, clear, assignment copy, and the
+iteration envelope through the same Go-shaped map contract.
 
 That common contract is one exported nominal abstract class, not a structural
 interface:

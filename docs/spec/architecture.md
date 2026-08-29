@@ -618,19 +618,24 @@ emits no substitute virtual address, JavaScript cast, identity extraction, or
 target-specific codec in canonical source. Safe pointer semantics are never
 routed through a legacy raw-memory implementation to keep a corpus compiling.
 
-Maps have one representation owner and three storage modes. An exact built-in
-boolean, integer, or string key with a runtime-basic value uses the canonical
-`GoMap<K,V>` runtime. Closed map shapes that need static zero, copy, hash, or
-equality operations use one deduplicated support specialization for each exact
-semantic shape.
+Maps have one representation owner and three storage modes. A key with an
+identity boolean, integer, or string primitive representation and a
+runtime-basic value uses the canonical `GoMap<K,V>` runtime. Closed map shapes
+that need an explicit key projection or static zero, copy, hash, or equality
+operations use one deduplicated support specialization for each exact semantic
+shape.
 
 A specialization uses native JavaScript `Map` storage only when its selected
-key is an exact built-in boolean, integer, or string. Tuple cells preserve the
-difference between an absent key and a present `undefined` value. All other
-specialized keys use typed hash/equality buckets because JavaScript `Map`
-identity is not Go equality for those classes. Both representations retain the
-same nil, zero-on-miss, comma-ok, copy, mutation, and iteration contracts;
-neither is selected by a source spelling or use site.
+key storage is an exact boolean, integer, or string primitive. A defined key is
+admitted only through its canonical bijective storage mapping: either an
+identity representation or an explicit projection which the specialization
+owns at every key input and reverses at key iteration output. Tuple
+cells preserve the difference between an absent key and a present `undefined`
+value. Floating-point, complex, pointer, interface, aggregate, and
+non-bijective defined keys use typed hash/equality buckets because JavaScript
+`Map` identity is not Go equality for those classes. Both representations
+retain the same nil, zero-on-miss, comma-ok, copy, mutation, and iteration
+contracts; neither is selected by a source spelling or use site.
 
 Native storage compares the already-selected primitive carrier. Consequently,
 wide integer keys under the `number` profile retain that profile's declared

@@ -323,13 +323,6 @@ func storageKeyType(
 	return sourceType, nil
 }
 
-func underlyingStorageKeyType(sourceType types.Type) types.Type {
-	if model, ok := definedtype.ResolveBasic(sourceType); ok {
-		return model.Underlying()
-	}
-	return sourceType
-}
-
 func storageKeyOperationContext(
 	context api.Context,
 	sourceType types.Type,

@@ -206,22 +206,23 @@ func assertAggregateMapArtifacts(
 			}
 		}
 	}
-	if generatedDefinitions != 6 {
+	if generatedDefinitions != 7 {
 		t.Fatalf(
-			"map specialization definitions = %d, want six exact reached shapes",
+			"map specialization definitions = %d, want seven exact reached shapes",
 			generatedDefinitions,
 		)
 	}
-	if nativeDefinitions != 2 ||
+	if nativeDefinitions != 3 ||
 		hashedDefinitions != 4 ||
 		hashedBucketLoops != hashedDefinitions*3 {
 		t.Fatalf(
-			"map storage shapes = native:%d hashed:%d typed-bucket-loops:%d, want 2/4/12",
+			"map storage shapes = native:%d hashed:%d typed-bucket-loops:%d, want 3/4/12",
 			nativeDefinitions,
 			hashedDefinitions,
 			hashedBucketLoops,
 		)
 	}
+	assertProjectedPrimitiveMap(t, artifacts)
 	anonymous := readFile(
 		t,
 		artifacts.file(t, output.AnonymousStructSupportPath),
@@ -272,6 +273,7 @@ func main() {
 	fmt.Println(values.StructKeyLifecycle())
 	fmt.Println(values.AnonymousShapeLifecycle())
 	fmt.Println(values.CollisionEquality())
+	fmt.Println(values.NamedKeyLifecycle())
 	fmt.Println(values.LiteralOrder())
 }
 `)
@@ -296,15 +298,16 @@ func executeAggregateMapTypeScript(
     ArrayKeyLifecycle,
     CollisionEquality,
     LiteralOrder,
+    NamedKeyLifecycle,
     NamedValueLifecycle,
     StructKeyLifecycle,
 } from "`+artifacts.module(t, "source.ts")+`";
 import "./program.js";
 
-function show(value: number | bigint | boolean): string {
+function show(value: number | bigint | boolean | string): string {
     return typeof value === "bigint" ? value.toString() : String(value);
 }
-function print(...values: Array<number | bigint | boolean>): void {
+function print(...values: Array<number | bigint | boolean | string>): void {
     console.log(...values.map(show));
 }
 
@@ -313,6 +316,7 @@ print(...ArrayKeyLifecycle());
 print(...StructKeyLifecycle());
 print(...AnonymousShapeLifecycle());
 print(...CollisionEquality());
+print(...NamedKeyLifecycle());
 print(LiteralOrder());
 `)
 	writeFile(
@@ -327,6 +331,44 @@ print(LiteralOrder());
 		"node",
 		filepath.Join(workingDirectory, "out", "runner.js"),
 	)
+}
+
+func assertProjectedPrimitiveMap(t *testing.T, artifacts materialized) {
+	t.Helper()
+	source := readFile(t, artifacts.file(t, output.MapSpecializationSupportPath))
+	var selected string
+	for name, classSource := range mapClassSources(source) {
+		if name == "$goMap$MapOf_Named_aggregatemap$Label_To_int32" {
+			selected = classSource
+			break
+		}
+	}
+	if selected == "" {
+		var names []string
+		for name := range mapClassSources(source) {
+			names = append(names, name)
+		}
+		slices.Sort(names)
+		t.Fatalf("defined-string key map specialization is absent; classes=%v", names)
+	}
+	for _, required := range []string{
+		"private readonly values: Map<gostring, [",
+		"private static $projectKey($key: Label__from_aggregatemap): gostring",
+		"private static $reifyKey($storageKey: gostring): Label__from_aggregatemap",
+		"values.get(storageKey)",
+		"values.set(storageKey, [",
+		"values.delete(storageKey)",
+		"result.push(",
+	} {
+		if !strings.Contains(selected, required) {
+			t.Fatalf("defined-string native map lacks %q:\n%s", required, selected)
+		}
+	}
+	for _, forbidden := range []string{"$hash(", "$equal(", "$find(", "buckets"} {
+		if strings.Contains(selected, forbidden) {
+			t.Fatalf("defined-string native map contains %q:\n%s", forbidden, selected)
+		}
+	}
 }
 
 func loadAggregateMapProject(t *testing.T) *load.Package {

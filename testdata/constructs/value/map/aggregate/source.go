@@ -20,6 +20,23 @@ type CollisionKey struct {
 	Value int64
 }
 
+type Label string
+
+func NamedKeyLifecycle() (int32, bool, string, bool) {
+	values := map[Label]int32{
+		"first": 41,
+	}
+	found, ok := values[Label("first")]
+	delete(values, Label("first"))
+	values[Label("second")] = 42
+	keys := make([]Label, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	_, deleted := values[Label("first")]
+	return found, ok, string(keys[0]), deleted
+}
+
 func NamedValueLifecycle() (
 	int32,
 	int32,

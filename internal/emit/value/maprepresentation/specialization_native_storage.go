@@ -6,7 +6,7 @@ import (
 )
 
 func (b specializationBuilder) buildNative() []tsgo.ClassElement {
-	return []tsgo.ClassElement{
+	members := []tsgo.ClassElement{
 		b.nativeConstructor(),
 		b.operationMethod(
 			specializationZeroOperation,
@@ -22,6 +22,29 @@ func (b specializationBuilder) buildNative() []tsgo.ClassElement {
 			b.valueType,
 			b.copyValue,
 		),
+	}
+	if b.keyProjection {
+		members = append(
+			members,
+			b.operationMethod(
+				specializationProjectKeyOperation,
+				[]tsgo.ParameterDeclaration{
+					b.parameter("$key", b.keyType),
+				},
+				b.storageKeyType,
+				b.projectKey,
+			),
+			b.operationMethod(
+				specializationReifyKeyOperation,
+				[]tsgo.ParameterDeclaration{
+					b.parameter("$storageKey", b.storageKeyType),
+				},
+				b.keyType,
+				b.reifyKey,
+			),
+		)
+	}
+	members = append(members,
 		b.nativeNilMethod(),
 		b.nativeMakeMethod(),
 		b.nativeLookupMethod(),
@@ -32,7 +55,8 @@ func (b specializationBuilder) buildNative() []tsgo.ClassElement {
 		b.nativeIsNilMethod(),
 		b.nativeClearMethod(),
 		b.nativeKeysMethod(),
-	}
+	)
+	return members
 }
 
 func (b specializationBuilder) nativeCellType() tsgo.TypeNode {
@@ -134,11 +158,13 @@ func (b specializationBuilder) nativeMakeMethod() tsgo.MethodDeclaration {
 func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 	values := b.id("values")
 	entry := b.id("entry")
-	return b.method(
+	storageKey, keyStatements := b.storageKeyBinding(b.id("key"))
+	return b.methodWithPrefix(
 		nil,
 		b.members.lookup,
 		[]tsgo.ParameterDeclaration{b.parameter("key", b.keyType)},
 		b.valueType,
+		keyStatements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"values",
@@ -160,7 +186,7 @@ func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 				b.nativeCellType(),
 				b.undefinedType(),
 			}),
-			b.call(values, "get", b.id("key")),
+			b.call(values, "get", storageKey),
 		),
 		b.factory.ReturnStatement(b.staticCall(
 			specializationCopyValueOperation,
@@ -178,6 +204,7 @@ func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 	values := b.id("values")
 	entry := b.id("entry")
+	storageKey, keyStatements := b.storageKeyBinding(b.id("key"))
 	resultType := b.factory.TupleTypeNode([]tsgo.TypeNode{
 		b.valueType,
 		b.booleanType(),
@@ -194,11 +221,12 @@ func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 			false,
 		)
 	}
-	return b.method(
+	return b.methodWithPrefix(
 		nil,
 		b.members.lookupOK,
 		[]tsgo.ParameterDeclaration{b.parameter("key", b.keyType)},
 		resultType,
+		keyStatements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"values",
@@ -217,7 +245,7 @@ func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 				b.nativeCellType(),
 				b.undefinedType(),
 			}),
-			b.call(values, "get", b.id("key")),
+			b.call(values, "get", storageKey),
 		),
 		b.factory.IfStatement(
 			b.undefined(entry),
@@ -239,7 +267,8 @@ func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 
 func (b specializationBuilder) nativeStoreMethod() tsgo.MethodDeclaration {
 	values := b.id("values")
-	return b.method(
+	storageKey, keyStatements := b.storageKeyBinding(b.id("key"))
+	return b.methodWithPrefix(
 		nil,
 		b.members.store,
 		[]tsgo.ParameterDeclaration{
@@ -247,6 +276,7 @@ func (b specializationBuilder) nativeStoreMethod() tsgo.MethodDeclaration {
 			b.parameter("value", b.valueType),
 		},
 		b.voidType(),
+		keyStatements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"values",
@@ -268,7 +298,7 @@ func (b specializationBuilder) nativeStoreMethod() tsgo.MethodDeclaration {
 		b.factory.ExpressionStatement(b.call(
 			values,
 			"set",
-			b.id("key"),
+			storageKey,
 			b.factory.ArrayLiteralExpression(
 				[]tsgo.Expression{b.staticCall(
 					specializationCopyValueOperation,
@@ -282,11 +312,13 @@ func (b specializationBuilder) nativeStoreMethod() tsgo.MethodDeclaration {
 
 func (b specializationBuilder) nativeDeleteMethod() tsgo.MethodDeclaration {
 	values := b.id("values")
-	return b.method(
+	storageKey, keyStatements := b.storageKeyBinding(b.id("key"))
+	return b.methodWithPrefix(
 		nil,
 		b.members.deleteMember,
 		[]tsgo.ParameterDeclaration{b.parameter("key", b.keyType)},
 		b.voidType(),
+		keyStatements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"values",
@@ -298,7 +330,7 @@ func (b specializationBuilder) nativeDeleteMethod() tsgo.MethodDeclaration {
 				tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
 				b.undefined(values),
 			),
-			b.factory.ExpressionStatement(b.call(values, "delete", b.id("key"))),
+			b.factory.ExpressionStatement(b.call(values, "delete", storageKey)),
 			nil,
 		),
 	)
@@ -359,11 +391,45 @@ func (b specializationBuilder) nativeClearMethod() tsgo.MethodDeclaration {
 
 func (b specializationBuilder) nativeKeysMethod() tsgo.MethodDeclaration {
 	values := b.id("values")
+	if !b.keyProjection {
+		return b.method(
+			nil,
+			b.members.keys,
+			nil,
+			b.factory.ArrayTypeNode(b.keyType),
+			b.variable(
+				tsgo.NodeFlagsConst,
+				"values",
+				b.nativeStorageType(),
+				b.property(b.factory.ThisExpression(), "values"),
+			),
+			b.factory.IfStatement(
+				b.undefined(values),
+				b.returnBlock(b.factory.ArrayLiteralExpression(nil, false)),
+				nil,
+			),
+			b.factory.ReturnStatement(b.factory.CallExpression(
+				b.property(b.id("Array"), "from"),
+				nil,
+				nil,
+				[]tsgo.Expression{b.call(values, "keys")},
+				tsgo.NodeFlagsNone,
+			)),
+		)
+	}
+	result := b.id("result")
+	storageKey := b.id("storageKey")
 	return b.method(
 		nil,
 		b.members.keys,
 		nil,
 		b.factory.ArrayTypeNode(b.keyType),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"result",
+			b.factory.ArrayTypeNode(b.keyType),
+			b.factory.ArrayLiteralExpression(nil, false),
+		),
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"values",
@@ -372,15 +438,29 @@ func (b specializationBuilder) nativeKeysMethod() tsgo.MethodDeclaration {
 		),
 		b.factory.IfStatement(
 			b.undefined(values),
-			b.returnBlock(b.factory.ArrayLiteralExpression(nil, false)),
+			b.returnBlock(result),
 			nil,
 		),
-		b.factory.ReturnStatement(b.factory.CallExpression(
-			b.property(b.id("Array"), "from"),
+		b.factory.ForOfStatement(
 			nil,
-			nil,
-			[]tsgo.Expression{b.call(values, "keys")},
-			tsgo.NodeFlagsNone,
-		)),
+			b.factory.VariableDeclarationList(
+				[]tsgo.VariableDeclaration{b.factory.VariableDeclaration(
+					storageKey,
+					nil,
+					nil,
+					nil,
+				)},
+				tsgo.NodeFlagsConst,
+			),
+			b.call(values, "keys"),
+			b.factory.Block([]tsgo.Statement{b.factory.ExpressionStatement(
+				b.call(
+					result,
+					"push",
+					b.reifyKeyExpression(storageKey),
+				),
+			)}, true),
+		),
+		b.factory.ReturnStatement(result),
 	)
 }

@@ -229,10 +229,7 @@ func specializationOperations(
 		zero.Requests(),
 		copyValue.Requests(),
 	)
-	if storage == StorageNative {
-		return operations, requests, nil
-	}
-	if storage != StorageHashed {
+	if storage != StorageNative && storage != StorageHashed {
 		return specializationOperationSet{}, nil, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "map specialization operation storage is invalid",
@@ -242,11 +239,51 @@ func specializationOperations(
 	if err != nil {
 		return specializationOperationSet{}, nil, err
 	}
+	key := context.Factory().Identifier("$key")
+	keyProjection := !types.Identical(mapType.Key(), keyType)
+	var projectKey api.ExpressionEmission
+	var reifyKey api.ExpressionEmission
+	var projectKeyBody operationBody
+	var reifyKeyBody operationBody
+	if keyProjection {
+		projectKey, err = context.Values().ToStorage(
+			context.WithRole(api.RoleMapKey),
+			source,
+			mapType.Key(),
+			api.DirectExpression(key),
+		)
+		if err != nil {
+			return specializationOperationSet{}, nil, err
+		}
+		reifyKey, err = context.Values().FromStorage(
+			context.WithRole(api.RoleMapKey),
+			source,
+			mapType.Key(),
+			api.DirectExpression(
+				context.Factory().Identifier("$storageKey"),
+			),
+		)
+		if err != nil {
+			return specializationOperationSet{}, nil, err
+		}
+		projectKeyBody = operation(projectKey)
+		reifyKeyBody = operation(reifyKey)
+	}
+	operations.projectKey = projectKeyBody
+	operations.reifyKey = reifyKeyBody
+	operations.keyProjection = keyProjection
+	requests = api.CombineRequests(
+		requests,
+		projectKey.Requests(),
+		reifyKey.Requests(),
+	)
+	if storage == StorageNative {
+		return operations, requests, nil
+	}
 	keyContext, err := storageKeyOperationContext(context, mapType.Key())
 	if err != nil {
 		return specializationOperationSet{}, nil, err
 	}
-	key := context.Factory().Identifier("$key")
 	hash, err := context.Values().Hash(
 		keyContext.WithRole(api.RoleMapKey),
 		source,
@@ -279,48 +316,14 @@ func specializationOperations(
 	if err != nil {
 		return specializationOperationSet{}, nil, err
 	}
-	keyProjection := !types.Identical(mapType.Key(), keyType)
-	var projectKey api.ExpressionEmission
-	var reifyKey api.ExpressionEmission
-	var projectKeyBody operationBody
-	var reifyKeyBody operationBody
-	if keyProjection {
-		projectKey, err = context.Values().ToStorage(
-			context.WithRole(api.RoleMapKey),
-			source,
-			mapType.Key(),
-			api.DirectExpression(key),
-		)
-		if err != nil {
-			return specializationOperationSet{}, nil, err
-		}
-		reifyKey, err = context.Values().FromStorage(
-			context.WithRole(api.RoleMapKey),
-			source,
-			mapType.Key(),
-			api.DirectExpression(
-				context.Factory().Identifier("$storageKey"),
-			),
-		)
-		if err != nil {
-			return specializationOperationSet{}, nil, err
-		}
-		projectKeyBody = operation(projectKey)
-		reifyKeyBody = operation(reifyKey)
-	}
 	operations.hash = operation(hash)
 	operations.equal = operation(equal)
 	operations.copyKey = operation(copyKey)
-	operations.projectKey = projectKeyBody
-	operations.reifyKey = reifyKeyBody
-	operations.keyProjection = keyProjection
 	return operations, api.CombineRequests(
 		requests,
 		hash.Requests(),
 		equal.Requests(),
 		copyKey.Requests(),
-		projectKey.Requests(),
-		reifyKey.Requests(),
 	), nil
 }
 

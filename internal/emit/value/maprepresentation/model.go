@@ -46,7 +46,8 @@ func Source(
 	storage := StorageHashed
 	if nativeMapKey(context, source.Key()) {
 		storage = StorageNative
-		if representedBasic(context, source.Elem()) {
+		if nativeIdentityMapKey(context, source.Key()) &&
+			representedBasic(context, source.Elem()) {
 			storage = StorageScalar
 		}
 	}
@@ -61,10 +62,12 @@ func Source(
 
 func nativeMapKey(context api.Context, sourceType types.Type) bool {
 	_, direct := directKey(context, sourceType)
-	return direct && types.Identical(
-		sourceType,
-		underlyingStorageKeyType(sourceType),
-	)
+	return direct
+}
+
+func nativeIdentityMapKey(context api.Context, sourceType types.Type) bool {
+	storageType, err := storageKeyType(context, sourceType)
+	return err == nil && types.Identical(sourceType, storageType)
 }
 
 func (m Model) Type() types.Type {
