@@ -1177,6 +1177,15 @@ complete compiler-owned artifact set: a seeded obsolete source file and an old
 target `tsconfig` must both disappear, and the sorted manifest membership
 (including the manifest itself) must exact-join the physical file set.
 
+The same build manifest carries a content-addressed, canonically ordered
+contract for every reached GoToTS-generated generic kernel. Verification
+independently joins each record to exactly one generated module function or
+class member and rejects a wrong path, wrong function, wrong class, wrong
+member, duplicate record, stale digest, or unselected source file. A target
+mutation that restores spelling-based `$kernel` recognition or omits the
+generated contract must fail while a local same-spelled declaration remains
+ordinary.
+
 The output-lifecycle gate proves a distinct compilation worker seals and
 officially encodes the complete TS-Go AST, writes its validated handoff, and
 exits before the parent starts any TS-Go consumer. The post-compilation plan may

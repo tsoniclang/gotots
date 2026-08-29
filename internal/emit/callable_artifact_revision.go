@@ -386,7 +386,7 @@ func (s *programSession) SettleCallableImplementationVariant(
 	inferredKernel bool,
 ) (bool, error) {
 	if s == nil || s.callableImplementations == nil {
-		return inferredKernel, nil
+		return s.recordGeneratedGenericKernel(owner, inferredKernel)
 	}
 	current, ok := context.FunctionArtifactOwner()
 	if !ok || current != owner || owner == nil || owner.Origin() != owner {
@@ -397,7 +397,7 @@ func (s *programSession) SettleCallableImplementationVariant(
 	}
 	selected, ok := s.callableImplementations.ForFunction(owner)
 	if !ok {
-		return inferredKernel, nil
+		return s.recordGeneratedGenericKernel(owner, inferredKernel)
 	}
 	if previous, exists := s.callableImplementationVariants[selected.SourceIdentity()]; exists {
 		if previous == api.CallableImplementationVariantSource && inferredKernel {
@@ -406,7 +406,10 @@ func (s *programSession) SettleCallableImplementationVariant(
 				Reason: "callable implementation source variant omits required kernel ABI",
 			}
 		}
-		return previous == api.CallableImplementationVariantKernel, nil
+		return s.recordGeneratedGenericKernel(
+			owner,
+			previous == api.CallableImplementationVariantKernel,
+		)
 	}
 	settled := api.CallableImplementationVariantSource
 	kernel := false
@@ -421,7 +424,25 @@ func (s *programSession) SettleCallableImplementationVariant(
 		kernel = true
 	}
 	s.callableImplementationVariants[selected.SourceIdentity()] = settled
-	return kernel, nil
+	return s.recordGeneratedGenericKernel(owner, kernel)
+}
+
+func (s *programSession) recordGeneratedGenericKernel(
+	owner *types.Func,
+	selected bool,
+) (bool, error) {
+	if !selected {
+		return false, nil
+	}
+	if s == nil || owner == nil || owner.Origin() != owner ||
+		len(api.GenericDeclarationParameters(owner)) == 0 {
+		return false, &ScheduleError{
+			Object: ownerName(owner),
+			Reason: "generated generic kernel selection is invalid",
+		}
+	}
+	s.generatedGenericKernels[owner] = struct{}{}
+	return true, nil
 }
 
 func (s *programSession) AcceptCallableImplementation(

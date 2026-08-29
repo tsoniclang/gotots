@@ -25,6 +25,7 @@ const (
 
 type printPlan struct {
 	files                     []printPlanFile
+	representationTransports  []representationTransport
 	protocolDirectory         string
 	sourceImplementation      sourceImplementationPrintPlan
 	hasSourceImplementation   bool
@@ -111,6 +112,18 @@ type packageDependency struct {
 	version string
 }
 
+const (
+	representationTransportFunctionKernel = "generated-generic-function-kernel"
+	representationTransportMemberKernel   = "generated-generic-member-kernel"
+)
+
+type representationTransport struct {
+	Kind       string `json:"kind"`
+	SourcePath string `json:"sourcePath"`
+	ExportName string `json:"exportName"`
+	MemberName string `json:"memberName,omitempty"`
+}
+
 func stagePrintPlan(
 	outputDirectory string,
 	emission emit.ProgramEmission,
@@ -161,6 +174,31 @@ func stagePrintPlan(
 		files:             files,
 		protocolDirectory: protocolDirectory,
 		packageDocument:   packageDocument,
+	}
+	transports := emission.RepresentationTransports()
+	plan.representationTransports = make(
+		[]representationTransport,
+		len(transports),
+	)
+	for index, transport := range transports {
+		kind := ""
+		switch transport.Kind() {
+		case emit.RepresentationTransportFunctionKernel:
+			kind = representationTransportFunctionKernel
+		case emit.RepresentationTransportMemberKernel:
+			kind = representationTransportMemberKernel
+		default:
+			return printPlan{}, commandError(
+				"stage representation transport",
+				"generated transport kind is invalid",
+			)
+		}
+		plan.representationTransports[index] = representationTransport{
+			Kind:       kind,
+			SourcePath: transport.SourcePath(),
+			ExportName: transport.ExportName(),
+			MemberName: transport.MemberName(),
+		}
 	}
 	if verification, ok := emission.SourceImplementationPlan(); ok {
 		generatedDirectory := filepath.Join(
@@ -338,6 +376,23 @@ func (p printPlan) validate(outputDirectory string) error {
 			return commandError("validate print plan", "target file identity is duplicated")
 		}
 		outputPaths[file.outputPath] = struct{}{}
+	}
+	previousTransport := ""
+	for _, transport := range p.representationTransports {
+		_, sourceSelected := outputPaths[transport.SourcePath]
+		validShape := transport.Kind == representationTransportFunctionKernel &&
+			transport.MemberName == "" ||
+			transport.Kind == representationTransportMemberKernel &&
+				transport.MemberName != ""
+		key := representationTransportKey(transport)
+		if !sourceSelected || transport.ExportName == "" || !validShape ||
+			previousTransport >= key {
+			return commandError(
+				"validate print plan",
+				"generated representation transport is invalid",
+			)
+		}
+		previousTransport = key
 	}
 	if p.hasSourceImplementation {
 		generatedDirectory := filepath.Join(
@@ -521,6 +576,11 @@ func (p printPlan) validate(outputDirectory string) error {
 		return commandError("validate print plan", "runtime manifest is incomplete")
 	}
 	return nil
+}
+
+func representationTransportKey(transport representationTransport) string {
+	return transport.Kind + "\x00" + transport.SourcePath + "\x00" +
+		transport.ExportName + "\x00" + transport.MemberName
 }
 
 func (p printPlan) removeProtocolScratch() error {

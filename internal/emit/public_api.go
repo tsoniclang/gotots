@@ -515,6 +515,19 @@ func (e ProgramEmission) Files() []TargetFile {
 	return slices.Clone(e.files)
 }
 
+type RepresentationTransportKind = api.GeneratedRepresentationTransportKind
+
+const (
+	RepresentationTransportFunctionKernel = api.GeneratedRepresentationTransportFunctionKernel
+	RepresentationTransportMemberKernel   = api.GeneratedRepresentationTransportMemberKernel
+)
+
+type RepresentationTransport = api.GeneratedRepresentationTransport
+
+func (e ProgramEmission) RepresentationTransports() []RepresentationTransport {
+	return slices.Clone(e.representationTransports)
+}
+
 func (e ProgramEmission) SourceImplementationPlan() (
 	sourceimplementation.GeneratedContractPlan,
 	bool,

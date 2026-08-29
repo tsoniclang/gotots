@@ -99,6 +99,79 @@ func TestRunBuildsSimpleProgramThroughPinnedTSGo(t *testing.T) {
 	}
 }
 
+func TestRunBuildPublishesGeneratedGenericKernelTransports(t *testing.T) {
+	root := t.TempDir()
+	writeCommandFixture(t, filepath.Join(root, "go.mod"), "module example.test/transport\n\ngo 1.26.4\n")
+	writeCommandFixture(t, filepath.Join(root, "source.go"), `package main
+
+type Box[T any] struct { Value T }
+
+func (box *Box[T]) Get() T { return box.Value }
+
+func Identity[T any](value T) T { return value }
+
+func Use() int {
+	box := Box[int]{Value: 41}
+	return Identity(box.Get())
+}
+
+func main() { _ = Use() }
+`)
+	writeCommandFixture(t, filepath.Join(root, "gotots.json"), `{
+  "schemaVersion": 3,
+  "distribution": {"root": "`+filepath.ToSlash(repositoryRoot(t))+`"},
+  "source": {"root": ".", "package": ".", "mode": "main"},
+  "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
+  "semantics": {"integers": "number", "evaluationOrder": "direct"},
+  "providers": {"standardLibrary": false, "externals": false},
+  "implementations": {"packages": [], "callables": []},
+  "output": {"directory": "generated"}
+}
+`)
+	var output bytes.Buffer
+	if err := Run(context.Background(), root, []string{"build"}, &output, &output); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := os.ReadFile(filepath.Join(root, "generated", buildManifestName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		SchemaVersion            int `json:"schemaVersion"`
+		RepresentationTransports struct {
+			SchemaVersion int `json:"schemaVersion"`
+			Callables     []struct {
+				Kind       string `json:"kind"`
+				SourcePath string `json:"sourcePath"`
+				ExportName string `json:"exportName"`
+				MemberName string `json:"memberName,omitempty"`
+			} `json:"callables"`
+		} `json:"representationTransports"`
+	}
+	if err := json.Unmarshal(payload, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.SchemaVersion != buildManifestSchemaVersion ||
+		manifest.RepresentationTransports.SchemaVersion != 1 {
+		t.Fatalf("manifest schemas = %d/%d", manifest.SchemaVersion, manifest.RepresentationTransports.SchemaVersion)
+	}
+	want := map[string]bool{
+		"generated-generic-function-kernel|Identity$kernel|": false,
+		"generated-generic-member-kernel|Box|Get$kernel":     false,
+	}
+	for _, callable := range manifest.RepresentationTransports.Callables {
+		key := callable.Kind + "|" + callable.ExportName + "|" + callable.MemberName
+		if _, selected := want[key]; selected && callable.SourcePath != "" {
+			want[key] = true
+		}
+	}
+	for identity, found := range want {
+		if !found {
+			t.Fatalf("generated transport %q absent from manifest: %s", identity, payload)
+		}
+	}
+}
+
 func TestRunEmitsCanonicalMarkersWithoutFabricatingCorePackage(t *testing.T) {
 	root := t.TempDir()
 	writeCommandFixture(t, filepath.Join(root, "go.mod"), "module example.test/markers\n\ngo 1.26.4\n")

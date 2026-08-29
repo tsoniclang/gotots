@@ -27,6 +27,7 @@ import (
 
 type ProgramEmission struct {
 	files                       []TargetFile
+	representationTransports    []api.GeneratedRepresentationTransport
 	sourceImplementationPlan    sourceimplementation.GeneratedContractPlan
 	callableImplementationPlan  callableimplementation.GeneratedContractPlan
 	environmentObligations      []EnvironmentObligation
@@ -76,6 +77,7 @@ type programSession struct {
 	callableImplementations        *callableimplementation.Certificate
 	callableImplementationVariants map[string]api.CallableImplementationVariant
 	callableImplementationTargets  map[string]api.CallableImplementationTarget
+	generatedGenericKernels        map[*types.Func]struct{}
 	callableImplementationPlan     callableimplementation.GeneratedContractPlan
 	externalFunctions              map[*types.Func]ExternalFunctionObligation
 	externalFunctionBindings       map[*types.Func]api.ExternalFunctionTarget
@@ -339,6 +341,7 @@ func newProgramSessionWithRegistry(
 			map[string]api.CallableImplementationVariant,
 		),
 		callableImplementationTargets: make(map[string]api.CallableImplementationTarget),
+		generatedGenericKernels:       make(map[*types.Func]struct{}),
 		externalFunctions:             make(map[*types.Func]ExternalFunctionObligation),
 		externalFunctionBindings:      externalBindings,
 		preparedDeclarationRequests:   make(map[api.RootRequest]struct{}),
