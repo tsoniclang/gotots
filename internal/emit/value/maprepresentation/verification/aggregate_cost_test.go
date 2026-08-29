@@ -194,7 +194,7 @@ func assertNativeBoxMapCost(t *testing.T, inventory []mapExpansionCost) {
 	var representative *mapExpansionCost
 	for index := range inventory {
 		candidate := &inventory[index]
-		if strings.Contains(candidate.source, "Map<int32, [") &&
+		if strings.Contains(candidate.source, "Map<int32, Box__from_aggregatemap>") &&
 			strings.Contains(candidate.source, "Box__from_aggregatemap") {
 			if representative != nil {
 				t.Fatal("native BoxMap has more than one expansion owner")

@@ -59,15 +59,11 @@ func (b specializationBuilder) buildNative() []tsgo.ClassElement {
 	return members
 }
 
-func (b specializationBuilder) nativeCellType() tsgo.TypeNode {
-	return b.factory.TupleTypeNode([]tsgo.TypeNode{b.valueType})
-}
-
 func (b specializationBuilder) nativeStorageType() tsgo.TypeNode {
 	return b.factory.UnionTypeNode([]tsgo.TypeNode{
 		b.factory.TypeReferenceNode(
 			b.id("Map"),
-			[]tsgo.TypeNode{b.storageKeyType, b.nativeCellType()},
+			[]tsgo.TypeNode{b.storageKeyType, b.valueType},
 		),
 		b.undefinedType(),
 	})
@@ -135,7 +131,7 @@ func (b specializationBuilder) nativeMakeMethod() tsgo.MethodDeclaration {
 						b.id("Map"),
 						[]tsgo.TypeNode{
 							b.storageKeyType,
-							b.nativeCellType(),
+							b.valueType,
 						},
 						nil,
 					),
@@ -157,7 +153,7 @@ func (b specializationBuilder) nativeMakeMethod() tsgo.MethodDeclaration {
 
 func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 	values := b.id("values")
-	entry := b.id("entry")
+	storedValue := b.id("storedValue")
 	storageKey, keyStatements := b.storageKeyBinding(b.id("key"))
 	return b.methodWithPrefix(
 		nil,
@@ -181,9 +177,9 @@ func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 		),
 		b.variable(
 			tsgo.NodeFlagsConst,
-			"entry",
+			"storedValue",
 			b.factory.UnionTypeNode([]tsgo.TypeNode{
-				b.nativeCellType(),
+				b.valueType,
 				b.undefinedType(),
 			}),
 			b.call(values, "get", storageKey),
@@ -191,11 +187,11 @@ func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 		b.factory.ReturnStatement(b.staticCall(
 			specializationCopyValueOperation,
 			b.factory.ConditionalExpression(
-				b.undefined(entry),
+				b.undefined(storedValue),
 				b.factory.QuestionToken(),
 				b.property(b.factory.ThisExpression(), "zeroValue"),
 				b.factory.ColonToken(),
-				b.element(entry, b.number("0")),
+				storedValue,
 			),
 		)),
 	)
@@ -203,7 +199,7 @@ func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 
 func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 	values := b.id("values")
-	entry := b.id("entry")
+	storedValue := b.id("storedValue")
 	storageKey, keyStatements := b.storageKeyBinding(b.id("key"))
 	resultType := b.factory.TupleTypeNode([]tsgo.TypeNode{
 		b.valueType,
@@ -217,6 +213,15 @@ func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 					b.property(b.factory.ThisExpression(), "zeroValue"),
 				),
 				b.factory.FalseLiteral(),
+			},
+			false,
+		)
+	}
+	present := func(value tsgo.Expression) tsgo.Expression {
+		return b.factory.ArrayLiteralExpression(
+			[]tsgo.Expression{
+				b.staticCall(specializationCopyValueOperation, value),
+				b.factory.TrueLiteral(),
 			},
 			false,
 		)
@@ -240,28 +245,31 @@ func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 		),
 		b.variable(
 			tsgo.NodeFlagsConst,
-			"entry",
+			"storedValue",
 			b.factory.UnionTypeNode([]tsgo.TypeNode{
-				b.nativeCellType(),
+				b.valueType,
 				b.undefinedType(),
 			}),
 			b.call(values, "get", storageKey),
 		),
 		b.factory.IfStatement(
-			b.undefined(entry),
-			b.returnBlock(missing()),
+			b.undefined(storedValue),
+			b.factory.Block([]tsgo.Statement{
+				b.factory.IfStatement(
+					b.factory.PrefixUnaryExpression(
+						tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+						b.call(values, "has", storageKey),
+					),
+					b.returnBlock(missing()),
+					nil,
+				),
+				b.factory.ReturnStatement(present(
+					b.property(b.factory.ThisExpression(), "zeroValue"),
+				)),
+			}, true),
 			nil,
 		),
-		b.factory.ReturnStatement(b.factory.ArrayLiteralExpression(
-			[]tsgo.Expression{
-				b.staticCall(
-					specializationCopyValueOperation,
-					b.element(entry, b.number("0")),
-				),
-				b.factory.TrueLiteral(),
-			},
-			false,
-		)),
+		b.factory.ReturnStatement(present(storedValue)),
 	)
 }
 
@@ -299,12 +307,9 @@ func (b specializationBuilder) nativeStoreMethod() tsgo.MethodDeclaration {
 			values,
 			"set",
 			storageKey,
-			b.factory.ArrayLiteralExpression(
-				[]tsgo.Expression{b.staticCall(
-					specializationCopyValueOperation,
-					b.id("value"),
-				)},
-				false,
+			b.staticCall(
+				specializationCopyValueOperation,
+				b.id("value"),
 			),
 		)),
 	)

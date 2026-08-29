@@ -49,9 +49,10 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 	)
 	for _, source := range []string{valueSource, pointerSource} {
 		for _, required := range []string{
-			"private readonly values: Map<string, [",
+			"private readonly values: Map<string, ",
 			"private static $copyValue",
-			"values.set(key, [",
+			"values.set(key, ",
+			"values.has(key)",
 			"values.delete(key)",
 			"Array.from(values.keys())",
 		} {
@@ -68,6 +69,8 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 			"count",
 			"GoDenseIndex",
 			"GoMapHash",
+			"private readonly values: Map<string, [",
+			"values.set(key, [",
 			" as ",
 		} {
 			if strings.Contains(source, forbidden) {
@@ -75,14 +78,20 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 			}
 		}
 		store := specializationMethodSource(t, source, "store", "delete")
+		lookup := specializationMethodSource(t, source, "lookup", "lookupOk")
+		lookupOK := specializationMethodSource(t, source, "lookupOk", "store")
 		if strings.Contains(store, "values.get(") ||
 			strings.Contains(store, "entry === undefined") ||
-			strings.Count(store, "values.set(key, [") != 1 ||
+			strings.Count(store, "values.set(key, ") != 1 ||
 			strings.Count(store, "$copyValue(value)") != 1 {
 			t.Fatalf("native store is not one copy-and-set operation:\n%s", store)
 		}
+		if strings.Contains(lookup, "entry[0]") ||
+			strings.Contains(lookupOK, "entry[0]") {
+			t.Fatalf("native lookup retains a value cell:\n%s\n%s", lookup, lookupOK)
+		}
 	}
-	t.Log("native store work: map-get=0 map-set=1 value-copy=1 semantic-branches=0")
+	t.Log("native store work: map-get=0 map-set=1 value-copy=1 tuple-allocation=0 semantic-branches=0")
 	typeScriptOutput := compileAndRunSpecialization(t, mapValueTestContract+`class Box {
     constructor(public value: number) {}
 }

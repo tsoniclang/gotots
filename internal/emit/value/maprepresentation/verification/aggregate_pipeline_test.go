@@ -352,11 +352,12 @@ func assertProjectedPrimitiveMap(t *testing.T, artifacts materialized) {
 		t.Fatalf("defined-string key map specialization is absent; classes=%v", names)
 	}
 	for _, required := range []string{
-		"private readonly values: Map<gostring, [",
+		"private readonly values: Map<gostring, int32>",
 		"private static $projectKey($key: Label__from_aggregatemap): gostring",
 		"private static $reifyKey($storageKey: gostring): Label__from_aggregatemap",
 		"values.get(storageKey)",
-		"values.set(storageKey, [",
+		"values.set(storageKey, ",
+		"values.has(storageKey)",
 		"values.delete(storageKey)",
 		"result.push(",
 	} {
@@ -364,7 +365,14 @@ func assertProjectedPrimitiveMap(t *testing.T, artifacts materialized) {
 			t.Fatalf("defined-string native map lacks %q:\n%s", required, selected)
 		}
 	}
-	for _, forbidden := range []string{"$hash(", "$equal(", "$find(", "buckets"} {
+	for _, forbidden := range []string{
+		"$hash(",
+		"$equal(",
+		"$find(",
+		"buckets",
+		"Map<gostring, [",
+		"values.set(storageKey, [",
+	} {
 		if strings.Contains(selected, forbidden) {
 			t.Fatalf("defined-string native map contains %q:\n%s", forbidden, selected)
 		}
