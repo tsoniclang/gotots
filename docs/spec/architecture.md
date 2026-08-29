@@ -447,17 +447,6 @@ and outer results remain direct; representation selection never creates a
 callable-effect dimension or public variant. A missing exact kernel fails
 closed rather than falling back to a Promise-bearing implementation.
 
-Every reached generated generic kernel is also published in the canonical
-build manifest as one closed declaration identity. A module function is keyed
-by generated source path and exported function name; a class kernel is keyed
-by generated source path, class name, and member name. GoToTS owns this fact
-because it owns the kernel decision and declaration. A target may use the
-contract only by exact-joining the selected call declaration to that generated
-declaration; kernel-name spelling, call-site scans, product allowlists, and
-target-side generic inference are forbidden. Provider-owned kernels remain in
-their independently certified provider contract, and product assembly composes
-the two disjoint authorities before target planning.
-
 Possibly nil indirect calls have one target owner. The emitter captures the
 callee, captures every argument in Go order, then calls
 `(callee ?? GoPanic.raiseRuntime("call of nil function"))`. The statically

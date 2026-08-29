@@ -1,7 +1,6 @@
 package command
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,7 +14,7 @@ import (
 
 const (
 	buildManifestName          = "gotots-manifest.json"
-	buildManifestSchemaVersion = 2
+	buildManifestSchemaVersion = 1
 )
 
 const projectPackageName = "package.json"
@@ -82,11 +81,7 @@ func writePrintPlanTo(
 	paths = append(paths, projectPackageName)
 	paths = append(paths, buildManifestName)
 	sort.Strings(paths)
-	manifest, err := encodeBuildManifest(
-		semanticDigest,
-		paths,
-		plan.representationTransports,
-	)
+	manifest, err := encodeBuildManifest(semanticDigest, paths)
 	if err != nil {
 		return 0, err
 	}
@@ -138,65 +133,23 @@ func writeTargetFile(root string, relative string, payload []byte) error {
 	return nil
 }
 
-type representationTransportContractDocument struct {
-	SchemaVersion int                       `json:"schemaVersion"`
-	Digest        string                    `json:"digest"`
-	Callables     []representationTransport `json:"callables"`
-}
-
-func encodeBuildManifest(
-	semanticDigest string,
-	files []string,
-	transports []representationTransport,
-) ([]byte, error) {
+func encodeBuildManifest(semanticDigest string, files []string) ([]byte, error) {
 	selected := slices.Clone(files)
 	if !slices.IsSorted(selected) {
 		return nil, commandError("encode build manifest", "files are not sorted")
 	}
-	transportContract, err := sealRepresentationTransportContract(transports)
-	if err != nil {
-		return nil, err
-	}
 	document := struct {
-		SchemaVersion            int                                     `json:"schemaVersion"`
-		SemanticDigest           string                                  `json:"semanticDigest"`
-		Files                    []string                                `json:"files"`
-		RepresentationTransports representationTransportContractDocument `json:"representationTransports"`
+		SchemaVersion  int      `json:"schemaVersion"`
+		SemanticDigest string   `json:"semanticDigest"`
+		Files          []string `json:"files"`
 	}{
-		SchemaVersion:            buildManifestSchemaVersion,
-		SemanticDigest:           semanticDigest,
-		Files:                    selected,
-		RepresentationTransports: transportContract,
+		SchemaVersion:  buildManifestSchemaVersion,
+		SemanticDigest: semanticDigest,
+		Files:          selected,
 	}
 	payload, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
 		return nil, commandError("encode build manifest", err.Error())
 	}
 	return append(payload, '\n'), nil
-}
-
-func sealRepresentationTransportContract(
-	transports []representationTransport,
-) (representationTransportContractDocument, error) {
-	callables := slices.Clone(transports)
-	body := struct {
-		SchemaVersion int                       `json:"schemaVersion"`
-		Callables     []representationTransport `json:"callables"`
-	}{
-		SchemaVersion: 1,
-		Callables:     callables,
-	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return representationTransportContractDocument{}, commandError(
-			"encode representation transport contract",
-			err.Error(),
-		)
-	}
-	digest := fmt.Sprintf("%x", sha256.Sum256(payload))
-	return representationTransportContractDocument{
-		SchemaVersion: body.SchemaVersion,
-		Digest:        digest,
-		Callables:     callables,
-	}, nil
 }

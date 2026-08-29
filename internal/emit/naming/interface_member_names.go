@@ -4,6 +4,7 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
@@ -264,10 +265,24 @@ func interfaceAdapterSource(sourceType types.Type) bool {
 }
 
 func (n *File) InterfaceMethodName(method *types.Func) (string, error) {
-	if n == nil || n.owner == nil || n.owner.registry == nil {
-		return "", &api.NameError{Reason: "interface method name owner is invalid"}
+	if method == nil {
+		return "", &api.NameError{Reason: "interface method is nil"}
 	}
-	return n.owner.registry.interfaceMethodName(method)
+	if _, ok := methodidentity.Signature(method); !ok {
+		return "", &api.NameError{
+			Name:   method.Name(),
+			Reason: "interface method signature is invalid",
+		}
+	}
+	if method.Exported() {
+		return portableIdentifier(method.Name()), nil
+	}
+	qualifier, err := n.generatedPackageToken(method.Pkg())
+	if err != nil {
+		return "", err
+	}
+	return "$go$private$" + qualifier + "$" +
+		semanticname.Identifier(method.Name()), nil
 }
 
 func (n *File) MethodTarget(

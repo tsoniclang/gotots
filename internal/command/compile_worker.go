@@ -18,34 +18,26 @@ import (
 )
 
 const (
-	compileWorkerCommand       = "__gotots_compile_worker_v6"
+	compileWorkerCommand       = "__gotots_compile_worker_v5"
 	compileWorkerDirectoryName = ".gotots-compile-worker"
-	compileWorkerSchemaVersion = 6
+	compileWorkerSchemaVersion = 5
 	compileWorkerLogLimit      = 64 * 1024
 )
 
 type compileWorkerDocument struct {
-	SchemaVersion            int                                    `json:"schemaVersion"`
-	WorkerPID                int                                    `json:"workerPid"`
-	SemanticDigest           string                                 `json:"semanticDigest"`
-	Files                    []compileWorkerFile                    `json:"files"`
-	RepresentationTransports []compileWorkerRepresentationTransport `json:"representationTransports"`
-	RuntimeManifest          *compileWorkerArtifact                 `json:"runtimeManifest"`
-	SourceImplementation     *compileWorkerSourceImplementation     `json:"sourceImplementation,omitempty"`
-	CallableImplementation   *compileWorkerCallableImplementation   `json:"callableImplementation,omitempty"`
-	PackageDocument          string                                 `json:"packageDocument"`
+	SchemaVersion          int                                  `json:"schemaVersion"`
+	WorkerPID              int                                  `json:"workerPid"`
+	SemanticDigest         string                               `json:"semanticDigest"`
+	Files                  []compileWorkerFile                  `json:"files"`
+	RuntimeManifest        *compileWorkerArtifact               `json:"runtimeManifest"`
+	SourceImplementation   *compileWorkerSourceImplementation   `json:"sourceImplementation,omitempty"`
+	CallableImplementation *compileWorkerCallableImplementation `json:"callableImplementation,omitempty"`
+	PackageDocument        string                               `json:"packageDocument"`
 }
 
 type compileWorkerFile struct {
 	OutputPath   string `json:"outputPath"`
 	ProtocolHash string `json:"protocolHash"`
-}
-
-type compileWorkerRepresentationTransport struct {
-	Kind       string `json:"kind"`
-	SourcePath string `json:"sourcePath"`
-	ExportName string `json:"exportName"`
-	MemberName string `json:"memberName,omitempty"`
 }
 
 type compileWorkerArtifact struct {
@@ -233,16 +225,6 @@ func readCompileWorkerDocument(
 	plan := printPlan{
 		files:             make([]printPlanFile, len(document.Files)),
 		protocolDirectory: protocolDirectory,
-		representationTransports: make(
-			[]representationTransport,
-			len(document.RepresentationTransports),
-		),
-	}
-	for index, transport := range document.RepresentationTransports {
-		plan.representationTransports[index] = representationTransport{
-			Kind: transport.Kind, SourcePath: transport.SourcePath,
-			ExportName: transport.ExportName, MemberName: transport.MemberName,
-		}
 	}
 	for index, file := range document.Files {
 		digest, err := hex.DecodeString(file.ProtocolHash)
@@ -368,21 +350,11 @@ func encodeCompileWorkerDocument(
 		return nil, commandError("encode compilation worker handoff", "identity is invalid")
 	}
 	document := compileWorkerDocument{
-		SchemaVersion:  compileWorkerSchemaVersion,
-		WorkerPID:      workerPID,
-		SemanticDigest: semanticDigest,
-		Files:          make([]compileWorkerFile, len(plan.files)),
-		RepresentationTransports: make(
-			[]compileWorkerRepresentationTransport,
-			len(plan.representationTransports),
-		),
+		SchemaVersion:   compileWorkerSchemaVersion,
+		WorkerPID:       workerPID,
+		SemanticDigest:  semanticDigest,
+		Files:           make([]compileWorkerFile, len(plan.files)),
 		PackageDocument: base64.StdEncoding.EncodeToString(plan.packageDocument),
-	}
-	for index, transport := range plan.representationTransports {
-		document.RepresentationTransports[index] = compileWorkerRepresentationTransport{
-			Kind: transport.Kind, SourcePath: transport.SourcePath,
-			ExportName: transport.ExportName, MemberName: transport.MemberName,
-		}
 	}
 	for index, file := range plan.files {
 		document.Files[index] = compileWorkerFile{

@@ -184,13 +184,8 @@ func compileProgramSession(
 	if err != nil {
 		return ProgramEmission{}, err
 	}
-	representationTransports, err := session.generatedRepresentationTransports()
-	if err != nil {
-		return ProgramEmission{}, err
-	}
 	return ProgramEmission{
 		files:                       files,
-		representationTransports:    representationTransports,
 		sourceImplementationPlan:    session.sourceImplementationPlan,
 		callableImplementationPlan:  session.callableImplementationPlan,
 		environmentObligations:      obligations,
