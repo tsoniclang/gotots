@@ -54,17 +54,9 @@ func structValueOperationsStatement(
 				adapter.Requests(),
 			), true, nil
 	}
-	panicReference, err := context.Names().Runtime(
-		api.RuntimePanic,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return nil, nil, false, err
-	}
 	scaffold := &locationScaffold{
 		factory:        factory,
 		adapter:        adapter,
-		panicRef:       panicReference,
 		descriptorType: descriptorType,
 	}
 	fields := make([]tsgo.Expression, 0, structType.NumFields())
@@ -82,17 +74,21 @@ func structValueOperationsStatement(
 			descriptor.Requests()...,
 		)
 		settable := field.Exported()
-		var boxedField tsgo.Expression
-		var boxedFieldBlock tsgo.Block
+		_, interfaceField := types.Unalias(field.Type()).Underlying().(*types.Interface)
+		var getBody tsgo.ConciseBody
 		var setBlock tsgo.Block
 		var address tsgo.Expression
+		var fieldAdapter api.NameReference
+		var admit tsgo.Expression
 		if field.Name() == "_" {
 			settable = false
-			setBlock = unaddressableFieldSetter(scaffold)
-			if _, isInterface := types.Unalias(field.Type()).Underlying().(*types.Interface); isInterface {
-				boxedField = factory.Identifier("undefined")
+			if interfaceField {
+				getBody = factory.ParenthesizedExpression(
+					factory.Identifier("undefined"),
+				)
 			} else {
-				fieldAdapter, adapterErr := context.Names().InterfaceAdapter(
+				var adapterErr error
+				fieldAdapter, adapterErr = context.Names().InterfaceAdapter(
 					field.Type(),
 					nil,
 				)
@@ -115,13 +111,8 @@ func structValueOperationsStatement(
 					scaffold.requests,
 					zero.Requests()...,
 				)
-				boxedZero := factory.NewExpression(
-					fieldAdapter.Expression(factory),
-					nil,
-					[]tsgo.Expression{zero.Value()},
-				)
 				if len(zero.Before()) == 0 {
-					boxedField = boxedZero
+					getBody = factory.ParenthesizedExpression(zero.Value())
 				} else {
 					statements := append(
 						[]tsgo.Statement(nil),
@@ -129,9 +120,9 @@ func structValueOperationsStatement(
 					)
 					statements = append(
 						statements,
-						factory.ReturnStatement(boxedZero),
+						factory.ReturnStatement(zero.Value()),
 					)
-					boxedFieldBlock = factory.Block(statements, true)
+					getBody = factory.Block(statements, true)
 				}
 			}
 		} else {
@@ -145,13 +136,12 @@ func structValueOperationsStatement(
 				return nil, nil, false, targetErr
 			}
 			var fieldRequests []api.RootRequest
-			boxedField, boxedFieldBlock, setBlock, fieldRequests, descriptorErr =
+			getBody, setBlock, fieldRequests, descriptorErr =
 				storageStructFieldCallbacks(
 					context,
 					field,
 					target,
 					settable,
-					scaffold,
 				)
 			if descriptorErr != nil {
 				return nil, nil, false, descriptorErr
@@ -180,16 +170,76 @@ func structValueOperationsStatement(
 				scaffold.requests,
 				fieldAddress.Requests()...,
 			)
+			if interfaceField && settable {
+				panicReference, panicErr := context.Names().Runtime(
+					api.RuntimePanic,
+					api.ImportPhaseValue,
+				)
+				if panicErr != nil {
+					return nil, nil, false, panicErr
+				}
+				scaffold.panicRef = panicReference
+				admitted, admittedRequests, admittedErr := admittedInterfaceValue(
+					context,
+					field.Type(),
+					factory.Identifier("value"),
+					"Value.Set",
+					scaffold,
+				)
+				if admittedErr != nil {
+					return nil, nil, false, admittedErr
+				}
+				admit = factory.ArrowFunction(
+					nil,
+					nil,
+					[]tsgo.ParameterDeclaration{untypedParameter(factory, "value")},
+					nil,
+					factory.EqualsGreaterThanToken(),
+					factory.ParenthesizedExpression(admitted),
+				)
+				scaffold.requests = append(
+					scaffold.requests,
+					panicReference.Requests()...,
+				)
+				scaffold.requests = append(
+					scaffold.requests,
+					admittedRequests...,
+				)
+			}
+			if !interfaceField {
+				var adapterErr error
+				fieldAdapter, adapterErr = context.Names().InterfaceAdapter(
+					field.Type(),
+					nil,
+				)
+				if adapterErr != nil {
+					return nil, nil, false, adapterErr
+				}
+				scaffold.requests = append(
+					scaffold.requests,
+					fieldAdapter.Requests()...,
+				)
+			}
 		}
-		fields = append(fields, structFieldOperations(
-			scaffold,
-			descriptor,
-			settable,
-			boxedField,
-			boxedFieldBlock,
-			setBlock,
-			address,
-		))
+		if interfaceField {
+			fields = append(fields, structInterfaceFieldFact(
+				scaffold,
+				descriptor,
+				getBody,
+				setBlock,
+				admit,
+				address,
+			))
+		} else {
+			fields = append(fields, structValueFieldFact(
+				scaffold,
+				descriptor,
+				fieldAdapter,
+				getBody,
+				setBlock,
+				address,
+			))
+		}
 	}
 	clone, err := structCloneCallback(context, sourceType, scaffold)
 	if err != nil {
@@ -201,12 +251,20 @@ func structValueOperationsStatement(
 			"$registerStruct",
 			descriptorName,
 			adapter,
-			factory.ArrayLiteralExpression(fields, true),
+			factory.ArrowFunction(
+				nil,
+				nil,
+				[]tsgo.ParameterDeclaration{untypedParameter(factory, "fields")},
+				nil,
+				factory.EqualsGreaterThanToken(),
+				factory.ParenthesizedExpression(
+					factory.ArrayLiteralExpression(fields, true),
+				),
+			),
 			clone,
 		), api.CombineRequests(
 			operations.Requests(),
 			adapter.Requests(),
-			panicReference.Requests(),
 			scaffold.requests,
 		), true, nil
 }
@@ -280,38 +338,38 @@ func structCloneCallback(
 	), nil
 }
 
-func structFieldOperations(
+func structValueFieldFact(
 	scaffold *locationScaffold,
 	descriptor api.NameReference,
-	settable bool,
-	get tsgo.Expression,
-	getBlock tsgo.Block,
+	adapter api.NameReference,
+	get tsgo.ConciseBody,
 	set tsgo.Block,
 	address tsgo.Expression,
-) tsgo.ObjectLiteralExpression {
+) tsgo.Expression {
 	factory := scaffold.factory
-	var getBody tsgo.ConciseBody
-	if getBlock != nil {
-		getBody = getBlock
-	} else {
-		getBody = factory.ParenthesizedExpression(get)
-	}
-	properties := []tsgo.ObjectLiteralElementLike{
-		expressionProperty(factory, "type", arrow(
-			factory,
-			scaffold.descriptorType,
-			descriptor.Expression(factory),
-		)),
-		booleanProperty(factory, "settable", settable),
-		expressionProperty(factory, "get", factory.ArrowFunction(
+	member := "readonlyValue"
+	arguments := []tsgo.Expression{
+		arrow(factory, scaffold.descriptorType, descriptor.Expression(factory)),
+		factory.ArrowFunction(
+			nil,
+			nil,
+			nil,
+			nil,
+			factory.EqualsGreaterThanToken(),
+			factory.ParenthesizedExpression(adapter.Expression(factory)),
+		),
+		factory.ArrowFunction(
 			nil,
 			nil,
 			[]tsgo.ParameterDeclaration{untypedParameter(factory, "instance")},
 			nil,
 			factory.EqualsGreaterThanToken(),
-			getBody,
-		)),
-		expressionProperty(factory, "set", factory.ArrowFunction(
+			get,
+		),
+	}
+	if set != nil {
+		member = "value"
+		arguments = append(arguments, factory.ArrowFunction(
 			nil,
 			nil,
 			[]tsgo.ParameterDeclaration{
@@ -321,15 +379,75 @@ func structFieldOperations(
 			nil,
 			factory.EqualsGreaterThanToken(),
 			set,
-		)),
+		))
 	}
 	if address != nil {
-		properties = append(
-			properties,
-			expressionProperty(factory, "address", address),
-		)
+		arguments = append(arguments, address)
 	}
-	return factory.ObjectLiteralExpression(properties, true)
+	return structFieldBuilderCall(factory, member, arguments)
+}
+
+func structInterfaceFieldFact(
+	scaffold *locationScaffold,
+	descriptor api.NameReference,
+	get tsgo.ConciseBody,
+	set tsgo.Block,
+	admit tsgo.Expression,
+	address tsgo.Expression,
+) tsgo.Expression {
+	factory := scaffold.factory
+	member := "readonlyInterface"
+	arguments := []tsgo.Expression{
+		arrow(factory, scaffold.descriptorType, descriptor.Expression(factory)),
+	}
+	if set != nil {
+		member = "interfaceValue"
+		arguments = append(arguments, admit)
+	}
+	arguments = append(arguments, factory.ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{untypedParameter(factory, "instance")},
+		nil,
+		factory.EqualsGreaterThanToken(),
+		get,
+	))
+	if set != nil {
+		arguments = append(arguments, factory.ArrowFunction(
+			nil,
+			nil,
+			[]tsgo.ParameterDeclaration{
+				untypedParameter(factory, "instance"),
+				untypedParameter(factory, "value"),
+			},
+			nil,
+			factory.EqualsGreaterThanToken(),
+			set,
+		))
+	}
+	if address != nil {
+		arguments = append(arguments, address)
+	}
+	return structFieldBuilderCall(factory, member, arguments)
+}
+
+func structFieldBuilderCall(
+	factory tsgo.Factory,
+	member string,
+	arguments []tsgo.Expression,
+) tsgo.Expression {
+	return factory.CallExpression(
+		factory.PropertyAccessExpression(
+			factory.Identifier("fields"),
+			nil,
+			factory.Identifier(member),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		arguments,
+		tsgo.NodeFlagsNone,
+	)
 }
 
 func structRegistrationCall(

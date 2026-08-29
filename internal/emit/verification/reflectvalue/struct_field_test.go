@@ -98,6 +98,11 @@ func main() {
 			).MatchString(artifacts.printed) {
 				t.Fatalf("struct reflection resolves its adapter eagerly")
 			}
+			if !regexp.MustCompile(
+				`(?s)\.\$registerStruct\([^;]+,\s*fields\s*=>`,
+			).MatchString(artifacts.printed) {
+				t.Fatalf("struct reflection materializes field facts eagerly")
+			}
 		},
 	)
 }

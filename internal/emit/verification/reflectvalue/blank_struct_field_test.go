@@ -72,8 +72,8 @@ func main() {
 		goRunner,
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
-				"settable: false",
-				"reflect: Value.Set using unaddressable value",
+				"fields.readonlyValue(",
+				"fields.readonlyInterface(",
 				".$storageOf(instance).Value",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
