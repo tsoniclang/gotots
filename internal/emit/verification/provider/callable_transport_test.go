@@ -193,7 +193,8 @@ func SortNamedField(source []string) {
 		"public compare: namedCompare",
 		"export class namedCompare",
 		"public readonly $value:",
-		"fields.readonlyValue(",
+		"fields.readonlyValueProperty(",
+		`"compare"`,
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("callable-field transport lacks %q:\n%s", required, printed)
