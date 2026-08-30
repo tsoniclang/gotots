@@ -43,6 +43,7 @@ const (
 	RuntimeMapClear                   = runtimecontract.RuntimeMapClear
 	RuntimeMapKeys                    = runtimecontract.RuntimeMapKeys
 	RuntimeMapValue                   = runtimecontract.RuntimeMapValue
+	RuntimeMapStore                   = runtimecontract.RuntimeMapStore
 	RuntimePanic                      = runtimecontract.RuntimePanic
 	RuntimePanicValue                 = runtimecontract.RuntimePanicValue
 	RuntimeRecovery                   = runtimecontract.RuntimeRecovery

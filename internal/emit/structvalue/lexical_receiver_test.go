@@ -15,6 +15,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestNamedStructSyntheticBindingsAndNativeReceiverHaveExactShape(
@@ -225,6 +226,9 @@ func strictTypecheck(
 	workingDirectory string,
 	targetPaths []string,
 ) error {
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		return err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	arguments := []string{

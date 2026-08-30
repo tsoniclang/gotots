@@ -2,7 +2,7 @@ package tsoniccore
 
 import "testing"
 
-func TestPointerContractIsPinned(t *testing.T) {
+func TestTsonicCoreContractIsPinned(t *testing.T) {
 	tests := []struct {
 		symbol Symbol
 		module string
@@ -22,6 +22,8 @@ func TestPointerContractIsPinned(t *testing.T) {
 		{SymbolBindRawPointer, "@tsonic/core/lang.js", "bindRawPointer", PhaseValue},
 		{SymbolEqualRawPointer, "@tsonic/core/lang.js", "equalRawPointer", PhaseValue},
 		{SymbolHashRawPointer, "@tsonic/core/lang.js", "hashRawPointer", PhaseValue},
+		{SymbolStruct, "@tsonic/core/lang.js", "struct", PhaseValue},
+		{SymbolField, "@tsonic/core/lang.js", "field", PhaseValue},
 	}
 	for _, test := range tests {
 		declaration, err := Resolve(test.symbol)

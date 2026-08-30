@@ -1,10 +1,14 @@
 import type { bool, int32 } from "@gotots/runtime/scalars.js";
 import type { Pointer } from "@tsonic/core/types.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import { addressOf, loadPointer } from "@tsonic/core/lang.js";
+import { addressOf, field, loadPointer, struct } from "@tsonic/core/lang.js";
 export class Point {
     declare private readonly $goType: void;
     public constructor(public X: int32, public Visible: bool) {
+        struct({
+            X: field<int32>(),
+            Visible: field<bool>()
+        });
     }
     static $zero(): Point {
         return new Point(0, false);
@@ -20,6 +24,10 @@ export class Point {
 export class Box {
     declare private readonly $goType: void;
     public constructor(public Point: Point, public Active: bool) {
+        struct({
+            Point: field<Point>(),
+            Active: field<bool>()
+        });
     }
     static $zero(): Box {
         return new Box(Point.$zero(), false);
@@ -40,24 +48,36 @@ export class Box {
 export class Mirror {
     declare private readonly $goType: void;
     public constructor(public Point: Point, public Active: bool) {
+        struct({
+            Point: field<Point>(),
+            Active: field<bool>()
+        });
     }
     declare private readonly then?: never;
 }
 export class Reserved {
     declare private readonly $goType: void;
     public constructor(public __go_constructor: int32) {
+        struct({
+            __go_constructor: field<int32>()
+        });
     }
     declare private readonly then?: never;
 }
 export class Grouped {
     declare private readonly $goType: void;
     public constructor(public Left: int32, public Right: int32) {
+        struct({
+            Left: field<int32>(),
+            Right: field<int32>()
+        });
     }
     declare private readonly then?: never;
 }
 export class Empty {
     declare private readonly $goType: void;
     public constructor() {
+        struct({});
     }
     static $zero(): Empty {
         return new Empty();

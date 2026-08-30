@@ -141,9 +141,22 @@ synthetic nodes. Mutations substitute a different node, duplicate or omit one
 selected fact, classify a local same-spelled call, reparse source, or introduce
 a range join; each must fail at its sole owner.
 
+Every emitted Go struct class additionally proves one constructor-owned
+value-structure assertion. Focused artifacts cover named, anonymous, generic,
+embedded, empty, blank-field, direct-layout, and storage-layout structs. The
+assertion exact-joins its declaration-ordered represented fields and logical
+types to the emitted class layout. Mutations omit or duplicate the assertion,
+change a field name, order, or type, move it outside the owning constructor,
+select a local same-spelled call, or leave the assertion/import in executable
+output. Each must fail at the GoToTS AST gate, TSTS fact gate, or selected
+target consumption gate.
+
 GoToTS strict-typechecks canonical marker-bearing TypeScript against the
-resolution-only declaration contract but never executes that module's
-JavaScript. A direct Go-versus-Node differential remains valid only for an
+resolution fixture. Pointer and raw-pointer operations in that fixture fail
+loudly if executed. Its structural `struct` and `field` markers alone are
+inert so direct Go-versus-Node construct differentials can execute canonical
+pre-target source; selected product targets must still consume their exact
+facts and remove both calls before publication. A direct differential remains valid only for an
 artifact proven to contain no canonical marker call. For marker-bearing
 artifacts, GoToTS records native-Go evidence and canonical AST/typecheck
 evidence; TSTS fact finalization plus the selected target's lowering and
@@ -418,6 +431,13 @@ consumer before its root; each fails at AST shape, strict typecheck, target
 effect settlement, or runtime initialization. The target control retains a
 public structural `readonly then?: never` result, proving that nominal evidence
 rather than member spelling owns the optimization.
+
+Native-specialization proof additionally exact-joins its single store with the
+canonical `goMapStore` runtime contract and inspects that contract's generic
+parameters, one `values.set(key, value)` body, evaluation order, and `void`
+result. A mutation that writes native storage directly, routes hashed storage
+through the callable, duplicates an argument, changes its order, or changes the
+checked body fails at the runtime-contract or generated-AST owner.
 
 The native defined-numeric fixture includes value and pointer methods, direct
 calls, method expressions, method values, interface adaptation, explicit

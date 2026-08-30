@@ -42,8 +42,15 @@ func emitLayout(
 	if err != nil {
 		return layoutEmission{}, err
 	}
+	assertion, assertionRequests, err := valueStructureAssertion(context, selected)
+	if err != nil {
+		return layoutEmission{}, err
+	}
+	requests = api.CombineRequests(requests, assertionRequests)
 	if !storage {
-		members := []tsgo.ClassElement{directConstructor(context, selected)}
+		members := []tsgo.ClassElement{
+			directConstructor(context, selected, assertion),
+		}
 		return layoutEmission{
 			members:  members,
 			fields:   selected,
@@ -67,6 +74,7 @@ func emitLayout(
 		className,
 		storageType,
 		selected,
+		assertion,
 		typeParameters,
 		typeArguments,
 	)
@@ -136,6 +144,7 @@ func emitLayoutFields(
 func directConstructor(
 	context api.Context,
 	fields []layoutField,
+	assertion tsgo.Statement,
 ) tsgo.ConstructorDeclaration {
 	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
 	for _, selected := range fields {
@@ -157,7 +166,7 @@ func directConstructor(
 		nil,
 		parameters,
 		nil,
-		context.Factory().Block(nil, true),
+		context.Factory().Block([]tsgo.Statement{assertion}, true),
 	)
 }
 
@@ -198,6 +207,7 @@ func storageMembers(
 	className string,
 	storageType tsgo.TypeNode,
 	fields []layoutField,
+	assertion tsgo.Statement,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
 ) ([]tsgo.ClassElement, []api.RootRequest, error) {
@@ -216,7 +226,7 @@ func storageMembers(
 			nil,
 		)},
 		nil,
-		context.Factory().Block(nil, true),
+		context.Factory().Block([]tsgo.Statement{assertion}, true),
 	)
 	members := []tsgo.ClassElement{
 		constructor,
