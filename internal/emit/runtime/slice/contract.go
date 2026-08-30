@@ -22,10 +22,11 @@ const (
 )
 
 const (
-	StorageAllocateMember      = "$allocate"
-	StorageGrownCapacityMember = "$grownCapacity"
-	StorageInitializeMember    = "$initialize"
-	StorageWithLengthMember    = "$withLength"
+	StorageAllocateMember         = "$allocate"
+	StorageGrownCapacityMember    = "$grownCapacity"
+	StorageInitializeMember       = "$initialize"
+	StorageProjectedAddressMember = "$projectedAddress"
+	StorageWithLengthMember       = "$withLength"
 )
 
 func MemberName(member Member) string {

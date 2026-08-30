@@ -9,11 +9,12 @@ import (
 )
 
 type builder struct {
-	factory     tsgo.Factory
-	className   string
-	panicName   string
-	pointerName string
-	addressName string
+	factory            tsgo.Factory
+	className          string
+	panicName          string
+	pointerName        string
+	addressName        string
+	pointerProjectName string
 }
 
 type Capabilities struct {
@@ -37,6 +38,7 @@ func Build(
 		panicName,
 		"",
 		"",
+		"",
 		Capabilities{},
 	)
 }
@@ -47,14 +49,16 @@ func BuildWithCapabilities(
 	panicName string,
 	pointerName string,
 	addressName string,
+	pointerProjectName string,
 	capabilities Capabilities,
 ) tsgo.ClassDeclaration {
 	target := builder{
-		factory:     factory,
-		className:   className,
-		panicName:   panicName,
-		pointerName: pointerName,
-		addressName: addressName,
+		factory:            factory,
+		className:          className,
+		panicName:          panicName,
+		pointerName:        pointerName,
+		addressName:        addressName,
+		pointerProjectName: pointerProjectName,
 	}
 	members := []tsgo.ClassElement{target.constructor()}
 	members = append(
@@ -82,7 +86,11 @@ func BuildWithCapabilities(
 		members = append(members, target.clearMethod())
 	}
 	if capabilities.Address {
-		members = append(members, target.addressMethod())
+		members = append(
+			members,
+			target.addressMethod(),
+			target.projectedAddressMethod(),
+		)
 	}
 	if capabilities.Address || capabilities.ArrayPointer || capabilities.Region {
 		members = append(members, target.arrayLocationMethod())
