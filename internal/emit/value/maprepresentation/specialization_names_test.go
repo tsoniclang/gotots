@@ -310,8 +310,6 @@ func (staticSpecializationNames) Runtime(
 		return api.NewNameReference("GoPanic")
 	case api.RuntimeMapValue:
 		return api.NewNameReference("GoMapValue")
-	case api.RuntimeMapStore:
-		return api.NewNameReference("goMapStore")
 	default:
 		panic("unexpected runtime symbol")
 	}

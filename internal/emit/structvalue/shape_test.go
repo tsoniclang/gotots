@@ -18,14 +18,6 @@ func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 		"Point": 2, "Box": 2, "Mirror": 2,
 		"Reserved": 1, "Grouped": 2, "Empty": 0,
 	}
-	fieldNames := map[string][]string{
-		"Point":    {"X", "Visible"},
-		"Box":      {"Point", "Active"},
-		"Mirror":   {"Point", "Active"},
-		"Reserved": {"__go_constructor"},
-		"Grouped":  {"Left", "Right"},
-		"Empty":    {},
-	}
 	for _, name := range []string{
 		"Point",
 		"Box",
@@ -57,7 +49,6 @@ func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 		if len(constructor.Parameters()) != fieldCounts[name] {
 			t.Fatalf("%s constructor parameters = %d, want %d", name, len(constructor.Parameters()), fieldCounts[name])
 		}
-		assertValueStructureAssertion(t, name, constructor, fieldNames[name])
 	}
 
 	reserved := targetClass(t, source, "Reserved")
@@ -66,42 +57,6 @@ func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 		t.Fatalf("reserved constructor parameter = %q, want collision-safe target name", got)
 	}
 
-}
-
-func assertValueStructureAssertion(
-	t *testing.T,
-	className string,
-	constructor tsgo.ConstructorDeclaration,
-	fieldNames []string,
-) {
-	t.Helper()
-	body, ok := constructor.Body().(tsgo.Block)
-	if !ok || len(body.Statements()) != 1 {
-		t.Fatalf("%s constructor has no sole value-structure assertion", className)
-	}
-	statement, ok := body.Statements()[0].(tsgo.ExpressionStatement)
-	if !ok {
-		t.Fatalf("%s constructor assertion = %T", className, body.Statements()[0])
-	}
-	call, ok := statement.Expression().(tsgo.CallExpression)
-	if !ok || targetName(call.Expression()) != "struct" || len(call.Arguments()) != 1 {
-		t.Fatalf("%s constructor lacks canonical struct(...) call", className)
-	}
-	shape, ok := call.Arguments()[0].(tsgo.ObjectLiteralExpression)
-	if !ok || len(shape.Properties()) != len(fieldNames) {
-		t.Fatalf("%s struct shape has %d fields, want %d", className, len(shape.Properties()), len(fieldNames))
-	}
-	for index, expected := range fieldNames {
-		property, ok := shape.Properties()[index].(tsgo.PropertyAssignment)
-		if !ok || targetName(property.Name()) != expected {
-			t.Fatalf("%s struct field %d does not name %q", className, index, expected)
-		}
-		fieldCall, ok := property.Initializer().(tsgo.CallExpression)
-		if !ok || targetName(fieldCall.Expression()) != "field" ||
-			len(fieldCall.TypeArguments()) != 1 || len(fieldCall.Arguments()) != 0 {
-			t.Fatalf("%s struct field %q lacks canonical field<T>()", className, expected)
-		}
-	}
 }
 
 func classMemberNames(members []tsgo.ClassElement) []string {

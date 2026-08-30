@@ -7,9 +7,7 @@ import (
 	"testing"
 )
 
-func TestResolutionFixturePinsStructuralInertnessAndRejectsPointerExecution(
-	t *testing.T,
-) {
+func TestResolutionFixtureIsCompleteAndFailsOnExecution(t *testing.T) {
 	root := t.TempDir()
 	if err := InstallResolutionOnly(root); err != nil {
 		t.Fatal(err)
@@ -39,13 +37,6 @@ func TestResolutionFixturePinsStructuralInertnessAndRejectsPointerExecution(
 		if !strings.Contains(string(declarations), "function "+name) ||
 			!strings.Contains(string(runtime), `unsupported("`+name+`")`) {
 			t.Fatalf("resolution fixture lacks %s", name)
-		}
-	}
-	for _, name := range []string{"struct", "field"} {
-		if !strings.Contains(string(declarations), "function "+name) ||
-			strings.Contains(string(runtime), `unsupported("`+name+`")`) ||
-			!strings.Contains(string(runtime), "export const "+name) {
-			t.Fatalf("resolution fixture lacks inert structural marker %s", name)
 		}
 	}
 	types, err := os.ReadFile(filepath.Join(module, "types.d.ts"))

@@ -19,8 +19,6 @@ const (
 	SymbolBindRawPointer
 	SymbolEqualRawPointer
 	SymbolHashRawPointer
-	SymbolStruct
-	SymbolField
 )
 
 type Phase uint8
@@ -85,10 +83,6 @@ func Resolve(symbol Symbol) (Declaration, error) {
 		return value("equalRawPointer"), nil
 	case SymbolHashRawPointer:
 		return value("hashRawPointer"), nil
-	case SymbolStruct:
-		return value("struct"), nil
-	case SymbolField:
-		return value("field"), nil
 	default:
 		return Declaration{}, fmt.Errorf(
 			"resolve Tsonic core symbol: invalid symbol %d",

@@ -81,19 +81,6 @@ func BuildSpecialization(
 	if err != nil {
 		return Specialization{}, err
 	}
-	var mapStoreRequests []api.RootRequest
-	mapStoreName := ""
-	if model.Storage() == StorageNative {
-		mapStoreReference, err := context.Names().Runtime(
-			api.RuntimeMapStore,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return Specialization{}, err
-		}
-		mapStoreName = mapStoreReference.Name()
-		mapStoreRequests = mapStoreReference.Requests()
-	}
 	builder := specializationBuilder{
 		factory:        context.Factory(),
 		className:      className,
@@ -101,7 +88,6 @@ func BuildSpecialization(
 		storageKeyType: storageKeyType,
 		valueType:      valueType,
 		panicName:      panicReference.Name(),
-		mapStoreName:   mapStoreName,
 		zero:           operations.zero,
 		hash:           operations.hash,
 		equal:          operations.equal,
@@ -147,7 +133,6 @@ func BuildSpecialization(
 			requests,
 			panicReference.Requests(),
 			mapValueReference.Requests(),
-			mapStoreRequests,
 		),
 	}, nil
 }

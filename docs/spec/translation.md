@@ -528,9 +528,7 @@ maps to the source-ordered ordinary shape:
 
 ```ts
 class Point {
-  constructor(public X: int32, public Y: int32) {
-    struct({ X: field<int32>(), Y: field<int32>() });
-  }
+  constructor(public X: int32, public Y: int32) {}
 }
 
 function NewPoint(): Point {
@@ -540,24 +538,8 @@ function NewPoint(): Point {
 }
 ```
 
-The constructor's parameters are the complete represented declaration field
-set and create the fields directly without an argument-object allocation. Its
-first statement is one canonical value-structure assertion selected by exact
-`@tsonic/core/lang.js` declaration identities. The assertion contains one
-`field<T>()` property for each represented nonblank Go field, in declaration
-order, using the field's logical type. Blank Go fields have no observable
-target member and are omitted. TSTS finalizes the exact `StructFact` and field
-facts on that assertion; a selected target must consume the fact and remove
-the assertion before execution or reject the source. GoToTS never infers this
-evidence from a class name, `$goType`, constructor shape, or target-file path.
-
-The same assertion is emitted for named, anonymous, generic, embedded,
-direct-layout, and storage-layout structs. A generic assertion remains in the
-instance constructor so its `field<T>()` types can refer to the class type
-parameters. The assertion is metadata only: it does not add a source-facing
-parameter, field, static member, or runtime value.
-
-Under the
+The constructor's parameters are the complete declaration field set and create
+the fields directly without an argument-object allocation. Under the
 preserve-Go profile, the call captures only the expressions needed to retain
 source evaluation order before placing arguments in declaration order. The
 direct profile omits those captures by explicit project choice. If a later
@@ -625,26 +607,16 @@ copy, hash, or equality operations uses one deduplicated support specialization
 for its semantic shape, never one class per use site.
 
 When the selected key storage is an exact boolean, integer, or string
-primitive, a specialized map stores values directly in a native JavaScript
-`Map`.
+primitive, a specialized map stores tuple cells in a native JavaScript `Map`.
 This includes a defined key only when its canonical storage mapping is
 bijective: either the identity representation or an explicit projection.
 Public lookup/store/delete/keys operations apply and reverse any explicit
-projection at the specialization boundary. `Map.has` distinguishes a present
-`undefined` value from an absent key. Floating-point,
+projection at the specialization boundary. The cell
+distinguishes a present `undefined` value from an absent key. Floating-point,
 complex, pointer, interface, aggregate, and non-bijective defined keys retain
 the typed hash/equality bucket representation. Both paths preserve nil
 behavior, zero on miss, comma-ok, deletion, clear, assignment copy, and the
 iteration envelope through the same Go-shaped map contract.
-
-A native specialization performs its final write through the one canonical
-generic `goMapStore<K,V>(values, key, value)` runtime callable. That callable
-evaluates its three arguments once in order, executes exactly
-`values.set(key, value)`, and returns `void`; hashed storage does not request
-it. This is an executable canonical boundary, not a target decision. A
-selected target may inline the checked callable only under its own explicit
-exact-declaration contract, while an unoptimized consumer executes the same
-GoToTS-owned behavior directly.
 
 That common contract is one exported nominal abstract class, not a structural
 interface:

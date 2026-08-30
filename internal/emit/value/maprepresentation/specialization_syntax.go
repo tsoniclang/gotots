@@ -9,7 +9,6 @@ type specializationBuilder struct {
 	storageKeyType tsgo.TypeNode
 	valueType      tsgo.TypeNode
 	panicName      string
-	mapStoreName   string
 	zero           operationBody
 	hash           operationBody
 	equal          operationBody

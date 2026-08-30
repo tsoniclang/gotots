@@ -66,9 +66,6 @@ func Build(
 	if err != nil {
 		return nil, err
 	}
-	if symbol == api.RuntimeMapStore {
-		return storeTransport(factory, contract.ExportedName()), nil
-	}
 	if (symbol != api.RuntimeMap && symbol != api.RuntimeMapValue) ||
 		contract.Module() != api.RuntimeModuleMap {
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}

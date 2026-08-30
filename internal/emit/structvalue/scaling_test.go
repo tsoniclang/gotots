@@ -12,7 +12,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
-	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestNamedStructDefinitionScalesByFieldsWhileUseSitesStayConstant(t *testing.T) {
@@ -207,9 +206,6 @@ func printAndTypecheckScalingStruct(
 		"--noEmit",
 	}
 	arguments = append(arguments, targetPaths...)
-	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
-		t.Fatal(err)
-	}
 	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
 		t.Fatal(err)
 	}

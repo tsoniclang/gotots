@@ -73,14 +73,6 @@ func fixtureFiles() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	structMarker, err := exportName(corecontract.SymbolStruct)
-	if err != nil {
-		return nil, err
-	}
-	fieldMarker, err := exportName(corecontract.SymbolField)
-	if err != nil {
-		return nil, err
-	}
 	return map[string]string{
 		"package.json": `{
   "type": "module",
@@ -113,9 +105,7 @@ export declare function %[8]s<T>(identity: object, read: () => T, write: (value:
 export declare function %[9]s(identity: object): import("./types.js").RawPointer;
 export declare function %[10]s(left: import("./types.js").RawPointer | undefined, right: import("./types.js").RawPointer | undefined): boolean;
 export declare function %[11]s(pointer: import("./types.js").RawPointer | undefined): number;
-export declare function %[12]s<T>(shape: T): T;
-export declare function %[13]s<T>(): T;
-`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer, structMarker, fieldMarker),
+`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer),
 		"lang.js": fmt.Sprintf(`const unsupported = (name) => {
   throw new Error("resolution-only Tsonic core fixture executed " + name);
 };
@@ -130,9 +120,7 @@ export const %[8]s = () => unsupported("%[8]s");
 export const %[9]s = () => unsupported("%[9]s");
 export const %[10]s = () => unsupported("%[10]s");
 export const %[11]s = () => unsupported("%[11]s");
-export const %[12]s = (shape) => shape;
-export const %[13]s = () => undefined;
-`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer, structMarker, fieldMarker),
+`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer),
 	}, nil
 }
 
