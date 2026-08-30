@@ -51,7 +51,7 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 		for _, required := range []string{
 			"private readonly values: Map<string, ",
 			"private static $copyValue",
-			"values.set(key, ",
+			"goMapStore(values, key, ",
 			"values.has(key)",
 			"values.delete(key)",
 			"Array.from(values.keys())",
@@ -82,7 +82,8 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 		lookupOK := specializationMethodSource(t, source, "lookupOk", "store")
 		if strings.Contains(store, "values.get(") ||
 			strings.Contains(store, "entry === undefined") ||
-			strings.Count(store, "values.set(key, ") != 1 ||
+			strings.Count(store, "goMapStore(values, key, ") != 1 ||
+			strings.Contains(store, "values.set(key, ") ||
 			strings.Count(store, "$copyValue(value)") != 1 {
 			t.Fatalf("native store is not one copy-and-set operation:\n%s", store)
 		}

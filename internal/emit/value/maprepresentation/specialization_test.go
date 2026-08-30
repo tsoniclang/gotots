@@ -19,6 +19,9 @@ import (
 const mapValueTestContract = `abstract class GoMapValue<K, V> {
     declare private readonly then?: never;
 }
+function goMapStore<K, V>(values: Map<K, V>, key: K, value: V): void {
+    values.set(key, value);
+}
 `
 
 func TestStaticSpecializationExecutesCollisionsCopiesAndNilSemantics(

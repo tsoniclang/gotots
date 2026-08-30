@@ -98,6 +98,48 @@ func TestMapValueContractIsNominallyNonThenable(t *testing.T) {
 	}
 }
 
+func TestBuildCreatesGenericMapValueTransport(t *testing.T) {
+	statement, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeMapStore,
+		panicClassName(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declaration, ok := statement.(tsgo.FunctionDeclaration)
+	if !ok {
+		t.Fatalf("definition = %T, want FunctionDeclaration", statement)
+	}
+	contract, err := api.RuntimeContract(api.RuntimeMapStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if declaration.Name().Text() != contract.ExportedName() ||
+		len(declaration.TypeParameters()) != 2 ||
+		len(declaration.Parameters()) != 3 {
+		t.Fatalf(
+			"map transport = %q with %d type parameters and %d parameters",
+			declaration.Name().Text(),
+			len(declaration.TypeParameters()),
+			len(declaration.Parameters()),
+		)
+	}
+	body := declaration.Body().(tsgo.Block).Statements()
+	if len(body) != 1 {
+		t.Fatalf("map transport statements = %d, want one", len(body))
+	}
+	call := body[0].(tsgo.ExpressionStatement).Expression().(tsgo.CallExpression)
+	access := call.Expression().(tsgo.PropertyAccessExpression)
+	if access.Expression().(tsgo.Identifier).Text() != valuesName ||
+		access.Name().(tsgo.Identifier).Text() != "set" ||
+		len(call.Arguments()) != 2 ||
+		call.Arguments()[0].(tsgo.Identifier).Text() != keyName ||
+		call.Arguments()[1].(tsgo.Identifier).Text() != valueName {
+		t.Fatalf("map transport body = %#v, want values.set(key, value)", body)
+	}
+}
+
 func TestClearSurfaceBelongsToCompleteMapContract(t *testing.T) {
 	factory := tsgo.NewFactory()
 	statement, err := Build(
