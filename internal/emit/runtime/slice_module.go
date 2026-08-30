@@ -89,7 +89,6 @@ func buildSlice(
 			panicContract.ExportedName(),
 			pointerName,
 			addressName,
-			pointerProjectName,
 			capabilities,
 		),
 	)
@@ -111,6 +110,7 @@ func buildSlice(
 					sliceContract.ExportedName(),
 					panicContract.ExportedName(),
 					pointerName,
+					pointerProjectName,
 					capabilities,
 				),
 			)

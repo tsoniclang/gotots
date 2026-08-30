@@ -56,93 +56,14 @@ func (b builder) pointerType(element tsgo.TypeNode) tsgo.TypeReferenceNode {
 	)
 }
 
-func (b builder) projectedAddressMethod() tsgo.MethodDeclaration {
-	targetType := b.factory.TypeReferenceNode(b.id("U"), nil)
-	numericIndex := b.id("numericIndex")
-	backing := b.id("backing")
-	address := b.factory.CallExpression(
-		b.id(b.addressName),
-		nil,
-		[]tsgo.TypeNode{b.typeT()},
-		[]tsgo.Expression{b.backingElement(backing, numericIndex)},
-		tsgo.NodeFlagsNone,
-	)
-	projected := b.factory.CallExpression(
-		b.id(b.pointerProjectName),
-		nil,
-		[]tsgo.TypeNode{b.typeT(), targetType},
-		[]tsgo.Expression{
-			address,
-			b.id("fromSource"),
-			b.id("toSource"),
-		},
-		tsgo.NodeFlagsNone,
-	)
-	return b.method(
-		nil,
-		StorageProjectedAddressMember,
-		[]tsgo.TypeParameterDeclaration{b.factory.TypeParameterDeclaration(
-			nil,
-			b.id("U"),
-			nil,
-			nil,
-			nil,
-		)},
-		[]tsgo.ParameterDeclaration{
-			b.parameter("index", b.integerInputType()),
-			b.parameter(
-				"fromSource",
-				b.factory.FunctionTypeNode(
-					nil,
-					[]tsgo.ParameterDeclaration{b.parameter("value", b.typeT())},
-					targetType,
-				),
-			),
-			b.parameter(
-				"toSource",
-				b.factory.FunctionTypeNode(
-					nil,
-					[]tsgo.ParameterDeclaration{b.parameter("value", targetType)},
-					b.typeT(),
-				),
-			),
-		},
-		b.pointerType(targetType),
-		b.variable(
-			tsgo.NodeFlagsConst,
-			"numericIndex",
-			b.toNumber(b.id("index")),
-		),
-		b.variable(
-			tsgo.NodeFlagsConst,
-			"backing",
-			b.thisProperty("backing"),
-		),
-		b.factory.IfStatement(
-			b.binary(
-				b.binary(
-					backing,
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-					b.factory.NullLiteral(),
-				),
-				tsgo.BinaryOperatorBarBarToken,
-				b.boundsCondition(numericIndex),
-			),
-			b.throwBounds(),
-			nil,
-		),
-		b.returnStatement(projected),
-	)
-}
-
 func (b projectionBuilder) addressMethod() tsgo.MethodDeclaration {
 	targetType := b.typeReference("T")
 	projected := b.factory.CallExpression(
-		b.property(b.source(), StorageProjectedAddressMember),
+		b.id(b.pointerProject),
 		nil,
-		[]tsgo.TypeNode{targetType},
+		[]tsgo.TypeNode{b.typeReference("F"), targetType},
 		[]tsgo.Expression{
-			b.id("index"),
+			b.call(b.source(), MemberName(MemberAddress), b.id("index")),
 			b.thisProperty("fromSource"),
 			b.thisProperty("toSource"),
 		},
@@ -159,67 +80,6 @@ func (b projectionBuilder) addressMethod() tsgo.MethodDeclaration {
 		},
 		b.pointerType(targetType),
 		b.factory.Block([]tsgo.Statement{b.returnStatement(projected)}, true),
-	)
-}
-
-func (b projectionBuilder) projectedAddressMethod() tsgo.MethodDeclaration {
-	targetType := b.typeReference("U")
-	fromSource := b.factory.ArrowFunction(
-		nil,
-		nil,
-		[]tsgo.ParameterDeclaration{
-			b.parameter(nil, "value", b.typeReference("F")),
-		},
-		targetType,
-		b.factory.EqualsGreaterThanToken(),
-		b.factory.CallExpression(
-			b.id("fromTarget"),
-			nil,
-			nil,
-			[]tsgo.Expression{b.convert("fromSource", b.id("value"))},
-			tsgo.NodeFlagsNone,
-		),
-	)
-	toSource := b.factory.ArrowFunction(
-		nil,
-		nil,
-		[]tsgo.ParameterDeclaration{
-			b.parameter(nil, "value", targetType),
-		},
-		b.typeReference("F"),
-		b.factory.EqualsGreaterThanToken(),
-		b.convert(
-			"toSource",
-			b.factory.CallExpression(
-				b.id("toTarget"),
-				nil,
-				nil,
-				[]tsgo.Expression{b.id("value")},
-				tsgo.NodeFlagsNone,
-			),
-		),
-	)
-	return b.factory.MethodDeclaration(
-		[]tsgo.ModifierLike{b.factory.OverrideKeyword()},
-		nil,
-		b.id(StorageProjectedAddressMember),
-		nil,
-		[]tsgo.TypeParameterDeclaration{b.typeParameter("U")},
-		[]tsgo.ParameterDeclaration{
-			b.parameter(nil, "index", b.integerInputType()),
-			b.parameter(nil, "fromTarget", b.converterType("T", "U")),
-			b.parameter(nil, "toTarget", b.converterType("U", "T")),
-		},
-		b.pointerType(targetType),
-		b.factory.Block([]tsgo.Statement{b.returnStatement(
-			b.factory.CallExpression(
-				b.property(b.source(), StorageProjectedAddressMember),
-				nil,
-				[]tsgo.TypeNode{targetType},
-				[]tsgo.Expression{b.id("index"), fromSource, toSource},
-				tsgo.NodeFlagsNone,
-			),
-		)}, true),
 	)
 }
 

@@ -68,9 +68,7 @@ func TestRuntimeSliceProjectionPreservesBidirectionalAlias(t *testing.T) {
 		"this.source.set(index, this.toSource(value))",
 		"this.source.slice(low, high, max)",
 		"this.source.append(this.sourceZero, converted)",
-		"$projectedAddress<U>",
-		"projectPointer<T, U>",
-		"this.source.$projectedAddress<T>",
+		"projectPointer<F, T>",
 		"projectPointer<T | undefined, GoArray<T, N>>",
 		"projected slice has no contiguous target representation",
 	} {
@@ -78,17 +76,12 @@ func TestRuntimeSliceProjectionPreservesBidirectionalAlias(t *testing.T) {
 			t.Fatalf("projected slice runtime lacks %q:\n%s", fragment, sliceSource)
 		}
 	}
-	if strings.Contains(
-		sliceSource,
-		"projectPointer<F, T>(this.source.address(index)",
-	) {
-		t.Fatal("projected slice address retained the superseded two-location path")
-	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import {
   RuntimeSlice,
   RuntimeSliceProjection,
 } from "./runtime/slice.js";
+
 const source = RuntimeSlice.make<bigint>(2, 4, 0n);
 source.set(0, 1n);
 source.set(1, 2n);

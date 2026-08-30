@@ -11,6 +11,7 @@ type projectionBuilder struct {
 	sliceName      string
 	panicName      string
 	pointerName    string
+	pointerProject string
 }
 
 func BuildProjection(
@@ -19,6 +20,7 @@ func BuildProjection(
 	sliceName string,
 	panicName string,
 	pointerName string,
+	pointerProject string,
 	capabilities Capabilities,
 ) tsgo.ClassDeclaration {
 	builder := projectionBuilder{
@@ -27,6 +29,7 @@ func BuildProjection(
 		sliceName:      sliceName,
 		panicName:      panicName,
 		pointerName:    pointerName,
+		pointerProject: pointerProject,
 	}
 	members := []tsgo.ClassElement{
 		builder.constructor(),
@@ -50,11 +53,7 @@ func BuildProjection(
 		members = append(members, builder.clearMethod())
 	}
 	if capabilities.Address {
-		members = append(
-			members,
-			builder.addressMethod(),
-			builder.projectedAddressMethod(),
-		)
+		members = append(members, builder.addressMethod())
 	}
 	if capabilities.Address || capabilities.ArrayPointer || capabilities.Region {
 		members = append(members, builder.arrayLocationMethod())
