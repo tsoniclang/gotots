@@ -259,13 +259,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoMapValue",
 			true,
 		), nil
-	case RuntimeMapStore:
-		return runtimeContract(
-			RuntimeModuleMap,
-			"runtime/map.ts",
-			"goMapStore",
-			false,
-		), nil
 	case RuntimePanic:
 		return runtimeContract(
 			RuntimeModulePanic,

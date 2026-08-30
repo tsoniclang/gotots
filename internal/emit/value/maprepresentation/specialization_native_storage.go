@@ -303,19 +303,14 @@ func (b specializationBuilder) nativeStoreMethod() tsgo.MethodDeclaration {
 			)),
 			nil,
 		),
-		b.factory.ExpressionStatement(b.factory.CallExpression(
-			b.id(b.mapStoreName),
-			nil,
-			nil,
-			[]tsgo.Expression{
-				values,
-				storageKey,
-				b.staticCall(
-					specializationCopyValueOperation,
-					b.id("value"),
-				),
-			},
-			tsgo.NodeFlagsNone,
+		b.factory.ExpressionStatement(b.call(
+			values,
+			"set",
+			storageKey,
+			b.staticCall(
+				specializationCopyValueOperation,
+				b.id("value"),
+			),
 		)),
 	)
 }

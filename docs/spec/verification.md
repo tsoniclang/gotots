@@ -419,13 +419,6 @@ effect settlement, or runtime initialization. The target control retains a
 public structural `readonly then?: never` result, proving that nominal evidence
 rather than member spelling owns the optimization.
 
-Native-specialization proof additionally exact-joins its single store with the
-canonical `goMapStore` runtime contract and inspects that contract's generic
-parameters, one `values.set(key, value)` body, evaluation order, and `void`
-result. A mutation that writes native storage directly, routes hashed storage
-through the callable, duplicates an argument, changes its order, or changes the
-checked body fails at the runtime-contract or generated-AST owner.
-
 The native defined-numeric fixture includes value and pointer methods, direct
 calls, method expressions, method values, interface adaptation, explicit
 conversion, and a switch whose listed constants do not exhaust the underlying

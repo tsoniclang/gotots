@@ -35,7 +35,6 @@ const (
 	RuntimeMapClear                   RuntimeSymbol = 402
 	RuntimeMapKeys                    RuntimeSymbol = 403
 	RuntimeMapValue                   RuntimeSymbol = 404
-	RuntimeMapStore                   RuntimeSymbol = 405
 	RuntimePanic                      RuntimeSymbol = 500
 	RuntimePanicValue                 RuntimeSymbol = 501
 	RuntimeRecovery                   RuntimeSymbol = 502

@@ -618,15 +618,6 @@ the typed hash/equality bucket representation. Both paths preserve nil
 behavior, zero on miss, comma-ok, deletion, clear, assignment copy, and the
 iteration envelope through the same Go-shaped map contract.
 
-A native specialization performs its final write through the one canonical
-generic `goMapStore<K,V>(values, key, value)` runtime callable. That callable
-evaluates its three arguments once in order, executes exactly
-`values.set(key, value)`, and returns `void`; hashed storage does not request
-it. This is an executable canonical boundary, not a target decision. A
-selected target may inline the checked callable only under its own explicit
-exact-declaration contract, while an unoptimized consumer executes the same
-GoToTS-owned behavior directly.
-
 That common contract is one exported nominal abstract class, not a structural
 interface:
 
