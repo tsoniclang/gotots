@@ -84,6 +84,13 @@ func Emit(
 		)
 	} else if directEligible(context, tag, clauses) {
 		target, err = emitDirect(context, tag, clauses, targetLabel)
+	} else if nativeSelectionEligible(context, tag, clauses) {
+		target, err = emitNativeSelection(
+			context,
+			tag,
+			clauses,
+			targetLabel,
+		)
 	} else {
 		target, err = emitConditional(context, tag, clauses, targetLabel)
 	}

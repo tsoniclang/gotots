@@ -1127,11 +1127,15 @@ not pass a reusable target label to nested breakable statements. The control
 label used to resolve source `break`, `continue`, and `goto` identities remains
 available independently and never selects a target label by spelling.
 
-An explicit Go `fallthrough` never becomes an implicit TypeScript case fall.
-The switch owner selects one clause, then executes ordered clause blocks under
-one break label; fallthrough advances to the next block without re-evaluating
-its case expressions. A Go `break` exits that label, while `continue` still
-targets the enclosing source loop.
+For a tagged switch with exact native primitive equality and prerequisite-free
+case expressions, the owner uses one native TypeScript switch to select the
+source clause. It then executes ordered clause blocks under one break label;
+an explicit final Go `fallthrough` advances to the next block without
+evaluating that block's case expressions. This split avoids implicit target
+fallthrough, remains valid under `noFallthroughCasesInSwitch`, and preserves a
+source `break` plus the enclosing source loop's `continue`. Switches outside
+that exact class use the general conditional-selection route before the same
+ordered execution owner.
 
 An expressionless Go switch whose case expressions have no prerequisites and
 whose clauses do not fall through emits an ordered `if`/`else if` chain inside
