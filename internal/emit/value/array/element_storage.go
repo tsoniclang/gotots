@@ -20,6 +20,17 @@ func (a RuntimeArray) loadElement(
 	)
 }
 
+func (a RuntimeArray) zeroElement(
+	context api.Context,
+	source ast.Node,
+) (api.ExpressionEmission, error) {
+	return context.ContainerStorage().ContainerStorageZero(
+		context,
+		source,
+		a.ElementType(),
+	)
+}
+
 func (a RuntimeArray) storeElement(
 	context api.Context,
 	source ast.Node,

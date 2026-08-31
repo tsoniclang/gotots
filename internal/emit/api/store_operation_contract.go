@@ -25,6 +25,11 @@ type ContainerStorageValues interface {
 		ast.Node,
 		types.Type,
 	) (TypeEmission, error)
+	ContainerStorageZero(
+		Context,
+		ast.Node,
+		types.Type,
+	) (ExpressionEmission, error)
 	ToContainerStorage(
 		Context,
 		ast.Node,

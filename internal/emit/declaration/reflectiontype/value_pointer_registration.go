@@ -28,14 +28,9 @@ func pointerValueOperationsStatement(
 		adapter:        adapter,
 		descriptorType: descriptorType,
 	}
-	if err := attachPointerPanic(context, scaffold); err != nil {
-		return nil, nil, false, err
-	}
-	properties := []tsgo.ObjectLiteralElementLike{
-		booleanProperty(factory, "zero", true),
-	}
+	properties := make([]tsgo.ObjectLiteralElementLike, 0, 2)
 	pointee := pointerType.Elem()
-	var element tsgo.ObjectLiteralExpression
+	var element tsgo.Expression
 	var elementErr error
 	if _, isInterface := types.Unalias(pointee).Underlying().(*types.Interface); isInterface {
 		element, elementErr = pointerInterfaceElementOperations(
@@ -94,7 +89,16 @@ func pointerValueOperationsStatement(
 				factory.EqualsGreaterThanToken(),
 				factory.ParenthesizedExpression(adapter.Expression(factory)),
 			),
-			factory.ObjectLiteralExpression(properties, true),
+			factory.ArrowFunction(
+				nil,
+				nil,
+				[]tsgo.ParameterDeclaration{untypedParameter(factory, "elements")},
+				nil,
+				factory.EqualsGreaterThanToken(),
+				factory.ParenthesizedExpression(
+					factory.ObjectLiteralExpression(properties, true),
+				),
+			),
 		},
 		tsgo.NodeFlagsNone,
 	))
@@ -105,32 +109,13 @@ func pointerValueOperationsStatement(
 	), true, nil
 }
 
-func attachPointerPanic(
-	context api.Context,
-	scaffold *locationScaffold,
-) error {
-	panicReference, err := context.Names().Runtime(
-		api.RuntimePanic,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return err
-	}
-	scaffold.panicRef = panicReference
-	scaffold.requests = append(
-		scaffold.requests,
-		panicReference.Requests()...,
-	)
-	return nil
-}
-
 func pointerStoredElementOperations(
 	context api.Context,
 	names api.ReflectionNames,
 	reflectionType *types.TypeName,
 	pointee types.Type,
 	scaffold *locationScaffold,
-) (tsgo.ObjectLiteralExpression, error) {
+) (tsgo.Expression, error) {
 	factory := scaffold.factory
 	elemAdapter, err := context.Names().InterfaceAdapter(pointee, nil)
 	if err != nil {
@@ -158,11 +143,7 @@ func pointerStoredElementOperations(
 		pointee,
 		pointee,
 		api.ValueTransferCopy,
-		api.DirectExpression(guardedForeignPayload(
-			scaffold,
-			elemAdapter,
-			"Value.Set",
-		)),
+		api.DirectExpression(factory.Identifier("value")),
 	)
 	if err != nil {
 		return nil, err
@@ -181,31 +162,31 @@ func pointerStoredElementOperations(
 			tsgo.NodeFlagsNone,
 		),
 	))
-	return factory.ObjectLiteralExpression([]tsgo.ObjectLiteralElementLike{
-		expressionProperty(factory, "type", arrow(
-			factory,
-			scaffold.descriptorType,
-			descriptor.Expression(factory),
-		)),
-		expressionProperty(factory, "get", factory.ArrowFunction(
+	return pointerElementBuilderCall(factory, "value", []tsgo.Expression{
+		arrow(factory, scaffold.descriptorType, descriptor.Expression(factory)),
+		factory.ArrowFunction(
+			nil,
+			nil,
+			nil,
+			nil,
+			factory.EqualsGreaterThanToken(),
+			factory.ParenthesizedExpression(elemAdapter.Expression(factory)),
+		),
+		factory.ArrowFunction(
 			nil,
 			nil,
 			[]tsgo.ParameterDeclaration{untypedParameter(factory, "pointer")},
 			nil,
 			factory.EqualsGreaterThanToken(),
-			factory.ParenthesizedExpression(factory.NewExpression(
-				elemAdapter.Expression(factory),
+			factory.ParenthesizedExpression(factory.CallExpression(
+				loadPointer.Expression(factory),
 				nil,
-				[]tsgo.Expression{factory.CallExpression(
-					loadPointer.Expression(factory),
-					nil,
-					nil,
-					[]tsgo.Expression{factory.Identifier("pointer")},
-					tsgo.NodeFlagsNone,
-				)},
+				nil,
+				[]tsgo.Expression{factory.Identifier("pointer")},
+				tsgo.NodeFlagsNone,
 			)),
-		)),
-		expressionProperty(factory, "set", factory.ArrowFunction(
+		),
+		factory.ArrowFunction(
 			nil,
 			nil,
 			[]tsgo.ParameterDeclaration{
@@ -215,8 +196,8 @@ func pointerStoredElementOperations(
 			nil,
 			factory.EqualsGreaterThanToken(),
 			factory.Block(setStatements, true),
-		)),
-	}, true), nil
+		),
+	}), nil
 }
 
 func pointerInterfaceElementOperations(
@@ -225,7 +206,7 @@ func pointerInterfaceElementOperations(
 	reflectionType *types.TypeName,
 	pointee types.Type,
 	scaffold *locationScaffold,
-) (tsgo.ObjectLiteralExpression, error) {
+) (tsgo.Expression, error) {
 	factory := scaffold.factory
 	descriptor, err := names.ReflectionValueType(pointee, reflectionType)
 	if err != nil {
@@ -239,7 +220,15 @@ func pointerInterfaceElementOperations(
 	if err != nil {
 		return nil, err
 	}
-	assigned, admissionRequests, err := admittedInterfaceValue(
+	panicReference, err := context.Names().Runtime(
+		api.RuntimePanic,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.panicRef = panicReference
+	admitted, admissionRequests, err := admittedInterfaceValue(
 		context,
 		pointee,
 		factory.Identifier("value"),
@@ -251,6 +240,7 @@ func pointerInterfaceElementOperations(
 	}
 	scaffold.requests = api.CombineRequests(
 		scaffold.requests,
+		panicReference.Requests(),
 		descriptor.Requests(),
 		loadPointer.Requests(),
 		storePointer.Requests(),
@@ -263,18 +253,22 @@ func pointerInterfaceElementOperations(
 			nil,
 			[]tsgo.Expression{
 				factory.Identifier("pointer"),
-				assigned,
+				factory.Identifier("value"),
 			},
 			tsgo.NodeFlagsNone,
 		),
 	)}, true)
-	return factory.ObjectLiteralExpression([]tsgo.ObjectLiteralElementLike{
-		expressionProperty(factory, "type", arrow(
-			factory,
-			scaffold.descriptorType,
-			descriptor.Expression(factory),
-		)),
-		expressionProperty(factory, "get", factory.ArrowFunction(
+	return pointerElementBuilderCall(factory, "interfaceValue", []tsgo.Expression{
+		arrow(factory, scaffold.descriptorType, descriptor.Expression(factory)),
+		factory.ArrowFunction(
+			nil,
+			nil,
+			[]tsgo.ParameterDeclaration{untypedParameter(factory, "value")},
+			nil,
+			factory.EqualsGreaterThanToken(),
+			factory.ParenthesizedExpression(admitted),
+		),
+		factory.ArrowFunction(
 			nil,
 			nil,
 			[]tsgo.ParameterDeclaration{untypedParameter(factory, "pointer")},
@@ -287,8 +281,8 @@ func pointerInterfaceElementOperations(
 				[]tsgo.Expression{factory.Identifier("pointer")},
 				tsgo.NodeFlagsNone,
 			)),
-		)),
-		expressionProperty(factory, "set", factory.ArrowFunction(
+		),
+		factory.ArrowFunction(
 			nil,
 			nil,
 			[]tsgo.ParameterDeclaration{
@@ -298,8 +292,27 @@ func pointerInterfaceElementOperations(
 			nil,
 			factory.EqualsGreaterThanToken(),
 			set,
-		)),
-	}, true), nil
+		),
+	}), nil
+}
+
+func pointerElementBuilderCall(
+	factory tsgo.Factory,
+	member string,
+	arguments []tsgo.Expression,
+) tsgo.Expression {
+	return factory.CallExpression(
+		factory.PropertyAccessExpression(
+			factory.Identifier("elements"),
+			nil,
+			factory.Identifier(member),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		arguments,
+		tsgo.NodeFlagsNone,
+	)
 }
 
 func pointerNewOperation(

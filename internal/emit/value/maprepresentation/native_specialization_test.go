@@ -49,9 +49,10 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 	)
 	for _, source := range []string{valueSource, pointerSource} {
 		for _, required := range []string{
-			"private readonly values: Map<string, [",
+			"private readonly values: Map<string, ",
 			"private static $copyValue",
-			"values.set(key, [",
+			"values.set(key, ",
+			"values.has(key)",
 			"values.delete(key)",
 			"Array.from(values.keys())",
 		} {
@@ -68,6 +69,8 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 			"count",
 			"GoDenseIndex",
 			"GoMapHash",
+			"private readonly values: Map<string, [",
+			"values.set(key, [",
 			" as ",
 		} {
 			if strings.Contains(source, forbidden) {
@@ -75,14 +78,20 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 			}
 		}
 		store := specializationMethodSource(t, source, "store", "delete")
+		lookup := specializationMethodSource(t, source, "lookup", "lookupOk")
+		lookupOK := specializationMethodSource(t, source, "lookupOk", "store")
 		if strings.Contains(store, "values.get(") ||
 			strings.Contains(store, "entry === undefined") ||
-			strings.Count(store, "values.set(key, [") != 1 ||
+			strings.Count(store, "values.set(key, ") != 1 ||
 			strings.Count(store, "$copyValue(value)") != 1 {
 			t.Fatalf("native store is not one copy-and-set operation:\n%s", store)
 		}
+		if strings.Contains(lookup, "entry[0]") ||
+			strings.Contains(lookupOK, "entry[0]") {
+			t.Fatalf("native lookup retains a value cell:\n%s\n%s", lookup, lookupOK)
+		}
 	}
-	t.Log("native store work: map-get=0 map-set=1 value-copy=1 semantic-branches=0")
+	t.Log("native store work: map-get=0 map-set=1 value-copy=1 tuple-allocation=0 semantic-branches=0")
 	typeScriptOutput := compileAndRunSpecialization(t, mapValueTestContract+`class Box {
     constructor(public value: number) {}
 }
@@ -149,6 +158,11 @@ func TestNativeMapKeySelectionUsesDirectPrimitiveCarrier(t *testing.T) {
 		types.Typ[types.String],
 		nil,
 	)
+	namedInt32 := types.NewNamed(
+		types.NewTypeName(token.NoPos, pkg, "NamedInt32", nil),
+		types.Typ[types.Int32],
+		nil,
+	)
 	for _, testCase := range []struct {
 		name       string
 		sourceType types.Type
@@ -161,7 +175,8 @@ func TestNativeMapKeySelectionUsesDirectPrimitiveCarrier(t *testing.T) {
 		{name: "float64", sourceType: types.Typ[types.Float64]},
 		{name: "complex128", sourceType: types.Typ[types.Complex128]},
 		{name: "pointer", sourceType: types.NewPointer(types.Typ[types.Int32])},
-		{name: "named string", sourceType: namedString},
+		{name: "named string", sourceType: namedString, direct: true},
+		{name: "named int32", sourceType: namedInt32, direct: true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			actual := nativeMapKey(targetContext, testCase.sourceType)
@@ -169,6 +184,48 @@ func TestNativeMapKeySelectionUsesDirectPrimitiveCarrier(t *testing.T) {
 				t.Fatalf("native map key = %t, want %t", actual, testCase.direct)
 			}
 		})
+	}
+}
+
+func TestProjectedPrimitiveKeyUsesSpecialization(t *testing.T) {
+	projectedContext, _, _, _ := nativeSpecializationContext(t)
+	pkg := types.NewPackage("example.com/native-map-owner", "nativeowner")
+	namedString := types.NewNamed(
+		types.NewTypeName(token.NoPos, pkg, "NamedString", nil),
+		types.Typ[types.String],
+		nil,
+	)
+	projected, ok := Source(
+		projectedContext,
+		types.NewMap(namedString, types.Typ[types.Int32]),
+	)
+	if !ok || projected.Storage() != StorageNative {
+		t.Fatalf(
+			"projected primitive map storage = %d/%t, want native specialization",
+			projected.Storage(),
+			ok,
+		)
+	}
+
+	identityContext, _, _, _ := nativeSpecializationContextWithNames(
+		t,
+		generatedNumericSpecializationNames{},
+	)
+	namedInt32 := types.NewNamed(
+		types.NewTypeName(token.NoPos, pkg, "NamedInt32", nil),
+		types.Typ[types.Int32],
+		nil,
+	)
+	identity, ok := Source(
+		identityContext,
+		types.NewMap(namedInt32, types.Typ[types.Int32]),
+	)
+	if !ok || identity.Storage() != StorageScalar {
+		t.Fatalf(
+			"identity primitive map storage = %d/%t, want scalar owner",
+			identity.Storage(),
+			ok,
+		)
 	}
 }
 
@@ -206,6 +263,13 @@ func nativeSpecializationSource(
 func nativeSpecializationContext(
 	t *testing.T,
 ) (api.Context, types.Type, types.Type, types.Type) {
+	return nativeSpecializationContextWithNames(t, staticSpecializationNames{})
+}
+
+func nativeSpecializationContextWithNames(
+	t *testing.T,
+	names api.Names,
+) (api.Context, types.Type, types.Type, types.Type) {
 	t.Helper()
 	key := types.Typ[types.String]
 	value := types.NewStruct(
@@ -234,7 +298,7 @@ func nativeSpecializationContext(
 		types.SizesFor("gc", "amd64"),
 		api.MemoryByteOrderLittleEndian,
 		tsgo.NewFactory(),
-		staticSpecializationNames{},
+		names,
 		values,
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderPreserveGo,
@@ -243,6 +307,19 @@ func nativeSpecializationContext(
 		t.Fatal(err)
 	}
 	return targetContext, key, value, pointer
+}
+
+type generatedNumericSpecializationNames struct {
+	staticSpecializationNames
+}
+
+func (generatedNumericSpecializationNames) DefinedValueRepresentation(
+	*types.TypeName,
+) (api.DefinedValueRepresentation, error) {
+	return api.NewDefinedValueRepresentation(
+		api.DefinedValueRepresentationGeneratedNumeric,
+		api.NameReference{},
+	)
 }
 
 type nativeSpecializationValues struct {

@@ -123,7 +123,12 @@ import {
 } from ${JSON.stringify(runtimeValueModule)};
 
 const descriptor = {};
-registerRuntimeStructValueOperations(descriptor, () => CycleAdapter, []);
+registerRuntimeStructValueOperations(
+  descriptor,
+  () => CycleAdapter,
+  (value) => value,
+  () => [],
+);
 
 export function registeredOperations() {
   return runtimeValueOperations(descriptor);
@@ -187,7 +192,13 @@ test("lazy pointer registration preserves the predeclared descriptor identity", 
 });
 
 test("typed struct registration owns common guards, locations, and copies", () => {
-  type Record = { name: string; count: bigint };
+  type Record = {
+    name: string;
+    count: bigint;
+    readonly secret: boolean;
+    payload: GoInterfaceValue | undefined;
+    child: { label: string };
+  };
   const stringDescriptor = createRuntimeType(
     () => metadata("string", 24n),
     () => [],
@@ -203,6 +214,10 @@ test("typed struct registration owns common guards, locations, and copies", () =
   const recordAdapter = valueAdapter<Record>(Object.freeze({ comparable: true }));
   const stringAdapter = valueAdapter<string>(Object.freeze({ comparable: true }));
   const intAdapter = valueAdapter<bigint>(Object.freeze({ comparable: true }));
+  const boolAdapter = valueAdapter<boolean>(Object.freeze({ comparable: true }));
+  const childAdapter = valueAdapter<{ label: string }>(
+    Object.freeze({ comparable: false }),
+  );
   let adapterResolutionCount = 0;
   registerRuntimeStructValueOperations(
     recordDescriptor,
@@ -210,40 +225,59 @@ test("typed struct registration owns common guards, locations, and copies", () =
       adapterResolutionCount += 1;
       return recordAdapter;
     },
-    [
-      {
-        type: () => stringDescriptor,
-        settable: true,
-        get: (record: Record): GoInterfaceValue => new stringAdapter(record.name),
-        set: (record: Record, field: GoInterfaceValue | undefined): void => {
-          if (!stringAdapter.$is(field)) {
-            throw new Error("foreign string field");
-          }
-          record.name = field.$go$value;
+    (record: Record): Record => record,
+    (fields) => [
+      fields.valueProperty(
+        () => stringDescriptor,
+        () => stringAdapter,
+        "name",
+        (record: Record): GoInterfaceValue => new stringAdapter(record.name),
+      ),
+      fields.valueProperty(
+        () => intDescriptor,
+        () => intAdapter,
+        "count",
+      ),
+      fields.readonlyValueProperty(
+        () => intDescriptor,
+        () => boolAdapter,
+        "secret",
+      ),
+      fields.interfaceValue(
+        () => recordDescriptor,
+        (field) => intAdapter.$is(field)
+          ? field
+          : GoPanic.raiseRuntime(
+            "reflect: Value.Set received a value outside the interface contract",
+          ),
+        (record: Record): GoInterfaceValue | undefined => record.payload,
+        (record: Record, field: GoInterfaceValue | undefined): void => {
+          record.payload = field;
         },
-      },
-      {
-        type: () => intDescriptor,
-        settable: true,
-        get: (record: Record): GoInterfaceValue => new intAdapter(record.count),
-        set: (record: Record, field: GoInterfaceValue | undefined): void => {
-          if (!intAdapter.$is(field)) {
-            throw new Error("foreign integer field");
-          }
-          record.count = field.$go$value;
-        },
-      },
+      ),
+      fields.copyingValueProperty(
+        () => recordDescriptor,
+        () => childAdapter,
+        "child",
+        (child): { label: string } => ({ ...child }),
+      ),
     ],
     (record: Record): Record => ({ ...record }),
   );
 
   assert.equal(adapterResolutionCount, 0);
-  const source = new recordAdapter({ name: "before", count: 3n });
+  const source = new recordAdapter({
+    name: "before",
+    count: 3n,
+    secret: true,
+    payload: undefined,
+    child: { label: "before" },
+  });
   const operations = runtimeValueOperations(recordDescriptor);
   assert.equal(adapterResolutionCount, 1);
   assert.equal(runtimeValueOperations(recordDescriptor), operations);
   assert.equal(adapterResolutionCount, 1);
-  assert.equal(operations?.numField, 2n);
+  assert.equal(operations?.numField, 5n);
   const location = operations?.field?.(source, 0n);
   assert.equal(location?.type(), stringDescriptor);
   assert.equal(location?.settable, true);
@@ -255,6 +289,8 @@ test("typed struct registration owns common guards, locations, and copies", () =
   assert.equal(before.$go$value, "before");
   location?.set(new stringAdapter("after"));
   assert.equal(source.$go$value.name, "after");
+  const address = location?.address?.();
+  assert.equal(stringAdapter.$is(address), true);
   const countLocation = operations?.field?.(source, 1n);
   assert.equal(countLocation?.type(), intDescriptor);
   const count = countLocation?.get();
@@ -265,6 +301,27 @@ test("typed struct registration owns common guards, locations, and copies", () =
   assert.equal(count.$go$value, 3n);
   countLocation?.set(new intAdapter(5n));
   assert.equal(source.$go$value.count, 5n);
+  assert.throws(
+    () => location?.set(new intAdapter(1n)),
+    panicWith(/foreign interface box/),
+  );
+  const secretLocation = operations?.field?.(source, 2n);
+  assert.equal(secretLocation?.settable, false);
+  assert.throws(
+    () => secretLocation?.set(new boolAdapter(false)),
+    panicWith(/unaddressable value/),
+  );
+  const payloadLocation = operations?.field?.(source, 3n);
+  payloadLocation?.set(new intAdapter(7n));
+  assert.equal(intAdapter.$is(source.$go$value.payload), true);
+  assert.throws(
+    () => payloadLocation?.set(new stringAdapter("foreign")),
+    panicWith(/outside the interface contract/),
+  );
+  const child = { label: "after" };
+  operations?.field?.(source, 4n).set(new childAdapter(child));
+  assert.notEqual(source.$go$value.child, child);
+  assert.deepEqual(source.$go$value.child, child);
   const cloned = operations?.cloned?.(source);
   assert.equal(recordAdapter.$is(cloned), true);
   if (!recordAdapter.$is(cloned)) {
@@ -277,7 +334,7 @@ test("typed struct registration owns common guards, locations, and copies", () =
     panicWith(/foreign interface box/),
   );
   assert.throws(
-    () => operations?.field?.(source, 2n),
+    () => operations?.field?.(source, 5n),
     panicWith(/index out of range/),
   );
 });
@@ -322,20 +379,21 @@ test("typed pointer registration preserves nil and aliased element storage", () 
   const pointerAdapter = valueAdapter<Cell | undefined>(
     Object.freeze({ comparable: true }),
   );
-  registerRuntimePointerValueOperations(pointerDescriptor, () => pointerAdapter, {
-    zero: true,
-    element: {
-      type: () => recordDescriptor,
-      get: (cell: Cell): GoInterfaceValue => new recordAdapter(cell.value),
-      set: (cell: Cell, value: GoInterfaceValue | undefined): void => {
-        if (!recordAdapter.$is(value)) {
-          throw new Error("foreign pointee");
-        }
-        cell.value = value.$go$value;
-      },
-    },
-    newPointer: (): Cell => ({ value: { count: 0n } }),
-  });
+  registerRuntimePointerValueOperations(
+    pointerDescriptor,
+    () => pointerAdapter,
+    (elements) => ({
+      element: elements.value(
+        () => recordDescriptor,
+        () => recordAdapter,
+        (cell: Cell): Record => cell.value,
+        (cell: Cell, value: Record): void => {
+          cell.value = value;
+        },
+      ),
+      newPointer: (): Cell => ({ value: { count: 0n } }),
+    }),
+  );
 
   const operations = runtimeValueOperations(pointerDescriptor);
   const cell: Cell = { value: { count: 4n } };

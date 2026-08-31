@@ -90,7 +90,30 @@ func admittedInterfaceValue(
 	operation string,
 	scaffold *locationScaffold,
 ) (tsgo.Expression, []api.RootRequest, error) {
+	accepted, requests, err := acceptedInterfaceValue(context, targetType, value)
+	if err != nil {
+		return nil, nil, err
+	}
 	factory := scaffold.factory
+	assigned := factory.ConditionalExpression(
+		accepted,
+		factory.QuestionToken(),
+		value,
+		factory.ColonToken(),
+		runtimePanic(
+			scaffold,
+			"reflect: "+operation+" received a value outside the interface contract",
+		),
+	)
+	return assigned, requests, nil
+}
+
+func acceptedInterfaceValue(
+	context api.Context,
+	targetType types.Type,
+	value tsgo.Expression,
+) (tsgo.Expression, []api.RootRequest, error) {
+	factory := context.Factory()
 	nilValue := factory.BinaryExpression(
 		nil,
 		value,
@@ -115,15 +138,5 @@ func admittedInterfaceValue(
 		factory.BinaryOperatorToken(tsgo.BinaryOperatorBarBarToken),
 		implements.Value(),
 	)
-	assigned := factory.ConditionalExpression(
-		accepted,
-		factory.QuestionToken(),
-		value,
-		factory.ColonToken(),
-		runtimePanic(
-			scaffold,
-			"reflect: "+operation+" received a value outside the interface contract",
-		),
-	)
-	return assigned, implements.Requests(), nil
+	return accepted, implements.Requests(), nil
 }

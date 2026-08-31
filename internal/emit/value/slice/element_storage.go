@@ -22,6 +22,18 @@ func loadElement(
 	)
 }
 
+func zeroElement(
+	context api.Context,
+	source ast.Node,
+	elementType types.Type,
+) (api.ExpressionEmission, error) {
+	return context.ContainerStorage().ContainerStorageZero(
+		context.WithRole(api.RoleSliceElement),
+		source,
+		elementType,
+	)
+}
+
 func storeElement(
 	context api.Context,
 	source ast.Node,

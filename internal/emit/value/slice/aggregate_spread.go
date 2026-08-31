@@ -265,19 +265,7 @@ func spreadElementOperations(
 		return api.ExpressionEmission{}, api.ExpressionEmission{},
 			api.ExpressionEmission{}, err
 	}
-	tailZero, err := context.Values().Zero(
-		context.WithRole(api.RoleSliceElement),
-		source,
-		elementType,
-	)
-	if err == nil {
-		tailZero, err = storeElement(
-			context,
-			source,
-			elementType,
-			tailZero,
-		)
-	}
+	tailZero, err := zeroElement(context, source, elementType)
 	return snapshotNext, existingCopy, tailZero, err
 }
 

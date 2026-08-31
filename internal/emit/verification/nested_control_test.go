@@ -52,7 +52,49 @@ outer:
 	return total
 }
 
-func Audit() (int, int) { return LoopInsideSwitch(0), SwitchInsideLoop() }
+func ExplicitBreak(value int) int {
+	total := 0
+	switch value {
+	case 0:
+		total++
+		fallthrough
+	case 1:
+		total += 10
+		break
+	}
+	return total
+}
+
+func ContinueThroughSwitch() int {
+	total := 0
+	for index := 0; index < 3; index++ {
+		switch index {
+		case 0:
+			fallthrough
+		case 1:
+			continue
+		default:
+			total += 10
+		}
+		total++
+	}
+	return total
+}
+
+func ArraySwitch(value [1]int) int {
+	switch value {
+	case [1]int{0}:
+		fallthrough
+	case [1]int{1}:
+		return 1
+	default:
+		return 2
+	}
+}
+
+func Audit() (int, int, int, int, int) {
+	return LoopInsideSwitch(0), SwitchInsideLoop(), ExplicitBreak(0), ContinueThroughSwitch(), ArraySwitch([1]int{0})
+}
 `)
 
 	program, err := load.Load(context.Background(), load.Request{
@@ -74,6 +116,30 @@ func Audit() (int, int) { return LoopInsideSwitch(0), SwitchInsideLoop() }
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	fallthroughTarget := targetFunctionText(
+		t,
+		artifacts.printed,
+		"LoopInsideSwitch",
+	)
+	if strings.Contains(fallthroughTarget, "__gotots_switch_match_") {
+		t.Fatalf(
+			"primitive fallthrough switch retained conditional matching:\n%s",
+			fallthroughTarget,
+		)
+	}
+	if !strings.Contains(fallthroughTarget, "switch (value)") {
+		t.Fatalf(
+			"primitive fallthrough switch is not native:\n%s",
+			fallthroughTarget,
+		)
+	}
+	arrayTarget := targetFunctionText(t, artifacts.printed, "ArraySwitch")
+	if !strings.Contains(arrayTarget, "__gotots_switch_match_") {
+		t.Fatalf(
+			"custom-equality fallthrough switch lost conditional matching:\n%s",
+			arrayTarget,
+		)
+	}
 	if strings.Contains(
 		artifacts.printed,
 		"break __gotots_control_target_0;\n                }\n                total",
@@ -91,7 +157,7 @@ import { Audit } from "`+sourceModuleForExport(
 	)+`";
 
 const values = Audit();
-console.log(String(values[0]) + "," + String(values[1]));
+console.log(values.map(String).join(","));
 `)
 	writeProgramFile(
 		t,
@@ -125,8 +191,8 @@ import (
 )
 
 func main() {
-	left, right := nestedcontrol.Audit()
-	fmt.Printf("%d,%d\n", left, right)
+	loopInside, switchInside, explicitBreak, continued, arraySwitch := nestedcontrol.Audit()
+	fmt.Printf("%d,%d,%d,%d,%d\n", loopInside, switchInside, explicitBreak, continued, arraySwitch)
 }
 `)
 	goOutput := runProgram(

@@ -10,7 +10,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
-	"github.com/tsoniclang/gotots/internal/output"
 )
 
 func TestDefinedMapsUseSelectedRepresentationsAndExecuteDifferentially(
@@ -77,15 +76,15 @@ func TestDefinedMapKeySignatureMutationFailsStrictTypecheck(
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materialize(t, emission, workingDirectory)
-	specializationPath := definedKeySpecializationPath(t, artifacts)
-	original := readFile(t, specializationPath)
+	sourcePath := artifacts.file(t, "source.ts")
+	original := readFile(t, sourcePath)
 	strictTypecheck(t, artifacts, workingDirectory)
-	const signature = "lookup(key: Count"
+	const signature = "key: Count): int32"
 	if count := strings.Count(original, signature); count != 1 {
 		t.Fatalf("defined-key lookup signatures = %d, want one", count)
 	}
-	mutated := strings.Replace(original, signature, "lookup(key: boolean", 1)
-	writeFile(t, specializationPath, mutated)
+	mutated := strings.Replace(original, signature, "key: boolean): int32", 1)
+	writeFile(t, sourcePath, mutated)
 	if err := strictTypecheckResult(
 		artifacts,
 		workingDirectory,
@@ -98,7 +97,6 @@ func TestDefinedMapKeySignatureMutationFailsStrictTypecheck(
 func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 	t.Helper()
 	source := readFile(t, artifacts.file(t, "source.ts"))
-	specialization := definedKeySpecialization(t, artifacts)
 	t.Logf("defined map source bytes=%d", len(source))
 	if len(source) > 12_000 {
 		t.Fatalf(
@@ -119,28 +117,16 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		".store(key, ",
 		".lookup(key)",
 		"export function DefinedKeyZero(): bool",
-		".nil();",
+		"GoMap.nil<Count, int32>",
+		"let values: GoMapValue<Count, int32> = GoMap.make<int32, int32>",
 	} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("defined map artifact lacks %q:\n%s", required, source)
 		}
 	}
-	for _, required := range []string{
-		"private static $copyKey($key: Count",
-		"): Count",
-		"return $key;",
-		"lookup(key: Count",
-		"store(key: Count",
-		"value: int32): void",
-		"keys(): Count",
-		"[] {",
-	} {
-		if !strings.Contains(specialization, required) {
-			t.Fatalf(
-				"defined-key map specialization lacks %q:\n%s",
-				required,
-				specialization,
-			)
+	for _, path := range artifacts.paths {
+		if strings.HasSuffix(filepath.ToSlash(path), "/support/maps.ts") {
+			t.Fatalf("identity primitive key emitted a map specialization: %s", path)
 		}
 	}
 	zeroStart := strings.Index(source, "export function ZeroState")
@@ -164,7 +150,6 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		"key.$value",
 		"export class Alias",
 		"export class PlainAlias",
-		"GoMap.nil<Count",
 		"$projectKey",
 		"$reifyKey",
 		"new Count",
@@ -178,33 +163,6 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 			t.Fatalf("defined map artifact contains %q:\n%s", forbidden, source)
 		}
 	}
-}
-
-func definedKeySpecialization(t *testing.T, artifacts materialized) string {
-	t.Helper()
-	return readFile(t, definedKeySpecializationPath(t, artifacts))
-}
-
-func definedKeySpecializationPath(
-	t *testing.T,
-	artifacts materialized,
-) string {
-	t.Helper()
-	var matches []string
-	for _, path := range artifacts.paths {
-		if filepath.ToSlash(path) == filepath.ToSlash(
-			artifacts.file(t, output.MapSpecializationSupportPath),
-		) {
-			matches = append(matches, path)
-		}
-	}
-	if len(matches) != 1 {
-		t.Fatalf(
-			"defined-key map specialization files = %d, want one",
-			len(matches),
-		)
-	}
-	return matches[0]
 }
 
 func executeDefinedMapGo(t *testing.T, workingDirectory string) string {

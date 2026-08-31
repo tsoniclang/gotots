@@ -32,7 +32,7 @@
       "sourcePath": "src/internal/facets/named-reflect.ts",
       "export": "ReflectTypeMetadataOperations",
       "member": "$registerStruct",
-      "inputParameters": [0, 1, 2, 3]
+      "inputParameters": [0, 1, 2, 3, 4]
     },
     {
       "sourceIdentity": "reflect|kind=2|receiver=|name=Type",

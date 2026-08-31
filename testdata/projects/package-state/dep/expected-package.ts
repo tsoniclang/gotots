@@ -5,8 +5,8 @@ export function $initialize(): void {
     $state.A = 0;
     $state.B = 0;
     $state.Dormant = 0;
-    $state.Empty = Cell.$storageOf(Cell.$zero());
-    $state.Filled = Cell.$storageOf(Cell.$zero());
+    $state.Empty = Cell.$zeroStorage();
+    $state.Filled = Cell.$zeroStorage();
     $state.Trace = 0;
     $state.__go___proto__ = 0;
     $state.hidden = 0;

@@ -618,19 +618,24 @@ emits no substitute virtual address, JavaScript cast, identity extraction, or
 target-specific codec in canonical source. Safe pointer semantics are never
 routed through a legacy raw-memory implementation to keep a corpus compiling.
 
-Maps have one representation owner and three storage modes. An exact built-in
-boolean, integer, or string key with a runtime-basic value uses the canonical
-`GoMap<K,V>` runtime. Closed map shapes that need static zero, copy, hash, or
-equality operations use one deduplicated support specialization for each exact
-semantic shape.
+Maps have one representation owner and three storage modes. A key with an
+identity boolean, integer, or string primitive representation and a
+runtime-basic value uses the canonical `GoMap<K,V>` runtime. Closed map shapes
+that need an explicit key projection or static zero, copy, hash, or equality
+operations use one deduplicated support specialization for each exact semantic
+shape.
 
 A specialization uses native JavaScript `Map` storage only when its selected
-key is an exact built-in boolean, integer, or string. Tuple cells preserve the
-difference between an absent key and a present `undefined` value. All other
-specialized keys use typed hash/equality buckets because JavaScript `Map`
-identity is not Go equality for those classes. Both representations retain the
-same nil, zero-on-miss, comma-ok, copy, mutation, and iteration contracts;
-neither is selected by a source spelling or use site.
+key storage is an exact boolean, integer, or string primitive. A defined key is
+admitted only through its canonical bijective storage mapping: either an
+identity representation or an explicit projection which the specialization
+owns at every key input and reverses at key iteration output. Tuple
+cells preserve the difference between an absent key and a present `undefined`
+value. Floating-point, complex, pointer, interface, aggregate, and
+non-bijective defined keys use typed hash/equality buckets because JavaScript
+`Map` identity is not Go equality for those classes. Both representations
+retain the same nil, zero-on-miss, comma-ok, copy, mutation, and iteration
+contracts; neither is selected by a source spelling or use site.
 
 Native storage compares the already-selected primitive carrier. Consequently,
 wide integer keys under the `number` profile retain that profile's declared
@@ -773,17 +778,23 @@ descriptor overrides are forbidden.
 
 Invariant reflection mechanics are emitted once at the portable provider
 owner, never repeated inside every descriptor. Generated code supplies only
-exact typed facts and callbacks: the concrete adapter, canonical relation
-descriptors, ordered struct-field accessors, pointer load/store operations,
-copy/zero operations, and explicit unsupported dispositions. For example, a
-struct registration supplies an ordered array of typed field accessors; the
-provider owns the single adapter guard, index bounds check, reflected-location
-construction, and clone guard. A pointer registration supplies its typed
-pointee descriptor and exact location callbacks; the provider owns the single
-nil/foreign-box decision. Moving common mechanics into generated per-type
-closures is a source-size and typecheck regression even when behavior remains
-correct. Erasing callback payloads or recovering their types dynamically is
-equally invalid.
+exact typed facts and irreducible callbacks: the concrete adapter, canonical
+relation descriptors, one represented-storage resolver, ordered struct-field
+property facts, pointer load/store operations, copy/zero operations, and
+explicit unsupported dispositions. A direct struct field contributes its
+target-name owner's exact property key; the provider's generic builder owns
+the read and write. A structural-copy field additionally contributes its
+ordinary typed copy callback. Blank, interface-valued, and representation-
+transforming fields contribute explicit callbacks because a property key alone
+cannot express their semantics. The key is statically checked against the
+resolver's inferred storage type and is never used to classify a source name
+or inspect a runtime shape. The provider owns the single adapter guard, index
+bounds check, reflected-location construction, and clone guard. A pointer
+registration supplies its typed pointee descriptor and exact location
+callbacks; the provider owns the single nil/foreign-box decision. Moving
+common mechanics into generated per-type closures is a source-size and
+typecheck regression even when behavior remains correct. Erasing callback
+payloads or recovering their types dynamically is equally invalid.
 
 Pointer location registration is total over every statically representable
 pointee kind. The canonical value-transfer owner decides whether extracting or

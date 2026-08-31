@@ -11,6 +11,7 @@ const (
 	StructMakeMember              = "$make"
 	StructStorageOfMember         = "$storageOf"
 	StructFromStorageMember       = "$fromStorage"
+	StructStorageZeroMember       = "$zeroStorage"
 	StructStorageTypeSuffix       = "$Storage"
 	InterfaceContractSuffix       = "$contract"
 	InterfaceGuardSuffix          = "$is"

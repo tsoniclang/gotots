@@ -12,6 +12,25 @@ import type {
 
 import type { Type } from "../../../reflect.js";
 import type { ProviderRawPointer } from "../../runtime/raw-pointer.js";
+import {
+  createRuntimePointerElementBuilder,
+  createRuntimeStructFieldBuilder,
+  type RuntimePointerElementBuilder,
+  type RuntimePointerValueOperations,
+  type RuntimeStructFieldFactory,
+  type RuntimeStructFieldOperations,
+  type RuntimeStructStorageResolver,
+  type RuntimeValueAdapterResolver,
+} from "./runtime-value-members.js";
+export type {
+  RuntimePointerElementBuilder,
+  RuntimePointerValueOperations,
+  RuntimeStructFieldFactory,
+  RuntimeStructFieldOperations,
+  RuntimeStructStorageResolver,
+  RuntimeValueAdapter,
+  RuntimeValueAdapterResolver,
+} from "./runtime-value-members.js";
 
 // RuntimeValueLocation is one addressable typed view over original Go
 // storage: reads box the current value and writes reach the represented
@@ -25,40 +44,6 @@ export interface RuntimeValueLocation {
   readonly address?: () => GoInterfaceValue;
 }
 
-export interface RuntimeValueAdapter<T> {
-  new (value: T): GoInterfaceValue & { readonly $go$value: T };
-  $is(
-    value: GoInterfaceValue | undefined,
-  ): value is GoInterfaceValue & { readonly $go$value: T };
-}
-
-export type RuntimeValueAdapterResolver<T> = () => RuntimeValueAdapter<T>;
-
-export interface RuntimeStructFieldOperations<T> {
-  readonly type: () => Type;
-  readonly settable: bool;
-  readonly get: (value: T) => GoInterfaceValue | undefined;
-  readonly set: (
-    value: T,
-    field: GoInterfaceValue | undefined,
-  ) => void;
-  readonly address?: (value: T) => GoInterfaceValue;
-}
-
-export interface RuntimePointerElementOperations<P> {
-  readonly type: () => Type;
-  readonly get: (pointer: P) => GoInterfaceValue | undefined;
-  readonly set: (
-    pointer: P,
-    value: GoInterfaceValue | undefined,
-  ) => void;
-}
-
-export interface RuntimePointerValueOperations<P> {
-  readonly zero?: true;
-  readonly element?: RuntimePointerElementOperations<P>;
-  readonly newPointer?: () => P;
-}
 
 // RuntimeValueOperations are the settled value operations of one
 // reflection-visible Go type. Generated callbacks carry exact typed storage
@@ -188,14 +173,18 @@ export function registerRuntimeValueOperations(
   operationsByType.set(type, { factory });
 }
 
-export function registerRuntimeStructValueOperations<T>(
+export function registerRuntimeStructValueOperations<T, S>(
   type: Type,
   resolveAdapter: RuntimeValueAdapterResolver<T>,
-  fields: readonly RuntimeStructFieldOperations<T>[],
+  resolveStorage: RuntimeStructStorageResolver<T, S>,
+  createFields: RuntimeStructFieldFactory<T, S>,
   clone?: (value: T) => T,
 ): void {
   registerRuntimeValueOperations(type, () => {
     const adapter = resolveAdapter();
+    const fields = createFields(
+      createRuntimeStructFieldBuilder<T, S>(resolveStorage),
+    );
     const fieldCount = BigInt(fields.length);
     const field = (
       box: GoInterfaceValue,
@@ -277,41 +266,15 @@ export function registerRuntimeOpaqueStructValueOperations<T>(
 export function registerRuntimePointerValueOperations<P>(
   type: Type,
   resolveAdapter: RuntimeValueAdapterResolver<P | undefined>,
-  descriptor: RuntimePointerValueOperations<P>,
+  createDescriptor: (
+    elements: RuntimePointerElementBuilder<P>,
+  ) => RuntimePointerValueOperations<P>,
 ): void {
   registerRuntimeValueOperations(type, () => {
     const adapter = resolveAdapter();
+    const descriptor = createDescriptor(createRuntimePointerElementBuilder<P>());
     const element = descriptor.element;
     const newPointer = descriptor.newPointer;
-    const elementOperation = element === undefined
-      ? {}
-      : {
-        elem: (
-          box: GoInterfaceValue,
-        ): RuntimeValueLocation | undefined => {
-          if (!adapter.$is(box)) {
-            return GoPanic.raiseRuntime(
-              "reflect: Value.Elem received a foreign interface box",
-            );
-          }
-          const pointer = box.$go$value;
-          if (pointer === undefined) {
-            return undefined;
-          }
-          return {
-            type: element.type,
-            settable: true,
-            get: (): GoInterfaceValue | undefined => element.get(pointer),
-            set: (value: GoInterfaceValue | undefined): void => {
-              element.set(pointer, value);
-            },
-            address: (): GoInterfaceValue => box,
-          };
-        },
-      };
-    const zeroOperation = descriptor.zero === true
-      ? { zero: (): GoInterfaceValue => new adapter(undefined) }
-      : {};
     const newPointerOperation = newPointer === undefined
       ? {}
       : { newPointer: (): GoInterfaceValue => new adapter(newPointer()) };
@@ -324,8 +287,29 @@ export function registerRuntimePointerValueOperations<P>(
         }
         return box.$go$value === undefined;
       },
-      ...elementOperation,
-      ...zeroOperation,
+      elem: (
+        box: GoInterfaceValue,
+      ): RuntimeValueLocation | undefined => {
+        if (!adapter.$is(box)) {
+          return GoPanic.raiseRuntime(
+            "reflect: Value.Elem received a foreign interface box",
+          );
+        }
+        const pointer = box.$go$value;
+        if (pointer === undefined) {
+          return undefined;
+        }
+        return {
+          type: element.type,
+          settable: true,
+          get: (): GoInterfaceValue | undefined => element.get(pointer),
+          set: (value: GoInterfaceValue | undefined): void => {
+            element.set(pointer, value);
+          },
+          address: (): GoInterfaceValue => box,
+        };
+      },
+      zero: (): GoInterfaceValue => new adapter(undefined),
       ...newPointerOperation,
     };
   });

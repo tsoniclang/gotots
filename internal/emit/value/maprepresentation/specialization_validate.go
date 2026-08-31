@@ -58,10 +58,7 @@ func validateSpecialization(
 	} else if storage != StorageNative {
 		return specializationShapeError(role, "storage", fmt.Sprintf("%d", storage))
 	}
-	if storage == StorageNative && keyProjection {
-		return specializationShapeError(role, "native key projection", "true")
-	}
-	if storage == StorageHashed && keyProjection {
+	if keyProjection {
 		expected[specializationProjectKeyOperation] = []tsgo.SyntaxKind{
 			tsgo.SyntaxKindPrivateKeyword,
 			tsgo.SyntaxKindStaticKeyword,

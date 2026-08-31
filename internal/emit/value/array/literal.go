@@ -67,19 +67,9 @@ func (a RuntimeArray) EmitLiteral(
 	var typeRequests []api.RootRequest
 	var runtimeRequests []api.RootRequest
 	if a.aggregate {
-		loopZero, zeroErr := context.Values().Zero(
+		loopZero, zeroErr := a.zeroElement(
 			context.WithRole(api.RoleCompositeElement),
 			source,
-			a.ElementType(),
-		)
-		if zeroErr != nil {
-			return api.ExpressionEmission{}, zeroErr
-		}
-		loopZero, zeroErr = context.ContainerStorage().ToContainerStorage(
-			context.WithRole(api.RoleCompositeElement),
-			source,
-			a.ElementType(),
-			loopZero,
 		)
 		if zeroErr != nil {
 			return api.ExpressionEmission{}, zeroErr
@@ -152,19 +142,9 @@ func (a RuntimeArray) EmitLiteral(
 			)
 		}
 	} else {
-		elementZero, err = context.Values().Zero(
+		elementZero, err = a.zeroElement(
 			context.WithRole(api.RoleCompositeElement),
 			source,
-			a.ElementType(),
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		elementZero, err = context.ContainerStorage().ToContainerStorage(
-			context.WithRole(api.RoleCompositeElement),
-			source,
-			a.ElementType(),
-			elementZero,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err

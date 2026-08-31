@@ -67,7 +67,7 @@ func EmitStorage(
 	if err != nil {
 		return StorageEmission{}, err
 	}
-	initial, role, err := emitInitialStorageValue(
+	initial, err := emitInitialStorage(
 		assemblyContext,
 		source,
 		variable,
@@ -76,26 +76,20 @@ func EmitStorage(
 	if err != nil {
 		return StorageEmission{}, err
 	}
-	target, err := api.NewCanonicalStorageTargetEmission(
-		assemblyReference.Expression(assemblyContext.Factory()),
-		variable.Type(),
-		assemblyReference.Requests(),
-	)
-	if err != nil {
-		return StorageEmission{}, err
-	}
-	assigned, err := target.StoreValue(
-		assemblyContext.WithRole(role),
-		source,
-		initial,
-	)
-	if err != nil {
-		return StorageEmission{}, err
-	}
-	initializationStatements := assigned.Before()
+	initializationStatements := initial.Before()
 	initializationStatements = append(
 		initializationStatements,
-		assemblyContext.Factory().ExpressionStatement(assigned.Value()),
+		assemblyContext.Factory().ExpressionStatement(
+			assemblyContext.Factory().BinaryExpression(
+				nil,
+				assemblyReference.Expression(assemblyContext.Factory()),
+				nil,
+				assemblyContext.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsToken,
+				),
+				initial.Value(),
+			),
+		),
 	)
 	return StorageEmission{
 		field: stateContext.Factory().PropertyDeclaration(
@@ -108,27 +102,27 @@ func EmitStorage(
 		initializationStatements: initializationStatements,
 		stateRequests:            targetType.Requests(),
 		assemblyRequests: api.CombineRequests(
-			assigned.Requests(),
+			assemblyReference.Requests(),
+			initial.Requests(),
 		),
 	}, nil
 }
 
-func emitInitialStorageValue(
+func emitInitialStorage(
 	context api.Context,
 	source ast.Node,
 	variable *types.Var,
 	embedded *load.EmbedValue,
-) (api.ExpressionEmission, api.Role, error) {
+) (api.ExpressionEmission, error) {
 	if embedded == nil {
-		value, err := context.Values().Zero(
+		return context.Values().StorageZero(
 			context.WithRole(api.RolePackageVariableZero),
 			source,
 			variable.Type(),
 		)
-		return value, api.RolePackageVariableZero, err
 	}
 	if embedded.Kind() != load.EmbedString {
-		return api.ExpressionEmission{}, api.RolePackageVariableValue,
+		return api.ExpressionEmission{},
 			api.Unsupported(
 				context.WithRole(api.RolePackageVariableValue),
 				api.CategoryDeclaration,
@@ -137,7 +131,7 @@ func emitInitialStorageValue(
 	}
 	content, ok := embedded.String()
 	if !ok {
-		return api.ExpressionEmission{}, api.RolePackageVariableValue,
+		return api.ExpressionEmission{},
 			&api.InvariantError{
 				Role:   context.Role(),
 				Reason: "embedded string storage lacks exactly one selected file",
@@ -149,7 +143,15 @@ func emitInitialStorageValue(
 		variable.Type(),
 		constant.MakeString(content),
 	)
-	return value, api.RolePackageVariableValue, err
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return context.Values().ToStorage(
+		context.WithRole(api.RolePackageVariableValue),
+		source,
+		variable.Type(),
+		value,
+	)
 }
 
 func EmitInitializer(

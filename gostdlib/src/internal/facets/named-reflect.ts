@@ -23,8 +23,10 @@ import {
   registerRuntimePointerValueOperations,
   registerRuntimeStructValueOperations,
   registerRuntimeValueOperations,
+  type RuntimePointerElementBuilder,
   type RuntimePointerValueOperations,
-  type RuntimeStructFieldOperations,
+  type RuntimeStructFieldFactory,
+  type RuntimeStructStorageResolver,
   type RuntimeValueAdapterResolver,
   type RuntimeValueOperations,
 } from "../portable/reflect/runtime-value.js";
@@ -49,13 +51,20 @@ export class ReflectTypeMetadataOperations {
     registerRuntimeValueOperations(type, operations);
   }
 
-  static $registerStruct<T>(
+  static $registerStruct<T, S>(
     type: Type,
     resolveAdapter: RuntimeValueAdapterResolver<T>,
-    fields: readonly RuntimeStructFieldOperations<T>[],
+    resolveStorage: RuntimeStructStorageResolver<T, S>,
+    createFields: RuntimeStructFieldFactory<T, S>,
     clone?: (value: T) => T,
   ): void {
-    registerRuntimeStructValueOperations(type, resolveAdapter, fields, clone);
+    registerRuntimeStructValueOperations(
+      type,
+      resolveAdapter,
+      resolveStorage,
+      createFields,
+      clone,
+    );
   }
 
   static $registerOpaqueStruct<T>(
@@ -73,9 +82,15 @@ export class ReflectTypeMetadataOperations {
   static $registerPointer<P>(
     type: Type,
     resolveAdapter: RuntimeValueAdapterResolver<P | undefined>,
-    descriptor: RuntimePointerValueOperations<P>,
+    createDescriptor: (
+      elements: RuntimePointerElementBuilder<P>,
+    ) => RuntimePointerValueOperations<P>,
   ): void {
-    registerRuntimePointerValueOperations(type, resolveAdapter, descriptor);
+    registerRuntimePointerValueOperations(
+      type,
+      resolveAdapter,
+      createDescriptor,
+    );
   }
 }
 

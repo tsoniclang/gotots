@@ -96,10 +96,12 @@ func main() {
 		goRunner,
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
-				"elem:",
+				"elements.value(",
 				".$copy(",
 				"storePointer(pointer,",
-				"settable: false",
+				"fields.readonlyValue(",
+				"fields.copyingValueProperty(",
+				`"Inline", value =>`,
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf("aggregate reflection artifact lacks %q", required)

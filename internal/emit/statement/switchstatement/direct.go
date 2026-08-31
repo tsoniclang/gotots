@@ -14,6 +14,24 @@ func directEligible(
 	tag tagEmission,
 	clauses []clauseEmission,
 ) bool {
+	return !containsFallthrough(clauses) &&
+		nativeTaggedSwitchEligible(context, tag, clauses)
+}
+
+func nativeSelectionEligible(
+	context api.Context,
+	tag tagEmission,
+	clauses []clauseEmission,
+) bool {
+	return containsFallthrough(clauses) &&
+		nativeTaggedSwitchEligible(context, tag, clauses)
+}
+
+func nativeTaggedSwitchEligible(
+	context api.Context,
+	tag tagEmission,
+	clauses []clauseEmission,
+) bool {
 	if tag.expressionless {
 		return false
 	}
@@ -26,9 +44,6 @@ func directEligible(
 		return false
 	}
 	for _, clause := range clauses {
-		if clause.fallsThrough {
-			return false
-		}
 		for _, expression := range clause.expressions {
 			if len(expression.Before()) != 0 {
 				return false
@@ -44,20 +59,12 @@ func emitDirect(
 	clauses []clauseEmission,
 	targetLabel string,
 ) (api.StatementEmission, error) {
-	operationContext := context
-	nativeNumeric := false
-	if tag.wrapped {
-		var err error
-		operationContext, err = tag.model.OperationContext(context)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
-		representation, representationErr := tag.model.Representation(context)
-		if representationErr != nil {
-			return api.StatementEmission{}, representationErr
-		}
-		nativeNumeric = representation.Kind() ==
-			api.DefinedValueRepresentationGeneratedNumeric
+	operationContext, nativeNumeric, err := directProjectionContext(
+		context,
+		tag,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
 	}
 	targetClauses := make(
 		[]tsgo.CaseOrDefaultClause,
@@ -79,54 +86,17 @@ func emitDirect(
 			continue
 		}
 		for index, expression := range clause.expressions {
-			value := expression.Value()
-			expressionRequests := expression.Requests()
-			if tag.wrapped && !nativeNumeric {
-				facts, constant := context.TypesInfo().TypeAndValue(
-					clause.source.List[index],
-				)
-				if constant && facts.Value != nil {
-					direct, err := constantvalue.EmitValue(
-						operationContext.
-							WithRole(api.RoleSwitchCaseExpression).
-							WithExpectedType(tag.model.Underlying()),
-						clause.source.List[index],
-						tag.model.Underlying(),
-						facts.Value,
-					)
-					if err != nil {
-						return api.StatementEmission{}, err
-					}
-					if len(direct.Before()) != 0 {
-						return api.StatementEmission{},
-							api.Unsupported(
-								context.WithRole(
-									api.RoleSwitchCaseExpression,
-								),
-								api.CategoryExpression,
-								clause.source.List[index],
-							)
-					}
-					value = direct.Value()
-					expressionRequests = direct.Requests()
-				} else {
-					projected, err := tag.model.Project(
-						context.WithRole(api.RoleSwitchCaseExpression),
-						api.DirectExpression(value, expressionRequests...),
-					)
-					if err != nil {
-						return api.StatementEmission{}, err
-					}
-					if len(projected.Before()) != 0 {
-						return api.StatementEmission{}, api.Unsupported(
-							context.WithRole(api.RoleSwitchCaseExpression),
-							api.CategoryExpression,
-							clause.source.List[index],
-						)
-					}
-					value = projected.Value()
-					expressionRequests = projected.Requests()
-				}
+			value, expressionRequests, err := directCaseTarget(
+				context,
+				operationContext,
+				tag,
+				clause,
+				index,
+				expression,
+				nativeNumeric,
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
 			}
 			var statements []tsgo.Statement
 			if index == len(clause.expressions)-1 {
@@ -141,16 +111,9 @@ func emitDirect(
 			requests = append(requests, expressionRequests...)
 		}
 	}
-	tagTarget := tag.target
-	if tag.wrapped && !nativeNumeric {
-		var err error
-		tagTarget, err = tag.model.Project(
-			context.WithRole(api.RoleSwitchTag),
-			tagTarget,
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
+	tagTarget, err := directTagTarget(context, tag, nativeNumeric)
+	if err != nil {
+		return api.StatementEmission{}, err
 	}
 	target := tsgo.Statement(context.Factory().SwitchStatement(
 		tagTarget.Value(),
@@ -163,6 +126,93 @@ func emitDirect(
 		statements,
 		api.CombineRequests(requests, tagTarget.Requests()),
 	)
+}
+
+func directProjectionContext(
+	context api.Context,
+	tag tagEmission,
+) (api.Context, bool, error) {
+	if !tag.wrapped {
+		return context, false, nil
+	}
+	operationContext, err := tag.model.OperationContext(context)
+	if err != nil {
+		return api.Context{}, false, err
+	}
+	representation, err := tag.model.Representation(context)
+	if err != nil {
+		return api.Context{}, false, err
+	}
+	return operationContext,
+		representation.Kind() == api.DefinedValueRepresentationGeneratedNumeric,
+		nil
+}
+
+func directTagTarget(
+	context api.Context,
+	tag tagEmission,
+	nativeNumeric bool,
+) (api.ExpressionEmission, error) {
+	if !tag.wrapped || nativeNumeric {
+		return tag.target, nil
+	}
+	return tag.model.Project(
+		context.WithRole(api.RoleSwitchTag),
+		tag.target,
+	)
+}
+
+func directCaseTarget(
+	context api.Context,
+	operationContext api.Context,
+	tag tagEmission,
+	clause clauseEmission,
+	index int,
+	expression api.ExpressionEmission,
+	nativeNumeric bool,
+) (tsgo.Expression, []api.RootRequest, error) {
+	value := expression.Value()
+	requests := expression.Requests()
+	if !tag.wrapped || nativeNumeric {
+		return value, requests, nil
+	}
+	facts, constant := context.TypesInfo().TypeAndValue(clause.source.List[index])
+	if constant && facts.Value != nil {
+		direct, err := constantvalue.EmitValue(
+			operationContext.
+				WithRole(api.RoleSwitchCaseExpression).
+				WithExpectedType(tag.model.Underlying()),
+			clause.source.List[index],
+			tag.model.Underlying(),
+			facts.Value,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(direct.Before()) != 0 {
+			return nil, nil, api.Unsupported(
+				context.WithRole(api.RoleSwitchCaseExpression),
+				api.CategoryExpression,
+				clause.source.List[index],
+			)
+		}
+		return direct.Value(), direct.Requests(), nil
+	}
+	projected, err := tag.model.Project(
+		context.WithRole(api.RoleSwitchCaseExpression),
+		api.DirectExpression(value, requests...),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(projected.Before()) != 0 {
+		return nil, nil, api.Unsupported(
+			context.WithRole(api.RoleSwitchCaseExpression),
+			api.CategoryExpression,
+			clause.source.List[index],
+		)
+	}
+	return projected.Value(), projected.Requests(), nil
 }
 
 func directBody(

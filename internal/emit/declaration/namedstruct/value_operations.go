@@ -16,6 +16,7 @@ func emitValueOperation(
 	source ast.Node,
 	className string,
 	classType tsgo.TypeNode,
+	storageType tsgo.TypeNode,
 	fields []layoutField,
 	assembly operationAssembly,
 	typeParameters []tsgo.TypeParameterDeclaration,
@@ -126,6 +127,21 @@ func emitValueOperation(
 			typeParameters,
 			canonicalStorage,
 		)
+	case api.NamedStructOperationStorageZero:
+		if !canonicalStorage || storageType == nil {
+			return nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "storage-zero operation has no canonical storage",
+			}
+		}
+		member, requests, err = storageZeroMethod(
+			context,
+			source,
+			storageType,
+			fields,
+			capabilities,
+			typeParameters,
+		)
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
@@ -200,21 +216,22 @@ func zeroMethod(
 	var body []tsgo.Statement
 	var requests []api.RootRequest
 	for _, field := range fields {
-		value, err := context.Values().Zero(
-			context.WithRole(api.RoleStructZeroField),
-			field.source,
-			field.object.Type(),
-		)
-		if err != nil {
-			return nil, nil, err
+		fieldContext := context.WithRole(api.RoleStructZeroField)
+		var value api.ExpressionEmission
+		var err error
+		if canonicalStorage {
+			value, err = context.Values().StorageZero(
+				fieldContext,
+				field.source,
+				field.object.Type(),
+			)
+		} else {
+			value, err = context.Values().Zero(
+				fieldContext,
+				field.source,
+				field.object.Type(),
+			)
 		}
-		value, err = operationConstructionValue(
-			context.WithRole(api.RoleStructZeroField),
-			field.source,
-			field,
-			value,
-			canonicalStorage,
-		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -262,12 +279,22 @@ func copyMethod(
 	for _, field := range fields {
 		var copied api.ExpressionEmission
 		var err error
+		requiresConstructionConversion := true
 		if field.blank {
-			copied, err = context.Values().Zero(
-				context.WithRole(api.RoleStructCopyField),
-				field.source,
-				field.object.Type(),
-			)
+			if canonicalStorage {
+				copied, err = context.Values().StorageZero(
+					context.WithRole(api.RoleStructCopyField),
+					field.source,
+					field.object.Type(),
+				)
+				requiresConstructionConversion = false
+			} else {
+				copied, err = context.Values().Zero(
+					context.WithRole(api.RoleStructCopyField),
+					field.source,
+					field.object.Type(),
+				)
+			}
 		} else {
 			value, valueErr := operationFieldValue(
 				context.WithRole(api.RoleStructCopyField),
@@ -301,15 +328,17 @@ func copyMethod(
 		if err != nil {
 			return nil, nil, err
 		}
-		copied, err = operationConstructionValue(
-			context.WithRole(api.RoleStructCopyField),
-			field.source,
-			field,
-			copied,
-			canonicalStorage,
-		)
-		if err != nil {
-			return nil, nil, err
+		if requiresConstructionConversion {
+			copied, err = operationConstructionValue(
+				context.WithRole(api.RoleStructCopyField),
+				field.source,
+				field,
+				copied,
+				canonicalStorage,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		if len(copied.Before()) != 0 {
 			return nil, nil, api.Unsupported(
@@ -486,90 +515,5 @@ func structEqualityBody(
 	return append(
 		body,
 		context.Factory().ReturnStatement(context.Factory().TrueLiteral()),
-	)
-}
-
-func operationMethod(
-	context api.Context,
-	name string,
-	parameters []tsgo.ParameterDeclaration,
-	result tsgo.TypeNode,
-	statements []tsgo.Statement,
-	capabilities []tsgo.ParameterDeclaration,
-	typeParameters []tsgo.TypeParameterDeclaration,
-) tsgo.MethodDeclaration {
-	parameters = append(
-		append([]tsgo.ParameterDeclaration(nil), capabilities...),
-		parameters...,
-	)
-	return context.Factory().MethodDeclaration(
-		[]tsgo.ModifierLike{context.Factory().StaticKeyword()},
-		nil,
-		context.Factory().Identifier(name),
-		nil,
-		typeParameters,
-		parameters,
-		result,
-		context.Factory().Block(statements, true),
-	)
-}
-
-func construct(
-	context api.Context,
-	className string,
-	typeArguments []tsgo.TypeNode,
-	fields []field,
-	constructionTypes []tsgo.TypeNode,
-	arguments []tsgo.Expression,
-	canonicalStorage bool,
-) tsgo.NewExpression {
-	constructorArguments := arguments
-	if canonicalStorage {
-		properties := make([]tsgo.ObjectLiteralElementLike, 0, len(fields))
-		for index, selected := range fields {
-			properties = append(properties, context.Factory().PropertyAssignment(
-				nil,
-				context.Factory().Identifier(selected.name),
-				nil,
-				constructionTypes[index],
-				arguments[index],
-			))
-		}
-		constructorArguments = []tsgo.Expression{
-			context.Factory().ObjectLiteralExpression(properties, true),
-		}
-	}
-	return context.Factory().NewExpression(
-		context.Factory().Identifier(className),
-		typeArguments,
-		constructorArguments,
-	)
-}
-
-func parameter(
-	context api.Context,
-	name string,
-	targetType tsgo.TypeNode,
-) tsgo.ParameterDeclaration {
-	return context.Factory().ParameterDeclaration(
-		nil,
-		nil,
-		context.Factory().Identifier(name),
-		nil,
-		targetType,
-		nil,
-	)
-}
-
-func property(
-	context api.Context,
-	receiver string,
-	name string,
-) tsgo.PropertyAccessExpression {
-	return context.Factory().PropertyAccessExpression(
-		context.Factory().Identifier(receiver),
-		nil,
-		context.Factory().Identifier(name),
-		tsgo.NodeFlagsNone,
 	)
 }

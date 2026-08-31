@@ -27,15 +27,7 @@ func ClearAggregate(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	zero, err := context.Values().Zero(
-		context.WithRole(api.RoleSliceElement),
-		source,
-		elementType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	zero, err = storeElement(context, source, elementType, zero)
+	zero, err := zeroElement(context, source, elementType)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

@@ -39,8 +39,8 @@ func TestAggregateMapGeneratedCostInventory(t *testing.T) {
 	)
 	artifacts := materialize(t, emission, t.TempDir())
 	inventory := mapExpansionCosts(t, emission, artifacts)
-	if len(inventory) != 6 {
-		t.Fatalf("map expansion inventory = %d, want six reached classes", len(inventory))
+	if len(inventory) != 7 {
+		t.Fatalf("map expansion inventory = %d, want seven reached classes", len(inventory))
 	}
 	for index, expansion := range inventory[:min(20, len(inventory))] {
 		t.Logf(
@@ -194,7 +194,7 @@ func assertNativeBoxMapCost(t *testing.T, inventory []mapExpansionCost) {
 	var representative *mapExpansionCost
 	for index := range inventory {
 		candidate := &inventory[index]
-		if strings.Contains(candidate.source, "Map<int32, [") &&
+		if strings.Contains(candidate.source, "Map<int32, Box__from_aggregatemap>") &&
 			strings.Contains(candidate.source, "Box__from_aggregatemap") {
 			if representative != nil {
 				t.Fatal("native BoxMap has more than one expansion owner")

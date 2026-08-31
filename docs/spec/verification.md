@@ -277,6 +277,14 @@ Static searches reject source-facing occurrences of:
 - public `$Value`/storage/effect type parameters;
 - digest-named effect/profile exports.
 
+Storage-backed struct fixtures additionally exact-check that nested named-struct
+zero values use the demanded `$zeroStorage` owner. A mutation restoring
+`$storageOf($zero())` must fail the generated-shape gate, while strict
+typechecking and Go/TypeScript differential execution prove identical field
+zeros for nested and generic structs. The same fixture initializes aggregate
+slice storage and rejects an outer `$storageOf($zero())` composition, proving
+that container initialization uses the same direct owner.
+
 Required mutations append each forbidden parameter/type parameter, publish a
 private helper, alter receiver placement, duplicate a variadic slot, or select
 an unjoined provider signature. The signature gate must fail before printing.
@@ -577,6 +585,19 @@ ESM for:
   implementation checks;
 - open generic `TypeFor[T]` through exact private capability or
   concretization, with unchanged source value arity.
+
+Struct-field artifact proof partitions every field before inspecting output.
+A field whose selected storage needs no value projection must emit one exact
+property-key fact against the registration's typed storage resolver; a
+settable aggregate additionally emits its canonical copy callback. Blank,
+interface-valued, and representation-transforming fields must instead emit
+their explicit typed callback form. Focused fixtures exercise both sides with
+the same represented source types used by ordinary assignment.
+Mutating a key, restoring a direct getter/setter closure, dropping a copy, or
+forcing a transformed field through the property path must fail generated
+shape, strict typecheck, or differential behavior at this gate. Product proof
+reports the exact count and bytes of both dispositions and rejects a zero-row
+property path as vacuous.
 
 Mutating an address callback to omit reflection-interface exposure must
 remove the address-only interface method and fail artifact inspection before

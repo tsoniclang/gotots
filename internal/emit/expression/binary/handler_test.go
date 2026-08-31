@@ -505,6 +505,14 @@ func (unusedValues) ToStorage(
 	panic("unused")
 }
 
+func (unusedValues) StorageZero(
+	api.Context,
+	ast.Node,
+	types.Type,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
 func (unusedValues) FromStorage(
 	api.Context,
 	ast.Node,

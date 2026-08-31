@@ -90,6 +90,9 @@ func TestNamedStructOperationMemberNamesAreClosed(t *testing.T) {
 		{operation: NamedStructOperationEqual, want: "$equal"},
 		{operation: NamedStructOperationHash, want: "$hash"},
 		{operation: NamedStructOperationConvert, want: "$convert"},
+		{operation: NamedStructOperationStorage, want: "$storage"},
+		{operation: NamedStructOperationAssign, want: "$assign"},
+		{operation: NamedStructOperationStorageZero, want: "$zeroStorage"},
 	} {
 		got, err := NamedStructOperationMemberName(testCase.operation)
 		if err != nil {
@@ -103,7 +106,7 @@ func TestNamedStructOperationMemberNamesAreClosed(t *testing.T) {
 
 func TestNamedStructOperationsHaveTotalGenericConsumerIdentities(t *testing.T) {
 	seen := make(map[GenericOperationConsumer]NamedStructOperation)
-	for operation := NamedStructOperationZero; operation <= NamedStructOperationAssign; operation++ {
+	for operation := NamedStructOperationZero; operation <= NamedStructOperationStorageZero; operation++ {
 		consumer, err := GenericNamedStructOperationConsumer(operation)
 		if err != nil {
 			t.Fatalf("%s: %v", operation, err)

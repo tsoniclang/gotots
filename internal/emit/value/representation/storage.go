@@ -174,6 +174,52 @@ func (owner Owner) StorageType(
 	)
 }
 
+func (owner Owner) StorageZero(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+) (api.ExpressionEmission, error) {
+	if typeName, _, ok := namedStruct(sourceType); ok {
+		required, err := owner.RequiresStorageProjection(context, sourceType)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if required {
+			storage, err := context.Names().NamedStructOperation(
+				typeName,
+				api.NamedStructOperationStorage,
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			zero, err := owner.namedStructOperationMember(
+				context,
+				source,
+				sourceType,
+				api.NamedStructOperationStorageZero,
+				api.StructStorageZeroMember,
+				nil,
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			return api.NewExpressionEmission(
+				zero.Before(),
+				zero.Value(),
+				api.CombineRequests(
+					storage.Requests(),
+					zero.Requests(),
+				),
+			)
+		}
+	}
+	zero, err := owner.Zero(context, source, sourceType)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return owner.ToStorage(context, source, sourceType, zero)
+}
+
 func (owner Owner) ToStorage(
 	context api.Context,
 	source ast.Node,

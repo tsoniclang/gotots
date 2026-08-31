@@ -19,10 +19,10 @@ export class Cell {
     public set Value($value: int32) {
         this.$storage.Value = $value;
     }
-    static $zero(): Cell {
-        return new Cell({
+    static $zeroStorage(): Cell$Storage {
+        return {
             Value: 0
-        });
+        };
     }
     declare private readonly then?: never;
 }

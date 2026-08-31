@@ -527,11 +527,23 @@ func measureReflectionRegistrations(
 			if len(lazyStructs) != count {
 				t.Fatalf("lazy struct registrations = %d, want %d", len(lazyStructs), count)
 			}
+			lazyStructFields := regexp.MustCompile(
+				`(?s)\.\$registerStruct\([^;]+,\s*fields\s*=>`,
+			).FindAllString(text, -1)
+			if len(lazyStructFields) != count {
+				t.Fatalf("lazy struct field factories = %d, want %d", len(lazyStructFields), count)
+			}
 			lazyPointers := regexp.MustCompile(
 				`(?s)\.\$registerPointer\(\s*[^,]+,\s*\(\)\s*=>`,
 			).FindAllString(text, -1)
 			if len(lazyPointers) < count {
 				t.Fatalf("lazy pointer registrations = %d, want at least %d", len(lazyPointers), count)
+			}
+			lazyPointerElements := regexp.MustCompile(
+				`(?s)\.\$registerPointer\([^;]+,\s*elements\s*=>`,
+			).FindAllString(text, -1)
+			if len(lazyPointerElements) < count {
+				t.Fatalf("lazy pointer element factories = %d, want at least %d", len(lazyPointerElements), count)
 			}
 			for _, forbidden := range []string{
 				"switch (index)",

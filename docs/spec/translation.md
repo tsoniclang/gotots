@@ -553,7 +553,13 @@ return Point.$fromStorage({ X: field1, Y: field0 });
 An empty storage-backed value uses `Empty.$fromStorage({})`; neither source
 construction nor a package consumer calls a storage constructor directly.
 Static `$zero`, `$copy`, `$equal`, `$hash`, `$convert`, `$storageOf`, `$fromStorage`,
-and `$assign` members exist only when their exact semantic use requests them. A
+`$zeroStorage`, and `$assign` members exist only when their exact semantic use
+requests them. `$zeroStorage` constructs canonical field storage directly; a
+storage consumer must not allocate `$zero()` and immediately discard its wrapper
+through `$storageOf(...)`. For example, a nested `Inner` field in `Outer{}` uses
+`Inner.$zeroStorage()`, not `Inner.$storageOf(Inner.$zero())`; array and slice
+storage initialization applies the same rule through the one container-storage
+zero owner. A
 certified provider may expose a positional `$make` operation; ordinary
 generated structs never gain that compatibility factory.
 
@@ -594,18 +600,23 @@ recovery, filesystem artifact, text patch, or product-specific implementation.
 ### Maps
 
 Map representation is selected once from the exact closed key and value
-types. A map with an exact built-in boolean, integer, or string key and a
-runtime-basic value uses the canonical `GoMap<K,V>` owner. A map that needs
-static zero, copy, hash, or equality operations uses one deduplicated support
-specialization for its semantic shape, never one class per use site.
+types. A map whose key already has an identity boolean, integer, or string
+primitive representation and whose value is runtime-basic uses the canonical
+`GoMap<K,V>` owner. A map that needs an explicit key projection or static zero,
+copy, hash, or equality operations uses one deduplicated support specialization
+for its semantic shape, never one class per use site.
 
-When the selected key storage is an exact built-in boolean, integer, or string
-key, a specialized map stores tuple cells in a native JavaScript `Map`. The
-cell distinguishes a present `undefined` value from an absent key. Defined,
-floating-point, complex, pointer, interface, and aggregate keys retain the
-typed hash/equality bucket representation. Both paths preserve nil behavior,
-zero on miss, comma-ok, deletion, clear, assignment copy, and the iteration
-envelope through the same Go-shaped map contract.
+When the selected key storage is an exact boolean, integer, or string
+primitive, a specialized map stores tuple cells in a native JavaScript `Map`.
+This includes a defined key only when its canonical storage mapping is
+bijective: either the identity representation or an explicit projection.
+Public lookup/store/delete/keys operations apply and reverse any explicit
+projection at the specialization boundary. The cell
+distinguishes a present `undefined` value from an absent key. Floating-point,
+complex, pointer, interface, aggregate, and non-bijective defined keys retain
+the typed hash/equality bucket representation. Both paths preserve nil
+behavior, zero on miss, comma-ok, deletion, clear, assignment copy, and the
+iteration envelope through the same Go-shaped map contract.
 
 That common contract is one exported nominal abstract class, not a structural
 interface:
@@ -856,19 +867,16 @@ typed registration equivalent to:
 ReflectTypeMetadataOperations.$registerStruct(
   $goReflectType_Entry,
   () => $goInterfaceAdapter_Entry,
-  [{
-    type: () => $goReflectType_string,
-    settable: true,
-    get: entry => new $goInterfaceAdapter_string(entry.Name),
-    set: (entry, field) => {
-      entry.Name = $goInterfaceAdapter_string.$is(field)
-        ? field.$go$value
-        : GoPanic.raiseRuntime(
-            "reflect: Value.Set received a foreign interface box",
-          );
-    },
-  }],
-  Entry.$copy,
+  entry => entry,
+  fields => [
+    fields.valueProperty(
+      () => $goReflectType_string,
+      () => $goInterfaceAdapter_string,
+      "Name",
+      storage => new $goInterfaceAdapter_ptr_string(addressOf(storage.Name)),
+    ),
+  ],
+  value => Entry.$copy(value),
 );
 ```
 
@@ -876,10 +884,17 @@ The portable provider owns the one adapter guard, field bounds check,
 location wrapper, and clone wrapper used by every such registration. The
 adapter resolver is retained lazily and evaluated only when reflection first
 materializes the operation record, after ESM module initialization. The
-generated callbacks stay statically typed from their concrete adapter; no
-payload cast, source-name lookup, or host reflection is permitted. Provider-
-represented structs use a distinct typed opaque-field registration whose
-only generated facts are field-order-preserving failure messages; they do not
+storage resolver is likewise typed: for a direct class it is the identity; for
+a selected canonical-storage class it is that class's exact `$storageOf`
+operation. A field requiring Go value-copy semantics uses
+`copyingValueProperty` with the existing canonical copy operation. A field
+whose storage requires projection retains an explicit typed getter and setter
+instead of pretending that a property key is sufficient. The emitted property
+key is the target-name owner's exact member identity and is checked against the
+inferred storage type; it is not a source-name lookup. No payload cast, runtime
+shape test, `any`, `unknown`, or host reflection is permitted. Provider-
+represented structs use a distinct typed opaque-field registration whose only
+generated facts are field-order-preserving failure messages; they do not
 retain the ordinary field-access path behind a fallback.
 
 An addressable registration also carries its canonical pointer box callback.
@@ -1112,11 +1127,15 @@ not pass a reusable target label to nested breakable statements. The control
 label used to resolve source `break`, `continue`, and `goto` identities remains
 available independently and never selects a target label by spelling.
 
-An explicit Go `fallthrough` never becomes an implicit TypeScript case fall.
-The switch owner selects one clause, then executes ordered clause blocks under
-one break label; fallthrough advances to the next block without re-evaluating
-its case expressions. A Go `break` exits that label, while `continue` still
-targets the enclosing source loop.
+For a tagged switch with exact native primitive equality and prerequisite-free
+case expressions, the owner uses one native TypeScript switch to select the
+source clause. It then executes ordered clause blocks under one break label;
+an explicit final Go `fallthrough` advances to the next block without
+evaluating that block's case expressions. This split avoids implicit target
+fallthrough, remains valid under `noFallthroughCasesInSwitch`, and preserves a
+source `break` plus the enclosing source loop's `continue`. Switches outside
+that exact class use the general conditional-selection route before the same
+ordered execution owner.
 
 An expressionless Go switch whose case expressions have no prerequisites and
 whose clauses do not fall through emits an ordered `if`/`else if` chain inside

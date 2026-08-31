@@ -20,6 +20,7 @@ const (
 	NamedStructOperationConvert
 	NamedStructOperationStorage
 	NamedStructOperationAssign
+	NamedStructOperationStorageZero
 )
 
 func (o NamedStructOperation) Valid() bool {
@@ -29,7 +30,8 @@ func (o NamedStructOperation) Valid() bool {
 		o == NamedStructOperationHash ||
 		o == NamedStructOperationConvert ||
 		o == NamedStructOperationStorage ||
-		o == NamedStructOperationAssign
+		o == NamedStructOperationAssign ||
+		o == NamedStructOperationStorageZero
 }
 
 func (o NamedStructOperation) String() string {
@@ -48,6 +50,8 @@ func (o NamedStructOperation) String() string {
 		return "storage"
 	case NamedStructOperationAssign:
 		return "assign"
+	case NamedStructOperationStorageZero:
+		return "storage-zero"
 	default:
 		return fmt.Sprintf("named-struct-operation(%d)", o)
 	}
@@ -58,6 +62,9 @@ func NamedStructOperationMemberName(
 ) (string, error) {
 	if !operation.Valid() {
 		return "", &NameError{Reason: "named-struct operation is invalid"}
+	}
+	if operation == NamedStructOperationStorageZero {
+		return StructStorageZeroMember, nil
 	}
 	return "$" + operation.String(), nil
 }

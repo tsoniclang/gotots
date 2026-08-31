@@ -114,8 +114,8 @@ func main() {
 		goRunner,
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
+				"fields.interfaceValue(",
 				"value === undefined",
-				"reflect: Value.Set received a value outside the interface contract",
 				"zero: (): GoInterfaceValue | undefined => undefined",
 				".$storageOf(instance).Value",
 			} {

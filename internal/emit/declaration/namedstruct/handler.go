@@ -236,6 +236,7 @@ func emitStructClass(
 			source,
 			className,
 			classType,
+			layout.storageType,
 			layout.fields,
 			operation,
 			typeParameters,

@@ -19,20 +19,7 @@ func MakeAggregate(
 	before []tsgo.Statement,
 	requests []api.RootRequest,
 ) (api.ExpressionEmission, error) {
-	next, err := context.Values().Zero(
-		context.WithRole(api.RoleSliceElement),
-		source,
-		elementType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	next, err = context.ContainerStorage().ToContainerStorage(
-		context.WithRole(api.RoleSliceElement),
-		source,
-		elementType,
-		next,
-	)
+	next, err := zeroElement(context, source, elementType)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
