@@ -19,7 +19,7 @@ func TestPackageConstantsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	targetFiles := emitPackageConstantsProject(t, loaded, workingDirectory)
 	for name, targetFile := range targetFiles {
-		printed := printTargetFile(t, targetFile, workingDirectory)
+		printed := printExecutableTargetFile(t, targetFile, workingDirectory)
 		expected, err := os.ReadFile(filepath.Join(
 			packageConstantsProjectDirectory(),
 			"expected-"+name+".ts",
@@ -43,12 +43,8 @@ func TestPackageConstantsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 func TestPackageConstantsCreateOwnedExportedDeclarationsAndImports(t *testing.T) {
 	loaded := loadPackageConstantsProject(t)
 	targetFiles := emitPackageConstantsProject(t, loaded, t.TempDir())
-	constants := targetFiles["constants"].Statements()
-	if len(constants) != 3 {
-		t.Fatalf("constant statements = %d, want type import and two declarations", len(constants))
-	}
-	for index, name := range []string{"Base", "Enabled"} {
-		statement := constants[index+1].(tsgo.VariableStatement)
+	for _, name := range []string{"Base", "Enabled"} {
+		statement := targetVariable(t, targetFiles["constants"], name)
 		if statement.Modifiers()[0].Kind() != tsgo.SyntaxKindExportKeyword {
 			t.Fatalf("%s is not exported", name)
 		}
@@ -61,11 +57,40 @@ func TestPackageConstantsCreateOwnedExportedDeclarationsAndImports(t *testing.T)
 		}
 	}
 
-	use := targetFiles["use"].Statements()
-	valueImport := use[1].(tsgo.ImportDeclaration)
-	if valueImport.ModuleSpecifier().(tsgo.StringLiteral).Text() != "./constants.js" {
-		t.Fatalf("constant import module = %q", valueImport.ModuleSpecifier())
+	if targetImport(t, targetFiles["use"], "./constants.js") == nil {
+		t.Fatal("constant value import is absent")
 	}
+}
+
+func targetVariable(t *testing.T, file tsgo.SourceFile, name string) tsgo.VariableStatement {
+	t.Helper()
+	for _, statement := range file.Statements() {
+		variable, ok := statement.(tsgo.VariableStatement)
+		if !ok || len(variable.DeclarationList().Declarations()) != 1 {
+			continue
+		}
+		identifier, ok := variable.DeclarationList().Declarations()[0].Name().(tsgo.Identifier)
+		if ok && identifier.Text() == name {
+			return variable
+		}
+	}
+	t.Fatalf("target variable %s not found", name)
+	return nil
+}
+
+func targetImport(t *testing.T, file tsgo.SourceFile, module string) tsgo.ImportDeclaration {
+	t.Helper()
+	for _, statement := range file.Statements() {
+		declaration, ok := statement.(tsgo.ImportDeclaration)
+		if !ok {
+			continue
+		}
+		specifier, ok := declaration.ModuleSpecifier().(tsgo.StringLiteral)
+		if ok && specifier.Text() == module {
+			return declaration
+		}
+	}
+	return nil
 }
 
 func TestPackageConstantSpellingMutationKeepsObjectOwnedReference(t *testing.T) {
@@ -77,7 +102,7 @@ func TestPackageConstantSpellingMutationKeepsObjectOwnedReference(t *testing.T) 
 	reference.Name = "forged"
 
 	targetFiles := emitPackageConstantsProject(t, loaded, t.TempDir())
-	targetUse := targetFiles["use"].Statements()[2].(tsgo.FunctionDeclaration)
+	targetUse := targetFunction(t, targetFiles["use"], "AddBase")
 	targetReturn := targetUse.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
 	sum := targetReturn.Expression().(tsgo.BinaryExpression)
 	targetReference := sum.Left().(tsgo.Identifier)

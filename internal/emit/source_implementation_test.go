@@ -165,6 +165,8 @@ export function Sum(value: string): number { return value.length; }
 		t.Fatal(err)
 	}
 	options := DefaultOptions()
+	options.IntegerRepresentation = IntegerRepresentationNumber
+	options.EvaluationOrder = EvaluationOrderDirect
 	options.SourceImplementations = certificate
 	contractSession, err := newProgramSession(program, options)
 	if err != nil {

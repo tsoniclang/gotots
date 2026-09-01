@@ -212,7 +212,7 @@ func (s *programSession) publishPackageExports(
 			if err := exportPlacement.Apply([]api.RootRequest{request}); err != nil {
 				return err
 			}
-			declaration, initialization := deferredConstantPackageExport(
+			declaration, initialization := constantbinding.DeferredPackageExport(
 				s.factory,
 				binding.Name,
 				deferredName,

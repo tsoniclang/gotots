@@ -3,16 +3,15 @@ package emit
 import (
 	"fmt"
 	"go/types"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
 
 	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	"github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
@@ -152,7 +151,7 @@ func (s *programSession) environmentObligations() (
 			var requirements []api.DeclarationRequirement
 			if _, constant := declaration.object.(*types.Const); !constant {
 				var err error
-				requirements, err = s.environmentDeclarationRequirements(
+				requirements, err = environmentcontract.SelectDeclarationRequirements(
 					declaration.object,
 					s.requirements.SelectedFor(
 						api.MustSourceArtifactOwner(declaration.object),
@@ -313,7 +312,7 @@ func (s *programSession) implementationRouteObligations(
 			receiver:        description.Receiver(),
 			sourceSignature: description.Signature(),
 			sourceValue:     description.Value(),
-			sourceLocation: environmentSourceLocation(
+			sourceLocation: environmentcontract.SourceLocation(
 				environmentPackage,
 				object,
 			),
@@ -386,7 +385,7 @@ func buildEnvironmentObligation(
 		receiver:          receiver,
 		sourceSignature:   signature,
 		sourceValue:       value,
-		sourceLocation:    environmentSourceLocation(builder.sourcePackage, object),
+		sourceLocation:    environmentcontract.SourceLocation(builder.sourcePackage, object),
 		targetName:        targetName,
 		targetFingerprint: fingerprint,
 		requirements:      requirementKeys,
@@ -401,33 +400,6 @@ func environmentContractKey(sourcePackage *load.Package) string {
 		return sourcePackage.ToolchainKey()
 	}
 	return sourcePackage.ExternalContractKey()
-}
-
-func environmentSourceLocation(
-	sourcePackage *load.Package,
-	object types.Object,
-) string {
-	if sourcePackage == nil ||
-		sourcePackage.FileSet() == nil ||
-		!object.Pos().IsValid() {
-		return ""
-	}
-	position := sourcePackage.FileSet().PositionFor(object.Pos(), false)
-	if !position.IsValid() {
-		return ""
-	}
-	sourcePath := filepath.ToSlash(position.Filename)
-	if sourcePackage.Kind() == load.PackageStandardLibraryContract {
-		root := filepath.Join(sourcePackage.Program().GoTool().Root(), "src")
-		if relative, err := filepath.Rel(root, position.Filename); err == nil &&
-			relative != "." &&
-			!strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			sourcePath = filepath.ToSlash(relative)
-		}
-	}
-	return sourcePath + ":" +
-		strconv.Itoa(position.Line) + ":" +
-		strconv.Itoa(position.Column)
 }
 
 func environmentRequirementKeys(

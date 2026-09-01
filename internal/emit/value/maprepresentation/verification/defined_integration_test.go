@@ -19,7 +19,7 @@ func TestDefinedMapsUseSelectedRepresentationsAndExecuteDifferentially(
 		name    string
 		options emit.Options
 	}{
-		{name: "number", options: emit.DefaultOptions()},
+		{name: "number", options: mapNumberOptions()},
 		{
 			name: "bigint",
 			options: emit.Options{
@@ -97,11 +97,12 @@ func TestDefinedMapKeySignatureMutationFailsStrictTypecheck(
 func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 	t.Helper()
 	source := readFile(t, artifacts.file(t, "source.ts"))
-	t.Logf("defined map source bytes=%d", len(source))
-	if len(source) > 12_000 {
+	executableSource := withoutSourceFactApplications(source)
+	t.Logf("defined map source bytes=%d canonical=%d", len(executableSource), len(source))
+	if len(executableSource) > 12_000 {
 		t.Fatalf(
 			"defined map source = %d bytes, want at most 12000",
-			len(source),
+			len(executableSource),
 		)
 	}
 	for _, required := range []string{
@@ -120,7 +121,7 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		"GoMap.nil<Count, int32>",
 		"let values: GoMapValue<Count, int32> = GoMap.make<int32, int32>",
 	} {
-		if !strings.Contains(source, required) {
+		if !strings.Contains(executableSource, required) {
 			t.Fatalf("defined map artifact lacks %q:\n%s", required, source)
 		}
 	}
@@ -129,16 +130,16 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 			t.Fatalf("identity primitive key emitted a map specialization: %s", path)
 		}
 	}
-	zeroStart := strings.Index(source, "export function ZeroState")
-	makeStart := strings.Index(source, "export function MakeAliases")
+	zeroStart := strings.Index(executableSource, "export function ZeroState")
+	makeStart := strings.Index(executableSource, "export function MakeAliases")
 	if zeroStart < 0 || makeStart <= zeroStart {
 		t.Fatalf("defined map functions are absent:\n%s", source)
 	}
-	zeroBody := source[zeroStart:makeStart]
+	zeroBody := executableSource[zeroStart:makeStart]
 	if strings.Count(zeroBody, "new Values(GoMap.nil") != 2 {
 		t.Fatalf("defined map zero wrapper count differs:\n%s", zeroBody)
 	}
-	conversionStart := strings.Index(source, "export function Conversions")
+	conversionStart := strings.Index(executableSource, "export function Conversions")
 	if conversionStart <= makeStart {
 		t.Fatalf("defined map conversion function is absent:\n%s", source)
 	}
@@ -153,13 +154,14 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		"$projectKey",
 		"$reifyKey",
 		"new Count",
-		"any",
+		": any",
+		" as any",
 		"unknown",
 		".call(",
 		".apply(",
 		".bind(",
 	} {
-		if strings.Contains(source, forbidden) {
+		if strings.Contains(executableSource, forbidden) {
 			t.Fatalf("defined map artifact contains %q:\n%s", forbidden, source)
 		}
 	}

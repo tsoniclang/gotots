@@ -66,11 +66,10 @@ func TestIntegerBigIntCarrierProfilesWrapFixedWidthOperationsDifferentially(t *t
 		nativeAlias    string
 	}{
 		{"fixed64-bigint", emit.IntegerRepresentationFixed64BigInt, "export type int = number;"},
-		{"bigint", emit.IntegerRepresentationBigInt, "export type int = bigint;"},
+		{"bigint", emit.IntegerRepresentationBigInt, "export type int = $go$core$int64;"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			options := emit.DefaultOptions()
-			options.IntegerRepresentation = test.representation
+			options := integerOptions(test.representation)
 			emission := compileIntegerFamily(
 				t,
 				loaded,
@@ -172,7 +171,7 @@ func TestIntegerNumberProfileRecordsWideHashBoundary(t *testing.T) {
 	emission := compileIntegerFamily(
 		t,
 		loaded,
-		emit.DefaultOptions(),
+		integerOptions(emit.IntegerRepresentationNumber),
 		"WideHash",
 	)
 	workingDirectory := t.TempDir()

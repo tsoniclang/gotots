@@ -20,7 +20,7 @@ import (
 // strict-typechecks and executes identically to Go.
 func TestConstantFamilyNumberProfileExecutesDifferentially(t *testing.T) {
 	loaded := loadConstantFamily(t)
-	emission := compileConstantFamily(t, loaded, emit.DefaultOptions(), numberRoots...)
+	emission := compileConstantFamily(t, loaded, numberOptions(), numberRoots...)
 
 	printed := printConstantFamily(t, emission)
 	assertNoForbiddenConstructs(t, printed)
@@ -63,7 +63,7 @@ func TestConstantFamilyBigIntProfileExecutesDifferentially(t *testing.T) {
 // exported binding referenced by identity.
 func TestConstantFamilyShape(t *testing.T) {
 	loaded := loadConstantFamily(t)
-	emission := compileConstantFamily(t, loaded, emit.DefaultOptions(), numberRoots...)
+	emission := compileConstantFamily(t, loaded, numberOptions(), numberRoots...)
 	source := constantFamilySourceFile(t, emission)
 
 	declared := declaredTopLevelBindings(source)
@@ -202,7 +202,11 @@ func TestUntypedConstantNumberProjectionUsesDeclaredApproximateProfile(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	emission, err := emit.Compile(loaded.Program(), []emit.Root{root})
+	emission, err := emit.CompileWithOptions(
+		loaded.Program(),
+		[]emit.Root{root},
+		numberOptions(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

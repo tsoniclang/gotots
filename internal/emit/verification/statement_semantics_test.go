@@ -17,6 +17,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestWaveFourStatementsPrintAndTypecheck(t *testing.T) {
@@ -59,7 +60,9 @@ func TestWaveFourStatementsPrintAndTypecheck(t *testing.T) {
 				emission,
 				workingDirectory,
 			)
-			if artifacts.bytes > 65_000 || artifacts.largest > 28_000 {
+			// Canonical facts are counted here and erased only by the executable
+			// TypeScript target, whose output has an independent budget.
+			if artifacts.bytes > 90_000 || artifacts.largest > 42_000 {
 				t.Fatalf(
 					"Wave 4 artifact bounds exceeded: total=%d largest=%d",
 					artifacts.bytes,
@@ -446,6 +449,9 @@ console.log(Run());
 	arguments = append(arguments, artifacts.paths...)
 	arguments = append(arguments, runnerPath)
 	if err := runtimefixture.InstallResolution(workingDirectory, outputDirectory); err != nil {
+		t.Fatal(err)
+	}
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)

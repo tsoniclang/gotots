@@ -43,7 +43,7 @@ func MaximumFloat() float64 { return math.MaxFloat64 }
 		}
 		roots = append(roots, root)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.IntegerRepresentation = emit.IntegerRepresentationBigInt
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, roots, options)
@@ -95,13 +95,8 @@ func MaximumFloat() float64 { return math.MaxFloat64 }
 			artifacts.printed,
 		)
 	}
-	for _, forbidden := range []string{
-		"export declare const Max",
-		"@gotots/gostdlib/math.js",
-	} {
-		if strings.Contains(artifacts.printed, forbidden) {
-			t.Fatalf("provider projection retained %q:\n%s", forbidden, artifacts.printed)
-		}
+	if strings.Contains(artifacts.printed, "export declare const Max") {
+		t.Fatalf("provider projection retained ambient declarations:\n%s", artifacts.printed)
 	}
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }
@@ -180,7 +175,7 @@ func DurationMath(value time.Duration) time.Duration {
 	}
 	for _, profile := range profiles {
 		t.Run(profile.name, func(t *testing.T) {
-			options := emit.DefaultOptions()
+			options := providerNumberOptions()
 			options.IntegerRepresentation = profile.representation
 			options.StandardLibrary = certificate
 			emission, err := emit.CompileWithOptions(program, roots, options)

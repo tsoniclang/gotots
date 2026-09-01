@@ -105,8 +105,8 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 			callerSource,
 		)
 	}
-	if strings.Contains(providerSource, "crosslocal") ||
-		strings.Contains(providerSource, "Twice$Named_Local") {
+	if strings.Contains(providerSource, "Twice$Named_Local") ||
+		strings.Contains(providerSource, "BothEqual$Named_Outer$Named_Inner") {
 		t.Fatalf(
 			"generic provider acquired a caller-local reverse dependency:\n%s",
 			providerSource,

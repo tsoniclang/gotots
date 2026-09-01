@@ -15,7 +15,7 @@ func TestOrderedBuiltinsExecuteDifferentially(t *testing.T) {
 		options    emit.Options
 		wideSuffix string
 	}{
-		{"number", emit.DefaultOptions(), ""},
+		{"number", orderedNumberOptions(), ""},
 		{
 			"bigint",
 			emit.Options{

@@ -138,7 +138,10 @@ func compileReflectFixture(
 	for _, name := range roots {
 		selected = append(selected, mustRoot(t, scope.Lookup(name)))
 	}
-	options := emit.DefaultOptions()
+	options := emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
+	}
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, selected, options)
 	if err != nil {

@@ -7,11 +7,16 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func InstallResolution(root string, outputDirectory string) error {
 	if root == "" || outputDirectory == "" {
 		return fmt.Errorf("install GoToTS runtime resolution fixture: path is absent")
+	}
+	if err := corefixture.InstallResolutionOnly(root); err != nil {
+		return fmt.Errorf("install GoToTS runtime resolution fixture dependency: %w", err)
 	}
 	runtimeRoot := filepath.Join(root, "runtime")
 	entries, err := os.ReadDir(runtimeRoot)

@@ -32,8 +32,10 @@ func TestZeroMethodInterfaceAdaptersShareBoundedCommonMachinery(t *testing.T) {
 			large.factoryBytes,
 		)
 	}
-	if countDelta != 24 || byteDelta/countDelta > 1_200 ||
-		nodeDelta/countDelta > 180 {
+	// Per-adapter growth includes its canonical declaration and implementation
+	// facts; the executable TypeScript target erases those statements.
+	if countDelta != 24 || byteDelta/countDelta > 2_100 ||
+		nodeDelta/countDelta > 210 {
 		t.Fatalf(
 			"zero-method adapter growth is not bounded: counts=%d/%d bytes=%d/%d nodes=%d/%d",
 			small.count,

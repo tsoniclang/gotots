@@ -17,6 +17,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestPackageStatePrintsTypechecksAndExecutesCheckerInitializationOrder(
@@ -58,8 +59,8 @@ func TestPackageStatePrintsTypechecksAndExecutesCheckerInitializationOrder(
 	var apiAssembly emit.TargetFile
 	var targetPaths []string
 	files := emission.Files()
-	if len(files) != 8 {
-		t.Fatalf("target files = %d, want eight exact package-state artifacts", len(files))
+	if len(files) != 9 {
+		t.Fatalf("target files = %d, want nine exact package-state artifacts", len(files))
 	}
 	for _, file := range files {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
@@ -107,46 +108,6 @@ func TestPackageStatePrintsTypechecksAndExecutesCheckerInitializationOrder(
 	)
 	if targetOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", targetOutput, goOutput)
-	}
-}
-
-func packageStateExpectedPath(
-	t *testing.T,
-	projectDirectory string,
-	file emit.TargetFile,
-) string {
-	t.Helper()
-	switch file.Kind() {
-	case emit.TargetFileSource:
-		return filepath.Join(
-			projectDirectory,
-			file.PackageName(),
-			"expected-source.ts",
-		)
-	case emit.TargetFilePackageState:
-		return filepath.Join(
-			projectDirectory,
-			file.PackageName(),
-			"expected-state.ts",
-		)
-	case emit.TargetFilePackageAssembly:
-		return filepath.Join(
-			projectDirectory,
-			file.PackageName(),
-			"expected-package.ts",
-		)
-	case emit.TargetFileProgramInitialization:
-		return filepath.Join(projectDirectory, "expected-program.ts")
-	case emit.TargetFileSupport:
-		return filepath.Join(
-			repositoryRoot(),
-			"testdata",
-			"support",
-			"scalars-int32.ts",
-		)
-	default:
-		t.Fatalf("unexpected target file kind %d", file.Kind())
-		return ""
 	}
 }
 
@@ -199,6 +160,9 @@ func executePackageStateTypeScript(
 	stringify bool,
 ) string {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	writeProgramFile(
 		t,
 		filepath.Join(workingDirectory, "package.json"),
@@ -293,9 +257,9 @@ func TestPackageInitializationHandlesMultipleResultsInitFunctionsAndBlankImports
 	var assemblyPath string
 	var targetPaths []string
 	files := emission.Files()
-	if len(files) != 12 {
+	if len(files) != 13 {
 		t.Fatalf(
-			"target files = %d, want twelve exact initialization artifacts",
+			"target files = %d, want thirteen exact initialization artifacts",
 			len(files),
 		)
 	}
@@ -462,47 +426,6 @@ func assertSamePackageInitializationAST(
 	}
 }
 
-func packageInitializationExpectedPath(
-	t *testing.T,
-	projectDirectory string,
-	file emit.TargetFile,
-) string {
-	t.Helper()
-	switch file.Kind() {
-	case emit.TargetFileSource:
-		name := "expected-source.ts"
-		if file.PackageName() == "sideeffect" {
-			base := filepath.Base(file.OutputPath())
-			name = "expected-" + base
-		}
-		return filepath.Join(projectDirectory, file.PackageName(), name)
-	case emit.TargetFilePackageState:
-		return filepath.Join(
-			projectDirectory,
-			file.PackageName(),
-			"expected-state.ts",
-		)
-	case emit.TargetFilePackageAssembly:
-		return filepath.Join(
-			projectDirectory,
-			file.PackageName(),
-			"expected-package.ts",
-		)
-	case emit.TargetFileProgramInitialization:
-		return filepath.Join(projectDirectory, "expected-program.ts")
-	case emit.TargetFileSupport:
-		return filepath.Join(
-			repositoryRoot(),
-			"testdata",
-			"support",
-			"scalars-int32.ts",
-		)
-	default:
-		t.Fatalf("unexpected target file kind %d", file.Kind())
-		return ""
-	}
-}
-
 func executePackageInitializationGo(
 	t *testing.T,
 	projectDirectory string,
@@ -550,6 +473,9 @@ func executePackageInitializationTypeScript(
 	assemblyPath string,
 ) string {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	writeProgramFile(
 		t,
 		filepath.Join(workingDirectory, "package.json"),

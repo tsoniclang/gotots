@@ -56,7 +56,7 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	loaded := loadCallableValuesProject(t)
 	workingDirectory := t.TempDir()
 	targetFile := compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
-	printed := printTargetFile(t, targetFile, workingDirectory)
+	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
 
 	for _, forbidden := range []string{".call(", ".apply(", ".bind(", "any", "unknown"} {
 		if strings.Contains(printed, forbidden) {
@@ -329,7 +329,7 @@ func TestKnownDirectCallableArtifactIsExact(t *testing.T) {
 	loaded := loadCallableValuesProject(t)
 	workingDirectory := t.TempDir()
 	targetFile := compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
-	printed := printTargetFile(t, targetFile, workingDirectory)
+	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
 	const expected = `export function UseNamed(value: int32): int32 {
     return Apply(Double, value);
 }`

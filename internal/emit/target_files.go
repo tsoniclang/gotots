@@ -10,6 +10,7 @@ import (
 	declarationorder "github.com/tsoniclang/gotots/internal/emit/declaration/order"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
+	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -352,6 +353,22 @@ func (s *programSession) programInitializationFile(
 		return TargetFile{}, err
 	}
 	placement := targetplacement.New()
+	compilation, err := canonicalsourcefact.Compilation(
+		s.factory,
+		s.source,
+		s.scalar,
+		s.evaluationOrder,
+		s.standardLibrary,
+		s.externalProvider,
+		s.sourceImplementations,
+		s.callableImplementations,
+	)
+	if err != nil {
+		return TargetFile{}, err
+	}
+	if err := placement.Apply(compilation.Requests()); err != nil {
+		return TargetFile{}, err
+	}
 	var calls []tsgo.Statement
 	for _, builder := range order {
 		if !builder.hasInitializationWork() {
@@ -395,6 +412,7 @@ func (s *programSession) programInitializationFile(
 		calls = append(calls, s.factory.ExpressionStatement(call))
 	}
 	statements := placement.Statements(s.factory)
+	statements = append(statements, compilation.Statements()...)
 	statements = append(statements, calls...)
 	requirements.observe(placement)
 	return s.sourceFile(

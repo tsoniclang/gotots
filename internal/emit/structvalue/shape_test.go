@@ -101,8 +101,14 @@ func TestNamedStructOperationsAreUniqueAndOwnedByClass(t *testing.T) {
 	}
 }
 
-func TestNamedStructValuesDefaultToDirectConstruction(t *testing.T) {
-	source := structTargetSource(t, compileStructFixture(t))
+func TestNamedStructValuesDirectProfileUsesDirectConstruction(t *testing.T) {
+	source := structTargetSource(t, compileStructFixtureWithOptions(
+		t,
+		emit.Options{
+			IntegerRepresentation: emit.IntegerRepresentationNumber,
+			EvaluationOrder:       emit.EvaluationOrderDirect,
+		},
+	))
 	for _, name := range []string{
 		"NewBox",
 		"CompositeArgument",

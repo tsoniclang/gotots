@@ -46,8 +46,7 @@ go 1.26.4
 			if err != nil {
 				t.Fatal(err)
 			}
-			options := emit.DefaultOptions()
-			options.IntegerRepresentation = representation
+			options := integerOptions(representation)
 			roots := matrixRoots(t, loaded, representation)
 			emission, err := emit.CompileWithOptions(loaded.Program(), roots, options)
 			if err != nil {

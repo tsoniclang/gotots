@@ -1,6 +1,11 @@
 package callableimplementation
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
+)
 
 type Variant uint8
 
@@ -19,6 +24,12 @@ type Selection struct {
 	outputPath     string
 	export         string
 	variant        Variant
+	packagePath    string
+	modulePath     string
+	moduleVersion  string
+	moduleDigest   string
+	sourceDigest   string
+	envelope       implementationcontract.Envelope
 }
 
 func NewSelection(
@@ -26,12 +37,24 @@ func NewSelection(
 	outputPath string,
 	export string,
 	variant Variant,
+	packagePath string,
+	modulePath string,
+	moduleVersion string,
+	moduleDigest string,
+	sourceDigest string,
+	envelope implementationcontract.Envelope,
 ) (Selection, error) {
 	selection := Selection{
 		sourceIdentity: sourceIdentity,
 		outputPath:     outputPath,
 		export:         export,
 		variant:        variant,
+		packagePath:    packagePath,
+		modulePath:     modulePath,
+		moduleVersion:  moduleVersion,
+		moduleDigest:   moduleDigest,
+		sourceDigest:   sourceDigest,
+		envelope:       cloneEnvelope(envelope),
 	}
 	if !selection.Valid() {
 		return Selection{}, &Error{Reason: "selection is incomplete"}
@@ -41,13 +64,29 @@ func NewSelection(
 
 func (s Selection) Valid() bool {
 	return s.sourceIdentity != "" && s.outputPath != "" &&
-		s.export != "" && s.variant.Valid()
+		s.export != "" && s.variant.Valid() && s.packagePath != "" &&
+		s.moduleDigest != "" && s.sourceDigest != "" && s.envelope.Valid()
 }
 
 func (s Selection) SourceIdentity() string { return s.sourceIdentity }
 func (s Selection) OutputPath() string     { return s.outputPath }
 func (s Selection) Export() string         { return s.export }
 func (s Selection) Variant() Variant       { return s.variant }
+func (s Selection) PackagePath() string    { return s.packagePath }
+func (s Selection) ModulePath() string     { return s.modulePath }
+func (s Selection) ModuleVersion() string  { return s.moduleVersion }
+func (s Selection) ModuleDigest() string   { return s.moduleDigest }
+func (s Selection) SourceDigest() string   { return s.sourceDigest }
+func (s Selection) EquivalenceEnvelope() implementationcontract.Envelope {
+	return cloneEnvelope(s.envelope)
+}
+
+func cloneEnvelope(source implementationcontract.Envelope) implementationcontract.Envelope {
+	result := source
+	result.PreservedObservables = slices.Clone(source.PreservedObservables)
+	result.Evidence = slices.Clone(source.Evidence)
+	return result
+}
 
 type TargetKind uint8
 

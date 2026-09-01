@@ -8,6 +8,8 @@ import (
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	"github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
+	environmentsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact/environment"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -81,6 +83,7 @@ type environmentConstantProjection struct {
 	projection types.BasicKind
 	name       string
 	statement  tsgo.Statement
+	facts      []tsgo.Statement
 	contract   artifactstate.Contract
 }
 
@@ -100,21 +103,86 @@ func (s *programSession) buildEnvironmentDeclaration(
 			environmentContractError(object, err)
 	}
 	owner := api.MustSourceArtifactOwner(object)
-	placement, dependencies, requestedRequirements, err :=
-		s.consumeArtifactRequests(owner, target.Requests())
-	if err != nil {
-		return environmentDeclaration{},
-			environmentContractError(object, err)
+	statements := target.Declarations()
+	requests := target.Requests()
+	if target.Disposition() == api.DeclarationDispositionMaterialized {
+		factOwner, ownerErr := environmentsourcefact.New(
+			builder.context,
+			builder.sourcePackage,
+			builder.outputPath,
+			s.source.SourceDigest(),
+			s.registry,
+			s.standardLibrary,
+		)
+		if ownerErr != nil {
+			return environmentDeclaration{}, environmentContractError(object, ownerErr)
+		}
+		origin, originErr := factOwner.Origin(object)
+		if originErr != nil {
+			return environmentDeclaration{}, environmentContractError(object, originErr)
+		}
+		facts, factErr := canonicalsourcefact.Declaration(
+			builder.context,
+			object,
+			origin,
+			statements,
+		)
+		if factErr != nil {
+			return environmentDeclaration{}, environmentContractError(object, factErr)
+		}
+		statements = append(statements, facts.Statements()...)
+		requests = api.CombineRequests(requests, facts.Requests())
+		if typeName, ok := object.(*types.TypeName); ok && !typeName.IsAlias() {
+			origins, originErr := factOwner.MemberOrigins(typeName)
+			if originErr != nil {
+				return environmentDeclaration{}, environmentContractError(object, originErr)
+			}
+			members, memberErr := canonicalsourcefact.TypeMembers(
+				builder.context,
+				typeName,
+				origins,
+			)
+			if memberErr != nil {
+				return environmentDeclaration{}, environmentContractError(object, memberErr)
+			}
+			statements = append(statements, members.Statements()...)
+			requests = api.CombineRequests(requests, members.Requests())
+		}
+		if function, ok := object.(*types.Func); ok {
+			external, linked, externalErr := s.externalImplementationSourceFact(
+				builder.context,
+				function,
+				statements,
+			)
+			if externalErr != nil {
+				return environmentDeclaration{}, environmentContractError(object, externalErr)
+			}
+			if linked {
+				statements = append(statements, external.Statements()...)
+				requests = api.CombineRequests(requests, external.Requests())
+			}
+		}
 	}
-	contract, err := environmentDeclarationContract(s.factory, target)
+	placement, dependencies, requestedRequirements, err :=
+		s.consumeArtifactRequests(owner, requests)
 	if err != nil {
-		return environmentDeclaration{},
-			environmentContractError(object, err)
+		return environmentDeclaration{}, environmentContractError(object, err)
+	}
+	contractTarget := target
+	if target.Disposition() == api.DeclarationDispositionMaterialized {
+		contractTarget, err = api.NewDeclarationEmission(statements, requests)
+		if err != nil {
+			return environmentDeclaration{}, environmentContractError(object, err)
+		}
+	}
+	contract, err := environmentDeclarationContract(s.factory, contractTarget)
+	if err != nil {
+		return environmentDeclaration{}, environmentContractError(object, err)
 	}
 	return environmentDeclaration{
 		object:     object,
 		name:       object.Name(),
-		statements: target.Declarations(),
+		statements: statements,
 		environmentArtifact: environmentArtifact{
 			placement:    placement,
 			dependencies: dependencies,
@@ -154,7 +222,7 @@ func (s *programSession) reconstructEnvironmentDeclaration(
 			Reason: "environment declaration was not emitted before reconstruction",
 		}
 	}
-	requirements, err := s.environmentDeclarationRequirements(
+	requirements, err := environmentcontract.SelectDeclarationRequirements(
 		object,
 		s.requirements.SelectedFor(api.MustSourceArtifactOwner(object)),
 	)
@@ -345,9 +413,43 @@ func (s *programSession) replaceEnvironmentConstantProjections(
 				return projectionErr
 			}
 		}
+		factOwner, ownerErr := environmentsourcefact.New(
+			builder.context,
+			builder.sourcePackage,
+			builder.outputPath,
+			s.source.SourceDigest(),
+			s.registry,
+			s.standardLibrary,
+		)
+		if ownerErr != nil {
+			return environmentContractError(selected, ownerErr)
+		}
+		origin, originErr := factOwner.Origin(selected)
+		if originErr != nil {
+			return environmentContractError(selected, originErr)
+		}
+		fact, factErr := canonicalsourcefact.ConstantProjection(
+			builder.context,
+			selected,
+			name,
+			projection,
+			origin,
+			[]tsgo.Statement{statement},
+		)
+		if factErr != nil {
+			return environmentContractError(selected, factErr)
+		}
+		selectedRequests = api.CombineRequests(
+			selectedRequests,
+			fact.Requests(),
+		)
+		projectionStatements := append(
+			[]tsgo.Statement{statement},
+			fact.Statements()...,
+		)
 		contract, err := artifactstate.ProjectContract(
 			s.factory,
-			[]tsgo.Statement{statement},
+			projectionStatements,
 		)
 		if err != nil {
 			return environmentContractError(selected, err)
@@ -357,9 +459,10 @@ func (s *programSession) replaceEnvironmentConstantProjections(
 			projection: projection,
 			name:       name,
 			statement:  statement,
+			facts:      fact.Statements(),
 			contract:   contract,
 		}
-		statements = append(statements, statement)
+		statements = append(statements, projectionStatements...)
 		requests = append(requests, selectedRequests...)
 	}
 	owner := api.MustSourceArtifactOwner(selected)
@@ -465,4 +568,26 @@ func (s *programSession) environmentArtifactSource(
 	default:
 		return false
 	}
+}
+
+func (s *programSession) externalImplementationSourceFact(
+	context api.Context,
+	function *types.Func,
+	statements []tsgo.Statement,
+) (api.StatementEmission, bool, error) {
+	if s.externalProvider == nil || function == nil {
+		return api.StatementEmission{}, false, nil
+	}
+	target, selected := s.externalFunctionBindings[function.Origin()]
+	if !selected || target.Kind() != api.ExternalFunctionTargetModule {
+		return api.StatementEmission{}, false, nil
+	}
+	emission, err := canonicalsourcefact.ExternalImplementation(
+		context,
+		s.externalProvider,
+		target,
+		function,
+		statements,
+	)
+	return emission, true, err
 }

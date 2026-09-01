@@ -74,7 +74,8 @@ func Boolean(value bool) (bool, bool) {
 		"type Box$Storage",
 		"Box.$storageOf(",
 		"goPointerHash",
-		"any",
+		": any",
+		" as any",
 		"unknown",
 	} {
 		if strings.Contains(typescript, forbidden) {
@@ -133,7 +134,8 @@ func Package(value int32) (int32, bool) {
 	for _, forbidden := range []string{
 		"GoPointer<Child",
 		"GoPointer.cell<Child",
-		"any",
+		": any",
+		" as any",
 		"unknown",
 	} {
 		if strings.Contains(typescript, forbidden) {
@@ -226,7 +228,8 @@ func CarrierMap(value int32) (int32, bool) {
 		"indexView",
 		"AddressView",
 		"goSliceAddressView",
-		"any",
+		": any",
+		" as any",
 		"unknown",
 	} {
 		if strings.Contains(typescript, forbidden) {

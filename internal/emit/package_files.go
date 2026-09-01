@@ -3,6 +3,7 @@ package emit
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
 	"slices"
 	"sort"
 
@@ -11,6 +12,7 @@ import (
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/emit/sourcepackage"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -224,7 +226,17 @@ func (e *emitter) fileContext(
 	sourceFile *ast.File,
 	targetPath string,
 ) (api.Context, error) {
-	return e.targetContext(sourceFile, targetPath)
+	_, ok := e.source.FileForSyntax(sourceFile)
+	if !ok {
+		return api.Context{}, &ScheduleError{
+			Reason: "file context source file is not package-owned",
+		}
+	}
+	context, err := e.targetContext(sourceFile, targetPath)
+	if err != nil {
+		return api.Context{}, err
+	}
+	return canonicalsourcefact.WithPackageEvidence(context, e.source, targetPath)
 }
 
 func (e *emitter) targetContext(
@@ -318,10 +330,6 @@ func (s *programSession) packageStateFile(
 			return TargetFile{}, err
 		}
 	}
-	if err := placement.RequireTypeOnly(); err != nil {
-		return TargetFile{}, err
-	}
-	requirements.observe(placement)
 	storage := slices.Clone(builder.storage)
 	sort.Slice(storage, func(left, right int) bool {
 		return storage[left].variable.Name() <
@@ -335,10 +343,33 @@ func (s *programSession) packageStateFile(
 	if err != nil {
 		return TargetFile{}, err
 	}
+	ownerKind, contractKey := canonicalsourcefact.PackageOwner(builder.sourcePackage)
+	storageFact, err := canonicalsourcefact.PackageStorage(
+		builder.stateContext,
+		packagevariable.StateClassName,
+		packagevariable.StateValueName,
+		builder.sourcePackage.Path(),
+		builder.sourcePackage.ModulePath(),
+		builder.sourcePackage.ModuleVersion(),
+		ownerKind,
+		contractKey,
+		builder.statePath,
+		s.source.SourceDigest(),
+		len(storage),
+		declarations,
+	)
+	if err != nil {
+		return TargetFile{}, err
+	}
+	if err := placement.Apply(storageFact.Requests()); err != nil {
+		return TargetFile{}, err
+	}
+	requirements.observe(placement)
 	statements := append(
 		placement.Statements(s.factory),
 		declarations...,
 	)
+	statements = append(statements, storageFact.Statements()...)
 	return s.sourceFile(
 		builder.statePath,
 		builder.sourcePackage.Name(),
@@ -381,6 +412,21 @@ func (s *programSession) packageAssemblyFile(
 		if err := placement.Apply(artifact.placement.Requests()); err != nil {
 			return TargetFile{}, err
 		}
+	}
+	storageFacts, storageFactRequests, err := s.packageStorageFacts(builder)
+	if err != nil {
+		return TargetFile{}, err
+	}
+	if err := placement.Apply(storageFactRequests); err != nil {
+		return TargetFile{}, err
+	}
+	initializationFacts, initializationFactRequests, err :=
+		s.packageInitializationFacts(builder)
+	if err != nil {
+		return TargetFile{}, err
+	}
+	if err := placement.Apply(initializationFactRequests); err != nil {
+		return TargetFile{}, err
 	}
 	requirements.observe(placement)
 	statements := placement.Statements(s.factory)
@@ -444,6 +490,8 @@ func (s *programSession) packageAssemblyFile(
 			nil,
 		))
 	}
+	statements = append(statements, storageFacts...)
+	statements = append(statements, initializationFacts...)
 	return s.sourceFile(
 		builder.assemblyPath,
 		builder.sourcePackage.Name(),
@@ -452,43 +500,89 @@ func (s *programSession) packageAssemblyFile(
 	)
 }
 
-func deferredConstantPackageExport(
-	factory tsgo.Factory,
-	publicName string,
-	deferredName string,
-) (tsgo.VariableStatement, tsgo.ExpressionStatement) {
-	declaration := factory.VariableStatement(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.VariableDeclarationList(
-			[]tsgo.VariableDeclaration{factory.VariableDeclaration(
-				factory.Identifier(publicName),
-				nil,
-				factory.TypeReferenceNode(
-					factory.Identifier("ReturnType"),
-					[]tsgo.TypeNode{factory.TypeQueryNode(
-						factory.Identifier(deferredName),
-						nil,
-					)},
-				),
-				nil,
-			)},
-			tsgo.NodeFlagsLet,
-		),
+func (s *programSession) packageInitializationFacts(
+	builder *packageTargetBuilder,
+) ([]tsgo.Statement, []api.RootRequest, error) {
+	if !builder.hasInitializationWork() {
+		return nil, nil, nil
+	}
+	initializers := make([][]*types.Var, 0, len(builder.initialization))
+	for _, artifact := range builder.initialization {
+		initializers = append(initializers, slices.Clone(artifact.initializer.Lhs))
+	}
+	initFunctions := make([]*types.Func, 0, len(builder.initFunctions))
+	for _, function := range builder.initFunctions {
+		initFunctions = append(initFunctions, function.function)
+	}
+	fact, err := canonicalsourcefact.SourcePackageInitialization(
+		builder.assemblyContext,
+		packageInitializeName,
+		builder.sourcePackage,
+		builder.assemblyPath,
+		s.source.SourceDigest(),
+		len(builder.storage),
+		initializers,
+		initFunctions,
 	)
-	initialization := factory.ExpressionStatement(factory.BinaryExpression(
-		nil,
-		factory.Identifier(publicName),
-		nil,
-		factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
-		factory.CallExpression(
-			factory.Identifier(deferredName),
-			nil,
-			nil,
-			nil,
-			tsgo.NodeFlagsNone,
-		),
-	))
-	return declaration, initialization
+	if err != nil {
+		return nil, nil, err
+	}
+	return fact.Statements(), fact.Requests(), nil
+}
+
+func (s *programSession) packageStorageFacts(
+	builder *packageTargetBuilder,
+) ([]tsgo.Statement, []api.RootRequest, error) {
+	if len(builder.storage) == 0 {
+		return nil, nil, nil
+	}
+	members := make([]canonicalsourcefact.PackageStorageMember, 0, len(builder.storage))
+	for _, storage := range builder.storage {
+		if storage.variable.Name() == "_" {
+			continue
+		}
+		reference, err := builder.stateContext.Names().PackageVariable(
+			storage.variable,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		site, ok := s.sites[storage.variable]
+		if !ok {
+			return nil, nil, &ScheduleError{
+				Object: storage.variable.Name(),
+				Reason: "package variable source-fact site is absent",
+			}
+		}
+		origin, err := canonicalsourcefact.Origin(
+			site.Source,
+			site.SourceFile,
+			site.OutputPath,
+			site.Occurrence,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		members = append(members, canonicalsourcefact.PackageStorageMember{
+			Variable: storage.variable,
+			Name:     reference.FieldName(),
+			Origin:   origin,
+		})
+	}
+	if len(members) == 0 {
+		return nil, nil, nil
+	}
+	fact, err := canonicalsourcefact.PackageStorageMembers(
+		builder.assemblyContext,
+		builder.assemblyPath,
+		builder.statePath,
+		packagevariable.StateClassName,
+		members,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fact.Statements(), fact.Requests(), nil
 }
 
 func (b *packageTargetBuilder) hasInitializationWork() bool {
@@ -497,13 +591,4 @@ func (b *packageTargetBuilder) hasInitializationWork() bool {
 		len(b.storage) != 0 ||
 		len(b.initialization) != 0 ||
 		len(b.initFunctions) != 0
-}
-
-func hasExportedPackageVariable(storage []packageStorage) bool {
-	for _, item := range storage {
-		if item.variable.Exported() {
-			return true
-		}
-	}
-	return false
 }

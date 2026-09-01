@@ -44,7 +44,7 @@ func TestInitializedLocalDeclarationBuildsInferredVariableList(t *testing.T) {
 	if target == nil {
 		t.Fatalf("complete emission has no source artifact %s", expectedPath)
 	}
-	compute := target.Statements()[1].(tsgo.FunctionDeclaration)
+	compute := localDeclarationFunctionByName(t, target, "Compute")
 	inner := compute.Body().(tsgo.Block).Statements()[1].(tsgo.Block)
 	pair := inner.Statements()[1].(tsgo.VariableStatement)
 	if pair.DeclarationList().Flags() != tsgo.NodeFlagsLet {
@@ -62,4 +62,20 @@ func TestInitializedLocalDeclarationBuildsInferredVariableList(t *testing.T) {
 		declarations[0].Initializer() == nil || declarations[1].Initializer() == nil {
 		t.Fatal("initialized declarations were not left to exact target inference")
 	}
+}
+
+func localDeclarationFunctionByName(
+	t *testing.T,
+	source tsgo.SourceFile,
+	name string,
+) tsgo.FunctionDeclaration {
+	t.Helper()
+	for _, statement := range source.Statements() {
+		function, ok := statement.(tsgo.FunctionDeclaration)
+		if ok && function.Name().Text() == name {
+			return function
+		}
+	}
+	t.Fatalf("target function %q is absent", name)
+	return nil
 }

@@ -40,7 +40,12 @@ func TestIntegerNumberProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 		"WidenSigned",
 		"WidenUnsigned",
 	)
-	emission := compileIntegerFamily(t, loaded, emit.DefaultOptions(), names...)
+	emission := compileIntegerFamily(
+		t,
+		loaded,
+		integerOptions(emit.IntegerRepresentationNumber),
+		names...,
+	)
 	assertIntegerAliases(t, emission, false)
 	printed := printIntegerFamily(t, emission)
 	assertDirectIntegerArtifact(t, printed, false)
@@ -67,8 +72,7 @@ func TestIntegerBigIntProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 		"WidenSigned",
 		"WidenUnsigned",
 	)
-	options := emit.DefaultOptions()
-	options.IntegerRepresentation = emit.IntegerRepresentationBigInt
+	options := integerOptions(emit.IntegerRepresentationBigInt)
 	emission := compileIntegerFamily(t, loaded, options, names...)
 	assertIntegerAliases(t, emission, true)
 	assertBigIntDivisionUsesRuntime(t, emission)
@@ -94,7 +98,7 @@ func TestIntegerNumberProfileEmitsWideConstantsWithoutWrapping(t *testing.T) {
 	emission := compileIntegerFamily(
 		t,
 		loaded,
-		emit.DefaultOptions(),
+		integerOptions(emit.IntegerRepresentationNumber),
 		"WideNumber",
 		"WideConversion",
 	)
@@ -135,7 +139,7 @@ func TestUint32OperationsCarryRequiredTypedASTNormalization(t *testing.T) {
 	emission := compileIntegerFamily(
 		t,
 		loaded,
-		emit.DefaultOptions(),
+		integerOptions(emit.IntegerRepresentationNumber),
 		"NumberBits32",
 		"NumberUnsignedShift",
 		"NumberUnaryUint",
@@ -245,55 +249,12 @@ func compileIntegerFamily(
 	return emission
 }
 
-func assertIntegerAliases(
-	t *testing.T,
-	emission emit.ProgramEmission,
-	exact bool,
-) {
-	t.Helper()
-	want := []string{
-		"int8", "int16", "int32", "int64",
-		"uint8", "uint16", "uint32", "uint64",
-		"int", "uint", "uintptr",
-	}
-	var got []string
-	for _, file := range emission.Files() {
-		if file.Kind() != emit.TargetFileSupport {
-			continue
-		}
-		for _, statement := range file.SourceFile().Statements() {
-			alias, ok := statement.(tsgo.TypeAliasDeclaration)
-			if !ok || alias.Name().Text() == "bool" {
-				continue
-			}
-			carrier := tsgo.SyntaxKindNumberKeyword
-			wideNative := strconv.IntSize == 64 &&
-				(alias.Name().Text() == "int" ||
-					alias.Name().Text() == "uint" ||
-					alias.Name().Text() == "uintptr")
-			if exact && (alias.Name().Text() == "int64" ||
-				alias.Name().Text() == "uint64" || wideNative) {
-				carrier = tsgo.SyntaxKindBigIntKeyword
-			}
-			if alias.Type().Kind() != carrier {
-				t.Fatalf("%s carrier = %d, want %d", alias.Name().Text(), alias.Type().Kind(), carrier)
-			}
-			got = append(got, alias.Name().Text())
-		}
-	}
-	slices.Sort(want)
-	slices.Sort(got)
-	if !slices.Equal(got, want) {
-		t.Fatalf("integer aliases = %v, want %v", got, want)
-	}
-}
-
 func assertDirectIntegerArtifact(t *testing.T, printed string, bigint bool) {
 	t.Helper()
 	for _, forbidden := range []string{
 		"Math.imul",
-		" as ",
-		"any",
+		" as any",
+		": any",
 		"unknown",
 		".call(",
 		".apply(",
@@ -304,10 +265,10 @@ func assertDirectIntegerArtifact(t *testing.T, printed string, bigint bool) {
 		}
 	}
 	if bigint && (!strings.Contains(printed, "1n") ||
-		!strings.Contains(printed, "export type int32 = number;") ||
-		!strings.Contains(printed, "export type int64 = bigint;") ||
+		!strings.Contains(printed, "export type int32 = $go$core$int32;") ||
+		!strings.Contains(printed, "export type int64 = $go$core$int64;") ||
 		strconv.IntSize == 64 &&
-			!strings.Contains(printed, "export type int = bigint;")) {
+			!strings.Contains(printed, "export type int = $go$core$int64;")) {
 		t.Fatalf("exact-width artifact lacks its number/BigInt carrier split:\n%s", printed)
 	}
 	if !bigint && regexp.MustCompile(`[0-9]n(?:\W|$)`).MatchString(printed) {

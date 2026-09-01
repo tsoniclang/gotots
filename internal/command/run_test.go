@@ -33,7 +33,8 @@ func TestRunPrintsResolvedConfigWithoutBuilding(t *testing.T) {
 	}, &output, &output); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), `"integers": "number"`) ||
+	if !strings.Contains(output.String(), `"integers": "bigint"`) ||
+		!strings.Contains(output.String(), `"evaluationOrder": "preserve-go"`) ||
 		!strings.Contains(output.String(), `"directory": "`+filepath.ToSlash(filepath.Join(root, "generated"))+`"`) {
 		t.Fatalf("resolved config = %s", output.String())
 	}

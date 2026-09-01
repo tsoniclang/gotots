@@ -7,6 +7,7 @@ import (
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"go/ast"
@@ -414,8 +415,17 @@ func (s *programSession) buildPackageInitializerRevision(
 	}
 	defer finish()
 	requirements := s.requirements.SelectedFor(owner)
+	evidence, err := canonicalsourcefact.PackageEvidence(
+		site.Source,
+		sourcePath,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
 	context, err := emitnaming.WithLexicalTypeRequirements(
-		builder.assemblyContext.WithArtifactOwner(owner),
+		builder.assemblyContext.
+			WithSourceEvidence(evidence).
+			WithArtifactOwner(owner),
 		site.Declaration,
 		owner,
 		requirements,

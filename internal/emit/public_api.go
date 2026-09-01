@@ -369,8 +369,8 @@ type Options struct {
 
 func DefaultOptions() Options {
 	return Options{
-		IntegerRepresentation: IntegerRepresentationNumber,
-		EvaluationOrder:       EvaluationOrderDirect,
+		IntegerRepresentation: IntegerRepresentationBigInt,
+		EvaluationOrder:       EvaluationOrderPreserveGo,
 	}
 }
 

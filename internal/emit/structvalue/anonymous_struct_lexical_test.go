@@ -218,7 +218,7 @@ func nestedFunctionExpression(
 
 func assertImmediateLexicalDefinitionPair(t *testing.T, block tsgo.Block) {
 	t.Helper()
-	statements := block.Statements()
+	statements := lexicalTypeDefinitions(block.Statements())
 	if len(statements) < 2 {
 		t.Fatalf("lexical block statements = %d", len(statements))
 	}
@@ -239,7 +239,9 @@ func assertImmediateLexicalDefinitionPair(t *testing.T, block tsgo.Block) {
 func assertGroupedLexicalAnchor(t *testing.T, source tsgo.SourceFile) {
 	t.Helper()
 	function := targetFunctionByName(t, source, "GroupedAnchorResult")
-	statements := function.Body().(tsgo.Block).Statements()
+	statements := lexicalTypeDefinitions(
+		function.Body().(tsgo.Block).Statements(),
+	)
 	if len(statements) < 4 {
 		t.Fatalf("grouped lexical statements = %d", len(statements))
 	}
@@ -265,6 +267,17 @@ func assertGroupedLexicalAnchor(t *testing.T, source tsgo.SourceFile) {
 		!strings.HasPrefix(names[3], "After") {
 		t.Fatalf("grouped lexical order = %q", names)
 	}
+}
+
+func lexicalTypeDefinitions(statements []tsgo.Statement) []tsgo.Statement {
+	result := make([]tsgo.Statement, 0, len(statements))
+	for _, statement := range statements {
+		switch statement.(type) {
+		case tsgo.TypeAliasDeclaration, tsgo.ClassDeclaration:
+			result = append(result, statement)
+		}
+	}
+	return result
 }
 
 func assertPackageInitializerLexicalPlacement(
@@ -415,20 +428,29 @@ func mutateNestedAnonymousClassToFunctionTop(
 			inner := declaration.Initializer().(tsgo.ArrowFunction)
 			innerBody := inner.Body().(tsgo.Block)
 			innerStatements := innerBody.Statements()
-			anonymous := innerStatements[1].(tsgo.ClassDeclaration)
+			var anonymous tsgo.ClassDeclaration
+			anonymousIndex := -1
+			for candidateIndex, candidate := range innerStatements {
+				class, classOK := candidate.(tsgo.ClassDeclaration)
+				if classOK && strings.HasPrefix(class.Name().Text(), "$goStruct$") {
+					anonymous = class
+					anonymousIndex = candidateIndex
+					break
+				}
+			}
+			if anonymous == nil {
+				t.Fatal("nested anonymous class is absent")
+			}
+			retainedInner := make([]tsgo.Statement, 0, len(innerStatements)-1)
+			retainedInner = append(retainedInner, innerStatements[:anonymousIndex]...)
+			retainedInner = append(retainedInner, innerStatements[anonymousIndex+1:]...)
 			inner = factory.ArrowFunction(
 				inner.Modifiers(),
 				inner.TypeParameters(),
 				inner.Parameters(),
 				inner.Type(),
 				inner.EqualsGreaterThanToken(),
-				factory.Block(
-					append(
-						[]tsgo.Statement{innerStatements[0]},
-						innerStatements[2:]...,
-					),
-					innerBody.MultiLine(),
-				),
+				factory.Block(retainedInner, innerBody.MultiLine()),
 			)
 			declaration = factory.VariableDeclaration(
 				declaration.Name(),

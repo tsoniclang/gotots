@@ -16,7 +16,7 @@ import (
 )
 
 func TestConversionASTUsesDirectAndBoundaryShapes(t *testing.T) {
-	number := compileConversions(t, emit.DefaultOptions())
+	number := compileConversions(t, conversionNumberOptions())
 	bigintOptions := emit.Options{
 		IntegerRepresentation: emit.IntegerRepresentationBigInt,
 		EvaluationOrder:       emit.EvaluationOrderDirect,
@@ -68,6 +68,13 @@ func TestConversionASTUsesDirectAndBoundaryShapes(t *testing.T) {
 	}
 	if strings.Count(numberText, "function goNumberToBigInt") != 1 {
 		t.Fatalf("number-to-BigInt definition count is not one:\n%s", numberText)
+	}
+}
+
+func conversionNumberOptions() emit.Options {
+	return emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
 	}
 }
 
@@ -364,10 +371,16 @@ func assertOneConversionRuntimeDefinition(
 	t.Helper()
 	for _, file := range emission.Files() {
 		if file.OutputPath() == "runtime/conversion.ts" {
-			if len(file.SourceFile().Statements()) != 1 {
+			definitions := 0
+			for _, statement := range file.SourceFile().Statements() {
+				if _, ok := statement.(tsgo.FunctionDeclaration); ok {
+					definitions++
+				}
+			}
+			if definitions != 1 {
 				t.Fatalf(
 					"conversion runtime definitions = %d, want 1",
-					len(file.SourceFile().Statements()),
+					definitions,
 				)
 			}
 			return

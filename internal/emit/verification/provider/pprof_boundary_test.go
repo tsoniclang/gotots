@@ -74,7 +74,7 @@ func Result() (bool, bool, bool, bool) {
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,

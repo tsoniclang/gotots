@@ -60,7 +60,7 @@ func Run(key string, value string) (string, bool, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	// The context formatting family is implemented with exact chain
 	// spellings: the constructor chain compiles through the used-provider
@@ -165,7 +165,7 @@ func SortNamedField(source []string) {
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	var roots []emit.Root
 	for _, name := range []string{
@@ -364,7 +364,7 @@ func SortInterface(source []string, provider comparer) {
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	var roots []emit.Root
 	for _, name := range []string{

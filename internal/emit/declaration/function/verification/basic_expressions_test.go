@@ -22,7 +22,7 @@ func TestBasicExpressionsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "basic-expressions.ts")
 	targetFile := emitBasicExpressions(t, loaded)
-	printed := printTargetFile(t, targetFile, workingDirectory)
+	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(basicExpressionsProjectDirectory(), "expected.ts"))
 	if err != nil {

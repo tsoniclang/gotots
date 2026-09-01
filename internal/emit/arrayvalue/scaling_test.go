@@ -97,7 +97,7 @@ return len(copy)
 	if err != nil {
 		t.Fatal(err)
 	}
-	emission, err := emit.Compile(program, roots)
+	emission, err := emit.CompileWithOptions(program, roots, arrayNumberOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,11 +111,9 @@ func assertScalingAST(
 ) int {
 	t.Helper()
 	functions := 0
-	nodes := 0
 	runtimeDefinitions := 0
 	var bodyWidth int
 	for _, file := range emission.Files() {
-		nodes += len(file.SourceFile().Statements())
 		if file.OutputPath() == "runtime/array.ts" {
 			for _, statement := range file.SourceFile().Statements() {
 				class, ok := statement.(tsgo.ClassDeclaration)
@@ -149,5 +147,5 @@ func assertScalingAST(
 			count,
 		)
 	}
-	return nodes
+	return functions + runtimeDefinitions
 }

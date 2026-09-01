@@ -161,15 +161,17 @@ func waveThreeTypecheck(
 }
 
 type waveFourArtifacts struct {
-	paths          []string
-	sourceModule   string
-	packageModules map[string]string
-	bytes          int
-	nodes          int
-	largest        int
-	sizes          []artifactSize
-	printed        string
-	printedByKind  map[emit.TargetFileKind][]string
+	paths             []string
+	sourceModule      string
+	packageModules    map[string]string
+	bytes             int
+	executableBytes   int
+	nodes             int
+	largest           int
+	executableLargest int
+	sizes             []artifactSize
+	printed           string
+	printedByKind     map[emit.TargetFileKind][]string
 }
 
 type artifactSize struct {
@@ -236,6 +238,15 @@ func materializeArtifacts(
 		writeProgramFile(t, targetPath, printed)
 		result.paths = append(result.paths, targetPath)
 		result.bytes += len(printed)
+		executable := withoutSourceFactApplications(printed)
+		if file.OutputPath() == "runtime/source-fact.ts" {
+			executable = ""
+		}
+		executableBytes := len(executable)
+		result.executableBytes += executableBytes
+		if executableBytes > result.executableLargest {
+			result.executableLargest = executableBytes
+		}
 		result.nodes += nodes
 		result.printed += "\n// " + file.OutputPath() + "\n" + printed
 		result.printedByKind[file.Kind()] = append(
@@ -269,6 +280,25 @@ func materializeArtifacts(
 	})
 	result.largest = result.sizes[0].bytes
 	return result
+}
+
+func withoutSourceFactApplications(source string) string {
+	var result strings.Builder
+	for _, line := range strings.SplitAfter(source, "\n") {
+		switch {
+		case strings.HasPrefix(line, "attribute<"):
+			continue
+		case strings.Contains(line, "source-fact.js"):
+			continue
+		case strings.Contains(line, `from "@tsonic/core/lang.js"`) &&
+			strings.Contains(line, "{ attribute }"):
+			continue
+		case strings.HasPrefix(line, "type $GoCompilation = never;"):
+			continue
+		}
+		result.WriteString(line)
+	}
+	return result.String()
 }
 
 func targetFunctionText(t *testing.T, printed, name string) string {

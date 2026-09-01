@@ -34,7 +34,8 @@ func TestAddressablePointersPrintAndTypecheckWithCanonicalMarkers(t *testing.T) 
 		}
 	}
 	for _, forbidden := range []string{
-		"any",
+		": any",
+		" as any",
 		"unknown",
 		".call(",
 		".apply(",

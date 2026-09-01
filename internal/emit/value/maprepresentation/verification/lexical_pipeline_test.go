@@ -18,7 +18,7 @@ func TestLexicalAggregateMapsCompileAndExecuteDifferentially(t *testing.T) {
 		name    string
 		options emit.Options
 	}{
-		{name: "number", options: emit.DefaultOptions()},
+		{name: "number", options: mapNumberOptions()},
 		{
 			name: "bigint",
 			options: emit.Options{

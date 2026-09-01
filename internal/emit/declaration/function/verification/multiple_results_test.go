@@ -20,7 +20,7 @@ func TestMultipleResultsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "multiple-results.ts")
 	targetFile := emitMultipleResultsProject(t, loaded)
-	printed := printTargetFile(t, targetFile, workingDirectory)
+	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(multipleResultsProjectDirectory(), "expected.ts"))
 	if err != nil {
@@ -41,12 +41,7 @@ func TestMultipleResultsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 func TestMultipleResultsCreateDirectTupleTreeAndSingleEvaluation(t *testing.T) {
 	loaded := loadMultipleResultsProject(t)
 	targetFile := emitMultipleResultsProject(t, loaded)
-	statements := targetFile.Statements()
-	if len(statements) != 10 {
-		t.Fatalf("target statements = %d, want import and nine functions", len(statements))
-	}
-
-	pair := statements[1].(tsgo.FunctionDeclaration)
+	pair := targetFunction(t, targetFile, "Pair")
 	tupleType, ok := pair.Type().(tsgo.TupleTypeNode)
 	if !ok || len(tupleType.Elements()) != 2 {
 		t.Fatalf("Pair result = %T, want two-element tuple", pair.Type())
@@ -57,13 +52,13 @@ func TestMultipleResultsCreateDirectTupleTreeAndSingleEvaluation(t *testing.T) {
 		t.Fatalf("Pair return = %T, want two-element array literal", pairReturn.Expression())
 	}
 
-	forward := statements[2].(tsgo.FunctionDeclaration)
+	forward := targetFunction(t, targetFile, "Forward")
 	forwardReturn := forward.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
 	if _, ok := forwardReturn.Expression().(tsgo.CallExpression); !ok {
 		t.Fatalf("Forward return = %T, want direct call", forwardReturn.Expression())
 	}
 
-	consume := statements[3].(tsgo.FunctionDeclaration)
+	consume := targetFunction(t, targetFile, "Consume")
 	consumeStatements := consume.Body().(tsgo.Block).Statements()
 	if calls := countDirectCalls(consumeStatements, "Pair"); calls != 1 {
 		t.Fatalf("Consume Pair calls = %d, want exactly one", calls)
@@ -77,13 +72,13 @@ func TestMultipleResultsCreateDirectTupleTreeAndSingleEvaluation(t *testing.T) {
 		t.Fatalf("capture type = %T, want inference from tuple initializer", capture.Type())
 	}
 
-	keepFirst := statements[5].(tsgo.FunctionDeclaration)
+	keepFirst := targetFunction(t, targetFile, "KeepFirst")
 	keepStatements := keepFirst.Body().(tsgo.Block).Statements()
 	if len(keepStatements) != 3 {
 		t.Fatalf("KeepFirst statements = %d, want capture, declaration, return", len(keepStatements))
 	}
 
-	addPair := statements[9].(tsgo.FunctionDeclaration)
+	addPair := targetFunction(t, targetFile, "AddPair")
 	addPairStatements := addPair.Body().(tsgo.Block).Statements()
 	if len(addPairStatements) != 2 {
 		t.Fatalf("AddPair statements = %d, want capture and return", len(addPairStatements))

@@ -103,7 +103,9 @@ func TestWaveFiveMethodsPrintAndTypecheck(t *testing.T) {
 				emission,
 				workingDirectory,
 			)
-			if artifacts.bytes > 40_000 || artifacts.largest > 24_000 {
+			// Canonical facts are counted here and erased only by the executable
+			// TypeScript target, whose output has an independent budget.
+			if artifacts.bytes > 80_000 || artifacts.largest > 55_000 {
 				t.Fatalf(
 					"Wave 5 artifact bounds exceeded: total=%d largest=%d",
 					artifacts.bytes,

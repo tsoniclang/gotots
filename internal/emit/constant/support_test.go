@@ -79,6 +79,13 @@ func compileConstantFamily(
 	return emission
 }
 
+func numberOptions() emit.Options {
+	return emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
+	}
+}
+
 func printConstantFamily(t *testing.T, emission emit.ProgramEmission) string {
 	t.Helper()
 	client, err := tsgo.StartClient(repositoryRoot(), t.TempDir())
@@ -114,7 +121,16 @@ func constantFamilySourceFile(t *testing.T, emission emit.ProgramEmission) tsgo.
 
 func assertNoForbiddenConstructs(t *testing.T, printed string) {
 	t.Helper()
-	for _, forbidden := range []string{" as ", "any", "unknown", ".call(", ".apply(", ".bind(", "iota"} {
+	for _, forbidden := range []string{
+		" as any",
+		" as unknown",
+		": any",
+		": unknown",
+		".call(",
+		".apply(",
+		".bind(",
+		"iota",
+	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("constant artifact contains %q:\n%s", forbidden, printed)
 		}

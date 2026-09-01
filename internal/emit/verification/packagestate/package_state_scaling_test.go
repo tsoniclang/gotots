@@ -136,7 +136,8 @@ func Run() int32 { return 2 }
 		case emit.TargetFileProgramInitialization:
 			programs++
 			for _, statement := range file.SourceFile().Statements() {
-				if _, ok := statement.(tsgo.ExpressionStatement); ok {
+				if _, ok := statement.(tsgo.ExpressionStatement); ok &&
+					!isSourceFactApplication(statement) {
 					programCalls++
 				}
 			}
@@ -207,7 +208,7 @@ func measurePackageStateScale(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(emission.Files()) != 5 {
+	if len(emission.Files()) != 6 {
 		t.Fatalf(
 			"target files = %d, want source/state/assembly/program/support",
 			len(emission.Files()),
@@ -419,7 +420,8 @@ func assertGlobalInitializationArtifact(
 		switch file.Kind() {
 		case emit.TargetFilePackageAssembly:
 			for _, statement := range file.SourceFile().Statements() {
-				if _, effect := statement.(tsgo.ExpressionStatement); effect {
+				if _, effect := statement.(tsgo.ExpressionStatement); effect &&
+					!isSourceFactApplication(statement) {
 					t.Fatalf(
 						"passive package assembly %s has a top-level effect",
 						file.OutputPath(),
@@ -429,6 +431,9 @@ func assertGlobalInitializationArtifact(
 		case emit.TargetFileProgramInitialization:
 			programs++
 			for _, statement := range file.SourceFile().Statements() {
+				if isSourceFactApplication(statement) {
+					continue
+				}
 				expression, ok := statement.(tsgo.ExpressionStatement)
 				if !ok {
 					continue

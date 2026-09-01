@@ -2,8 +2,6 @@ package load
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -26,19 +24,14 @@ type Request struct {
 	BuildProfile         BuildProfile
 	GoTool               toolchain.Go
 	ToolCacheRoot        string
+	Overlay              map[string][]byte
 }
 
 type File struct {
-	path   string
-	syntax *ast.File
-}
-
-func (f File) Path() string {
-	return f.path
-}
-
-func (f File) Syntax() *ast.File {
-	return f.syntax
+	path           string
+	sourceIdentity string
+	sourceDigest   string
+	syntax         *ast.File
 }
 
 type Package struct {
@@ -46,8 +39,11 @@ type Package struct {
 	name          string
 	modulePath    string
 	moduleVersion string
+	sourceRoot    string
 	contractKey   string
 	kind          PackageKind
+	owner         PackageOwner
+	ownerKey      string
 	files         []File
 	otherFiles    []string
 	fileSet       *token.FileSet
@@ -142,6 +138,15 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 	if err != nil {
 		return nil, err
 	}
+	toolchainPackages, err := loadToolchainPackageMembership(
+		ctx,
+		selectedGo,
+		buildProfile,
+		request.Directory,
+	)
+	if err != nil {
+		return nil, &Error{Pattern: request.Pattern, Reason: err.Error()}
+	}
 
 	fileSet := token.NewFileSet()
 	loaded, err := GoPackages(selectedGo, buildProfile, PackageRequest{
@@ -160,6 +165,7 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 			packages.NeedModule |
 			packages.NeedEmbedFiles |
 			packages.NeedEmbedPatterns,
+		Overlay: request.Overlay,
 	}, request.Pattern)
 	if err != nil {
 		return nil, &Error{Pattern: request.Pattern, Reason: err.Error()}
@@ -220,7 +226,14 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 	toolchainKey := currentToolchainKey(buildProfile)
 	byLoaded := make(map[*packages.Package]*Package, len(sourcePackages))
 	for _, current := range sourcePackages {
-		sourcePackage, err := wrapPackage(request.Pattern, current, fileSet)
+		sourcePackage, err := wrapPackage(
+			request.Pattern,
+			current,
+			fileSet,
+			request.Overlay,
+			toolchainKey,
+			toolchainPackages,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -252,6 +265,8 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 			fileSet,
 			kind,
 			contractKey,
+			toolchainKey,
+			toolchainPackages,
 		)
 		if err != nil {
 			return nil, err
@@ -287,6 +302,7 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 		sourcePackages,
 		buildProfile,
 		selectedGo,
+		request.Overlay,
 	)
 	if err != nil {
 		return nil, err
@@ -300,6 +316,8 @@ func wrapEnvironmentPackage(
 	fileSet *token.FileSet,
 	kind PackageKind,
 	contractKey string,
+	toolchainKey string,
+	toolchainPackages toolchainPackageMembership,
 ) (*Package, error) {
 	if selected == nil ||
 		selected.Fset != fileSet ||
@@ -316,17 +334,31 @@ func wrapEnvironmentPackage(
 	}
 	modulePath := ""
 	moduleVersion := ""
+	sourceRoot := ""
 	if selected.Module != nil {
 		modulePath = selected.Module.Path
 		moduleVersion = selected.Module.Version
+		sourceRoot = selected.Module.Dir
+	}
+	owner, ownerKey, err := classifyPackageOwner(
+		selected,
+		toolchainKey,
+		toolchainPackages,
+		true,
+	)
+	if err != nil {
+		return nil, &Error{Pattern: pattern, Reason: err.Error()}
 	}
 	return &Package{
 		path:          selected.PkgPath,
 		name:          selected.Name,
 		modulePath:    modulePath,
 		moduleVersion: moduleVersion,
+		sourceRoot:    sourceRoot,
 		contractKey:   contractKey,
 		kind:          kind,
+		owner:         owner,
+		ownerKey:      ownerKey,
 		fileSet:       selected.Fset,
 		typesPackage:  selected.Types,
 		typesInfo:     &types.Info{},
@@ -342,15 +374,13 @@ func currentToolchainKey(profile BuildProfile) string {
 	return key
 }
 
-func moduleContractKey(modulePath string, moduleVersion string) string {
-	digest := sha256.Sum256([]byte(modulePath + "\x00" + moduleVersion))
-	return hex.EncodeToString(digest[:])
-}
-
 func wrapPackage(
 	pattern string,
 	selected *packages.Package,
 	fileSet *token.FileSet,
+	overlay map[string][]byte,
+	toolchainKey string,
+	toolchainPackages toolchainPackageMembership,
 ) (*Package, error) {
 	if selected.Fset != fileSet || selected.Types == nil ||
 		selected.TypesInfo == nil || selected.TypesSizes == nil {
@@ -372,9 +402,22 @@ func wrapPackage(
 	}
 	files := make([]File, len(selected.Syntax))
 	for index := range selected.Syntax {
+		identity, digest, err := checkedSourceMetadata(
+			selected,
+			index,
+			overlay,
+		)
+		if err != nil {
+			return nil, &Error{
+				Pattern: pattern,
+				Reason:  selected.PkgPath + ": " + err.Error(),
+			}
+		}
 		files[index] = File{
-			path:   selected.CompiledGoFiles[index],
-			syntax: selected.Syntax[index],
+			path:           selected.CompiledGoFiles[index],
+			sourceIdentity: identity,
+			sourceDigest:   digest,
+			syntax:         selected.Syntax[index],
 		}
 	}
 	syntaxParents, err := buildSyntaxParents(files)
@@ -386,9 +429,20 @@ func wrapPackage(
 	}
 	var modulePath string
 	var moduleVersion string
+	var sourceRoot string
 	if selected.Module != nil {
 		modulePath = selected.Module.Path
 		moduleVersion = selected.Module.Version
+		sourceRoot = selected.Module.Dir
+	}
+	owner, ownerKey, err := classifyPackageOwner(
+		selected,
+		toolchainKey,
+		toolchainPackages,
+		false,
+	)
+	if err != nil {
+		return nil, &Error{Pattern: pattern, Reason: err.Error()}
 	}
 	embeds, err := resolvePackageEmbeds(selected)
 	if err != nil {
@@ -402,7 +456,10 @@ func wrapPackage(
 		name:          selected.Name,
 		modulePath:    modulePath,
 		moduleVersion: moduleVersion,
+		sourceRoot:    sourceRoot,
 		kind:          PackageSource,
+		owner:         owner,
+		ownerKey:      ownerKey,
 		files:         files,
 		otherFiles:    slices.Clone(selected.OtherFiles),
 		fileSet:       selected.Fset,
@@ -412,130 +469,6 @@ func wrapPackage(
 		syntaxParents: syntaxParents,
 		embeds:        embeds,
 	}, nil
-}
-
-func (p *Package) Path() string {
-	return p.path
-}
-
-func (p *Package) Name() string {
-	return p.name
-}
-
-func (p *Package) ModulePath() string {
-	return p.modulePath
-}
-
-func (p *Package) ModuleVersion() string {
-	return p.moduleVersion
-}
-
-func (p *Package) ToolchainKey() string {
-	if p.kind != PackageStandardLibraryContract {
-		return ""
-	}
-	return p.contractKey
-}
-
-func (p *Package) ExternalContractKey() string {
-	if p.kind != PackageExternalContract {
-		return ""
-	}
-	return p.contractKey
-}
-
-func (p *Package) Kind() PackageKind {
-	return p.kind
-}
-
-func (p *Package) Files() []File {
-	return slices.Clone(p.files)
-}
-
-func (p *Package) OtherFiles() []string {
-	return slices.Clone(p.otherFiles)
-}
-
-func (p *Package) SyntaxParent(source ast.Node) (ast.Node, bool) {
-	if p == nil || source == nil {
-		return nil, false
-	}
-	parent, ok := p.syntaxParents[source]
-	return parent, ok
-}
-
-func (p *Package) FileForSyntax(syntax *ast.File) (File, bool) {
-	for _, file := range p.files {
-		if file.syntax == syntax {
-			return file, true
-		}
-	}
-	return File{}, false
-}
-
-func (p *Package) FileSet() *token.FileSet {
-	return p.fileSet
-}
-
-func (p *Package) Types() *types.Package {
-	return p.typesPackage
-}
-
-func (p *Package) TypesInfo() *types.Info {
-	return p.typesInfo
-}
-
-func (p *Package) TypesSizes() types.Sizes {
-	return p.typesSizes
-}
-
-func (p *Package) Program() *Program {
-	return p.program
-}
-
-func (p *Program) Roots() []*Package {
-	return slices.Clone(p.roots)
-}
-
-func (p *Program) Packages() []*Package {
-	return slices.Clone(p.packages)
-}
-
-func (p *Program) EnvironmentPackages() []*Package {
-	return slices.Clone(p.environmentPackages)
-}
-
-func (p *Program) PackageByPath(path string) *Package {
-	return p.byPath[path]
-}
-
-func (p *Program) PackageForTypes(source *types.Package) *Package {
-	return p.byTypes[source]
-}
-
-func (p *Program) EnvironmentForTypes(source *types.Package) *Package {
-	return p.environmentByTypes[source]
-}
-
-func (p *Program) BuildProfile() BuildProfile {
-	if p == nil {
-		return BuildProfile{}
-	}
-	return p.buildProfile
-}
-
-func (p *Program) GoTool() toolchain.Go {
-	if p == nil {
-		return toolchain.Go{}
-	}
-	return p.goTool
-}
-
-func (p *Program) SourceDigest() string {
-	if p == nil {
-		return ""
-	}
-	return p.sourceDigest
 }
 
 func packageProblems(roots []*packages.Package) []string {

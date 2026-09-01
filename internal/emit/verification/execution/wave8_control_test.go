@@ -17,7 +17,7 @@ func TestWaveEightDeferAndPanicCompileThroughPublicPipeline(t *testing.T) {
 		name    string
 		options emit.Options
 	}{
-		{name: "number", options: emit.DefaultOptions()},
+		{name: "number", options: waveEightNumberOptions()},
 		{
 			name: "bigint",
 			options: emit.Options{
@@ -29,6 +29,13 @@ func TestWaveEightDeferAndPanicCompileThroughPublicPipeline(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			testWaveEightDeferAndPanic(t, testCase.options)
 		})
+	}
+}
+
+func waveEightNumberOptions() emit.Options {
+	return emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
 	}
 }
 
@@ -181,7 +188,7 @@ func TestWaveEightDirectGotoCompilesThroughPublicPipeline(t *testing.T) {
 			selected = append(selected, root)
 		}
 	}
-	emission, err := emit.Compile(program, selected)
+	emission, err := emit.CompileWithOptions(program, selected, waveEightNumberOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +289,7 @@ func TestWaveEightStateGotoCompilesThroughPublicPipeline(t *testing.T) {
 			selected = append(selected, root)
 		}
 	}
-	emission, err := emit.Compile(program, selected)
+	emission, err := emit.CompileWithOptions(program, selected, waveEightNumberOptions())
 	if err != nil {
 		t.Fatal(err)
 	}

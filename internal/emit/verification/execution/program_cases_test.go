@@ -347,7 +347,7 @@ func TestOrdinaryMultiPackageProgramsUseOneDemandEmissionPath(t *testing.T) {
 				t.Fatal(err)
 			}
 			files := emission.Files()
-			if len(files) != 6 {
+			if len(files) != 7 {
 				t.Fatalf(
 					"emitted files = %d, want source, assembly, program, and scalar modules",
 					len(files),
@@ -379,12 +379,14 @@ func TestOrdinaryMultiPackageProgramsUseOneDemandEmissionPath(t *testing.T) {
 						"expected.ts",
 					)
 				case emit.TargetFileSupport:
-					expectedPath = filepath.Join(
-						repositoryRoot(),
-						"testdata",
-						"support",
-						project.support,
-					)
+					if file.OutputPath() != "runtime/source-fact.ts" {
+						expectedPath = filepath.Join(
+							repositoryRoot(),
+							"testdata",
+							"support",
+							project.support,
+						)
+					}
 				case emit.TargetFilePackageAssembly,
 					emit.TargetFileProgramInitialization:
 					expectedPath = ""
@@ -400,11 +402,12 @@ func TestOrdinaryMultiPackageProgramsUseOneDemandEmissionPath(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					if printed != string(expected) {
+					executable := withoutSourceFactApplications(printed)
+					if executable != string(expected) {
 						t.Fatalf(
 							"%s TypeScript:\n%s\nwant:\n%s",
 							file.PackageName(),
-							printed,
+							executable,
 							expected,
 						)
 					}

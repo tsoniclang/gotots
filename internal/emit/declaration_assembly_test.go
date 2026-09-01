@@ -41,12 +41,12 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 		t.Fatal(err)
 	}
 	boxDeclaration := declarationForObject(t, session, box)
-	if len(boxDeclaration.statements) != 1 ||
+	initialClass := declarationClassStatement(t, boxDeclaration)
+	if initialClass == nil ||
 		len(session.requirements.AppliedFor(sourceArtifactOwner(box))) != 0 ||
 		boxDeclaration.reconstructions != 0 {
 		t.Fatalf("initial Box assembly = %#v", boxDeclaration)
 	}
-	initialClass := boxDeclaration.statements[0]
 
 	if err := session.RequireUse(use, rootUseDemand(use), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
@@ -78,11 +78,9 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 				expected.reconstructions,
 			)
 		}
-		if len(declaration.statements) != 1 {
-			t.Fatalf("%s assembly statements = %d, want one reconstructed class", name, len(declaration.statements))
-		}
+		declarationClassStatement(t, declaration)
 	}
-	if initialClass == boxDeclaration.statements[0] {
+	if initialClass == declarationClassStatement(t, boxDeclaration) {
 		t.Fatal("Box class node was not reconstructed after late requirements")
 	}
 
@@ -360,7 +358,7 @@ func measureDeclarationAssembly(
 			sourceArtifactOwner(record),
 		)),
 		reconstructions: declaration.reconstructions,
-		definitionRoots: len(declaration.statements),
+		definitionRoots: declarationClassCount(declaration),
 	}
 	for _, statement := range declaration.statements {
 		encoded, err := tsgo.EncodeNode(statement)
@@ -385,6 +383,38 @@ func measureDeclarationAssembly(
 		measurement.fileBytes += len(encoded)
 	}
 	return measurement
+}
+
+func declarationClassStatement(
+	t *testing.T,
+	declaration *targetDeclaration,
+) tsgo.ClassDeclaration {
+	t.Helper()
+	var result tsgo.ClassDeclaration
+	for _, statement := range declaration.statements {
+		class, ok := statement.(tsgo.ClassDeclaration)
+		if !ok {
+			continue
+		}
+		if result != nil {
+			t.Fatalf("declaration %s has multiple class roots", declaration.name)
+		}
+		result = class
+	}
+	if result == nil {
+		t.Fatalf("declaration %s has no class root", declaration.name)
+	}
+	return result
+}
+
+func declarationClassCount(declaration *targetDeclaration) int {
+	count := 0
+	for _, statement := range declaration.statements {
+		if _, ok := statement.(tsgo.ClassDeclaration); ok {
+			count++
+		}
+	}
+	return count
 }
 
 func loadDeclarationAssemblyScalingFixture(

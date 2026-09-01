@@ -58,13 +58,15 @@ func Empty(value struct{}) (struct{}, bool) {
 			continue
 		}
 		foundRuntime = true
-		statements := file.SourceFile().Statements()
-		if len(statements) != 1 {
-			t.Fatalf("empty struct runtime statements = %d, want one", len(statements))
+		classes := make([]tsgo.ClassDeclaration, 0, 1)
+		for _, statement := range file.SourceFile().Statements() {
+			class, ok := statement.(tsgo.ClassDeclaration)
+			if ok {
+				classes = append(classes, class)
+			}
 		}
-		class, ok := statements[0].(tsgo.ClassDeclaration)
-		if !ok || class.Name().Text() != "GoEmptyStruct" {
-			t.Fatalf("empty struct runtime owner = %T", statements[0])
+		if len(classes) != 1 || classes[0].Name().Text() != "GoEmptyStruct" {
+			t.Fatalf("empty struct runtime classes = %d, want sole GoEmptyStruct", len(classes))
 		}
 	}
 	if !foundRuntime {

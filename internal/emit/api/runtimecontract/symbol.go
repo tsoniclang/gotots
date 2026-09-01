@@ -87,7 +87,17 @@ const (
 	RuntimeSendChannel                RuntimeSymbol = 1102
 	RuntimeSelectCase                 RuntimeSymbol = 1103
 	RuntimeSelect                     RuntimeSymbol = 1104
+	RuntimeGoSpawn                    RuntimeSymbol = 1105
 	RuntimeSelectReady                RuntimeSymbol = 1106
 	RuntimeSelectAttempt              RuntimeSymbol = 1107
 	RuntimeUnsafeString               RuntimeSymbol = 1210
+	RuntimeSourceCompilationFact      RuntimeSymbol = 1300
+	RuntimeSourceDeclarationFact      RuntimeSymbol = 1301
+	RuntimeSourceBasicFact            RuntimeSymbol = 1302
+	RuntimeSourceAggregateFact        RuntimeSymbol = 1303
+	RuntimeSourceCallableFact         RuntimeSymbol = 1304
+	RuntimeSourceInterfaceFact        RuntimeSymbol = 1305
+	RuntimeSourceStorageFact          RuntimeSymbol = 1306
+	RuntimeSourceOperationFact        RuntimeSymbol = 1307
+	RuntimeSourceImplementationFact   RuntimeSymbol = 1308
 )

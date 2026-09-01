@@ -129,6 +129,8 @@ export function Sum(value: string): number { return value.length; }
 		t.Fatal(err)
 	}
 	options := DefaultOptions()
+	options.IntegerRepresentation = IntegerRepresentationNumber
+	options.EvaluationOrder = EvaluationOrderDirect
 	options.SourceImplementations = certificate
 	emission, err := CompileWithOptions(program, roots, options)
 	if err != nil {
@@ -144,20 +146,31 @@ export function Sum(value: string): number { return value.length; }
 		t.Fatal(err)
 	}
 	defer client.Close()
+	implementationFound := false
+	assemblyFound := false
 	for _, file := range emission.Files() {
-		if file.OutputPath() != assemblyPath {
-			continue
-		}
 		printed, printErr := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
 		if printErr != nil {
 			t.Fatal(printErr)
 		}
+		if strings.Contains(printed, "GoImplementationFact") &&
+			strings.Contains(printed, "gotots-go-package-implementation-fact-v1") {
+			implementationFound = true
+		}
+		if file.OutputPath() != assemblyPath {
+			continue
+		}
+		assemblyFound = true
 		if file.Kind() != TargetFileSourceImplementation ||
 			strings.Contains(printed, "private") ||
 			!strings.Contains(printed, "return value.length;") {
 			t.Fatalf("source implementation package =\n%s", printed)
 		}
-		return
 	}
-	t.Fatal("source implementation package assembly is absent")
+	if !assemblyFound {
+		t.Fatal("source implementation package assembly is absent")
+	}
+	if !implementationFound {
+		t.Fatal("source implementation selection has no canonical package fact")
+	}
 }

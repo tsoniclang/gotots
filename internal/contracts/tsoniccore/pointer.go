@@ -19,6 +19,18 @@ const (
 	SymbolBindRawPointer
 	SymbolEqualRawPointer
 	SymbolHashRawPointer
+	SymbolAttribute
+	SymbolBool
+	SymbolInt8
+	SymbolUint8
+	SymbolInt16
+	SymbolUint16
+	SymbolInt32
+	SymbolUint32
+	SymbolInt64
+	SymbolUint64
+	SymbolFloat32
+	SymbolFloat64
 )
 
 type Phase uint8
@@ -83,11 +95,43 @@ func Resolve(symbol Symbol) (Declaration, error) {
 		return value("equalRawPointer"), nil
 	case SymbolHashRawPointer:
 		return value("hashRawPointer"), nil
+	case SymbolAttribute:
+		return value("attribute"), nil
+	case SymbolBool:
+		return typeDeclaration("bool"), nil
+	case SymbolInt8:
+		return typeDeclaration("int8"), nil
+	case SymbolUint8:
+		return typeDeclaration("uint8"), nil
+	case SymbolInt16:
+		return typeDeclaration("int16"), nil
+	case SymbolUint16:
+		return typeDeclaration("uint16"), nil
+	case SymbolInt32:
+		return typeDeclaration("int32"), nil
+	case SymbolUint32:
+		return typeDeclaration("uint32"), nil
+	case SymbolInt64:
+		return typeDeclaration("int64"), nil
+	case SymbolUint64:
+		return typeDeclaration("uint64"), nil
+	case SymbolFloat32:
+		return typeDeclaration("float32"), nil
+	case SymbolFloat64:
+		return typeDeclaration("float64"), nil
 	default:
 		return Declaration{}, fmt.Errorf(
 			"resolve Tsonic core symbol: invalid symbol %d",
 			symbol,
 		)
+	}
+}
+
+func typeDeclaration(export string) Declaration {
+	return Declaration{
+		module: "@tsonic/core/types.js",
+		export: export,
+		phase:  PhaseType,
 	}
 }
 

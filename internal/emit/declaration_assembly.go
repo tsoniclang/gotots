@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/types"
 	"slices"
-	"strings"
 
 	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
@@ -12,7 +11,9 @@ import (
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -69,32 +70,7 @@ func (r *declarationRecord) joinSelection(selection gostdlib.UseSelection) {
 		return
 	}
 	r.selections = append(r.selections, selection)
-	slices.SortFunc(r.selections, compareUseSelections)
-}
-
-// compareUseSelections orders typed provider selections structurally so the
-// settled evidence is deterministic without flattening identity to strings.
-func compareUseSelections(left, right gostdlib.UseSelection) int {
-	if left.Kind() != right.Kind() {
-		if left.Kind() < right.Kind() {
-			return -1
-		}
-		return 1
-	}
-	leftKind, leftCapability, _ := left.Facet()
-	rightKind, rightCapability, _ := right.Facet()
-	if leftKind != rightKind {
-		return strings.Compare(string(leftKind), string(rightKind))
-	}
-	if leftCapability != rightCapability {
-		return strings.Compare(
-			string(leftCapability),
-			string(rightCapability),
-		)
-	}
-	leftKey, _ := left.ProfileKey()
-	rightKey, _ := right.ProfileKey()
-	return strings.Compare(leftKey, rightKey)
+	slices.SortFunc(r.selections, emitordering.CompareUseSelections)
 }
 
 // joinRoute settles the sole implementation route: the first observation
@@ -448,10 +424,57 @@ func (s *programSession) buildArtifactRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	requests, err := s.classArtifactRequests(
+	statements := result.Declarations()
+	requests := result.Requests()
+	if result.Disposition() == api.DeclarationDispositionMaterialized {
+		origin, originErr := canonicalsourcefact.Origin(
+			site.Source,
+			site.SourceFile,
+			site.OutputPath,
+			site.Occurrence,
+		)
+		if originErr != nil {
+			return artifactRevision{}, originErr
+		}
+		facts, factErr := canonicalsourcefact.SourceDeclaration(
+			context,
+			owner,
+			site.Occurrence,
+			origin,
+			statements,
+			handlerRequirements,
+			result.AdditionalPackageBindings(),
+		)
+		if factErr != nil {
+			return artifactRevision{}, factErr
+		}
+		statements = append(statements, facts.Statements()...)
+		requests = append(requests, facts.Requests()...)
+		if function, ok := owner.(*types.Func); ok {
+			statements, requests, err = s.appendImplementationSourceFacts(
+				context,
+				[]*types.Func{function},
+				statements,
+				requests,
+			)
+			if err != nil {
+				return artifactRevision{}, err
+			}
+		}
+	}
+	statements, requests, err = s.appendImplementationSourceFacts(
+		context,
+		selectedMethods,
+		statements,
+		requests,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	requests, err = s.classArtifactRequests(
 		owner,
 		selectedMethods,
-		result.Requests(),
+		requests,
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -481,6 +504,17 @@ func (s *programSession) buildArtifactRevision(
 		}
 		requests = append(requests, request)
 	}
+	statements, requests, err = s.attachSelectedMethodSourceFacts(
+		builder,
+		context,
+		owner,
+		selectedMethods,
+		statements,
+		requests,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
 	placement, dependencies, declarationRequirements, err :=
 		s.consumeArtifactRequests(
 			artifactOwner,
@@ -488,18 +522,6 @@ func (s *programSession) buildArtifactRevision(
 		)
 	if err != nil {
 		return artifactRevision{}, err
-	}
-	statements := result.Declarations()
-	if len(selectedMethods) != 0 {
-		statements, err = s.attachClassMemberContributions(
-			builder,
-			owner,
-			statements,
-			selectedMethods,
-		)
-		if err != nil {
-			return artifactRevision{}, err
-		}
 	}
 	var contract artifactstate.Contract
 	switch result.Disposition() {

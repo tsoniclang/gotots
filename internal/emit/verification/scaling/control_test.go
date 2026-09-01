@@ -481,7 +481,10 @@ func compileWaveEightScale(
 	if err != nil {
 		t.Fatal(err)
 	}
-	emission, err := emit.Compile(program, roots)
+	emission, err := emit.CompileWithOptions(program, roots, emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

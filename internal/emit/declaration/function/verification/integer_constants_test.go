@@ -53,12 +53,14 @@ func TestSafeIntegerConstantPrintsTypechecksAndExecutesDifferentially(t *testing
 				strings.TrimSuffix(file.OutputPath(), ".ts") +
 				".js"
 		case emit.TargetFileSupport:
-			expectedPath = filepath.Join(
-				repositoryRoot(),
-				"testdata",
-				"support",
-				"scalars-int64.ts",
-			)
+			if file.OutputPath() == "runtime/scalars.ts" {
+				expectedPath = filepath.Join(
+					repositoryRoot(),
+					"testdata",
+					"support",
+					"scalars-int64.ts",
+				)
+			}
 		case emit.TargetFileProgramInitialization:
 		default:
 			t.Fatalf(
@@ -68,12 +70,19 @@ func TestSafeIntegerConstantPrintsTypechecksAndExecutesDifferentially(t *testing
 			)
 		}
 		if expectedPath != "" {
+			executable, printErr := client.PrintNode(
+				executableTargetFile(file.SourceFile()),
+				tsgo.PrintOptions{},
+			)
+			if printErr != nil {
+				t.Fatal(printErr)
+			}
 			expected, err := os.ReadFile(expectedPath)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if printed != string(expected) {
-				t.Fatalf("%s:\n%s\nwant:\n%s", file.OutputPath(), printed, expected)
+			if executable != string(expected) {
+				t.Fatalf("%s:\n%s\nwant:\n%s", file.OutputPath(), executable, expected)
 			}
 		}
 		targetPath := filepath.Join(workingDirectory, filepath.FromSlash(file.OutputPath()))
@@ -164,7 +173,8 @@ func TestBigIntProfileTypechecksAndExecutesBeyondSafeNumberRange(t *testing.T) {
 			t.Fatal(err)
 		}
 		if file.OutputPath() == "runtime/scalars.ts" &&
-			!strings.Contains(printed, "export type int64 = bigint;") {
+			(!strings.Contains(printed, "int64 as $go$core$int64") ||
+				!strings.Contains(printed, "export type int64 = $go$core$int64;")) {
 			t.Fatalf("BigInt support artifact:\n%s", printed)
 		}
 		if file.Kind() == emit.TargetFileSource {
@@ -328,7 +338,7 @@ func TestIntegerConstantUsesGoValueNotLiteralSpelling(t *testing.T) {
 
 	emission := compileIntegerRoot(t, loaded, 0)
 	target := integerSourceFile(t, emission)
-	function := target.Statements()[1].(tsgo.FunctionDeclaration)
+	function := targetFunction(t, target, "Small")
 	result := function.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
 	if text := result.Expression().(tsgo.NumericLiteral).Text(); text != "42" {
 		t.Fatalf("semantic literal = %q, want 42", text)
@@ -376,7 +386,14 @@ func compileIntegerRootError(
 	if err != nil {
 		return emit.ProgramEmission{}, err
 	}
-	return emit.Compile(loaded.Program(), []emit.Root{root})
+	return emit.CompileWithOptions(
+		loaded.Program(),
+		[]emit.Root{root},
+		emit.Options{
+			IntegerRepresentation: emit.IntegerRepresentationNumber,
+			EvaluationOrder:       emit.EvaluationOrderDirect,
+		},
+	)
 }
 
 func integerSourceFile(t *testing.T, emission emit.ProgramEmission) tsgo.SourceFile {
@@ -402,7 +419,7 @@ func loadIntegerConstantsProject(t *testing.T) *load.Package {
 	return loaded
 }
 
-func printTargetFile(
+func printExecutableTargetFile(
 	t *testing.T,
 	targetFile tsgo.SourceFile,
 	workingDirectory string,
@@ -417,11 +434,34 @@ func printTargetFile(
 			t.Errorf("close TS-Go client: %v", err)
 		}
 	})
-	printed, err := client.PrintNode(targetFile, tsgo.PrintOptions{})
+	printed, err := client.PrintNode(executableTargetFile(targetFile), tsgo.PrintOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return printed
+}
+
+func executableTargetFile(targetFile tsgo.SourceFile) tsgo.SourceFile {
+	statements := make([]tsgo.Statement, 0, len(targetFile.Statements()))
+	for _, statement := range targetFile.Statements() {
+		if declaration, ok := statement.(tsgo.ImportDeclaration); ok {
+			module, moduleOK := declaration.ModuleSpecifier().(tsgo.StringLiteral)
+			if moduleOK && (strings.HasSuffix(module.Text(), "/source-fact.js") ||
+				module.Text() == "@tsonic/core/lang.js") {
+				continue
+			}
+		}
+		if _, fact := statement.(tsgo.ExpressionStatement); fact {
+			continue
+		}
+		statements = append(statements, statement)
+	}
+	factory := tsgo.NewFactory()
+	return factory.SourceFile(
+		statements,
+		targetFile.EndOfFileToken(),
+		targetFile.SourceData(),
+	)
 }
 
 func executeSafeIntegerGo(t *testing.T, workingDirectory string) string {

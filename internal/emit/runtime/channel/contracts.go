@@ -26,6 +26,7 @@ func Build(
 	sendName string,
 	caseName string,
 	selectName string,
+	spawnName string,
 	selectReadyName string,
 	selectAttemptName string,
 	panicName string,
@@ -37,6 +38,7 @@ func Build(
 		sendName:          sendName,
 		caseName:          caseName,
 		selectName:        selectName,
+		spawnName:         spawnName,
 		selectReadyName:   selectReadyName,
 		selectAttemptName: selectAttemptName,
 		panicName:         panicName,
@@ -52,6 +54,8 @@ func Build(
 		return target.selectCaseContract(), nil
 	case api.RuntimeSelect:
 		return target.selectFunction(), nil
+	case api.RuntimeGoSpawn:
+		return target.spawnFunction(), nil
 	case api.RuntimeSelectReady:
 		return target.selectReadyFunction(), nil
 	case api.RuntimeSelectAttempt:

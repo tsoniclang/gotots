@@ -223,11 +223,18 @@ func verifyOne(
 		sourcePath:     sourcePath,
 		digest:         hex.EncodeToString(implementationHash.Sum(nil)),
 		sourceDigest:   hex.EncodeToString(sourceHash[:]),
-		envelope:       document.Envelope.Kind,
+		envelope:       cloneEnvelope(document.Envelope),
 		exports:        exports,
 		sourceFile:     sourceFile,
 		privateModules: privateModules,
 	}, nil
+}
+
+func cloneEnvelope(source EnvelopeDocument) EnvelopeDocument {
+	result := source
+	result.PreservedObservables = slices.Clone(source.PreservedObservables)
+	result.Evidence = slices.Clone(source.Evidence)
+	return result
 }
 
 func verifyPrivateModule(

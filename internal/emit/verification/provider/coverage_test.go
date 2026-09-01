@@ -168,7 +168,7 @@ func LocalBuilder() string {
 		t.Fatal(err)
 	}
 	certificate := linkedProviderCertificate(t)
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = certificate
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -306,7 +306,7 @@ func Use(mutex *sync.Mutex, builder *strings.Builder) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,

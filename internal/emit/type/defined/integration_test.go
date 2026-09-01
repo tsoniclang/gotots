@@ -26,7 +26,7 @@ func TestDefinedBasicFamilyExecutesDifferentially(t *testing.T) {
 		options      emit.Options
 		nativeSuffix string
 	}{
-		{"number", emit.DefaultOptions(), ""},
+		{"number", definedNumberOptions(), ""},
 		{
 			"bigint",
 			emit.Options{

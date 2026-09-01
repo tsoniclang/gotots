@@ -19,6 +19,13 @@ import (
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
+func mapNumberOptions() emit.Options {
+	return emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
+	}
+}
+
 func TestMapValuesCreateTypedTargetAST(t *testing.T) {
 	loaded := loadMapValuesProject(t)
 	emission := compileExported(t, loaded)
@@ -147,7 +154,7 @@ func TestMapValuesStrictTypecheckUnderBigIntProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := mapNumberOptions()
 	options.IntegerRepresentation = emit.IntegerRepresentationBigInt
 	emission, err := emit.CompileWithOptions(loaded.Program(), roots, options)
 	if err != nil {
@@ -205,7 +212,11 @@ func compileExportedResult(
 	if err != nil {
 		return emit.ProgramEmission{}, err
 	}
-	emission, err := emit.Compile(loaded.Program(), roots)
+	emission, err := emit.CompileWithOptions(
+		loaded.Program(),
+		roots,
+		mapNumberOptions(),
+	)
 	if err != nil {
 		return emit.ProgramEmission{}, err
 	}

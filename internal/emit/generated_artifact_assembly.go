@@ -9,6 +9,7 @@ import (
 	genericcapability "github.com/tsoniclang/gotots/internal/emit/generic/capability"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	maprepresentation "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -282,6 +283,15 @@ func (s *programSession) buildMapSpecializationRevision(
 		valueType.Requests(),
 		specialization.Requests(),
 	)
+	statements, requests, err := canonicalsourcefact.IncludeGeneratedArtifact(
+		context,
+		artifact,
+		[]tsgo.Statement{statement},
+		requests,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
 	placement, dependencies, requirements, err :=
 		s.consumeArtifactRequests(owner, requests)
 	if err != nil {
@@ -289,13 +299,13 @@ func (s *programSession) buildMapSpecializationRevision(
 	}
 	contract, err := artifactstate.ProjectContract(
 		s.factory,
-		[]tsgo.Statement{statement},
+		statements,
 	)
 	if err != nil {
 		return artifactRevision{}, err
 	}
 	return artifactRevision{
-		statements:     []tsgo.Statement{statement},
+		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
 		requestRoots:   requirements,
@@ -453,6 +463,15 @@ func (s *programSession) buildGenericCapabilityRevision(
 		return artifactRevision{}, err
 	}
 	statements := []tsgo.Statement{statement}
+	statements, requests, err = canonicalsourcefact.IncludeGeneratedArtifact(
+		context,
+		artifact,
+		statements,
+		requests,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
 	placement, dependencies, requirements, err :=
 		s.consumeArtifactRequests(
 			owner,

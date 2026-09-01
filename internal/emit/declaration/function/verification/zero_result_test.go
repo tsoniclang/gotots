@@ -21,7 +21,7 @@ func TestZeroResultCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "void-calls.ts")
 	targetFile := emitZeroResultProject(t, loaded)
-	printed := printTargetFile(t, targetFile, workingDirectory)
+	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(zeroResultProjectDirectory(), "expected.ts"))
 	if err != nil {
@@ -42,11 +42,16 @@ func TestZeroResultCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 func TestZeroResultCallsCreateExactTargetTree(t *testing.T) {
 	loaded := loadZeroResultProject(t)
 	targetFile := emitZeroResultProject(t, loaded)
-	statements := targetFile.Statements()
-	if len(statements) != 4 {
-		t.Fatalf("target statements = %d, want import and three functions", len(statements))
+	var functions []tsgo.FunctionDeclaration
+	for _, statement := range targetFile.Statements() {
+		if function, ok := statement.(tsgo.FunctionDeclaration); ok {
+			functions = append(functions, function)
+		}
 	}
-	touch := statements[1].(tsgo.FunctionDeclaration)
+	if len(functions) != 3 {
+		t.Fatalf("target functions = %d, want three", len(functions))
+	}
+	touch := functions[0]
 	if touch.Type().Kind() != tsgo.SyntaxKindVoidKeyword {
 		t.Fatalf("Touch result kind = %d, want void keyword", touch.Type().Kind())
 	}
@@ -56,7 +61,7 @@ func TestZeroResultCallsCreateExactTargetTree(t *testing.T) {
 	if bareReturn.Expression() != nil {
 		t.Fatalf("bare return expression = %T, want nil", bareReturn.Expression())
 	}
-	runFunction := statements[3].(tsgo.FunctionDeclaration)
+	runFunction := functions[2]
 	runStatements := runFunction.Body().(tsgo.Block).Statements()
 	if len(runStatements) != 3 {
 		t.Fatalf("Run statements = %d, want two calls and return", len(runStatements))

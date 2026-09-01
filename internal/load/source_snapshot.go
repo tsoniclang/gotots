@@ -32,6 +32,7 @@ func sealSourceSnapshot(
 	selectedPackages []*packages.Package,
 	profile BuildProfile,
 	selectedGo toolchain.Go,
+	overlay map[string][]byte,
 ) (string, error) {
 	if len(selectedPackages) == 0 || !profile.Valid() || !selectedGo.Valid() {
 		return "", &Error{Pattern: pattern, Reason: "source snapshot input is incomplete"}
@@ -46,7 +47,7 @@ func sealSourceSnapshot(
 	writeSnapshotStrings(digest, "tags", profile.Tags())
 	writeSnapshotCount(digest, "packages", len(selectedPackages))
 	for _, selected := range selectedPackages {
-		if err := writePackageSnapshot(digest, pattern, selected); err != nil {
+		if err := writePackageSnapshot(digest, pattern, selected, overlay); err != nil {
 			return "", err
 		}
 	}
@@ -57,6 +58,7 @@ func writePackageSnapshot(
 	digest hash.Hash,
 	pattern string,
 	selected *packages.Package,
+	overlay map[string][]byte,
 ) error {
 	if selected == nil || selected.PkgPath == "" || selected.Name == "" ||
 		selected.Fset == nil || selected.TypesInfo == nil || selected.Dir == "" {
@@ -76,7 +78,13 @@ func writePackageSnapshot(
 	writeSnapshotString(digest, "module-version", moduleVersion)
 	writeSnapshotString(digest, "module-go-version", moduleGoVersion)
 
-	goInputs, err := readSnapshotFiles(selected, "go-input", selected.GoFiles, false)
+	goInputs, err := readSnapshotFiles(
+		selected,
+		"go-input",
+		selected.GoFiles,
+		false,
+		overlay,
+	)
 	if err != nil {
 		return &Error{Pattern: pattern, Reason: selected.PkgPath + ": " + err.Error()}
 	}
@@ -88,13 +96,25 @@ func writePackageSnapshot(
 	}
 	writeSnapshotFiles(digest, "checked-syntax", checkedSyntax)
 
-	otherInputs, err := readSnapshotFiles(selected, "other-input", selected.OtherFiles, false)
+	otherInputs, err := readSnapshotFiles(
+		selected,
+		"other-input",
+		selected.OtherFiles,
+		false,
+		overlay,
+	)
 	if err != nil {
 		return &Error{Pattern: pattern, Reason: selected.PkgPath + ": " + err.Error()}
 	}
 	writeSnapshotFiles(digest, "other-inputs", otherInputs)
 
-	embedInputs, err := readSnapshotFiles(selected, "embed-input", selected.EmbedFiles, false)
+	embedInputs, err := readSnapshotFiles(
+		selected,
+		"embed-input",
+		selected.EmbedFiles,
+		false,
+		overlay,
+	)
 	if err != nil {
 		return &Error{Pattern: pattern, Reason: selected.PkgPath + ": " + err.Error()}
 	}
@@ -149,11 +169,41 @@ func checkedSyntaxSnapshot(selected *packages.Package) ([]sourceSnapshotFile, er
 	return result, nil
 }
 
+func checkedSourceMetadata(
+	selected *packages.Package,
+	index int,
+	overlay map[string][]byte,
+) (string, string, error) {
+	if selected == nil || index < 0 || index >= len(selected.Syntax) ||
+		index >= len(selected.CompiledGoFiles) || selected.Syntax[index] == nil {
+		return "", "", fmt.Errorf("checked source index %d is invalid", index)
+	}
+	identity, err := snapshotFileIdentity(
+		selected,
+		"checked-syntax",
+		selected.CompiledGoFiles[index],
+		true,
+	)
+	if err != nil {
+		return "", "", err
+	}
+	payload, err := selectedSourceBytes(
+		selected.CompiledGoFiles[index],
+		overlay,
+	)
+	if err != nil {
+		return "", "", fmt.Errorf("read checked source %q: %w", identity, err)
+	}
+	digest := sha256.Sum256(payload)
+	return identity, hex.EncodeToString(digest[:]), nil
+}
+
 func readSnapshotFiles(
 	selected *packages.Package,
 	category string,
 	paths []string,
 	allowGenerated bool,
+	overlay map[string][]byte,
 ) ([]sourceSnapshotFile, error) {
 	result := make([]sourceSnapshotFile, len(paths))
 	seen := make(map[string]struct{}, len(paths))
@@ -166,7 +216,7 @@ func readSnapshotFiles(
 			return nil, fmt.Errorf("duplicate %s identity %q", category, identity)
 		}
 		seen[identity] = struct{}{}
-		payload, err := os.ReadFile(path)
+		payload, err := selectedSourceBytes(path, overlay)
 		if err != nil {
 			return nil, fmt.Errorf("read %s %q: %w", category, identity, err)
 		}
@@ -176,6 +226,13 @@ func readSnapshotFiles(
 		return result[left].identity < result[right].identity
 	})
 	return result, nil
+}
+
+func selectedSourceBytes(path string, overlay map[string][]byte) ([]byte, error) {
+	if payload, selected := overlay[path]; selected {
+		return slices.Clone(payload), nil
+	}
+	return os.ReadFile(path)
 }
 
 func snapshotFileIdentity(

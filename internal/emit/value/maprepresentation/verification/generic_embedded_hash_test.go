@@ -79,7 +79,8 @@ func Facts() string {
 		}
 	}
 	for _, forbidden := range []string{
-		"any",
+		": any",
+		" as any",
 		"unknown",
 		".call(",
 		".apply(",

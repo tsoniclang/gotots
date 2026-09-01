@@ -80,7 +80,7 @@ type Module struct {
 	outputPath           string
 	sourceDigest         string
 	digest               string
-	envelope             implementationcontract.EnvelopeKind
+	envelope             implementationcontract.Envelope
 	callableClaims       []CallableDocument
 	certificationSources []CertificationSource
 }
@@ -92,7 +92,13 @@ func (m Module) SourcePath() string                            { return m.source
 func (m Module) OutputPath() string                            { return m.outputPath }
 func (m Module) SourceDigest() string                          { return m.sourceDigest }
 func (m Module) Digest() string                                { return m.digest }
-func (m Module) Envelope() implementationcontract.EnvelopeKind { return m.envelope }
+func (m Module) Envelope() implementationcontract.EnvelopeKind { return m.envelope.Kind }
+func (m Module) EquivalenceEnvelope() implementationcontract.Envelope {
+	result := m.envelope
+	result.PreservedObservables = slices.Clone(result.PreservedObservables)
+	result.Evidence = slices.Clone(result.Evidence)
+	return result
+}
 func (m Module) CallableClaims() []CallableDocument {
 	return slices.Clone(m.callableClaims)
 }

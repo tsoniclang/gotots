@@ -114,7 +114,14 @@ func printGenerated(t *testing.T, source string) printedFiles {
 	if err != nil {
 		t.Fatal(err)
 	}
-	emission, err := emit.Compile(program, []emit.Root{root})
+	emission, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{root},
+		emit.Options{
+			IntegerRepresentation: emit.IntegerRepresentationNumber,
+			EvaluationOrder:       emit.EvaluationOrderDirect,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

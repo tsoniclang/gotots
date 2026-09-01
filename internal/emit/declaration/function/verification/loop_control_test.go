@@ -22,7 +22,7 @@ func TestLoopControlPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "loop.ts")
 	targetFile := emitLoopControl(t, loaded)
-	printed := printTargetFile(t, targetFile, workingDirectory)
+	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(loopControlProjectDirectory(), "expected.ts"))
 	if err != nil {
@@ -42,7 +42,7 @@ func TestLoopControlPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 func TestLoopControlCreatesExactTargetTree(t *testing.T) {
 	loaded := loadLoopControlProject(t)
 	targetFile := emitLoopControl(t, loaded)
-	function := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
+	function := targetFunction(t, targetFile, "Sum")
 	statements := function.Body().(tsgo.Block).Statements()
 	if len(statements) != 3 {
 		t.Fatalf("function statements = %d, want declaration, loop, return", len(statements))
@@ -163,8 +163,8 @@ func TestLoopControlPostUsesGoObjectIdentity(t *testing.T) {
 	loop.Post.(*ast.IncDecStmt).X.(*ast.Ident).Name = "forgedSourceSpelling"
 
 	targetFile := emitLoopControl(t, loaded)
-	targetFunction := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
-	targetLoop := targetFunction.Body().(tsgo.Block).Statements()[1].(tsgo.ForStatement)
+	targetDeclaration := targetFunction(t, targetFile, "Sum")
+	targetLoop := targetDeclaration.Body().(tsgo.Block).Statements()[1].(tsgo.ForStatement)
 	increment := targetLoop.Incrementor().(tsgo.PostfixUnaryExpression)
 	if name := increment.Operand().(tsgo.Identifier).Text(); name != "current" {
 		t.Fatalf("post operand = %q, want current", name)

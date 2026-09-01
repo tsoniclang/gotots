@@ -33,7 +33,10 @@ func TestBoolFlowPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 			t.Errorf("close TS-Go client: %v", err)
 		}
 	})
-	printed, err := client.PrintNode(targetFile, tsgo.PrintOptions{})
+	printed, err := client.PrintNode(
+		executableTargetFile(targetFile),
+		tsgo.PrintOptions{},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,14 +61,11 @@ func TestBoolFlowPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 func TestBoolFlowCreatesExactTargetTree(t *testing.T) {
 	loaded := loadBoolFlowProject(t)
 	targetFile := emitBoolFlow(t, loaded)
-	statements := targetFile.Statements()
-	if len(statements) != 4 {
-		t.Fatalf("target statements = %d, want import plus three functions", len(statements))
+	functions := boolFlowFunctions(targetFile)
+	if len(functions) != 3 {
+		t.Fatalf("target functions = %d, want three", len(functions))
 	}
-	runFunction, ok := statements[1].(tsgo.FunctionDeclaration)
-	if !ok {
-		t.Fatalf("run declaration = %T, want tsgo.FunctionDeclaration", statements[1])
-	}
+	runFunction := boolFlowFunctionByName(t, targetFile, "Run")
 	body := runFunction.Body().(tsgo.Block)
 	if len(body.Statements()) != 3 {
 		t.Fatalf("Run statements = %d, want 3", len(body.Statements()))
@@ -80,7 +80,7 @@ func TestBoolFlowCreatesExactTargetTree(t *testing.T) {
 	if ifStatement.Expression().Kind() != tsgo.SyntaxKindPrefixUnaryExpression {
 		t.Fatalf("if condition kind = %d, want prefix unary", ifStatement.Expression().Kind())
 	}
-	sameFunction := statements[3].(tsgo.FunctionDeclaration)
+	sameFunction := boolFlowFunctionByName(t, targetFile, "Same")
 	sameReturn := sameFunction.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
 	equality := sameReturn.Expression().(tsgo.BinaryExpression)
 	if equality.OperatorToken().Kind() != tsgo.SyntaxKindEqualsEqualsEqualsToken {
@@ -116,7 +116,7 @@ func TestBoolFlowCallsUseGoObjectIdentity(t *testing.T) {
 	call.Fun.(*ast.Ident).Name = "forgedSourceSpelling"
 
 	targetFile := emitBoolFlow(t, loaded)
-	runTarget := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
+	runTarget := boolFlowFunctionByName(t, targetFile, "Run")
 	targetIf := runTarget.Body().(tsgo.Block).Statements()[1].(tsgo.IfStatement)
 	thenBlock := targetIf.ThenStatement().(tsgo.Block)
 	targetAssignment := thenBlock.Statements()[0].(tsgo.ExpressionStatement)
@@ -136,12 +136,38 @@ func TestBoolFlowLiteralsUseGoObjectIdentity(t *testing.T) {
 	literal.Name = "true"
 
 	targetFile := emitBoolFlow(t, loaded)
-	runTarget := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
+	runTarget := boolFlowFunctionByName(t, targetFile, "Run")
 	targetDefinition := runTarget.Body().(tsgo.Block).Statements()[0].(tsgo.VariableStatement)
 	initializer := targetDefinition.DeclarationList().Declarations()[0].Initializer()
 	if initializer.Kind() != tsgo.SyntaxKindFalseKeyword {
 		t.Fatalf("initializer = %T, want semantic false constant", initializer)
 	}
+}
+
+func boolFlowFunctions(source tsgo.SourceFile) []tsgo.FunctionDeclaration {
+	functions := make([]tsgo.FunctionDeclaration, 0)
+	for _, statement := range source.Statements() {
+		function, ok := statement.(tsgo.FunctionDeclaration)
+		if ok {
+			functions = append(functions, function)
+		}
+	}
+	return functions
+}
+
+func boolFlowFunctionByName(
+	t *testing.T,
+	source tsgo.SourceFile,
+	name string,
+) tsgo.FunctionDeclaration {
+	t.Helper()
+	for _, function := range boolFlowFunctions(source) {
+		if function.Name().Text() == name {
+			return function
+		}
+	}
+	t.Fatalf("target function %q is absent", name)
+	return nil
 }
 
 func TestBoolFlowRejectsUnaryOperatorVariant(t *testing.T) {
