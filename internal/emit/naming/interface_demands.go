@@ -15,6 +15,13 @@ const (
 	interfaceDemandProviderBridge
 )
 
+func sourceMethodTargetKind(method *types.Func) api.MethodTargetKind {
+	if generatedNumericDefinedValue(api.MethodReceiverTypeName(method)) {
+		return api.MethodTargetSourceFunction
+	}
+	return api.MethodTargetClassMember
+}
+
 func (r *Registry) invalidateInterfaceDemandRequests() {
 	clear(r.interfaceDemandRequests)
 }

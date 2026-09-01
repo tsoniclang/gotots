@@ -4,8 +4,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/tsoniclang/gotots/internal/emit"
 )
 
 func TestGeneratedNumericConversionNeedsNoInferenceAnnotation(t *testing.T) {
@@ -13,7 +11,7 @@ func TestGeneratedNumericConversionNeedsNoInferenceAnnotation(t *testing.T) {
 	artifacts := printDefined(
 		t,
 		workingDirectory,
-		compileDefinedFixture(t, emit.DefaultOptions()),
+		compileDefinedFixture(t, definedNumberOptions()),
 	)
 	for _, declaration := range []string{
 		"let shortConverted = value;",

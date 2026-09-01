@@ -12,6 +12,7 @@ import (
 	"slices"
 	"sort"
 
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 )
@@ -150,10 +151,19 @@ func prepareOne(config Config, contractPath string) (Module, error) {
 		outputPath:           document.Output,
 		sourceDigest:         hex.EncodeToString(sourceHash[:]),
 		digest:               hex.EncodeToString(digest.Sum(nil)),
-		envelope:             document.Envelope.Kind,
+		envelope:             cloneEnvelope(document.Envelope),
 		callableClaims:       slices.Clone(document.Callables),
 		certificationSources: certificationSources,
 	}, nil
+}
+
+func cloneEnvelope(
+	source implementationcontract.Envelope,
+) implementationcontract.Envelope {
+	result := source
+	result.PreservedObservables = slices.Clone(source.PreservedObservables)
+	result.Evidence = slices.Clone(source.Evidence)
+	return result
 }
 
 func decodeDocument(payload []byte) (Document, error) {

@@ -35,7 +35,7 @@ func Result(path string) (bool, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -171,7 +171,7 @@ func Result(wrapped bool) (string, bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,

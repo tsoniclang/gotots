@@ -14,6 +14,7 @@ import (
 	providerinterfacebridge "github.com/tsoniclang/gotots/internal/emit/declaration/providerinterfacebridge"
 	reflectiontypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/reflectiontype"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -234,6 +235,29 @@ func (s *programSession) buildRepresentationArtifactRevision(
 	)
 	if err != nil {
 		return artifactRevision{}, err
+	}
+	statements, requests, err = canonicalsourcefact.IncludeGeneratedArtifact(
+		context,
+		artifact,
+		statements,
+		requests,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	if artifact.Kind() == api.GeneratedArtifactInterfaceAdapter {
+		implementations, implementationErr :=
+			canonicalsourcefact.InterfaceImplementations(
+				context,
+				artifact,
+				requirements,
+				statements,
+			)
+		if implementationErr != nil {
+			return artifactRevision{}, implementationErr
+		}
+		statements = append(statements, implementations.Statements()...)
+		requests = append(requests, implementations.Requests()...)
 	}
 	placement, dependencies, requestRoots, err :=
 		s.consumeArtifactRequests(

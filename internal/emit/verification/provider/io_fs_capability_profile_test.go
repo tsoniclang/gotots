@@ -104,7 +104,7 @@ func ReadProviderDir(root string) (string, int64, error) {
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,

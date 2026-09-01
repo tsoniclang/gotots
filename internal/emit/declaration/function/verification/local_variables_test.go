@@ -22,7 +22,7 @@ func TestLocalVariablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "local-variables.ts")
 	targetFile := emitLocalVariables(t, loaded)
-	printed := printTargetFile(t, targetFile, workingDirectory)
+	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(localVariablesProjectDirectory(), "expected.ts"))
 	if err != nil {
@@ -43,7 +43,7 @@ func TestLocalVariablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 func TestLocalVariablesCreateExactScopedTargetTree(t *testing.T) {
 	loaded := loadLocalVariablesProject(t)
 	targetFile := emitLocalVariables(t, loaded)
-	function := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
+	function := targetFunction(t, targetFile, "Compute")
 	body := function.Body().(tsgo.Block).Statements()
 	if len(body) != 2 {
 		t.Fatalf("function statements = %d, want outer declaration and lexical block", len(body))
@@ -84,7 +84,7 @@ func TestLocalVariablesCreateExactScopedTargetTree(t *testing.T) {
 			t.Fatalf("capture %d = %q, want %q", index, name, expected)
 		}
 	}
-	lateOuter := targetFile.Statements()[2].(tsgo.FunctionDeclaration).
+	lateOuter := targetFunction(t, targetFile, "LateOuter").
 		Body().(tsgo.Block).
 		Statements()
 	earlyName := lateOuter[0].(tsgo.Block).
@@ -113,8 +113,8 @@ func TestLocalVariablesUseGoObjectIdentityAcrossShadowing(t *testing.T) {
 	outerReference.Name = "forgedSourceSpelling"
 
 	targetFile := emitLocalVariables(t, loaded)
-	targetFunction := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
-	targetBlock := targetFunction.Body().(tsgo.Block).Statements()[1].(tsgo.Block)
+	targetDeclaration := targetFunction(t, targetFile, "Compute")
+	targetBlock := targetDeclaration.Body().(tsgo.Block).Statements()[1].(tsgo.Block)
 	declaration := targetBlock.Statements()[0].(tsgo.VariableStatement).
 		DeclarationList().
 		Declarations()[0]

@@ -349,6 +349,51 @@ func Build(
 	), nil
 }
 
+func ExactRequirement(
+	artifact *api.GeneratedArtifact,
+	requirements []api.DeclarationRequirement,
+) (bool, error) {
+	if artifact == nil || len(requirements) < 1 || len(requirements) > 2 {
+		return false, &api.ContextError{
+			Reason: "generic concretization requirements are not exact",
+		}
+	}
+	bound, boundOK := artifact.GenericConcretization()
+	base := false
+	deferred := false
+	for _, requirement := range requirements {
+		selected, ok := requirement.GenericConcretization()
+		generated, generatedOK := requirement.GeneratedArtifact()
+		if !ok || !generatedOK || generated != artifact || !boundOK ||
+			selected != bound {
+			return false, &api.ContextError{
+				Reason: "generic concretization received a foreign requirement",
+			}
+		}
+		if requirement.DeferredGenericConcretization() {
+			if deferred {
+				return false, &api.ContextError{
+					Reason: "generic concretization has duplicate deferred demand",
+				}
+			}
+			deferred = true
+			continue
+		}
+		if base {
+			return false, &api.ContextError{
+				Reason: "generic concretization has duplicate definition demand",
+			}
+		}
+		base = true
+	}
+	if !base {
+		return false, &api.ContextError{
+			Reason: "generic concretization lacks its definition demand",
+		}
+	}
+	return deferred, nil
+}
+
 func returnStatements(
 	factory tsgo.Factory,
 	emission api.ExpressionEmission,

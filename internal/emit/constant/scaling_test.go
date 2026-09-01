@@ -13,10 +13,10 @@ import (
 
 // TestLargeConstantProjectionScalesWithUsesNotValueSize proves the projection
 // design is O(value-size + uses), never O(value-size × uses): a large untyped
-// string constant used 1, 2, and 4 times materializes its payload exactly once
-// as a single projection, and every use is a constant-size reference. If uses
-// inlined the value, the payload would appear once per use and the artifact
-// would grow by the payload size for every added use.
+// string constant used 1, 2, and 4 times materializes its payload once in the
+// executable projection and once in its canonical source fact. Every use is a
+// constant-size reference. If uses inlined the value, the payload count would
+// grow with uses and the artifact would grow by the payload size per use.
 func TestLargeConstantProjectionScalesWithUsesNotValueSize(t *testing.T) {
 	const payload = "PAYLOAD_" // repeated to a large, distinctive literal
 	large := strings.Repeat(payload, 512)
@@ -25,9 +25,8 @@ func TestLargeConstantProjectionScalesWithUsesNotValueSize(t *testing.T) {
 	for _, uses := range []int{1, 2, 4} {
 		printed := compileScalingProgram(t, large, uses)
 
-		// The payload is materialized exactly once regardless of use count.
-		if count := strings.Count(printed, large); count != 1 {
-			t.Fatalf("uses=%d: payload appears %d times, want exactly one projection", uses, count)
+		if count := strings.Count(printed, large); count != 2 {
+			t.Fatalf("uses=%d: payload appears %d times, want projection plus source fact", uses, count)
 		}
 		// Every use is a constant-size reference to the projection.
 		if refs := strings.Count(printed, "Banner$string"); refs < uses {
@@ -47,8 +46,9 @@ func TestLargeConstantProjectionScalesWithUsesNotValueSize(t *testing.T) {
 }
 
 // TestLargeDefinedConstantThunkScalesWithUsesNotValueSize proves the ESM-safe
-// defined-basic path also materializes a large payload once. Added uses invoke
-// the same typed thunk and never duplicate its constructor payload.
+// defined-basic path also materializes a large payload once in executable code
+// and once in its source fact. Added uses invoke the same typed thunk and never
+// duplicate either payload.
 func TestLargeDefinedConstantThunkScalesWithUsesNotValueSize(t *testing.T) {
 	const payload = "DEFINED_PAYLOAD_"
 	large := strings.Repeat(payload, 512)
@@ -56,9 +56,9 @@ func TestLargeDefinedConstantThunkScalesWithUsesNotValueSize(t *testing.T) {
 	sizes := make(map[int]int)
 	for _, uses := range []int{1, 2, 4} {
 		printed := compileDefinedScalingProgram(t, large, uses)
-		if count := strings.Count(printed, large); count != 1 {
+		if count := strings.Count(printed, large); count != 2 {
 			t.Fatalf(
-				"uses=%d: defined payload appears %d times, want one thunk payload",
+				"uses=%d: defined payload appears %d times, want thunk plus source fact",
 				uses,
 				count,
 			)

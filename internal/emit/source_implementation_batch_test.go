@@ -80,6 +80,8 @@ func Value() int { return beta.Twice(alpha.Add(20, 1)) }
 		t.Fatal(err)
 	}
 	options := DefaultOptions()
+	options.IntegerRepresentation = IntegerRepresentationNumber
+	options.EvaluationOrder = EvaluationOrderDirect
 	options.SourceImplementations = certificate
 	emission, err := CompileWithOptions(program, roots, options)
 	if err != nil {

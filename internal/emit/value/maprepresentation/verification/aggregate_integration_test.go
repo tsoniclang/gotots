@@ -18,8 +18,8 @@ func TestScalarMapArtifactsStayAtTheImmutableBaseline(t *testing.T) {
 		t.TempDir(),
 	)
 	for path, expected := range map[string]string{
-		"source.ts":      "7c92c13c2d2ccdbb9358b215083ec1451c6930a6d7da271398d89f2bcd9cf82d",
-		"runtime/map.ts": "e196f4916d33969430331aae067d59cb30f7341376b9ebb012ef4d87f1993d57",
+		"source.ts":      "1b14f6c5e6f1ad93afbf1f8d4fc418318eabd3631f44b2c8635c8d84280cff13",
+		"runtime/map.ts": "a51728ce9129ead7b233637441c15710ad506b54826b41658f5949f3e55dee16",
 	} {
 		content := readFile(t, artifacts.file(t, path))
 		actual := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))

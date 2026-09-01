@@ -189,6 +189,9 @@ func TestCanonicalRuntimePackageManifestResolvesEveryBuildStage(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	if err := corefixture.InstallResolutionOnly(directory); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	if err := tsgo.Compile(ctx, root, directory, []string{

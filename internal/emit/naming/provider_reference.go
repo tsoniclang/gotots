@@ -57,25 +57,6 @@ func (n *File) providerImport(
 	return selected.local, request, nil
 }
 
-func (n *File) ExternalProviderFunction(
-	module string,
-	export string,
-) (api.NameReference, error) {
-	if export == "" {
-		return api.NameReference{}, &api.NameError{
-			Reason: "external provider export is empty",
-		}
-	}
-	qualifier, request, err := n.providerImport(
-		module,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	return api.NewQualifiedNameReference(qualifier, export, request)
-}
-
 func (n *File) providerFacetReference(
 	object types.Object,
 	kind gostdlib.FacetKind,

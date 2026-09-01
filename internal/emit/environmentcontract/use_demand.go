@@ -1,11 +1,61 @@
 package environmentcontract
 
 import (
+	"fmt"
 	"go/types"
 
 	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
+
+func SelectDeclarationRequirements(
+	object types.Object,
+	requirements []api.DeclarationRequirement,
+) ([]api.DeclarationRequirement, error) {
+	selected := make([]api.DeclarationRequirement, 0, len(requirements))
+	for _, requirement := range requirements {
+		if owner, _, ok := requirement.NamedStructOperation(); ok {
+			if owner != object {
+				return nil, &api.ContextError{
+					Reason: "environment named-struct operation requirement is foreign",
+				}
+			}
+			continue
+		}
+		if owner, _, _, ok := requirement.GenericRepresentation(); ok {
+			if owner != object {
+				return nil, &api.ContextError{
+					Reason: "environment generic representation requirement is foreign",
+				}
+			}
+			selected = append(selected, requirement)
+			continue
+		}
+		if owner, artifact, _, ok := requirement.TypeRepresentation(); ok {
+			if owner != object || artifact != nil {
+				return nil, &api.ContextError{
+					Reason: "environment type representation requirement is foreign",
+				}
+			}
+			selected = append(selected, requirement)
+			continue
+		}
+		owner, enclosing, callable, control, ok := requirement.CallableControl()
+		source, sourceOwned := owner.Source()
+		if ok && sourceOwned && source == object && enclosing == nil &&
+			callable == nil && control == api.CallableControlRecovery {
+			selected = append(selected, requirement)
+			continue
+		}
+		return nil, &api.ContextError{
+			Reason: fmt.Sprintf(
+				"environment declaration requirement kind %d is unsupported",
+				requirement.Kind(),
+			),
+		}
+	}
+	return selected, nil
+}
 
 // RequirementUseDemand classifies the closed environment use demand created
 // by scheduling one declaration requirement against its owner.

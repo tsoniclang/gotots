@@ -485,10 +485,37 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoEmptyStruct",
 			true,
 		), nil
+	case RuntimeSourceCompilationFact:
+		return sourceFactContract("GoCompilationFact"), nil
+	case RuntimeSourceDeclarationFact:
+		return sourceFactContract("GoDeclarationFact"), nil
+	case RuntimeSourceBasicFact:
+		return sourceFactContract("GoBasicFact"), nil
+	case RuntimeSourceAggregateFact:
+		return sourceFactContract("GoAggregateFact"), nil
+	case RuntimeSourceCallableFact:
+		return sourceFactContract("GoCallableFact"), nil
+	case RuntimeSourceInterfaceFact:
+		return sourceFactContract("GoInterfaceFact"), nil
+	case RuntimeSourceStorageFact:
+		return sourceFactContract("GoStorageFact"), nil
+	case RuntimeSourceOperationFact:
+		return sourceFactContract("GoOperationFact"), nil
+	case RuntimeSourceImplementationFact:
+		return sourceFactContract("GoImplementationFact"), nil
 	default:
 		if contract, ok := interfaceRuntimeContract(symbol); ok {
 			return contract, nil
 		}
 		return concurrencyRuntimeContract(symbol)
 	}
+}
+
+func sourceFactContract(exportedName string) RuntimeSymbolContract {
+	return runtimeContract(
+		RuntimeModuleSourceFact,
+		"runtime/source-fact.ts",
+		exportedName,
+		true,
+	)
 }

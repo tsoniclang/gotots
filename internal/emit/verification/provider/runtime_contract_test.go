@@ -18,7 +18,7 @@ func TestReflectTypeForUsesCanonicalGeneratedMetadata(t *testing.T) {
 		t,
 		program.Roots()[0].Types().Scope().Lookup("ReflectStatic"),
 	)
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
 	if err != nil {
@@ -125,7 +125,7 @@ func TestReflectTypeOfUsesRegisteredCanonicalDynamicType(t *testing.T) {
 		t,
 		program.Roots()[0].Types().Scope().Lookup("ReflectDynamicFacts"),
 	)
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
 	if err != nil {
@@ -197,7 +197,7 @@ func TestReflectTypeForOpenGenericUsesPrivateCapability(t *testing.T) {
 		t,
 		program.Roots()[0].Types().Scope().Lookup("ReflectGenericString"),
 	)
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
 	if err != nil {
@@ -246,7 +246,7 @@ func TestSelectedProviderContributesCertifiedRuntimeClosure(t *testing.T) {
 		program.Roots()[0].Types().Scope().Lookup("ReflectType"),
 	)
 	certificate := linkedProviderCertificate(t)
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = certificate
 	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
 	if err != nil {
@@ -258,8 +258,8 @@ func TestSelectedProviderContributesCertifiedRuntimeClosure(t *testing.T) {
 	for _, required := range []string{
 		"runtime/complex.ts",
 		"export class GoComplex128",
-		"export type int32 = number;",
-		"export type float64 = number;",
+		"export type int32 = $go$core$int32;",
+		"export type float64 = $go$core$float64;",
 		"reflect__from_gostdlib.Type",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
@@ -277,7 +277,7 @@ func TestUnselectedProviderDoesNotExpandRuntimeClosure(t *testing.T) {
 		t,
 		program.Roots()[0].Types().Scope().Lookup("Identity"),
 	)
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
 	if err != nil {
@@ -296,7 +296,7 @@ func TestSelectedProviderSupportsCertifiedBigIntProfile(t *testing.T) {
 		t,
 		program.Roots()[0].Types().Scope().Lookup("ReflectStatic"),
 	)
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.IntegerRepresentation = emit.IntegerRepresentationBigInt
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
@@ -327,8 +327,8 @@ func TestSelectedProviderSupportsCertifiedBigIntProfile(t *testing.T) {
 			)
 		}
 	}
-	if !strings.Contains(artifacts.printed, "export type int = bigint;") ||
-		!strings.Contains(artifacts.printed, "export type int64 = bigint;") {
+	if !strings.Contains(artifacts.printed, "export type int = $go$core$int64;") ||
+		!strings.Contains(artifacts.printed, "export type int64 = $go$core$int64;") {
 		t.Fatalf("bigint provider profile lacks exact scalar aliases:\n%s", artifacts.printed)
 	}
 	reflectionSource := readGeneratedArtifact(
@@ -370,7 +370,7 @@ func TestProviderStructFieldsProjectEveryValueOperation(t *testing.T) {
 		t,
 		program.Roots()[0].Types().Scope().Lookup("ProviderStructFields"),
 	)
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
 	if err != nil {
@@ -430,7 +430,7 @@ func TestProviderVariadicSliceProjectsDirectNamedPointers(t *testing.T) {
 		t,
 		program.Roots()[0].Types().Scope().Lookup("UnicodeDecimal"),
 	)
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
 	if err != nil {

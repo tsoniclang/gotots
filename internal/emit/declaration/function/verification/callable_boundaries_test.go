@@ -191,7 +191,7 @@ func TestVariadicArgumentsPreserveTheDeclaredSliceParameter(t *testing.T) {
 	source := ""
 	for _, file := range emission.Files() {
 		if file.Kind() == emit.TargetFileSource {
-			source += printTargetFile(t, file.SourceFile(), t.TempDir())
+			source += printExecutableTargetFile(t, file.SourceFile(), t.TempDir())
 		}
 	}
 	if strings.Count(source, "values: RuntimeSlice<int32>") < 3 {

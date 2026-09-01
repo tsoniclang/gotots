@@ -28,6 +28,13 @@ var (
 	linkedCertificateError error
 )
 
+func providerNumberOptions() emit.Options {
+	return emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
+	}
+}
+
 func materializeArtifacts(
 	t *testing.T,
 	emission emit.ProgramEmission,

@@ -6,6 +6,19 @@ import (
 	"path/filepath"
 )
 
+type outputFailure struct {
+	cause    error
+	artifact string
+}
+
+func (e *outputFailure) Error() string {
+	return fmt.Sprintf("%v; failure artifact preserved at %q", e.cause, e.artifact)
+}
+
+func (e *outputFailure) Unwrap() error {
+	return e.cause
+}
+
 func writeOutputTransaction(
 	target string,
 	write func(string) (int, error),
@@ -21,17 +34,21 @@ func writeOutputTransaction(
 	if err != nil {
 		return 0, commandError("create output staging", err.Error())
 	}
-	defer func() {
-		_ = os.RemoveAll(staging)
-	}()
 	files, err := write(staging)
 	if err != nil {
-		return 0, err
+		return 0, preserveOutputFailure(err, staging)
 	}
 	if err := installOutputDirectory(staging, target); err != nil {
-		return 0, err
+		return 0, preserveOutputFailure(err, staging)
 	}
 	return files, nil
+}
+
+func preserveOutputFailure(cause error, staging string) error {
+	if _, err := os.Lstat(staging); err != nil {
+		return cause
+	}
+	return &outputFailure{cause: cause, artifact: staging}
 }
 
 func installOutputDirectory(staging string, target string) error {

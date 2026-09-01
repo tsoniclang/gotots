@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestResolutionFixtureIsCompleteAndFailsOnExecution(t *testing.T) {
+func TestResolutionFixtureIsCompleteAndOnlyMetadataIsInert(t *testing.T) {
 	root := t.TempDir()
 	if err := InstallResolutionOnly(root); err != nil {
 		t.Fatal(err)
@@ -39,11 +39,23 @@ func TestResolutionFixtureIsCompleteAndFailsOnExecution(t *testing.T) {
 			t.Fatalf("resolution fixture lacks %s", name)
 		}
 	}
+	if !strings.Contains(string(declarations), "function attribute") ||
+		!strings.Contains(string(runtime), "export const attribute = () => attributeBuilder") ||
+		strings.Contains(string(runtime), `unsupported("attribute")`) {
+		t.Fatal("resolution fixture does not isolate inert source metadata")
+	}
 	types, err := os.ReadFile(filepath.Join(module, "types.d.ts"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(types), "interface RawPointer") {
-		t.Fatal("resolution fixture lacks RawPointer")
+	for _, declaration := range []string{
+		"interface RawPointer",
+		"type int32 = number",
+		"type int64 = bigint",
+		"type float64 = number",
+	} {
+		if !strings.Contains(string(types), declaration) {
+			t.Fatalf("resolution fixture lacks %s", declaration)
+		}
 	}
 }

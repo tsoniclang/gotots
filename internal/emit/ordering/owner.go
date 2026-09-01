@@ -2,9 +2,31 @@ package ordering
 
 import (
 	"go/types"
+	"strings"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
+
+func CompareUseSelections(left, right gostdlib.UseSelection) int {
+	if left.Kind() != right.Kind() {
+		if left.Kind() < right.Kind() {
+			return -1
+		}
+		return 1
+	}
+	leftKind, leftCapability, _ := left.Facet()
+	rightKind, rightCapability, _ := right.Facet()
+	if leftKind != rightKind {
+		return strings.Compare(string(leftKind), string(rightKind))
+	}
+	if leftCapability != rightCapability {
+		return strings.Compare(string(leftCapability), string(rightCapability))
+	}
+	leftKey, _ := left.ProfileKey()
+	rightKey, _ := right.ProfileKey()
+	return strings.Compare(leftKey, rightKey)
+}
 
 func CompareBasicKinds(left types.BasicKind, right types.BasicKind) int {
 	switch {

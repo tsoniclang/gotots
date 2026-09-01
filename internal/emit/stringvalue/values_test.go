@@ -221,7 +221,10 @@ func TestStringFamilyStrictTypechecksWithBigIntIndices(t *testing.T) {
 
 func compileStringFixture(t *testing.T) emit.ProgramEmission {
 	t.Helper()
-	return compileStringFixtureWithOptions(t, emit.DefaultOptions())
+	return compileStringFixtureWithOptions(t, emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
+	})
 }
 
 func compileStringFixtureWithOptions(

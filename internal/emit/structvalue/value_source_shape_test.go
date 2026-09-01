@@ -14,7 +14,7 @@ import (
 func TestOrdinaryStructUsesNamedConstructionWithoutUniversalFactory(
 	t *testing.T,
 ) {
-	_, emission := compileValueSourceProgram(t, `package valuesource
+	_, emission := compileValueSourceProgramWithOptions(t, `package valuesource
 
 type Record struct {
 	First int32
@@ -24,7 +24,10 @@ type Record struct {
 func Build(first int32, second bool) Record {
 	return Record{Second: second, First: first}
 }
-`)
+`, emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
+	})
 	source := structTargetSource(t, emission)
 	class := targetClass(t, source, "Record")
 	var constructor tsgo.ConstructorDeclaration

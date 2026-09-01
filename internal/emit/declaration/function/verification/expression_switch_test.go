@@ -22,7 +22,7 @@ func TestExpressionSwitchPrintsTypechecksAndExecutesDifferentially(t *testing.T)
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "expression-switch.ts")
 	targetFile := emitExpressionSwitch(t, loaded)
-	printed := printTargetFile(t, targetFile, workingDirectory)
+	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(expressionSwitchProjectDirectory(), "expected.ts"))
 	if err != nil {
@@ -43,7 +43,7 @@ func TestExpressionSwitchPrintsTypechecksAndExecutesDifferentially(t *testing.T)
 func TestExpressionSwitchCreatesScopedExactTargetTree(t *testing.T) {
 	loaded := loadExpressionSwitchProject(t)
 	targetFile := emitExpressionSwitch(t, loaded)
-	function := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
+	function := targetFunction(t, targetFile, "Classify")
 	body := function.Body().(tsgo.Block).Statements()
 	if len(body) != 3 {
 		t.Fatalf("function statements = %d, want declaration, switch scope, return", len(body))

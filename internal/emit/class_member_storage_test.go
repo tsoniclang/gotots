@@ -106,6 +106,35 @@ func TestClassMemberContributionReconstructsTheTypeOwnedClass(t *testing.T) {
 	}
 }
 
+func TestClassMethodLocalTypeRetainsItsSiblingSourceFile(t *testing.T) {
+	program := loadClassMemberAssemblyFixture(t)
+	use, err := NewRoot(program.Roots()[0].Types().Scope().Lookup("Use"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := Compile(program, []Root{use})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var encoded strings.Builder
+	for _, file := range emission.Files() {
+		payload, encodeErr := tsgo.EncodeSourceFile(file.SourceFile())
+		if encodeErr != nil {
+			t.Fatal(encodeErr)
+		}
+		encoded.Write(payload)
+	}
+	for _, required := range []string{
+		"checked-syntax:method.go",
+		"gotots-go-source-declaration-fact-v1",
+		"local",
+	} {
+		if !strings.Contains(encoded.String(), required) {
+			t.Fatalf("cross-file method source facts omit %q", required)
+		}
+	}
+}
+
 func loadClassMemberAssemblyFixture(t *testing.T) *load.Program {
 	t.Helper()
 	directory := t.TempDir()
@@ -120,8 +149,13 @@ type Record struct {
 		"method.go": `package classmember
 
 func (value Record) Read() int32 {
-	return value.Value
+	type local struct {
+		Value int32
+	}
+	return local{Value: value.Value}.Value
 }
+
+func Use(value Record) int32 { return value.Read() }
 `,
 	} {
 		if err := os.WriteFile(

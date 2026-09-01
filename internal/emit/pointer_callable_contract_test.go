@@ -73,7 +73,7 @@ func Apply(counter Counter, value *int) {
 	for _, required := range []string{
 		"Increment(value: Pointer<int> | undefined): void",
 		"const __gotots_store_0 = (value ?? GoPanic.raiseRuntime",
-		"storePointer(__gotots_store_0, loadPointer(__gotots_store_0) + 1);",
+		"storePointer(__gotots_store_0, goInt64(loadPointer(__gotots_store_0) + 1n));",
 		"counter.Increment(value);",
 	} {
 		if !strings.Contains(target, required) {

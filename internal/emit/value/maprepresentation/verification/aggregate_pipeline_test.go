@@ -19,7 +19,7 @@ func TestAggregateMapsCompileAndExecuteDifferentially(t *testing.T) {
 		name    string
 		options emit.Options
 	}{
-		{name: "number", options: emit.DefaultOptions()},
+		{name: "number", options: mapNumberOptions()},
 		{
 			name: "bigint",
 			options: emit.Options{
@@ -71,7 +71,7 @@ func TestAggregateMapArtifactsIgnoreRootOrderAndUnreachableShapes(t *testing.T) 
 	first, err := emit.CompileWithOptions(
 		loaded.Program(),
 		roots,
-		emit.DefaultOptions(),
+		mapNumberOptions(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +81,7 @@ func TestAggregateMapArtifactsIgnoreRootOrderAndUnreachableShapes(t *testing.T) 
 	second, err := emit.CompileWithOptions(
 		loaded.Program(),
 		reversed,
-		emit.DefaultOptions(),
+		mapNumberOptions(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -115,15 +115,15 @@ func TestAggregateMapArtifactsIgnoreRootOrderAndUnreachableShapes(t *testing.T) 
 	withoutUnreachable, err := emit.CompileWithOptions(
 		reached.Program(),
 		reachedRoots,
-		emit.DefaultOptions(),
+		mapNumberOptions(),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assertSameArtifacts(
 		t,
-		materializedContents(t, first),
-		materializedContents(t, withoutUnreachable),
+		withoutSourceFactApplicationsByPath(materializedContents(t, first)),
+		withoutSourceFactApplicationsByPath(materializedContents(t, withoutUnreachable)),
 		"unreachable map shape",
 	)
 }
@@ -418,6 +418,25 @@ func materializedContents(
 		result[filepath.ToSlash(relative)] = readFile(t, targetPath)
 	}
 	return result
+}
+
+func withoutSourceFactApplicationsByPath(contents map[string]string) map[string]string {
+	result := make(map[string]string, len(contents))
+	for path, content := range contents {
+		result[path] = withoutSourceFactApplications(content)
+	}
+	return result
+}
+
+func withoutSourceFactApplications(source string) string {
+	var result strings.Builder
+	for _, line := range strings.SplitAfter(source, "\n") {
+		if strings.HasPrefix(line, "attribute<") {
+			continue
+		}
+		result.WriteString(line)
+	}
+	return result.String()
 }
 
 func assertSameArtifacts(

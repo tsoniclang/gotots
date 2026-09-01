@@ -66,7 +66,7 @@ func Results() (bool, bool, bool, bool, bool, bool) {
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -174,7 +174,7 @@ func Result() bool {
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -266,7 +266,7 @@ func Result() bool {
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -351,7 +351,7 @@ func Message(failure error) string { return failure.Error() }
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,

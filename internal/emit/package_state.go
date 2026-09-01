@@ -88,6 +88,15 @@ type packageTargetBuilder struct {
 	exportRevisions        uint64
 }
 
+func hasExportedPackageVariable(storage []packageStorage) bool {
+	for _, item := range storage {
+		if item.variable.Exported() {
+			return true
+		}
+	}
+	return false
+}
+
 func newPackageInitializationScheduler() *packageInitializationScheduler {
 	return &packageInitializationScheduler{
 		pending: make(map[*load.Package]struct{}),

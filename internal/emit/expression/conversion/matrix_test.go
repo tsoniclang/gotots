@@ -43,7 +43,7 @@ go 1.26.4
 		name    string
 		options emit.Options
 	}{
-		{"number", emit.DefaultOptions()},
+		{"number", conversionNumberOptions()},
 		{
 			"bigint",
 			emit.Options{
@@ -62,7 +62,7 @@ go 1.26.4
 				t.Fatalf("matrix compile failed: %v", err)
 			}
 			printedBytes := strictTypecheckEmission(t, emission)
-			if printedBytes > 100_000 {
+			if printedBytes > 150_000 {
 				t.Fatalf(
 					"matrix output = %d bytes for %d conversions",
 					printedBytes,

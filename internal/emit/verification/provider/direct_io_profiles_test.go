@@ -47,7 +47,7 @@ func Result() (int, error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -157,7 +157,7 @@ func Result() error {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -221,7 +221,7 @@ func Result(target []byte) (int, error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -280,7 +280,7 @@ func Render(text string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,

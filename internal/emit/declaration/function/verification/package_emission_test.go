@@ -29,7 +29,10 @@ func TestPackageWideCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		}
 	})
 	for baseName, targetFile := range targetFiles {
-		printed, err := client.PrintNode(targetFile, tsgo.PrintOptions{})
+		printed, err := client.PrintNode(
+			executableTargetFile(targetFile),
+			tsgo.PrintOptions{},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -62,7 +65,7 @@ func TestPackageWideCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 func TestPackageWideImportsAreExactAndDeduplicated(t *testing.T) {
 	loaded := loadBoolMultifileProject(t)
 	targetFiles := emitBoolMultifile(t, loaded, t.TempDir())
-	entry := targetFiles["entry"]
+	entry := executableTargetFile(targetFiles["entry"])
 	statements := entry.Statements()
 	if len(statements) != 5 {
 		t.Fatalf("entry statements = %d, want two imports plus three functions", len(statements))
@@ -83,7 +86,7 @@ func TestPackageWideImportsAreExactAndDeduplicated(t *testing.T) {
 	if len(bindings) != 1 || bindings[0].Name().Text() != "flip" {
 		t.Fatalf("value import bindings = %v, want one flip", bindings)
 	}
-	logicFunction := targetFiles["logic"].Statements()[2].(tsgo.FunctionDeclaration)
+	logicFunction := targetFunction(t, targetFiles["logic"], "flip")
 	if modifiers := logicFunction.Modifiers(); len(modifiers) != 1 ||
 		modifiers[0].Kind() != tsgo.SyntaxKindExportKeyword {
 		t.Fatalf("unexported Go function target modifiers = %v, want module export", modifiers)
@@ -107,12 +110,13 @@ func TestPackageWideImportUsesGoObjectOwnership(t *testing.T) {
 	call.Fun.(*ast.Ident).Name = "identity"
 
 	targetFile := compileSourceFile(t, loaded, entryFile)
-	valueImport := targetFile.Statements()[1].(tsgo.ImportDeclaration)
+	executable := executableTargetFile(targetFile)
+	valueImport := executable.Statements()[1].(tsgo.ImportDeclaration)
 	imported := valueImport.ImportClause().NamedBindings().(tsgo.NamedImports).Elements()
 	if len(imported) != 1 || imported[0].Name().Text() != "flip" {
 		t.Fatalf("value imports = %v, want declaration-owned flip", imported)
 	}
-	targetRun := targetFile.Statements()[2].(tsgo.FunctionDeclaration)
+	targetRun := targetFunction(t, targetFile, "Run")
 	targetReturn := targetRun.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
 	targetCall := targetReturn.Expression().(tsgo.CallExpression)
 	if callee := targetCall.Expression().(tsgo.Identifier).Text(); callee != "flip" {

@@ -94,19 +94,25 @@ type Implementation struct {
 	sourcePath     string
 	digest         string
 	sourceDigest   string
-	envelope       EnvelopeKind
+	envelope       EnvelopeDocument
 	exports        []Export
 	sourceFile     tsgo.SourceFile
 	privateModules []PrivateModule
 }
 
-func (i Implementation) PackagePath() string         { return i.packagePath }
-func (i Implementation) ModulePath() string          { return i.modulePath }
-func (i Implementation) ModuleVersion() string       { return i.moduleVersion }
-func (i Implementation) SourcePath() string          { return i.sourcePath }
-func (i Implementation) Digest() string              { return i.digest }
-func (i Implementation) SourceDigest() string        { return i.sourceDigest }
-func (i Implementation) Envelope() EnvelopeKind      { return i.envelope }
+func (i Implementation) PackagePath() string    { return i.packagePath }
+func (i Implementation) ModulePath() string     { return i.modulePath }
+func (i Implementation) ModuleVersion() string  { return i.moduleVersion }
+func (i Implementation) SourcePath() string     { return i.sourcePath }
+func (i Implementation) Digest() string         { return i.digest }
+func (i Implementation) SourceDigest() string   { return i.sourceDigest }
+func (i Implementation) Envelope() EnvelopeKind { return i.envelope.Kind }
+func (i Implementation) EquivalenceEnvelope() EnvelopeDocument {
+	result := i.envelope
+	result.PreservedObservables = slices.Clone(result.PreservedObservables)
+	result.Evidence = slices.Clone(result.Evidence)
+	return result
+}
 func (i Implementation) Exports() []Export           { return slices.Clone(i.exports) }
 func (i Implementation) SourceFile() tsgo.SourceFile { return i.sourceFile }
 func (i Implementation) PrivateModules() []PrivateModule {

@@ -25,7 +25,7 @@ func Double() int { return Scale + Scale }
 func F32() float32 { return 0.1 + 0.2 }
 func F64() float64 { return 0.1 + 0.2 }
 `)
-	emission := compileExportedPackage(t, loaded)
+	emission := compileExportedPackageWithOptions(t, loaded, numberOptions())
 	typecheckProgram(t, emission)
 	source := onlySourceFile(t, emission, "contextual")
 
@@ -338,6 +338,23 @@ func compileExportedPackage(
 ) emit.ProgramEmission {
 	t.Helper()
 	emission, err := compileExportedPackageError(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return emission
+}
+
+func compileExportedPackageWithOptions(
+	t *testing.T,
+	loaded *load.Package,
+	options emit.Options,
+) emit.ProgramEmission {
+	t.Helper()
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.CompileWithOptions(loaded.Program(), roots, options)
 	if err != nil {
 		t.Fatal(err)
 	}

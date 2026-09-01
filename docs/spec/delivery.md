@@ -7,6 +7,35 @@ are capability checkpoints, not alternate compiler phases. Every milestone
 uses the same direct Go AST/`go/types` to typed TS-Go AST architecture for
 canonical source, followed by the one selected fact-driven target boundary.
 
+## Lossless Preservation Closure
+
+Before adding or optimizing another executable construct family, close the
+canonical preservation boundary in this order:
+
+1. make each existing semantic dispatcher total over its closed input class and
+   require an ordinary-TypeScript or exact-fact disposition at that owner;
+2. map all generated scalar aliases to shared primitive facts and add only the
+   Go string/complex/source-native companions that shared facts cannot own;
+3. conserve declaration, defined/alias, generic, receiver, callable, package,
+   module, and source identities on exact declaration subjects;
+4. conserve struct/field/tag/embedding, fixed-array length, slice, map,
+   interface, pointer, function-value, and channel facts;
+5. conserve storage/alias/copy/mutation/escape/capture/loop-lifetime facts;
+6. conserve evaluation, panic/defer/recover, goroutine/channel/select,
+   unsafe/layout, reflection, and implementation/provider operation facts;
+7. make executable integer carriers, direct evaluation, serial concurrency,
+   and target-specific implementation selection fact-replaceable and require
+   the selected target to retain, lower, or reject each choice explicitly; and
+8. require every selected target to consume or explicitly reject every reached
+   fact, then delete early-lowering and helper-spelling routes.
+
+Each step replaces its old route atomically. A fact may not be added as a
+decorative sibling to an earlier lossy path. The phase exits only when every
+closed owner fails on an omitted or duplicated disposition, every emitted fact
+is consumed exactly once, and the Go AST/checker graph can be released without
+removing a choice available to C#, Rust, TypeScript, or another selected target.
+A second whole-program semantic inventory is forbidden.
+
 For each construct family:
 
 1. add the smallest valid Go fixture and expected artifact shape;
@@ -79,7 +108,8 @@ Install:
 - structs/classes and demand-created members;
 - arrays, slices, strings, pointers, and maps;
 - composite literals, indexing, slicing, range, and addressability;
-- all integer profiles and both evaluation-order profiles.
+- the canonical `bigint` plus `preserve-go` profile first, followed by the
+  explicit executable integer and evaluation-order profiles.
 
 Exit: focused family matrices and mutations pass; direct representations stay
 direct; carriers/helpers appear only on exact demand; size grows with source
@@ -137,13 +167,15 @@ Exit: source callable signatures contain no recovery parameter; every direct
 and dynamic defer form passes the recovery-directness matrix; functions without
 control demand remain artifact-stable.
 
-## 6. Serial Execution
+## 6. Canonical Synchronous ABI And Serial TypeScript Envelope
 
-Install the one fixed synchronous execution contract:
+Install one direct synchronous callable ABI plus exact concurrency facts and
+the explicit TypeScript serial envelope:
 
 - one direct callable ABI for functions, methods, literals, callable values,
   interface methods, callbacks, deferred entries, and package initialization;
-- immediate serial execution of `go` calls;
+- one fact-bearing `goSpawn` operation for every `go` call, with serial
+  execution only in the selected TypeScript envelope;
 - buffered channel send, receive, close, range, and atomic ready/default
   `select` operations;
 - typed serial-blocking panics for every operation that would suspend;
@@ -153,8 +185,9 @@ Install the one fixed synchronous execution contract:
 
 Exit: generated and provider-facing callable surfaces contain no `Promise`,
 `async`, `await`, awaitable union, scheduler, blocked-operation queue, or
-execution-profile variant; ready channel differentials and every blocking,
-close, nil, and panic boundary pass.
+callable-ABI variant; every concurrency operation retains exact canonical
+facts before the TypeScript target selects the serial envelope, and ready
+channel differentials plus every blocking, close, nil, and panic boundary pass.
 
 ## 7. Language Closure
 

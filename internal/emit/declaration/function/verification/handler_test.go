@@ -27,7 +27,7 @@ func TestAddConstructCreatesExactTargetTree(t *testing.T) {
 	loaded := loadAddProject(t)
 	targetFile := emitAdd(t, loaded)
 
-	statements := targetFile.Statements()
+	statements := executableTargetFile(targetFile).Statements()
 	if len(statements) != 2 {
 		t.Fatalf("target statements = %d, want 2", len(statements))
 	}
@@ -88,7 +88,10 @@ func TestAddConstructPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 			t.Errorf("close TS-Go client: %v", err)
 		}
 	})
-	printed, err := client.PrintNode(targetFile, tsgo.PrintOptions{})
+	printed, err := client.PrintNode(
+		executableTargetFile(targetFile),
+		tsgo.PrintOptions{},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,8 +138,8 @@ func TestAddReferencesUseGoObjectIdentity(t *testing.T) {
 	binary.X.(*ast.Ident).Name = "forgedSourceSpelling"
 
 	targetFile := emitAdd(t, loaded)
-	targetFunction := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
-	targetBody := targetFunction.Body().(tsgo.Block)
+	targetDeclaration := targetFunction(t, targetFile, "Add")
+	targetBody := targetDeclaration.Body().(tsgo.Block)
 	targetReturn := targetBody.Statements()[0].(tsgo.ReturnStatement)
 	targetBinary := targetReturn.Expression().(tsgo.BinaryExpression)
 	assertIdentifier(t, targetBinary.Left(), "left")

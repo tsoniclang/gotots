@@ -41,7 +41,7 @@ func Result() error {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -126,7 +126,7 @@ func Result(value *uint32) error {
 	}
 	for _, profile := range profiles {
 		t.Run(profile.name, func(t *testing.T) {
-			options := emit.DefaultOptions()
+			options := providerNumberOptions()
 			options.IntegerRepresentation = profile.representation
 			options.StandardLibrary = linkedProviderCertificate(t)
 			emission, err := emit.CompileWithOptions(
@@ -194,7 +194,7 @@ func Result(source []byte) error {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,

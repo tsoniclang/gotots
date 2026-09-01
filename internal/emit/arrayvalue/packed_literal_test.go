@@ -109,7 +109,7 @@ func TestLargeConstantArrayPackedPayloadStrictTypechecksWithBigIntProfile(
 
 func compilePackedArrayFixture(t *testing.T) emit.ProgramEmission {
 	t.Helper()
-	return compilePackedArrayFixtureWithOptions(t, emit.DefaultOptions())
+	return compilePackedArrayFixtureWithOptions(t, arrayNumberOptions())
 }
 
 func compilePackedArrayFixtureWithOptions(

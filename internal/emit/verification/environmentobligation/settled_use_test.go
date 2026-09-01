@@ -80,6 +80,8 @@ func Kind(payload Payload) reflect.Kind {
 		roots = append(roots, root)
 	}
 	options := emit.DefaultOptions()
+	options.IntegerRepresentation = emit.IntegerRepresentationNumber
+	options.EvaluationOrder = emit.EvaluationOrderDirect
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {

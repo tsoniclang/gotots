@@ -46,7 +46,7 @@ func TestNamedStructAssemblyMaterializesOnlyExactValueDemand(t *testing.T) {
 		t.Fatalf("operation cases = %d, want complete enum denominator %d", got, want)
 	}
 	for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			program := loadDeclarationAssemblyFixture(t)
 			record := program.Roots()[0].Types().Scope().
 				Lookup("Item").(*types.TypeName)

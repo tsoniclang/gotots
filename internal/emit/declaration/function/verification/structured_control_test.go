@@ -21,7 +21,7 @@ func TestStructuredControlPrintsTypechecksAndExecutesDifferentially(t *testing.T
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "structured-control.ts")
 	targetFile := emitStructuredControl(t, loaded)
-	printed := printTargetFile(t, targetFile, workingDirectory)
+	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(structuredControlProjectDirectory(), "expected.ts"))
 	if err != nil {
@@ -42,8 +42,7 @@ func TestStructuredControlPrintsTypechecksAndExecutesDifferentially(t *testing.T
 func TestStructuredControlCreatesScopedExactTargetTree(t *testing.T) {
 	loaded := loadStructuredControlProject(t)
 	targetFile := emitStructuredControl(t, loaded)
-	statements := targetFile.Statements()
-	classify := statements[1].(tsgo.FunctionDeclaration)
+	classify := targetFunction(t, targetFile, "Classify")
 	classifyBody := classify.Body().(tsgo.Block).Statements()
 	if len(classifyBody) != 1 {
 		t.Fatalf("Classify statements = %d, want one initializer scope", len(classifyBody))
@@ -60,13 +59,13 @@ func TestStructuredControlCreatesScopedExactTargetTree(t *testing.T) {
 		t.Fatalf("alternate = %T, want nested if", condition.ElseStatement())
 	}
 
-	sum := statements[2].(tsgo.FunctionDeclaration)
+	sum := targetFunction(t, targetFile, "Sum")
 	sumLoop := sum.Body().(tsgo.Block).Statements()[2].(tsgo.ForStatement)
 	if sumLoop.Initializer() != nil || sumLoop.Incrementor() != nil ||
 		sumLoop.Condition() == nil {
 		t.Fatal("condition-only loop target children are not exact")
 	}
-	once := statements[3].(tsgo.FunctionDeclaration)
+	once := targetFunction(t, targetFile, "Once")
 	onceLoop := once.Body().(tsgo.Block).Statements()[1].(tsgo.ForStatement)
 	if onceLoop.Initializer() != nil ||
 		onceLoop.Condition() != nil ||

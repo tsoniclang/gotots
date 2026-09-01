@@ -15,7 +15,7 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 		options    emit.Options
 		wideSuffix string
 	}{
-		{"number", emit.DefaultOptions(), ""},
+		{"number", conversionNumberOptions(), ""},
 		{
 			"bigint",
 			emit.Options{

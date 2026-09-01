@@ -28,7 +28,7 @@ func TestMapNegativeRuntimeHintMatchesGoUnderIntegerProfiles(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			options := emit.DefaultOptions()
+			options := mapNumberOptions()
 			options.IntegerRepresentation = profile.representation
 			emission, err := emit.CompileWithOptions(
 				loaded.Program(),

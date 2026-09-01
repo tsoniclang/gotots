@@ -115,12 +115,14 @@ func TestGenericContainerStorageBindsExactTargetFacets(t *testing.T) {
 		workingDirectory,
 		artifacts.paths,
 	)
-	if ordinaryBytes > 30_000 ||
-		concretizations != 7 || concretizationBytes > 15_000 ||
+	// Canonical facts are counted here and erased only by the executable
+	// TypeScript target, whose output has an independent budget.
+	if ordinaryBytes > 75_000 ||
+		concretizations != 7 || concretizationBytes > 23_000 ||
 		capabilities != 0 || capabilityBytes != 0 ||
-		artifacts.bytes > 45_000 ||
-		artifacts.nodes > 7_500 ||
-		artifacts.largest > 17_000 {
+		artifacts.bytes > 100_000 ||
+		artifacts.nodes > 12_500 ||
+		artifacts.largest > 45_000 {
 		t.Fatalf(
 			"generic container-storage artifact bounds exceeded: ordinary=%d concretizations=%d/%d capabilities=%d/%d total=%d nodes=%d largest=%d",
 			ordinaryBytes,

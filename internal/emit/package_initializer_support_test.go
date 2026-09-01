@@ -1,8 +1,12 @@
 package emit
 
 import (
+	"context"
 	"go/types"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/load"
@@ -59,4 +63,62 @@ func packageInitializerForVariable(
 		)
 	}
 	return selected
+}
+
+func TestPackageInitializerCarriesSourceEvidenceIntoLocalTypeFacts(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(directory, "go.mod"),
+		[]byte("module example.com/initializerfacts\n\ngo 1.26.4\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(directory, "source.go"),
+		[]byte(`package initializerfacts
+
+	var Value = func() int32 {
+		type local struct {
+			Item int32
+		}
+		return local{Item: 1}.Item
+	}()
+	`),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := NewRoot(program.Roots()[0].Types().Scope().Lookup("Value"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := Compile(program, []Root{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var encoded strings.Builder
+	for _, file := range emission.Files() {
+		payload, err := tsgo.EncodeSourceFile(file.SourceFile())
+		if err != nil {
+			t.Fatal(err)
+		}
+		encoded.Write(payload)
+	}
+	for _, required := range []string{
+		"gotots-go-source-declaration-fact-v1",
+		"checked-syntax:source.go",
+		"local",
+	} {
+		if !strings.Contains(encoded.String(), required) {
+			t.Fatalf("package initializer facts omit %q", required)
+		}
+	}
 }

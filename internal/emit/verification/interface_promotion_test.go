@@ -53,7 +53,9 @@ func TestWaveSixInterfacesCompileThroughThePublicPipeline(t *testing.T) {
 				emission,
 				workingDirectory,
 			)
-			if artifacts.bytes > 110_000 || artifacts.largest > 45_000 {
+			// Canonical facts are counted here and erased only by the executable
+			// TypeScript target, whose output has an independent budget.
+			if artifacts.bytes > 205_000 || artifacts.largest > 92_000 {
 				t.Fatalf(
 					"Wave 6 artifact bounds exceeded: total=%d largest=%d",
 					artifacts.bytes,

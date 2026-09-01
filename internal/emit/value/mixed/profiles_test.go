@@ -11,7 +11,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestMixedValueFamiliesDefaultNumberProfileTypechecksAndExecutes(
+func TestMixedValueFamiliesNumberProfileTypechecksAndExecutes(
 	t *testing.T,
 ) {
 	program, err := load.Load(context.Background(), load.Request{
@@ -34,7 +34,14 @@ func TestMixedValueFamiliesDefaultNumberProfileTypechecksAndExecutes(
 			selected = append(selected, root)
 		}
 	}
-	emission, err := emit.Compile(program, selected)
+	emission, err := emit.CompileWithOptions(
+		program,
+		selected,
+		emit.Options{
+			IntegerRepresentation: emit.IntegerRepresentationNumber,
+			EvaluationOrder:       emit.EvaluationOrderDirect,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +56,7 @@ func TestMixedValueFamiliesDefaultNumberProfileTypechecksAndExecutes(
 		"runtime/map.ts",
 	)
 	if _, ok := artifacts.printed["runtime/integer.ts"]; ok {
-		t.Fatal("default number profile emitted unrequested BigInt integer runtime")
+		t.Fatal("number profile emitted unrequested BigInt integer runtime")
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import {

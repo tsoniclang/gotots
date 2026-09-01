@@ -18,7 +18,14 @@ import (
 
 func compileArrayFixture(t *testing.T) emit.ProgramEmission {
 	t.Helper()
-	return compileArrayFixtureWithOptions(t, emit.DefaultOptions())
+	return compileArrayFixtureWithOptions(t, arrayNumberOptions())
+}
+
+func arrayNumberOptions() emit.Options {
+	return emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
+	}
 }
 
 func compileArrayFixtureWithOptions(

@@ -112,34 +112,65 @@ func TestComplexGeneratedSurfaceIsBoundedAndDemandOwned(t *testing.T) {
 		}
 		switch {
 		case file.OutputPath() == "runtime/complex.ts":
-			if len(file.SourceFile().Statements()) != 16 {
+			executableFile := executableComplexFile(file.SourceFile())
+			if len(executableFile.Statements()) != 16 {
 				t.Fatalf(
 					"complex runtime statements = %d, want 1 import + 15 definitions",
-					len(file.SourceFile().Statements()),
+					len(executableFile.Statements()),
 				)
 			}
-			if len(text) > 6_000 {
-				t.Fatalf("complex runtime = %d bytes, want <= 6000", len(text))
+			executable, printErr := client.PrintNode(executableFile, tsgo.PrintOptions{})
+			if printErr != nil {
+				t.Fatal(printErr)
+			}
+			if len(executable) > 6_000 {
+				t.Fatalf("complex runtime = %d executable bytes (%d canonical), want <= 6000", len(executable), len(text))
 			}
 		case strings.HasSuffix(file.OutputPath(), "/source.ts"):
-			if len(text) > 6_000 {
-				t.Fatalf("complex source = %d bytes, want <= 6000", len(text))
+			executable, printErr := client.PrintNode(
+				executableComplexFile(file.SourceFile()),
+				tsgo.PrintOptions{},
+			)
+			if printErr != nil {
+				t.Fatal(printErr)
+			}
+			if len(executable) > 6_000 {
+				t.Fatalf("complex source = %d executable bytes (%d canonical), want <= 6000", len(executable), len(text))
 			}
 			for _, operation := range []string{
 				"goComplex64Multiply(left, right)",
 				"goComplex128Divide(left, right)",
 			} {
-				if strings.Count(text, operation) != 1 {
+				if strings.Count(executable, operation) != 1 {
 					t.Fatalf(
 						"source count(%q) = %d:\n%s",
 						operation,
-						strings.Count(text, operation),
-						text,
+						strings.Count(executable, operation),
+						executable,
 					)
 				}
 			}
 		}
 	}
+}
+
+func executableComplexFile(source tsgo.SourceFile) tsgo.SourceFile {
+	statements := make([]tsgo.Statement, 0, len(source.Statements()))
+	for _, statement := range source.Statements() {
+		if declaration, ok := statement.(tsgo.ImportDeclaration); ok {
+			module, moduleOK := declaration.ModuleSpecifier().(tsgo.StringLiteral)
+			if moduleOK && (strings.HasSuffix(module.Text(), "/source-fact.js") ||
+				module.Text() == "@tsonic/core/lang.js") {
+				continue
+			}
+		}
+		if _, fact := statement.(tsgo.ExpressionStatement); fact {
+			continue
+		}
+		statements = append(statements, statement)
+	}
+	factory := tsgo.NewFactory()
+	return factory.SourceFile(statements, source.EndOfFileToken(), source.SourceData())
 }
 
 func loadComplex(t *testing.T) *load.Package {

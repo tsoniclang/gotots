@@ -95,9 +95,19 @@ const (
 	RuntimeSendChannel                = runtimecontract.RuntimeSendChannel
 	RuntimeSelectCase                 = runtimecontract.RuntimeSelectCase
 	RuntimeSelect                     = runtimecontract.RuntimeSelect
+	RuntimeGoSpawn                    = runtimecontract.RuntimeGoSpawn
 	RuntimeSelectReady                = runtimecontract.RuntimeSelectReady
 	RuntimeSelectAttempt              = runtimecontract.RuntimeSelectAttempt
 	RuntimeUnsafeString               = runtimecontract.RuntimeUnsafeString
+	RuntimeSourceCompilationFact      = runtimecontract.RuntimeSourceCompilationFact
+	RuntimeSourceDeclarationFact      = runtimecontract.RuntimeSourceDeclarationFact
+	RuntimeSourceBasicFact            = runtimecontract.RuntimeSourceBasicFact
+	RuntimeSourceAggregateFact        = runtimecontract.RuntimeSourceAggregateFact
+	RuntimeSourceCallableFact         = runtimecontract.RuntimeSourceCallableFact
+	RuntimeSourceInterfaceFact        = runtimecontract.RuntimeSourceInterfaceFact
+	RuntimeSourceStorageFact          = runtimecontract.RuntimeSourceStorageFact
+	RuntimeSourceOperationFact        = runtimecontract.RuntimeSourceOperationFact
+	RuntimeSourceImplementationFact   = runtimecontract.RuntimeSourceImplementationFact
 )
 
 type RuntimeModule = runtimecontract.RuntimeModule
@@ -122,6 +132,7 @@ const (
 	RuntimeModuleStorage          = runtimecontract.RuntimeModuleStorage
 	RuntimeModuleDeferredRegistry = runtimecontract.RuntimeModuleDeferredRegistry
 	RuntimeModuleScalar           = runtimecontract.RuntimeModuleScalar
+	RuntimeModuleSourceFact       = runtimecontract.RuntimeModuleSourceFact
 )
 
 type RuntimeSymbolContract = runtimecontract.RuntimeSymbolContract

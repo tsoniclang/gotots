@@ -15,7 +15,7 @@ import (
 )
 
 func TestOrderedBuiltinASTAndDemandDefinitionsAreExact(t *testing.T) {
-	number := compileOrdered(t, emit.DefaultOptions())
+	number := compileOrdered(t, orderedNumberOptions())
 	bigint := compileOrdered(t, emit.Options{
 		IntegerRepresentation: emit.IntegerRepresentationBigInt,
 		EvaluationOrder:       emit.EvaluationOrderPreserveGo,
@@ -69,8 +69,8 @@ func TestOrderedBuiltinASTAndDemandDefinitionsAreExact(t *testing.T) {
 
 	workingDirectory := t.TempDir()
 	_, _, printed := printOrdered(t, workingDirectory, bigint)
-	if len(printed) > 8_000 {
-		t.Fatalf("ordered artifact = %d bytes, want <= 8000", len(printed))
+	if len(printed) > 25_000 {
+		t.Fatalf("ordered canonical artifact = %d bytes, want <= 25000", len(printed))
 	}
 	for _, required := range []string{
 		"goIntegerMin",
@@ -166,13 +166,26 @@ func assertRuntimeDefinitionCount(
 	t.Helper()
 	for _, file := range emission.Files() {
 		if file.OutputPath() == path {
-			if got := len(file.SourceFile().Statements()); got != want {
+			got := 0
+			for _, statement := range file.SourceFile().Statements() {
+				if _, ok := statement.(tsgo.FunctionDeclaration); ok {
+					got++
+				}
+			}
+			if got != want {
 				t.Fatalf("%s definitions = %d, want %d", path, got, want)
 			}
 			return
 		}
 	}
 	t.Fatalf("runtime file %s is absent", path)
+}
+
+func orderedNumberOptions() emit.Options {
+	return emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
+	}
 }
 
 func assertNoRuntimeFile(

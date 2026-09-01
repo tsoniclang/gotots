@@ -26,7 +26,7 @@ func TestCallableImplementationsReplaceOnlyExactSelectedBodies(t *testing.T) {
 		fixture.callable(t, fixture.method("Box", "Add"), "boxAddFast"),
 	}
 	certificate := fixture.certificate(t, callables)
-	options := DefaultOptions()
+	options := numberDirectOptions()
 	options.CallableImplementations = certificate
 	emission, err := CompileWithOptions(fixture.program, fixture.roots(t), options)
 	if err != nil {
@@ -86,7 +86,7 @@ func TestCallableImplementationRejectsWrongVariantAndUnconsumedClaim(t *testing.
 
 	wrongVariant := fixture.callable(t, fixture.function("Add"), "addFast")
 	wrongVariant.Variant = callableimplementation.VariantKernel
-	options := DefaultOptions()
+	options := numberDirectOptions()
 	options.CallableImplementations = fixture.certificate(
 		t,
 		[]callableimplementation.CallableDocument{wrongVariant},
@@ -173,7 +173,7 @@ func TestCallableImplementationSelectsExactKernelVariant(t *testing.T) {
 	fixture := loadCallableImplementationFixture(t)
 	claim := fixture.callable(t, fixture.method("NumberBox", "Twice"), "numberBoxTwiceFast")
 	claim.Variant = callableimplementation.VariantKernel
-	options := DefaultOptions()
+	options := numberDirectOptions()
 	options.CallableImplementations = fixture.certificate(
 		t,
 		[]callableimplementation.CallableDocument{claim},
@@ -211,6 +211,13 @@ func TestCallableImplementationSelectsExactKernelVariant(t *testing.T) {
 	actual := generated.String()
 	if !strings.Contains(actual, "numberBoxTwiceFast") || strings.Contains(actual, "5009") {
 		t.Fatalf("kernel body replacement is incomplete:\n%s", actual)
+	}
+}
+
+func numberDirectOptions() Options {
+	return Options{
+		IntegerRepresentation: IntegerRepresentationNumber,
+		EvaluationOrder:       EvaluationOrderDirect,
 	}
 }
 

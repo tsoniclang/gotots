@@ -2,6 +2,7 @@ package index
 
 import (
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"go/types"
 	"testing"
@@ -18,12 +19,20 @@ func TestAddSiteRejectsDuplicateObjectOwnership(t *testing.T) {
 		types.NewSignatureType(nil, nil, nil, nil, nil, false),
 	)
 	sites := make(map[types.Object]Site)
-	declaration := &ast.FuncDecl{Name: ast.NewIdent("Run")}
+	parsed, err := parser.ParseFile(token.NewFileSet(), "source.go", "package index\nfunc Run() {}\n", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declaration, ok := parsed.Decls[0].(*ast.FuncDecl)
+	if !ok {
+		t.Fatalf("declaration = %T", parsed.Decls[0])
+	}
 	if err := addSite(
 		sites,
 		object,
 		nil,
 		load.File{},
+		declaration,
 		declaration,
 		"modules/key/index/run.ts",
 	); err != nil {
@@ -34,6 +43,7 @@ func TestAddSiteRejectsDuplicateObjectOwnership(t *testing.T) {
 		object,
 		nil,
 		load.File{},
+		declaration,
 		declaration,
 		"modules/key/index/other.ts",
 	); err == nil {

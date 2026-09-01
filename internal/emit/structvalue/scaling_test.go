@@ -16,14 +16,15 @@ import (
 
 func TestNamedStructDefinitionScalesByFieldsWhileUseSitesStayConstant(t *testing.T) {
 	fieldCounts := []int{8, 16, 32}
-	printed := make([]string, len(fieldCounts))
+	useSiteSources := make([]string, len(fieldCounts))
 	sizes := make([]int, len(fieldCounts))
 	for index, fieldCount := range fieldCounts {
 		emission := compileScalingStruct(t, fieldCount)
 		source := structTargetSource(t, emission)
 		assertStructOperationWidths(t, source, fieldCount)
-		printed[index] = printAndTypecheckScalingStruct(t, emission)
-		sizes[index] = len(printed[index])
+		printed, useSites := printAndTypecheckScalingStruct(t, emission)
+		useSiteSources[index] = useSites
+		sizes[index] = len(printed)
 	}
 
 	firstDelta := sizes[1] - sizes[0]
@@ -38,18 +39,13 @@ func TestNamedStructDefinitionScalesByFieldsWhileUseSitesStayConstant(t *testing
 			secondDelta,
 		)
 	}
-	var useSites string
-	for index, target := range printed {
-		start := strings.Index(target, "export function CopyRecord")
-		if start < 0 {
-			t.Fatal("scaling artifact lacks use-site functions")
-		}
-		current := target[start:]
+	var baseline string
+	for index, current := range useSiteSources {
 		if index == 0 {
-			useSites = current
+			baseline = current
 			continue
 		}
-		if current != useSites {
+		if current != baseline {
 			t.Fatal("copy/assignment/equality/method use sites grew with field count")
 		}
 	}
@@ -167,7 +163,7 @@ func equalityLeafCount(expression tsgo.Expression) int {
 func printAndTypecheckScalingStruct(
 	t *testing.T,
 	emission emit.ProgramEmission,
-) string {
+) (string, string) {
 	t.Helper()
 	workingDirectory := t.TempDir()
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
@@ -180,6 +176,7 @@ func printAndTypecheckScalingStruct(
 		}
 	})
 	var sourceText string
+	var sourceFile tsgo.SourceFile
 	var targetPaths []string
 	for _, file := range emission.Files() {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
@@ -194,6 +191,7 @@ func printAndTypecheckScalingStruct(
 		targetPaths = append(targetPaths, targetPath)
 		if file.Kind() == emit.TargetFileSource {
 			sourceText = printed
+			sourceFile = file.SourceFile()
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -217,5 +215,24 @@ func printAndTypecheckScalingStruct(
 	); err != nil {
 		t.Fatal(err)
 	}
-	return sourceText
+	if sourceFile == nil {
+		t.Fatal("scaling source file is absent")
+	}
+	var useSites strings.Builder
+	for _, name := range []string{
+		"CopyRecord",
+		"AssignRecord",
+		"EqualRecord",
+		"InvokeRecord",
+	} {
+		printed, err := client.PrintNode(
+			targetFunction(t, sourceFile, name),
+			tsgo.PrintOptions{},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		useSites.WriteString(printed)
+	}
+	return sourceText, useSites.String()
 }

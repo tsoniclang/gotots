@@ -419,6 +419,67 @@ Compiler-owned private support definitions may have implementation parameters
 only when they claim no Go source identity and are not exposed through package
 assembly. Every generated source call still has the source argument list.
 
+## Lossless Source-Fact Boundary
+
+Each closed semantic owner performs one total preservation decision while the
+selected Go AST and checker evidence are live. Every target-relevant
+distinction that owner encounters is preserved exactly once by either:
+
+- an ordinary TS-Go AST shape whose checked TypeScript semantics retain the
+  distinction completely; or
+- one exact marker occurrence whose finalized fact retains the distinction on
+  the corresponding TS-Go AST subject.
+
+The existing AST/type/runtime dispatchers are the denominators for their own
+classes: unknown variants fail, constructors reject incomplete facts, and the
+root seals output only after every requested artifact has been consumed. No
+production pass copies those rows into a whole-program semantic inventory or
+re-walks the checker graph. A helper call, class name, source comment, manifest
+row, or executable implementation is not a preservation disposition.
+
+When canonical output selects a shared source-core primitive, pointer,
+fixed-array, struct/field, reference, borrow, move, or default contract, that
+contract owns its complete language-neutral meaning. GoToTS owns every Go-only
+remainder. It expresses that remainder as closed attribute families on exact
+declarations or exact semantic helper declarations through the canonical
+`@tsonic/core/lang.js` `attribute` marker. The fact class has an exact
+GoToTS-owned declaration identity; its arguments are typed TS-Go AST values.
+TSTS finalizes the application, and targets select it by fact and declaration
+identity rather than generated spelling.
+
+The TypeScript executable target may retain the ordinary canonical carrier and
+erase its finalized attributes as compile-time metadata. That is a closed
+target disposition only because no Go representation decision is reconstructed
+or changed: every exact application is consumed, and metadata-only bindings are
+removed only after an exact reference join. A C# or Rust target that changes a
+carrier must interpret the relevant exact fact class and schema or reject it.
+
+The Go-only families are:
+
+| Family | Sole content |
+|---|---|
+| compilation | Go version, build profile, native widths, language profile |
+| declaration | package/module/source identity, declaration kind, alias/defined/generic identity |
+| basic extension | Go string, complex, and source-native integer role not owned by shared primitives |
+| aggregate | tags/embedding/blank fields, array length, slice/map/channel roles |
+| callable | receiver kind, variadic/result shape, method/interface source identity |
+| interface | exact method-set identity, implicit implementation, typed-nil/boxing/copy contract |
+| storage and flow | addressability, alias/storage identity, copy, mutation, escape, capture, loop lifetime |
+| operation | only Go operations not completely expressed by ordinary TypeScript |
+| implementation | exact selected source/provider body and named equivalence envelope |
+
+One field has one owner. A Go companion never repeats meaning already supplied
+by the exact shared contract selected in that canonical shape. Runtime helpers
+that denote Go-only operations carry the operation attribute on their
+declaration; a target resolves the called declaration and reads the finalized
+fact. It never classifies a call by helper/member spelling.
+
+Canonical compilation preserves source evaluation order and concurrency
+intent. JavaScript integer carriers, temporary elimination, serial execution,
+package implementations, and other executable choices are target-profile
+lowerings after fact finalization. A lossy executable projection may be a named
+target envelope, but its output is not canonical input for another target.
+
 ## Callable Representation
 
 Every source function, method, function literal, callable value, interface
@@ -456,13 +517,15 @@ omit it. No conditional, target assertion, or alternate nil-call path coexists.
 
 ## Values And Representations
 
-The representation owner chooses the smallest exact direct TypeScript shape.
-Defaults prefer readable source and no semantic machinery:
+The representation owner chooses the smallest exact canonical preservation
+shape. Defaults preserve every selected Go distinction before a target chooses
+an executable representation:
 
-- integer profile defaults to `number`; `fixed64-bigint` and `bigint` are
-  explicit profiles;
-- evaluation defaults to direct TypeScript evaluation; `preserve-go` enables
-  additional ordering temporaries;
+- integer representation defaults to `bigint`; `number` and
+  `fixed64-bigint` are explicit executable profiles with their named
+  precision envelopes;
+- evaluation defaults to `preserve-go`; `direct` is an explicit executable
+  profile and is not admissible as canonical input to another target;
 - copy, pointer, interface, map, channel, and runtime support is demanded only
   when a selected occurrence requires it.
 
@@ -1073,12 +1136,21 @@ Native target control is used where structurally exact. Only genuinely
 non-structural `goto` selects a linear statement state machine assembled from
 already-created TS-Go statements. No CFG or control IR is retained.
 
-## Serial Channels And Goroutines
+## Canonical Concurrency Carrier And Serial TypeScript Envelope
 
-Execution is one fixed synchronous serial model, not a selectable concurrency
-profile. A `go` statement evaluates the callee and arguments in Go order and
-invokes the call immediately on the current JavaScript stack. It creates no
-Promise, host task, scheduler entry, or deferred callback.
+Canonical source has one direct synchronous callable ABI, but synchronous ABI
+does not erase a Go concurrency operation. A `go` statement evaluates the
+callee and arguments in Go order and calls the exact `goSpawn` runtime
+declaration. That declaration and call retain the goroutine operation through
+the canonical operation fact before any target acts. A direct unmarked call is
+not an admissible canonical representation of `go`.
+
+The GoToTS runtime supplies a synchronous serial reference carrier so canonical
+TypeScript remains executable. The TypeScript target may explicitly select
+that envelope by retaining the carrier after fact finalization. Another target
+must replace the fact-bearing operation with its task, thread, or scheduler
+representation, or reject it. The serial helper body is never concurrency
+authority and its output cannot become canonical input to a different target.
 
 One `GoChannel<T>` identity owns capacity, FIFO buffered values, close state,
 length, capacity, copy/zero behavior, and ready select operations. A send,
@@ -1103,8 +1175,9 @@ not part of source channel semantics.
 
 An event-backed provider such as a timer or OS signal may register a host
 callback internally while preserving its direct public Go call contract. This
-serial execution envelope is intentional and must not be described as Go
-concurrency parity.
+TypeScript serial execution envelope is intentional and must not be described
+as Go concurrency parity. Channel direction, operation, close, readiness, and
+select facts remain available before the target chooses that envelope.
 
 ## Provider And External Boundary
 
@@ -1619,6 +1692,13 @@ selected marker fact, and the selected target then strict-typechecks the
 executable artifact. The configured output directory is compiler-owned and is
 reconstructed through a staged replacement; a successful build cannot retain
 an artifact from an earlier canonical build.
+The output transaction removes scratch only after successful publication. If
+compilation, contract verification, printing, or installation fails while its
+staging directory still exists, that exact directory is retained outside the
+published output and its path is carried by the returned typed failure. A
+failure therefore preserves the immutable protocol, generated source, and
+verification scratch that produced it without exposing a partial build as the
+selected product.
 
 Compilation-scoped generated support definitions retain their full semantic
 artifact identities. Physical paths expose only semantic family and exact

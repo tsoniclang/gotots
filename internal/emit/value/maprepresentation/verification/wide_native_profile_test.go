@@ -92,7 +92,7 @@ func compileAggregateMapProfile(
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := mapNumberOptions()
 	options.IntegerRepresentation = representation
 	emission, err := emit.CompileWithOptions(loaded.Program(), roots, options)
 	if err != nil {
@@ -110,7 +110,11 @@ func assertWideNativeMapCarrier(
 ) {
 	t.Helper()
 	scalars := readFile(t, artifacts.file(t, "runtime/scalars.ts"))
-	if !strings.Contains(scalars, "export type uint64 = "+carrier+";") {
+	wantCarrier := carrier
+	if carrier == "bigint" {
+		wantCarrier = "$go$core$uint64"
+	}
+	if !strings.Contains(scalars, "export type uint64 = "+wantCarrier+";") {
 		t.Fatalf("uint64 carrier is not %s:\n%s", carrier, scalars)
 	}
 	wideDefinitions := 0

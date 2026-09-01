@@ -74,7 +74,7 @@ func Result(text string, custom bool) (int, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,

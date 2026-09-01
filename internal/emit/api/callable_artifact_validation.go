@@ -471,20 +471,6 @@ const (
 
 type CallableImplementationSelection = callableimplementationcontract.Selection
 
-func NewCallableImplementationSelection(
-	sourceIdentity string,
-	outputPath string,
-	export string,
-	variant CallableImplementationVariant,
-) (CallableImplementationSelection, error) {
-	return callableimplementationcontract.NewSelection(
-		sourceIdentity,
-		outputPath,
-		export,
-		variant,
-	)
-}
-
 type CallableImplementationTargetKind = callableimplementationcontract.TargetKind
 
 const (

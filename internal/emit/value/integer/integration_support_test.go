@@ -7,10 +7,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
@@ -18,6 +21,13 @@ import (
 type materializedProgram struct {
 	targetPaths []string
 	modules     map[string]string
+}
+
+func integerOptions(representation emit.IntegerRepresentation) emit.Options {
+	return emit.Options{
+		IntegerRepresentation: representation,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
+	}
 }
 
 func (p materializedProgram) module(t *testing.T, base string) string {
@@ -136,4 +146,83 @@ func repositoryRoot() string {
 
 func integerBoundaryDirectory() string {
 	return filepath.Join(repositoryRoot(), "testdata", "constructs", "value", "integer-boundaries")
+}
+
+func assertIntegerAliases(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	exact bool,
+) {
+	t.Helper()
+	want := []string{
+		"int8", "int16", "int32", "int64",
+		"uint8", "uint16", "uint32", "uint64",
+		"int", "uint", "uintptr",
+	}
+	var got []string
+	shared := map[string]string{
+		"int8":   "int8",
+		"int16":  "int16",
+		"int32":  "int32",
+		"uint8":  "uint8",
+		"uint16": "uint16",
+		"uint32": "uint32",
+	}
+	if exact {
+		shared["int64"] = "int64"
+		shared["uint64"] = "uint64"
+		if strconv.IntSize == 64 {
+			shared["int"] = "int64"
+			shared["uint"] = "uint64"
+			shared["uintptr"] = "uint64"
+		} else {
+			shared["int"] = "int32"
+			shared["uint"] = "uint32"
+			shared["uintptr"] = "uint32"
+		}
+	}
+	for _, file := range emission.Files() {
+		if file.Kind() != emit.TargetFileSupport {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			alias, ok := statement.(tsgo.TypeAliasDeclaration)
+			if !ok || alias.Name().Text() == "bool" {
+				continue
+			}
+			if sharedName, selected := shared[alias.Name().Text()]; selected {
+				reference, ok := alias.Type().(tsgo.TypeReferenceNode)
+				if !ok {
+					t.Fatalf("%s carrier = %T, want target-neutral type reference", alias.Name().Text(), alias.Type())
+				}
+				identifier, ok := reference.TypeName().(tsgo.Identifier)
+				if !ok {
+					t.Fatalf("%s carrier name = %T, want identifier $go$core$%s", alias.Name().Text(), reference.TypeName(), sharedName)
+				}
+				if identifier.Text() != "$go$core$"+sharedName {
+					t.Fatalf("%s carrier = %q, want $go$core$%s", alias.Name().Text(), identifier.Text(), sharedName)
+				}
+				got = append(got, alias.Name().Text())
+				continue
+			}
+			carrier := tsgo.SyntaxKindNumberKeyword
+			wideNative := strconv.IntSize == 64 &&
+				(alias.Name().Text() == "int" ||
+					alias.Name().Text() == "uint" ||
+					alias.Name().Text() == "uintptr")
+			if exact && (alias.Name().Text() == "int64" ||
+				alias.Name().Text() == "uint64" || wideNative) {
+				carrier = tsgo.SyntaxKindBigIntKeyword
+			}
+			if alias.Type().Kind() != carrier {
+				t.Fatalf("%s carrier = %d, want %d", alias.Name().Text(), alias.Type().Kind(), carrier)
+			}
+			got = append(got, alias.Name().Text())
+		}
+	}
+	slices.Sort(want)
+	slices.Sort(got)
+	if !slices.Equal(got, want) {
+		t.Fatalf("integer aliases = %v, want %v", got, want)
+	}
 }

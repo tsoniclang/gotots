@@ -240,8 +240,8 @@ func applyDefaults(selected *document) {
 	if selected.Go.CGO == nil {
 		selected.Go.CGO = boolPointer(false)
 	}
-	defaultString(&selected.Semantics.Integers, "number")
-	defaultString(&selected.Semantics.EvaluationOrder, "direct")
+	defaultString(&selected.Semantics.Integers, "bigint")
+	defaultString(&selected.Semantics.EvaluationOrder, "preserve-go")
 	if selected.Providers.StandardLibrary == nil {
 		selected.Providers.StandardLibrary = boolPointer(false)
 	}

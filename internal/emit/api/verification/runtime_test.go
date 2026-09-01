@@ -92,9 +92,19 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeSendChannel, 1102, api.RuntimeModuleChannel, "runtime/channel.ts", "GoSendChannel", true, []api.RuntimeSymbol{api.RuntimeSelectCase}},
 		{api.RuntimeSelectCase, 1103, api.RuntimeModuleChannel, "runtime/channel.ts", "GoSelectCase", true, nil},
 		{api.RuntimeSelect, 1104, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelect", false, []api.RuntimeSymbol{api.RuntimeSelectReady, api.RuntimeSelectAttempt}},
+		{api.RuntimeGoSpawn, 1105, api.RuntimeModuleChannel, "runtime/channel.ts", "goSpawn", false, nil},
 		{api.RuntimeSelectReady, 1106, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectReady", false, []api.RuntimeSymbol{api.RuntimeSelectAttempt}},
 		{api.RuntimeSelectAttempt, 1107, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectAttempt", false, []api.RuntimeSymbol{api.RuntimeSelectCase}},
 		{api.RuntimeUnsafeString, 1210, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeString", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimePanic}},
+		{api.RuntimeSourceCompilationFact, 1300, api.RuntimeModuleSourceFact, "runtime/source-fact.ts", "GoCompilationFact", true, nil},
+		{api.RuntimeSourceDeclarationFact, 1301, api.RuntimeModuleSourceFact, "runtime/source-fact.ts", "GoDeclarationFact", true, nil},
+		{api.RuntimeSourceBasicFact, 1302, api.RuntimeModuleSourceFact, "runtime/source-fact.ts", "GoBasicFact", true, nil},
+		{api.RuntimeSourceAggregateFact, 1303, api.RuntimeModuleSourceFact, "runtime/source-fact.ts", "GoAggregateFact", true, nil},
+		{api.RuntimeSourceCallableFact, 1304, api.RuntimeModuleSourceFact, "runtime/source-fact.ts", "GoCallableFact", true, nil},
+		{api.RuntimeSourceInterfaceFact, 1305, api.RuntimeModuleSourceFact, "runtime/source-fact.ts", "GoInterfaceFact", true, nil},
+		{api.RuntimeSourceStorageFact, 1306, api.RuntimeModuleSourceFact, "runtime/source-fact.ts", "GoStorageFact", true, nil},
+		{api.RuntimeSourceOperationFact, 1307, api.RuntimeModuleSourceFact, "runtime/source-fact.ts", "GoOperationFact", true, nil},
+		{api.RuntimeSourceImplementationFact, 1308, api.RuntimeModuleSourceFact, "runtime/source-fact.ts", "GoImplementationFact", true, nil},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {

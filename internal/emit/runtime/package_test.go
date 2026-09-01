@@ -43,6 +43,7 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 		"runtime/interface-value.ts",
 		"runtime/panic.ts",
 		"runtime/scalars.ts",
+		"runtime/source-fact.ts",
 		"runtime/string.ts",
 	}
 	if !slices.Equal(paths, wantPaths) {
@@ -295,24 +296,28 @@ func TestModuleImportsExactDependencyContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(imports) != 1 {
-		t.Fatalf("array runtime imports = %d, want one", len(imports))
+	if len(imports) != 3 {
+		t.Fatalf("array runtime imports = %d, want three", len(imports))
 	}
-	got := make(map[string]string, len(imports))
+	got := make(map[string][]string, len(imports))
 	for _, statement := range imports {
 		declaration := statement.(tsgo.ImportDeclaration)
 		module := declaration.ModuleSpecifier().(tsgo.StringLiteral)
 		bindings := declaration.ImportClause().NamedBindings().(tsgo.NamedImports).
 			Elements()
-		if len(bindings) != 1 || bindings[0].PropertyName() != nil {
-			t.Fatalf("array runtime bindings = %#v, want one direct binding", bindings)
+		for _, binding := range bindings {
+			if binding.PropertyName() != nil {
+				t.Fatalf("array runtime binding = %#v, want direct bindings", binding)
+			}
+			got[module.Text()] = append(got[module.Text()], binding.Name().Text())
 		}
-		got[module.Text()] = bindings[0].Name().Text()
 	}
-	wantImports := map[string]string{
-		"./panic.js": "GoPanic",
+	wantImports := map[string][]string{
+		"@tsonic/core/lang.js": {"attribute"},
+		"./panic.js":           {"GoPanic"},
+		"./source-fact.js":     {"GoAggregateFact", "GoOperationFact"},
 	}
-	if !maps.Equal(got, wantImports) {
+	if !maps.EqualFunc(got, wantImports, slices.Equal) {
 		t.Fatalf("array runtime imports = %v, want %v", got, wantImports)
 	}
 }

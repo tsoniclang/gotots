@@ -247,7 +247,9 @@ func materializeWaveThreeExpressions(
 		result.genericCapabilityBytes,
 	)
 	if result.genericConcretizations != 1 ||
-		result.genericConcretizationBytes > 850 ||
+		// Canonical source-fact metadata remains inspectable here and is erased
+		// only by the executable TypeScript target.
+		result.genericConcretizationBytes > 1_250 ||
 		result.genericCapabilities != 0 ||
 		result.genericCapabilityBytes != 0 {
 		t.Fatalf(
@@ -258,8 +260,10 @@ func materializeWaveThreeExpressions(
 			result.genericCapabilityBytes,
 		)
 	}
-	if result.bytes > 55_000 || result.nodes > 11_250 ||
-		result.largest > 25_000 {
+	// These canonical-artifact bounds include source facts; target-erased
+	// executable output owns a separate budget.
+	if result.bytes > 130_000 || result.nodes > 18_000 ||
+		result.largest > 72_000 {
 		t.Fatalf(
 			"Wave 3 artifact bounds exceeded: total=%d nodes=%d largest=%d",
 			result.bytes,

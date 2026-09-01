@@ -294,6 +294,13 @@ func (n *File) MethodTarget(
 		}
 	}
 	method = method.Origin()
+	signature, ok := method.Type().(*types.Signature)
+	if !ok || signature.Recv() == nil {
+		return api.MethodTarget{}, &api.NameError{
+			Name:   method.Name(),
+			Reason: "method target identity has no receiver",
+		}
+	}
 	binding, ok := n.owner.byObject[method]
 	if !ok && n.owner.registry != nil {
 		binding, ok = n.owner.registry.byObject[method]
@@ -407,13 +414,6 @@ func (n *File) MethodTarget(
 			Reason: "method target has no supported ownership",
 		}
 	}
-}
-
-func sourceMethodTargetKind(method *types.Func) api.MethodTargetKind {
-	if generatedNumericDefinedValue(api.MethodReceiverTypeName(method)) {
-		return api.MethodTargetSourceFunction
-	}
-	return api.MethodTargetClassMember
 }
 
 func (n *File) InterfaceMethodCallable(

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	corecontract "github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 )
@@ -73,6 +74,14 @@ func fixtureFiles() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	attribute, err := exportName(corecontract.SymbolAttribute)
+	if err != nil {
+		return nil, err
+	}
+	primitiveTypes, err := primitiveTypeDeclarations()
+	if err != nil {
+		return nil, err
+	}
 	return map[string]string{
 		"package.json": `{
   "type": "module",
@@ -90,7 +99,7 @@ declare const rawPointerBrand: unique symbol;
 export interface RawPointer {
   readonly [rawPointerBrand]: void;
 }
-`,
+` + primitiveTypes,
 		"types.js": "export {};\n",
 		"lang.d.ts": fmt.Sprintf(`import type { Pointer } from "./types.js";
 export declare function %[1]s<T>(storage: T | undefined): Pointer<T>;
@@ -105,7 +114,13 @@ export declare function %[8]s<T>(identity: object, read: () => T, write: (value:
 export declare function %[9]s(identity: object): import("./types.js").RawPointer;
 export declare function %[10]s(left: import("./types.js").RawPointer | undefined, right: import("./types.js").RawPointer | undefined): boolean;
 export declare function %[11]s(pointer: import("./types.js").RawPointer | undefined): number;
-`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer),
+export interface TsonicAttributeBuilder<T> {
+  add(fact: object, ...values: readonly {}[]): void;
+  property<TResult>(selector: (value: T) => TResult): TsonicAttributeBuilder<T>;
+  method<TResult>(selector: (value: T) => TResult): TsonicAttributeBuilder<T>;
+}
+export declare function %[12]s<T>(): TsonicAttributeBuilder<T>;
+`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer, attribute),
 		"lang.js": fmt.Sprintf(`const unsupported = (name) => {
   throw new Error("resolution-only Tsonic core fixture executed " + name);
 };
@@ -120,8 +135,47 @@ export const %[8]s = () => unsupported("%[8]s");
 export const %[9]s = () => unsupported("%[9]s");
 export const %[10]s = () => unsupported("%[10]s");
 export const %[11]s = () => unsupported("%[11]s");
-`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer),
+const attributeBuilder = Object.freeze({
+  add: () => undefined,
+  property: () => attributeBuilder,
+  method: () => attributeBuilder,
+});
+export const %[12]s = () => attributeBuilder;
+`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer, attribute),
 	}, nil
+}
+
+func primitiveTypeDeclarations() (string, error) {
+	types := []struct {
+		symbol     corecontract.Symbol
+		underlying string
+	}{
+		{corecontract.SymbolBool, "boolean"},
+		{corecontract.SymbolInt8, "number"},
+		{corecontract.SymbolUint8, "number"},
+		{corecontract.SymbolInt16, "number"},
+		{corecontract.SymbolUint16, "number"},
+		{corecontract.SymbolInt32, "number"},
+		{corecontract.SymbolUint32, "number"},
+		{corecontract.SymbolInt64, "bigint"},
+		{corecontract.SymbolUint64, "bigint"},
+		{corecontract.SymbolFloat32, "number"},
+		{corecontract.SymbolFloat64, "number"},
+	}
+	var declarations strings.Builder
+	for _, primitive := range types {
+		name, err := exportName(primitive.symbol)
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(
+			&declarations,
+			"export type %s = %s;\n",
+			name,
+			primitive.underlying,
+		)
+	}
+	return declarations.String(), nil
 }
 
 func exportName(symbol corecontract.Symbol) (string, error) {

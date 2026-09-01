@@ -61,15 +61,12 @@ func Local(value int32) int32 {
 	if function == nil {
 		t.Fatal("Local target function is absent")
 	}
-	body := function.Body().(tsgo.Block).Statements()
-	if len(body) != 4 {
-		t.Fatalf(
-			"lexical function statements = %d, want alias, class, value, return",
-			len(body),
-		)
+	definitions := lexicalTypeDefinitions(function.Body().(tsgo.Block).Statements())
+	if len(definitions) != 2 {
+		t.Fatalf("lexical type definitions = %d, want alias and class", len(definitions))
 	}
-	localAlias := body[0].(tsgo.TypeAliasDeclaration)
-	anonymousClass := body[1].(tsgo.ClassDeclaration)
+	localAlias := definitions[0].(tsgo.TypeAliasDeclaration)
+	anonymousClass := definitions[1].(tsgo.ClassDeclaration)
 	if !strings.HasPrefix(localAlias.Name().Text(), "Local") ||
 		!strings.HasPrefix(anonymousClass.Name().Text(), "$goStruct$") {
 		t.Fatalf(
@@ -116,8 +113,11 @@ func Nested(enabled bool, value int32) int32 {
 	var anonymousName string
 	for _, name := range []string{"First", "Second"} {
 		function := targetFunctionByName(t, source, name)
-		body := function.Body().(tsgo.Block).Statements()
-		anonymous := body[1].(tsgo.ClassDeclaration)
+		definitions := lexicalTypeDefinitions(function.Body().(tsgo.Block).Statements())
+		if len(definitions) != 2 {
+			t.Fatalf("%s lexical type definitions = %d, want two", name, len(definitions))
+		}
+		anonymous := definitions[1].(tsgo.ClassDeclaration)
 		if anonymousName == "" {
 			anonymousName = anonymous.Name().Text()
 		} else if anonymous.Name().Text() != anonymousName {
@@ -130,16 +130,16 @@ func Nested(enabled bool, value int32) int32 {
 	nested := targetFunctionByName(t, source, "Nested")
 	nestedBody := nested.Body().(tsgo.Block).Statements()
 	branch := nestedBody[0].(tsgo.IfStatement)
-	thenBlock := branch.ThenStatement().(tsgo.Block).Statements()
-	if len(thenBlock) != 4 {
-		t.Fatalf("nested lexical statements = %d, want four", len(thenBlock))
+	definitions := lexicalTypeDefinitions(branch.ThenStatement().(tsgo.Block).Statements())
+	if len(definitions) != 2 {
+		t.Fatalf("nested lexical type definitions = %d, want two", len(definitions))
 	}
-	if _, ok := thenBlock[0].(tsgo.TypeAliasDeclaration); !ok {
-		t.Fatalf("nested local type = %T, want alias", thenBlock[0])
+	if _, ok := definitions[0].(tsgo.TypeAliasDeclaration); !ok {
+		t.Fatalf("nested local type = %T, want alias", definitions[0])
 	}
-	if anonymous, ok := thenBlock[1].(tsgo.ClassDeclaration); !ok ||
+	if anonymous, ok := definitions[1].(tsgo.ClassDeclaration); !ok ||
 		!strings.HasPrefix(anonymous.Name().Text(), "$goStruct$") {
-		t.Fatalf("nested anonymous declaration = %T", thenBlock[1])
+		t.Fatalf("nested anonymous declaration = %T", definitions[1])
 	}
 }
 

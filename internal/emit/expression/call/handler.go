@@ -233,12 +233,13 @@ func emit(
 	}
 	guardNil := !static &&
 		!callable.StaticallyNonNil(context.TypesInfo(), source.Fun)
+	captureInvocation := detached || context.Role() == api.RoleGoroutineCall
 	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
 		children,
 		source,
 		signature,
-		guardNil || detached,
+		guardNil || captureInvocation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -271,7 +272,7 @@ func emit(
 				Reason: "static callee produced prerequisite statements",
 			}
 	}
-	if guardNil || (!static && (len(argumentBefore) != 0 || detached)) {
+	if guardNil || (!static && (len(argumentBefore) != 0 || captureInvocation)) {
 		temporaryName, err := context.Names().Temporary(api.TemporaryCallCallee)
 		if err != nil {
 			return api.ExpressionEmission{}, err

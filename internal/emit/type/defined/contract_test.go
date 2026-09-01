@@ -140,7 +140,7 @@ func (value Methodful) IsZero() bool { return value == 0 }
 }
 
 func TestDefinedBasicFamilyHasMinimalNominalShape(t *testing.T) {
-	emission := compileDefinedFixture(t, emit.DefaultOptions())
+	emission := compileDefinedFixture(t, definedNumberOptions())
 	source := definedSourceFile(t, emission)
 	classes := make(map[string]tsgo.ClassDeclaration)
 	aliases := make(map[string]tsgo.TypeAliasDeclaration)
@@ -225,7 +225,7 @@ func TestDefinedLiteralOperationHasNoTransientWrapper(t *testing.T) {
 	artifacts := printDefined(
 		t,
 		workingDirectory,
-		compileDefinedFixture(t, emit.DefaultOptions()),
+		compileDefinedFixture(t, definedNumberOptions()),
 	)
 	if strings.Contains(artifacts.printed, "new Count(") ||
 		!strings.Contains(
@@ -244,7 +244,7 @@ func TestDefinedContainersKeepNominalityAtSourceBoundaries(t *testing.T) {
 	artifacts := printDefined(
 		t,
 		workingDirectory,
-		compileDefinedFixture(t, emit.DefaultOptions()),
+		compileDefinedFixture(t, definedNumberOptions()),
 	)
 	for _, required := range []string{
 		"CountArrayValues(): [\n    GoArray<Count, 2>,",
@@ -270,7 +270,7 @@ func TestDefinedContainersKeepNominalityAtSourceBoundaries(t *testing.T) {
 func TestLocalDefinedTypeAndAliasUseThePackageOwners(t *testing.T) {
 	source := definedSourceFile(
 		t,
-		compileDefinedFixture(t, emit.DefaultOptions()),
+		compileDefinedFixture(t, definedNumberOptions()),
 	)
 	var localTypes tsgo.FunctionDeclaration
 	for _, statement := range source.Statements() {
@@ -284,13 +284,17 @@ func TestLocalDefinedTypeAndAliasUseThePackageOwners(t *testing.T) {
 		t.Fatal("LocalTypes target function is absent")
 	}
 	statements := localTypes.Body().(tsgo.Block).Statements()
-	if len(statements) != 5 {
-		t.Fatalf("LocalTypes statements = %d, want 5", len(statements))
+	aliases := make([]tsgo.TypeAliasDeclaration, 0, 2)
+	for _, statement := range statements {
+		alias, ok := statement.(tsgo.TypeAliasDeclaration)
+		if ok {
+			aliases = append(aliases, alias)
+		}
 	}
-	definedAlias, ok := statements[0].(tsgo.TypeAliasDeclaration)
-	if !ok {
-		t.Fatalf("local defined declaration = %#v", statements[0])
+	if len(aliases) != 2 {
+		t.Fatalf("LocalTypes aliases = %d, want 2", len(aliases))
 	}
+	definedAlias := aliases[0]
 	localName := definedAlias.Name().Text()
 	if localName == "Count" {
 		t.Fatal("local defined type collided with the package Count declaration")
@@ -303,9 +307,9 @@ func TestLocalDefinedTypeAndAliasUseThePackageOwners(t *testing.T) {
 		definedAlias,
 		"int32",
 	)
-	alias, ok := statements[1].(tsgo.TypeAliasDeclaration)
-	if !ok || alias.Name().Text() == "Alias" || len(alias.Modifiers()) != 0 {
-		t.Fatalf("local alias declaration = %#v", statements[1])
+	alias := aliases[1]
+	if alias.Name().Text() == "Alias" || len(alias.Modifiers()) != 0 {
+		t.Fatalf("local alias declaration = %#v", alias)
 	}
 	target, ok := alias.Type().(tsgo.TypeReferenceNode)
 	if !ok ||
@@ -495,7 +499,10 @@ func compileDefinedSource(t *testing.T, source string) string {
 		if file.Kind() != emit.TargetFileSource {
 			continue
 		}
-		target, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		target, err := client.PrintNode(
+			definedExecutableSource(file.SourceFile()),
+			tsgo.PrintOptions{},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}

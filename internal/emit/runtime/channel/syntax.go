@@ -14,6 +14,7 @@ type builder struct {
 	sendName          string
 	caseName          string
 	selectName        string
+	spawnName         string
 	selectReadyName   string
 	selectAttemptName string
 	panicName         string

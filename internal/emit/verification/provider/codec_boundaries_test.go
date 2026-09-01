@@ -82,7 +82,7 @@ func Result(failAt int) (int, int, int, int, int, int, int, string, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -188,7 +188,7 @@ func Decode(mutex *sync.Mutex) error {
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	// encoding/binary.Read is implemented over the reflection value model:
 	// the compilation passes the used-provider closure and preserves the
@@ -285,7 +285,7 @@ func Encode(mutex *sync.Mutex) error {
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	// Both callables are implemented over the reflection value model: the
 	// combined order, stream, and error profile ABI compiles through the
@@ -396,7 +396,7 @@ func Result() string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := emit.DefaultOptions()
+	options := providerNumberOptions()
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,

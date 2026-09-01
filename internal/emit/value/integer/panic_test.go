@@ -15,8 +15,7 @@ import (
 
 func TestBigIntDivisionByZeroUsesSharedGoPanicDifferentially(t *testing.T) {
 	loaded := loadIntegerFamily(t)
-	options := emit.DefaultOptions()
-	options.IntegerRepresentation = emit.IntegerRepresentationBigInt
+	options := integerOptions(emit.IntegerRepresentationBigInt)
 	emission := compileIntegerFamily(
 		t,
 		loaded,

@@ -38,7 +38,10 @@ func TestParallelIdentifierAssignmentPrintsTypechecksAndExecutesDifferentially(
 			t.Errorf("close TS-Go client: %v", err)
 		}
 	})
-	printed, err := client.PrintNode(targetFile, tsgo.PrintOptions{})
+	printed, err := client.PrintNode(
+		assignmentExecutableSource(targetFile),
+		tsgo.PrintOptions{},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +67,7 @@ func TestParallelAssignmentCreatesCapturesBeforeStores(t *testing.T) {
 		t,
 		loaded,
 	)
-	function := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
+	function := assignmentFunctionByName(t, targetFile, "SwapLeft")
 	statements := function.Body().(tsgo.Block).Statements()
 	if len(statements) != 5 {
 		t.Fatalf("SwapLeft statements = %d, want two captures, two stores, return", len(statements))
@@ -155,7 +158,7 @@ func TestCompoundIdentifierAssignmentUsesDirectTargetOperation(t *testing.T) {
 		t,
 		loaded,
 	)
-	function := targetFile.Statements()[5].(tsgo.FunctionDeclaration)
+	function := assignmentFunctionByName(t, targetFile, "Accumulate")
 	statement := function.Body().(tsgo.Block).Statements()[0].(tsgo.ExpressionStatement)
 	operation := statement.Expression().(tsgo.BinaryExpression)
 	if operation.OperatorToken().Kind() != tsgo.SyntaxKindPlusEqualsToken ||
@@ -165,6 +168,45 @@ func TestCompoundIdentifierAssignmentUsesDirectTargetOperation(t *testing.T) {
 	if identifierText(operation.Right()) != "delta" {
 		t.Fatal("compound assignment changed its right operand")
 	}
+}
+
+func assignmentFunctionByName(
+	t *testing.T,
+	source tsgo.SourceFile,
+	name string,
+) tsgo.FunctionDeclaration {
+	t.Helper()
+	for _, statement := range source.Statements() {
+		function, ok := statement.(tsgo.FunctionDeclaration)
+		if ok && function.Name().Text() == name {
+			return function
+		}
+	}
+	t.Fatalf("target function %q is absent", name)
+	return nil
+}
+
+func assignmentExecutableSource(source tsgo.SourceFile) tsgo.SourceFile {
+	statements := make([]tsgo.Statement, 0, len(source.Statements()))
+	for _, statement := range source.Statements() {
+		if declaration, ok := statement.(tsgo.ImportDeclaration); ok {
+			module, moduleOK := declaration.ModuleSpecifier().(tsgo.StringLiteral)
+			if moduleOK && (strings.HasSuffix(module.Text(), "/source-fact.js") ||
+				module.Text() == "@tsonic/core/lang.js") {
+				continue
+			}
+		}
+		if _, fact := statement.(tsgo.ExpressionStatement); fact {
+			continue
+		}
+		statements = append(statements, statement)
+	}
+	factory := tsgo.NewFactory()
+	return factory.SourceFile(
+		statements,
+		source.EndOfFileToken(),
+		source.SourceData(),
+	)
 }
 
 func TestPrimitiveAccessorCompoundAndIncrementAreOwned(t *testing.T) {

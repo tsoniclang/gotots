@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/contracts/externals"
+	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
@@ -72,6 +73,7 @@ type programSession struct {
 	compareArtifactOwners          func(api.ArtifactOwner, api.ArtifactOwner) int
 	requirementRemovalOwner        api.ArtifactOwner
 	standardLibrary                *gostdlibcertify.Certificate
+	externalProvider               *externalcertify.Certificate
 	sourceImplementations          *sourceimplementation.Certificate
 	callableImplementations        *callableimplementation.Certificate
 	callableImplementationVariants map[string]api.CallableImplementationVariant
@@ -333,6 +335,7 @@ func newProgramSessionWithRegistry(
 		goRuntime:               goRuntime,
 		compareArtifactOwners:   compareArtifactOwners,
 		standardLibrary:         options.StandardLibrary,
+		externalProvider:        options.ExternalProvider,
 		sourceImplementations:   options.SourceImplementations,
 		callableImplementations: options.CallableImplementations,
 		callableImplementationVariants: make(

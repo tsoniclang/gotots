@@ -154,6 +154,9 @@ func mapClassSources(source string) map[string]string {
 			end = len(prefix) + next
 		}
 		classSource := remainder[:end]
+		if annotation := strings.Index(classSource, "\nattribute<"); annotation >= 0 {
+			classSource = classSource[:annotation+1]
+		}
 		nameStart := len("export class ")
 		nameEnd := strings.IndexAny(classSource[nameStart:], " {<\n")
 		if nameEnd < 0 {

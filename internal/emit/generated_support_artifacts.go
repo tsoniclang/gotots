@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	genericconcretization "github.com/tsoniclang/gotots/internal/emit/generic/concretization"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"go/token"
@@ -192,6 +193,15 @@ func (s *programSession) buildProviderStatefulRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	statements, buildRequests, err = canonicalsourcefact.IncludeGeneratedArtifact(
+		context,
+		artifact,
+		statements,
+		buildRequests,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
 	placement, dependencies, nextRequirements, err :=
 		s.consumeArtifactRequests(
 			owner,
@@ -334,7 +344,7 @@ func (s *programSession) buildGenericConcretizationRevision(
 	}
 	defer finish()
 	context := builder.context.WithArtifactOwner(owner)
-	deferred, err := exactGenericConcretizationRequirement(
+	deferred, err := genericconcretization.ExactRequirement(
 		artifact,
 		s.requirements.SelectedFor(owner),
 	)
@@ -347,6 +357,15 @@ func (s *programSession) buildGenericConcretizationRevision(
 		artifact,
 		[]tsgo.ModifierLike{context.Factory().ExportKeyword()},
 		deferred,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	statements, requests, err = canonicalsourcefact.IncludeGeneratedArtifact(
+		context,
+		artifact,
+		statements,
+		requests,
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -368,56 +387,6 @@ func (s *programSession) buildGenericConcretizationRevision(
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
-}
-
-func exactGenericConcretizationRequirement(
-	artifact *api.GeneratedArtifact,
-	requirements []api.DeclarationRequirement,
-) (bool, error) {
-	if len(requirements) < 1 || len(requirements) > 2 {
-		return false, &ScheduleError{
-			Object: artifact.TargetName(),
-			Reason: "generic concretization requirements are not exact",
-		}
-	}
-	bound, boundOK := artifact.GenericConcretization()
-	base := false
-	deferred := false
-	for _, requirement := range requirements {
-		selected, ok := requirement.GenericConcretization()
-		generated, generatedOK := requirement.GeneratedArtifact()
-		if !ok || !generatedOK || generated != artifact || !boundOK ||
-			selected != bound {
-			return false, &ScheduleError{
-				Object: artifact.TargetName(),
-				Reason: "generic concretization received a foreign requirement",
-			}
-		}
-		if requirement.DeferredGenericConcretization() {
-			if deferred {
-				return false, &ScheduleError{
-					Object: artifact.TargetName(),
-					Reason: "generic concretization has duplicate deferred demand",
-				}
-			}
-			deferred = true
-		} else {
-			if base {
-				return false, &ScheduleError{
-					Object: artifact.TargetName(),
-					Reason: "generic concretization has duplicate definition demand",
-				}
-			}
-			base = true
-		}
-	}
-	if !base {
-		return false, &ScheduleError{
-			Object: artifact.TargetName(),
-			Reason: "generic concretization lacks its definition demand",
-		}
-	}
-	return deferred, nil
 }
 
 func (s *programSession) validateDeferredCallableRegistry(
@@ -562,6 +531,15 @@ func (s *programSession) buildDeferredCallableRegistryRevision(
 		return artifactRevision{}, err
 	}
 	statements := []tsgo.Statement{statement}
+	statements, requests, err = canonicalsourcefact.IncludeGeneratedArtifact(
+		context,
+		artifact,
+		statements,
+		requests,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
 	placement, dependencies, nextRequirements, err :=
 		s.consumeArtifactRequests(owner, requests)
 	if err != nil {

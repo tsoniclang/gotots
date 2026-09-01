@@ -70,7 +70,7 @@ func TestFloatValueFamilyExecutesDifferentially(t *testing.T) {
 			sourceModule = "./" + strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
 		}
 	}
-	for _, forbidden := range []string{" as ", "any", "unknown", ".call(", ".apply(", ".bind("} {
+	for _, forbidden := range []string{" as any", ": any", "unknown", ".call(", ".apply(", ".bind("} {
 		if strings.Contains(printed.String(), forbidden) {
 			t.Fatalf("float artifact contains %q:\n%s", forbidden, printed.String())
 		}

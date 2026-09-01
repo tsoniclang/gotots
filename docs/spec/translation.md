@@ -163,7 +163,7 @@ func F() uint64 { return Huge }
 ```
 
 Under the `bigint` integer profile the return occurrence emits the exact
-`9223372036854775808n` projection. Under the default number profile, an
+`9223372036854775808n` projection. Under the explicit number profile, an
 unrepresentable exact integer fails at the constant-value owner. Alternate
 source spellings of one checker value produce identical output.
 
@@ -194,9 +194,10 @@ silently retain zero.
 
 Assignments evaluate all right-hand values and required left-hand addresses in
 Go order before stores. Parallel assignment never observes an earlier store.
-The default `direct` evaluation profile avoids extra temporaries where
-ordinary TypeScript is equivalent. `preserve-go` requests the exact
-temporaries only at affected boundaries.
+The default `preserve-go` evaluation profile emits exact temporaries only at
+affected boundaries. The explicit `direct` executable profile may omit them
+where ordinary TypeScript is equivalent, but its output cannot serve as the
+canonical source for another target.
 
 ### Functions And Literals
 
@@ -276,6 +277,55 @@ zero-on-miss. The index expression does not decide this alone.
 
 ## Types And Values
 
+### Canonical Preservation Dispositions
+
+Type and operation emission records no second source model. While emitting the
+one TS-Go AST, each closed semantic owner chooses `ordinary-typescript`,
+`shared-source-fact`, or `gotots-source-fact` for every relevant form it
+handles. The first is valid only when ordinary checked TypeScript retains the
+complete distinction; the other two construct the exact marker AST at that
+owner. Unknown variants and incomplete fact construction fail before checker
+evidence is released; no root preservation inventory duplicates the source.
+
+```go
+type UserID int64
+type Record struct {
+    ID UserID `json:"id"`
+}
+```
+
+The numeric carrier is not the semantic owner. The canonical type reference
+retains signed 64-bit primitive evidence; the `UserID` declaration carries its
+Go declaration/defined-type identity; the record carries value-struct shape;
+and the field companion carries only the Go field identity and tag. A C# target
+may select `long`, Rust may select `i64`, and the TypeScript target may select
+`bigint` or a named bounded envelope without re-reading Go.
+
+```go
+var table map[string][]*Record
+```
+
+The canonical type retains map key/value, slice element, pointer pointee, nil,
+and copy/alias obligations. Existing GoToTS runtime classes may remain the
+ordinary TypeScript carrier, but their exact declarations carry closed Go
+aggregate facts and every semantically meaningful operation resolves to an
+exact fact-bearing declaration. `GoMapValue` or `RuntimeSlice` spelling is not
+evidence.
+
+```go
+go consume(ch)
+```
+
+Canonical output retains a goroutine operation and the channel's element and
+direction facts. A synchronous TypeScript profile may lower the operation to a
+serial call; a C# or Rust profile may select a task/thread/channel runtime. The
+serial result is a target artifact and cannot be reused as canonical input.
+
+The canonical profile always preserves Go evaluation order. A direct target
+projection may eliminate temporaries only after proving that complete
+observable order is unchanged. Numeric carrier and evaluation-order settings
+are target preferences, never permission to omit source facts.
+
 ### Source-Implementation Pointers
 
 Provider TypeScript uses a direct ABI that is independent of the product's
@@ -312,11 +362,10 @@ them before runtime execution. Provider source itself never imports or calls
 ### Basic Types
 
 Go basic identities map to GoToTS-owned aliases over TypeScript primitives.
-The default integer profile uses `number`; the explicit `fixed64-bigint` and
-`bigint` profiles use `bigint` for their selected wide carriers. No runtime
-marker compensates for missing semantics. Integer overflow not preserved by a
-selected number carrier is a declared profile tradeoff, not silently described
-as exact.
+The default integer profile is `bigint`; the explicit `number` and
+`fixed64-bigint` executable profiles retain their named precision envelopes.
+No runtime marker compensates for values already lost by an executable
+carrier. Such an artifact cannot serve as canonical input to another target.
 
 Each BigInt-carrier profile is exact for operations whose selected carrier is
 `bigint`. Their arithmetic, bitwise, shift, unary, compound-assignment, and
@@ -1205,12 +1254,16 @@ entry, while absence uses the ordinary provider callable.
 
 ### Channels, Goroutines, And Select
 
-Channel types use one typed runtime identity under fixed serial execution. A
-goroutine call is emitted as a direct call; ready buffered send/receive and
-ready/default select complete synchronously. A nil, unbuffered, full, empty, or
-otherwise unready operation that would suspend raises the typed
-serial-blocking panic instead of fabricating progress. The language path emits
-no `Promise`, `async`, `await`, scheduler, waiter queue, or host task.
+Channel types use one typed canonical runtime identity whose declaration and
+operations retain exact channel facts. A goroutine is emitted as a call to the
+fact-bearing `goSpawn` declaration, never as an unmarked direct call. The
+selected TypeScript serial envelope executes that call immediately; ready
+buffered send/receive and ready/default select complete synchronously. A nil,
+unbuffered, full, empty, or otherwise unready operation that would suspend
+raises the typed serial-blocking panic in that envelope instead of fabricating
+progress. Canonical callable signatures contain no `Promise`, `async`, or
+`await`; other targets consume the finalized concurrency facts before choosing
+their scheduler, task, thread, or channel representation.
 Explicit event-based provider APIs such as timers retain their separately
 certified host callback behavior without changing the source call's direct
 signature.
