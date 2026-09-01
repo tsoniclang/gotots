@@ -19,6 +19,65 @@ Every construct family is test-first and closes through independent evidence:
 Implementation tests alone do not prove architecture. Generated artifacts are
 mandatory evidence.
 
+## Information-Loss Closure Gate
+
+Production conservation is owner-local. Existing closed AST/type/runtime
+dispatchers provide the denominator for their own semantic class; tests mutate
+each dispatcher and fact constructor to prove omitted, duplicated, and unknown
+forms fail closed. Runtime and generated-artifact assemblers exact-join their
+requested declarations, members, and fact applications. The selected target
+then exact-joins planned source-attribute applications and metadata-only import
+bindings to the nodes it erases or lowers.
+
+The TypeScript-target control may consume a fact by exact-erasing its
+compile-time attribute while retaining the canonical executable carrier. Its
+proof exact-joins applications, metadata-only imports, and removable fact
+declarations, and preserves local same-spelled calls and every live binding.
+Native targets may not use this control as proof for a changed representation.
+
+Independent verification uses bounded fixtures that derive each semantic
+family through a structurally different path and compare exact emitted AST and
+finalized facts. It must not build a second production semantic inventory,
+re-run the checker, or claim universal whole-program coverage from a duplicate
+Go graph walk.
+
+The matrix includes:
+
+- every basic kind under 32-bit and 64-bit sizes, named and alias forms;
+- embedded/tagged/blank/generic structs and fixed arrays of distinct lengths;
+- nil and non-nil slices, maps, pointers, interfaces, functions, and channels;
+- direct and interface methods, variadics, multiple results, typed nil, and
+  implicit interface implementation;
+- addressable versus non-addressable values, aliases, copies, mutation,
+  escaping captures, and loop captures;
+- evaluation-order-sensitive calls and assignments;
+- panic/defer/recover and goroutine/channel/select operations;
+- reflection identity, unsafe/layout boundaries, and selected provider/body
+  implementations.
+
+TSTS must finalize every emitted marker on its exact TS-Go AST subject. For
+GoToTS-owned attributes, tests select the attribute type by exact canonical
+declaration identity and inspect its typed arguments; a local same-spelled
+attribute class and helper are foils. Every selected target then exact-joins all
+reached facts to either a lowering disposition or one typed unsupported
+diagnostic. Silent ordinary-carrier fallback fails.
+
+Required mutations omit one owner disposition; double-own one field in a shared
+and Go companion fact; change primitive width/signedness; drop defined-type or
+field-tag identity; collapse two array lengths; erase channel direction; turn a
+typed nil into an untyped nil; change a copy into an alias; move an
+evaluation-order prerequisite; replace a fact-bearing goroutine operation with
+an unmarked direct call before fact finalization;
+select a target implementation in canonical source; classify a runtime helper
+by spelling; and reuse a lossy target artifact as another target's input. Each
+must fail at its single owner.
+
+Broad searches reject semantic source comments, helper-name recognition,
+target-side Go parsing/checking, a serialized source-operation manifest,
+duplicate fact stores, direct-evaluation canonical mode, and an unmarked
+canonical serial-concurrency route. Artifact review shows source -> disposition -> exact
+TS-Go node -> finalized fact -> target decision for every fact family.
+
 ## Baseline Gates
 
 Every checkpoint runs, in dependency order:

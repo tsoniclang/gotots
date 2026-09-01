@@ -151,6 +151,25 @@ representation of the source program.
   and every selected target either lowers that fact or rejects it explicitly.
   Marker spelling, a local same-named declaration, or a no-op JavaScript body
   never establishes semantics.
+- The TypeScript target may exact-erase finalized attributes while retaining
+  the canonical ordinary-TypeScript carrier; that is its closed consumption
+  disposition. A target that changes representation must consume the relevant
+  fact family or reject it. Generic metadata erasure never authorizes a native
+  C# or Rust carrier.
+- Canonical output is information-lossless across selected targets. Before the
+  Go AST and checker graph are released, the closed semantic handler that
+  encounters each target-relevant Go distinction must preserve it either in an
+  ordinary TypeScript shape or in one finalized fact on its exact TS-Go AST
+  subject. Handler dispatch and fact construction are total and fail closed;
+  they do not feed a second whole-program semantic inventory. Runtime helper
+  spelling, generated names, source comments, and executable target behavior
+  are never preservation evidence.
+- Carrier choice is not source meaning. Integer carriers, direct-expression
+  simplification, serial concurrency, package implementations, and other
+  executable policies may be selected only after canonical facts retain the
+  source numeric kind, evaluation obligation, concurrency operation,
+  declaration identity, aggregate shape, storage/flow contract, and provider
+  identity needed by every target.
 
 ## Environment Ownership
 

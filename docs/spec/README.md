@@ -35,6 +35,57 @@ may import accepted public marker declarations from `@tsonic/core`; GoToTS does
 not copy those declarations or import a target plugin/runtime. TSTS and the
 selected target are downstream consumers, not Go semantic truth owners.
 
+## Information-Preservation Law
+
+Canonical GoToTS output is information-lossless for every selected downstream
+target. Before the selected Go AST and its one checker graph are released, each
+encountered target-relevant Go distinction must have exactly one preservation
+disposition:
+
+1. ordinary checked TypeScript preserves the distinction completely; or
+2. one accepted canonical marker produces one finalized typed fact on the
+   exact corresponding TS-Go AST subject.
+
+No third disposition exists. A generated helper name, runtime implementation,
+comment, source-text convention, target heuristic, or sidecar manifest is not
+semantic preservation. If neither disposition is available, canonical
+compilation fails before publication.
+
+The closed preservation classes include selected build and compilation
+identity; package, module, declaration, defined-type, alias, receiver, field,
+and source identity; exact scalar kind and source width; callable shape;
+struct, array, slice, map, interface, pointer, channel, and function-value
+shape; addressability, storage, alias, copy, mutation, escape, capture, and
+loop-lifetime obligations; Go evaluation order; interface boxing and typed nil;
+panic/defer/recover; goroutine, channel, and select intent; unsafe/layout
+operations; reflection identity; and selected implementation/provider identity.
+Each existing closed AST/type/runtime handler owns total disposition of the
+class it encounters. An unhandled form or incomplete fact constructor is a
+compiler error; GoToTS does not materialize a second semantic denominator.
+
+Canonical shapes use an exact public `@tsonic/core` contract whenever that
+contract completely owns the target-neutral meaning, including primitives and
+typed locations. Go-only meaning remains GoToTS-owned and is attached through
+the shared finalized attribute mechanism using exact GoToTS declaration
+identity. Those attributes are small closed fact families, not a serialized Go
+program. One semantic field has one owner: for example, a selected shared
+primitive fact owns fixed width and signedness while a Go native-integer
+companion owns only the source-native role and selected source width.
+
+Targets consume only the checked canonical TS-Go AST, finalized facts on its
+exact nodes, and their immutable target profile. A target may choose a
+different executable carrier, but it may not recover Go meaning from helper or
+member spelling. Every selected target must either consume each reached fact or
+reject it with a typed unsupported diagnostic.
+
+For the executable TypeScript target, retaining GoToTS's already-emitted
+ordinary TypeScript carrier and exact-erasing the finalized compile-time
+attribute is one closed consumption disposition. That target exact-joins every
+application, import, and removable fact declaration but need not reinterpret a
+Go payload merely to preserve the carrier's behavior. A target that replaces a
+carrier, including C# or Rust, must instead consume the relevant fact family or
+reject it; generic metadata erasure cannot authorize a native representation.
+
 ## One Compilation Model
 
 ```text
