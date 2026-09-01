@@ -167,9 +167,9 @@ func verifyOne(
 		return Implementation{}, err
 	}
 	for _, selected := range certificationSources {
-		violations, violationErr := project.CallableImplementationSourceViolations(
+		violations, violationErr := project.ImplementationSourceViolations(
 			selected.SourcePath(),
-			tsgo.CallableImplementationSourceCertification,
+			tsgo.ImplementationSourceCertificationDeclaration,
 		)
 		if violationErr != nil {
 			return Implementation{}, violationErr

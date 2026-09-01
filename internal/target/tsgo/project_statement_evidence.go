@@ -15,56 +15,56 @@ type ProjectStatementEvidence struct {
 func (e ProjectStatementEvidence) Kind() SyntaxKind { return e.kind }
 func (e ProjectStatementEvidence) TypeOnly() bool   { return e.typeOnly }
 
-type CallableImplementationSourceRole uint8
+type ImplementationSourceRole uint8
 
 const (
-	CallableImplementationSourceInvalid CallableImplementationSourceRole = iota
-	CallableImplementationSourceModule
-	CallableImplementationSourceCertification
+	ImplementationSourceInvalid ImplementationSourceRole = iota
+	ImplementationSourceExecutableModule
+	ImplementationSourceCertificationDeclaration
 )
 
-func (r CallableImplementationSourceRole) Valid() bool {
-	return r == CallableImplementationSourceModule ||
-		r == CallableImplementationSourceCertification
+func (r ImplementationSourceRole) Valid() bool {
+	return r == ImplementationSourceExecutableModule ||
+		r == ImplementationSourceCertificationDeclaration
 }
 
-type CallableImplementationSourceViolation uint8
+type ImplementationSourceViolation uint8
 
 const (
-	CallableImplementationViolationInvalid CallableImplementationSourceViolation = iota
-	CallableImplementationViolationSideEffectImport
-	CallableImplementationViolationExecutableTopLevel
-	CallableImplementationViolationBodylessFunction
-	CallableImplementationViolationTypeAssertion
-	CallableImplementationViolationNonNullAssertion
-	CallableImplementationViolationSuppressionDirective
-	CallableImplementationViolationExplicitAny
-	CallableImplementationViolationExplicitUnknown
-	CallableImplementationViolationInferredAny
-	CallableImplementationViolationInferredUnknown
+	ImplementationViolationInvalid ImplementationSourceViolation = iota
+	ImplementationViolationSideEffectImport
+	ImplementationViolationExecutableTopLevel
+	ImplementationViolationBodylessFunction
+	ImplementationViolationTypeAssertion
+	ImplementationViolationNonNullAssertion
+	ImplementationViolationSuppressionDirective
+	ImplementationViolationExplicitAny
+	ImplementationViolationExplicitUnknown
+	ImplementationViolationInferredAny
+	ImplementationViolationInferredUnknown
 )
 
-func (v CallableImplementationSourceViolation) String() string {
+func (v ImplementationSourceViolation) String() string {
 	switch v {
-	case CallableImplementationViolationSideEffectImport:
+	case ImplementationViolationSideEffectImport:
 		return "side-effect-import"
-	case CallableImplementationViolationExecutableTopLevel:
+	case ImplementationViolationExecutableTopLevel:
 		return "executable-top-level"
-	case CallableImplementationViolationBodylessFunction:
+	case ImplementationViolationBodylessFunction:
 		return "bodyless-function"
-	case CallableImplementationViolationTypeAssertion:
+	case ImplementationViolationTypeAssertion:
 		return "unchecked-type-assertion"
-	case CallableImplementationViolationNonNullAssertion:
+	case ImplementationViolationNonNullAssertion:
 		return "non-null-assertion"
-	case CallableImplementationViolationSuppressionDirective:
+	case ImplementationViolationSuppressionDirective:
 		return "diagnostic-suppression"
-	case CallableImplementationViolationExplicitAny:
+	case ImplementationViolationExplicitAny:
 		return "explicit-any"
-	case CallableImplementationViolationExplicitUnknown:
+	case ImplementationViolationExplicitUnknown:
 		return "explicit-unknown"
-	case CallableImplementationViolationInferredAny:
+	case ImplementationViolationInferredAny:
 		return "inferred-any"
-	case CallableImplementationViolationInferredUnknown:
+	case ImplementationViolationInferredUnknown:
 		return "inferred-unknown"
 	default:
 		return "invalid"
@@ -110,28 +110,28 @@ func (p *ProjectInspection) SourceStatements(
 	return result, nil
 }
 
-func (p *ProjectInspection) CallableImplementationSourceViolations(
+func (p *ProjectInspection) ImplementationSourceViolations(
 	sourceFile string,
-	role CallableImplementationSourceRole,
-) ([]CallableImplementationSourceViolation, error) {
+	role ImplementationSourceRole,
+) ([]ImplementationSourceViolation, error) {
 	if p == nil || !role.Valid() {
 		return nil, &ProjectInspectionError{
-			Operation: "callable implementation source",
+			Operation: "implementation source",
 			Path:      sourceFile,
 			Reason:    "inspection or source role is invalid",
 		}
 	}
 	absolute, err := filepath.Abs(sourceFile)
 	if err != nil {
-		return nil, projectInspectionError("callable implementation source", sourceFile, err)
+		return nil, projectInspectionError("implementation source", sourceFile, err)
 	}
 	path := filepath.ToSlash(absolute)
 	source, err := p.projectSourceEvidence(path)
 	if err != nil {
 		return nil, err
 	}
-	violations := make(map[CallableImplementationSourceViolation]struct{})
-	if role == CallableImplementationSourceModule {
+	violations := make(map[ImplementationSourceViolation]struct{})
+	if role == ImplementationSourceExecutableModule {
 		if err := source.collectCallableTopLevelViolations(path, violations); err != nil {
 			return nil, err
 		}
@@ -139,32 +139,36 @@ func (p *ProjectInspection) CallableImplementationSourceViolations(
 	for _, node := range source.nodes {
 		switch SyntaxKind(node.kind) {
 		case SyntaxKindAsExpression, SyntaxKindTypeAssertionExpression:
-			violations[CallableImplementationViolationTypeAssertion] = struct{}{}
+			violations[ImplementationViolationTypeAssertion] = struct{}{}
 		case SyntaxKindNonNullExpression:
-			violations[CallableImplementationViolationNonNullAssertion] = struct{}{}
+			violations[ImplementationViolationNonNullAssertion] = struct{}{}
 		case SyntaxKindAnyKeyword:
-			violations[CallableImplementationViolationExplicitAny] = struct{}{}
+			violations[ImplementationViolationExplicitAny] = struct{}{}
 		case SyntaxKindUnknownKeyword:
-			violations[CallableImplementationViolationExplicitUnknown] = struct{}{}
+			if role == ImplementationSourceExecutableModule {
+				violations[ImplementationViolationExplicitUnknown] = struct{}{}
+			}
 		}
 	}
 	for _, directive := range []string{"@ts-ignore", "@ts-nocheck", "@ts-expect-error"} {
 		if strings.Contains(source.text, directive) {
-			violations[CallableImplementationViolationSuppressionDirective] = struct{}{}
+			violations[ImplementationViolationSuppressionDirective] = struct{}{}
 			break
 		}
 	}
-	dynamic, err := p.sourceDynamicTypeFlags(path, source)
-	if err != nil {
-		return nil, err
+	if role == ImplementationSourceExecutableModule {
+		dynamic, err := p.sourceDynamicTypeFlags(path, source)
+		if err != nil {
+			return nil, err
+		}
+		if dynamic&typeFlagAny != 0 {
+			violations[ImplementationViolationInferredAny] = struct{}{}
+		}
+		if dynamic&typeFlagUnknown != 0 {
+			violations[ImplementationViolationInferredUnknown] = struct{}{}
+		}
 	}
-	if dynamic&typeFlagAny != 0 {
-		violations[CallableImplementationViolationInferredAny] = struct{}{}
-	}
-	if dynamic&typeFlagUnknown != 0 {
-		violations[CallableImplementationViolationInferredUnknown] = struct{}{}
-	}
-	result := make([]CallableImplementationSourceViolation, 0, len(violations))
+	result := make([]ImplementationSourceViolation, 0, len(violations))
 	for violation := range violations {
 		result = append(result, violation)
 	}
@@ -208,7 +212,7 @@ func (source projectSourceEvidence) statementIndexes(path string) ([]uint32, err
 
 func (source projectSourceEvidence) collectCallableTopLevelViolations(
 	path string,
-	violations map[CallableImplementationSourceViolation]struct{},
+	violations map[ImplementationSourceViolation]struct{},
 ) error {
 	statements, err := source.statementIndexes(path)
 	if err != nil {
@@ -218,15 +222,15 @@ func (source projectSourceEvidence) collectCallableTopLevelViolations(
 		switch SyntaxKind(source.nodes[index].kind) {
 		case SyntaxKindImportDeclaration:
 			if !source.hasDirectChild(index, SyntaxKindImportClause) {
-				violations[CallableImplementationViolationSideEffectImport] = struct{}{}
+				violations[ImplementationViolationSideEffectImport] = struct{}{}
 			}
 		case SyntaxKindInterfaceDeclaration, SyntaxKindTypeAliasDeclaration:
 		case SyntaxKindFunctionDeclaration:
 			if !source.hasDirectChild(index, SyntaxKindBlock) {
-				violations[CallableImplementationViolationBodylessFunction] = struct{}{}
+				violations[ImplementationViolationBodylessFunction] = struct{}{}
 			}
 		default:
-			violations[CallableImplementationViolationExecutableTopLevel] = struct{}{}
+			violations[ImplementationViolationExecutableTopLevel] = struct{}{}
 		}
 	}
 	return nil
@@ -368,6 +372,16 @@ func (source projectSourceEvidence) directInvocationReference(index int) bool {
 func (source projectSourceEvidence) callableDynamicTypeLocation(index int) bool {
 	kind := SyntaxKind(source.nodes[index].kind)
 	if kind == SyntaxKindIdentifier {
+		bindingParent := source.nodes[index].parent
+		if bindingParent != 0 && bindingParent < uint32(len(source.nodes)) {
+			switch SyntaxKind(source.nodes[bindingParent].kind) {
+			case SyntaxKindImportClause,
+				SyntaxKindNamespaceImport,
+				SyntaxKindImportSpecifier,
+				SyntaxKindImportEqualsDeclaration:
+				return false
+			}
+		}
 		for parent := source.nodes[index].parent; parent != 0 &&
 			parent < uint32(len(source.nodes)); parent = source.nodes[parent].parent {
 			parentKind := SyntaxKind(source.nodes[parent].kind)

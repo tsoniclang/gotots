@@ -31,8 +31,8 @@ func main() { _ = fast.Sum("value") }
 	implementation := filepath.Join(root, "implementation")
 	sharedCertificationPath := filepath.Join(root, "shared", "core.d.ts")
 	writeFixture(t, sharedCertificationPath, `declare module "@fixture/core.js" {
-  export interface CoreValue { readonly value: string; }
-}
+	  export interface CoreValue { readonly value: unknown; }
+	}
 `)
 	writeFixture(t, filepath.Join(implementation, "package.ts"), `import type { CoreValue } from "@fixture/core.js";
 type SelectedCore = CoreValue;

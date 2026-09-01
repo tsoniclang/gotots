@@ -1496,6 +1496,12 @@ internal fallback
 constraint for an unconstrained safe `T` is not misclassified as authored
 `any`. Explicit `this` parameter TypeNodes are checked at the same authored
 boundary; an implicit checker-only `this` fallback is not source evidence.
+Declaration-only certification sources are a separate boundary. They may
+faithfully declare a type-safe `unknown` provider slot, while explicit `any`,
+assertions, non-null assertions, and suppression directives remain forbidden.
+The executable module must still prove every actual argument and selected
+result exact; the ambient declaration's broad formal type is not itself an
+authored value flow.
 
 An explicit `kernel` variant may replace the one generated generic kernel while
 leaving all finite facades and callers intact. Ordinary and kernel variants are

@@ -1823,6 +1823,15 @@ verification content-deduplicates byte-identical declarations in scratch.
 Certification declarations never become generated output, runtime
 dependencies, or an alternate semantic owner. Missing, changed, executable,
 escaping, duplicated, unselected, or unsealed sources fail before printing.
+An exact certification declaration may expose `unknown` as its authoritative,
+type-safe public boundary; that declaration is not executable recovery.
+Explicit `any`, assertions, non-null assertions, and suppression directives
+remain forbidden. Inferred dynamic-transport inspection runs over the authored
+executable module and every value it actually transports, not recursively over
+the selected ambient declaration graph. Thus an ambient callback's `unknown`
+result or a referenced standard type's broad default cannot be mistaken for an
+authored escape, while storing, passing, returning, or consuming such a value
+inside the implementation still fails at the executable owner.
 
 The initial callable contract admits only ordinary synchronous variants that
 emit as module functions or static class methods, plus explicit generic

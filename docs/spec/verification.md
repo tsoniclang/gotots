@@ -1297,6 +1297,12 @@ implementation consumer, and replace it with executable TypeScript. Digest
 drift, unsealed evidence, an unused source, and a non-declaration source must
 fail before output. Callable-local byte-identical declarations are materialized
 once in scratch; no certification declaration appears in final output.
+An exact ambient declaration with an `unknown` formal or result is a positive
+control: exact authored arguments and results pass without classifying the
+declaration itself as executable transport. Mutating the declaration to
+explicit `any`, adding a suppression directive, or letting an ambient broad
+result enter authored storage, arguments, or output fails at the declaration or
+executable-source owner respectively.
 Mutate a selected Go callable body without changing its identity or signature.
 Its canonical body digest must fail the post-load join before emission; omit or
 change that digest across the compile-worker handoff and the parent exact join

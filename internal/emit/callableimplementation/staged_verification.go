@@ -110,7 +110,7 @@ func VerifyStagedGeneratedContracts(
 			project,
 			path,
 			module.outputPath,
-			tsgo.CallableImplementationSourceModule,
+			tsgo.ImplementationSourceExecutableModule,
 		); err != nil {
 			return nil, err
 		}
@@ -120,7 +120,7 @@ func VerifyStagedGeneratedContracts(
 			project,
 			path,
 			path,
-			tsgo.CallableImplementationSourceCertification,
+			tsgo.ImplementationSourceCertificationDeclaration,
 		); err != nil {
 			return nil, err
 		}
@@ -378,9 +378,9 @@ func rejectCallableImplementationSource(
 	project *tsgo.ProjectInspection,
 	path string,
 	subject string,
-	role tsgo.CallableImplementationSourceRole,
+	role tsgo.ImplementationSourceRole,
 ) error {
-	violations, err := project.CallableImplementationSourceViolations(path, role)
+	violations, err := project.ImplementationSourceViolations(path, role)
 	if err != nil {
 		return err
 	}

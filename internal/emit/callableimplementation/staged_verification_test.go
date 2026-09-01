@@ -3,6 +3,7 @@ package callableimplementation
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -268,7 +269,7 @@ func TestStagedVerificationUsesOnlyCertifiedDeclarationSources(t *testing.T) {
 		}
 	})
 
-	t.Run("ambient declaration enables authored import", func(t *testing.T) {
+	t.Run("ambient unknown declaration enables exact authored call", func(t *testing.T) {
 		fixture := newStagedVerificationFixture(t)
 		config, certificationPath := fixture.configWithCertificationSource(t)
 		verified, err := VerifyStagedGeneratedContracts(config)
@@ -280,6 +281,27 @@ func TestStagedVerificationUsesOnlyCertifiedDeclarationSources(t *testing.T) {
 		}
 		if _, err := os.Stat(certificationPath); err != nil {
 			t.Fatalf("certification source was modified: %v", err)
+		}
+	})
+
+	t.Run("ambient explicit any is rejected", func(t *testing.T) {
+		fixture := newStagedVerificationFixture(t)
+		config, certificationPath := fixture.configWithCertificationSource(t)
+		payload := []byte(
+			"declare module \"@fixture/runtime.js\" {\n" +
+				"  export function identity(value: any): number;\n" +
+				"}\n",
+		)
+		if err := replaceCertificationSource(
+			config.Modules,
+			certificationPath,
+			payload,
+		); err != nil {
+			t.Fatal(err)
+		}
+		_, err := VerifyStagedGeneratedContracts(config)
+		if err == nil || !strings.Contains(err.Error(), "explicit-any") {
+			t.Fatalf("certification any policy error = %v", err)
 		}
 	})
 
@@ -308,29 +330,13 @@ func TestStagedVerificationUsesOnlyCertifiedDeclarationSources(t *testing.T) {
 				"  export function identity(value: number): number;\n" +
 				"}\n",
 		)
-		if err := os.WriteFile(certificationPath, payload, 0o600); err != nil {
+		if err := replaceCertificationSource(
+			config.Modules,
+			certificationPath,
+			payload,
+		); err != nil {
 			t.Fatal(err)
 		}
-		digest := sha256.Sum256(payload)
-		changed, sourceErr := implementationcontract.NewCertificationSource(
-			certificationPath,
-			hex.EncodeToString(digest[:]),
-		)
-		if sourceErr != nil {
-			t.Fatal(sourceErr)
-		}
-		module := config.Modules[0]
-		module, sourceErr = NewStagedModule(
-			module.sourcePath,
-			module.outputPath,
-			module.sourceDigest,
-			module.exports,
-			[]implementationcontract.CertificationSource{changed},
-		)
-		if sourceErr != nil {
-			t.Fatal(sourceErr)
-		}
-		config.Modules[0] = module
 		_, err := VerifyStagedGeneratedContracts(config)
 		if err == nil || !strings.Contains(err.Error(), "diagnostic-suppression") {
 			t.Fatalf("certification source policy error = %v", err)
@@ -518,7 +524,7 @@ func (f *stagedVerificationFixture) configWithCertificationSource(
 	certificationPath := filepath.Join(f.root, "runtime-contract.d.ts")
 	payload := []byte(
 		"declare module \"@fixture/runtime.js\" {\n" +
-			"  export function identity(value: number): number;\n" +
+			"  export function identity(value: unknown): number;\n" +
 			"}\n",
 	)
 	if err := os.WriteFile(certificationPath, payload, 0o600); err != nil {
@@ -545,6 +551,40 @@ func (f *stagedVerificationFixture) configWithCertificationSource(
 	}
 	config.Modules[0] = module
 	return config, certificationPath
+}
+
+func replaceCertificationSource(
+	modules []StagedModule,
+	certificationPath string,
+	payload []byte,
+) error {
+	if len(modules) != 1 {
+		return fmt.Errorf("staged module denominator is %d, want 1", len(modules))
+	}
+	if err := os.WriteFile(certificationPath, payload, 0o600); err != nil {
+		return err
+	}
+	digest := sha256.Sum256(payload)
+	changed, err := implementationcontract.NewCertificationSource(
+		certificationPath,
+		hex.EncodeToString(digest[:]),
+	)
+	if err != nil {
+		return err
+	}
+	module := modules[0]
+	module, err = NewStagedModule(
+		module.sourcePath,
+		module.outputPath,
+		module.sourceDigest,
+		module.exports,
+		[]implementationcontract.CertificationSource{changed},
+	)
+	if err != nil {
+		return err
+	}
+	modules[0] = module
+	return nil
 }
 
 func stagedGeneratedFunction(t *testing.T) []byte {
