@@ -1,13 +1,9 @@
 package callableimplementation
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"go/types"
-	"path/filepath"
 	"slices"
-	"strings"
 
 	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -82,7 +78,7 @@ type Module struct {
 	digest               string
 	envelope             implementationcontract.Envelope
 	callableClaims       []CallableDocument
-	certificationSources []CertificationSource
+	certificationSources []implementationcontract.CertificationSource
 }
 
 func (m Module) PackagePath() string                           { return m.packagePath }
@@ -102,40 +98,8 @@ func (m Module) EquivalenceEnvelope() implementationcontract.Envelope {
 func (m Module) CallableClaims() []CallableDocument {
 	return slices.Clone(m.callableClaims)
 }
-func (m Module) CertificationSources() []CertificationSource {
+func (m Module) CertificationSources() []implementationcontract.CertificationSource {
 	return slices.Clone(m.certificationSources)
-}
-
-type CertificationSource struct {
-	sourcePath   string
-	sourceDigest string
-}
-
-func NewCertificationSource(
-	sourcePath string,
-	sourceDigest string,
-) (CertificationSource, error) {
-	decoded, err := hex.DecodeString(sourceDigest)
-	if !filepath.IsAbs(sourcePath) || filepath.Clean(sourcePath) != sourcePath ||
-		!strings.HasSuffix(sourcePath, ".d.ts") || err != nil || len(decoded) != sha256.Size {
-		return CertificationSource{}, &Error{
-			Operation: "admit certification source",
-			Subject:   sourcePath,
-			Reason:    "source evidence is invalid",
-		}
-	}
-	return CertificationSource{
-		sourcePath: sourcePath, sourceDigest: sourceDigest,
-	}, nil
-}
-
-func (s CertificationSource) SourcePath() string   { return s.sourcePath }
-func (s CertificationSource) SourceDigest() string { return s.sourceDigest }
-
-func (s CertificationSource) Valid() bool {
-	decoded, err := hex.DecodeString(s.sourceDigest)
-	return filepath.IsAbs(s.sourcePath) && filepath.Clean(s.sourcePath) == s.sourcePath &&
-		strings.HasSuffix(s.sourcePath, ".d.ts") && err == nil && len(decoded) == sha256.Size
 }
 
 type Implementation struct {

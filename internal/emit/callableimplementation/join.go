@@ -6,6 +6,7 @@ import (
 
 	callableimplementationcontract "github.com/tsoniclang/gotots/internal/contracts/callableimplementation"
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
@@ -162,7 +163,7 @@ func slicesCloneModules(source []Module) []Module {
 	for index, module := range source {
 		module.callableClaims = append([]CallableDocument(nil), module.callableClaims...)
 		module.certificationSources = append(
-			[]CertificationSource(nil),
+			[]implementationcontract.CertificationSource(nil),
 			module.certificationSources...,
 		)
 		result[index] = module

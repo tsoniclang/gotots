@@ -1290,12 +1290,13 @@ structurally exact-joins the complete ordinary and installed canonical sets.
 That final join consumes only the compiler worker's official encoded protocol
 and flattened expected exports after the worker has exited; no live TS-Go
 process or certificate crosses the compilation lifetime boundary.
-For callable-body modules, mutate an admitted `.d.ts` certification source
-after preparation, omit it from the compile-worker handoff, duplicate it under
-a second contract, and replace it with executable TypeScript. Digest drift,
-unsealed evidence, and a non-declaration source must fail before the staged
-project is printed; byte-identical declarations from multiple modules are
-materialized once in scratch and never appear in final output.
+For the shared implementation environment, mutate an admitted `.d.ts`
+certification source after preparation, omit it from either implementation
+verifier, duplicate it in the shared selection, select it with no
+implementation consumer, and replace it with executable TypeScript. Digest
+drift, unsealed evidence, an unused source, and a non-declaration source must
+fail before output. Callable-local byte-identical declarations are materialized
+once in scratch; no certification declaration appears in final output.
 Mutate a selected Go callable body without changing its identity or signature.
 Its canonical body digest must fail the post-load join before emission; omit or
 change that digest across the compile-worker handoff and the parent exact join
@@ -1417,8 +1418,9 @@ generated body, and selected authored body over representative and adversarial
 inputs; an equivalence envelope bounds every intentional algorithmic
 difference.
 
-Configuration mutations select schema 2, `implementations.bundles`, and
-`--implementation-bundle`; all must fail with the current migration diagnostic.
+Configuration mutations select schema 3, schema 2,
+`implementations.bundles`, and `--implementation-bundle`; all must fail with
+the current migration diagnostic.
 A no-callable-implementation control proves the ordinary source digest and
 output path remain singular and byte-stable.
 

@@ -352,9 +352,13 @@ human-source, and cost evidence. Full generation and runtime jobs are batched
 at milestone boundaries under the repository memory guard. Faster runtime
 alone cannot accept a package implementation or representation change.
 
-Schema 3 is the only project-config delivery surface. Schema 2,
+Schema 4 is the only project-config delivery surface. Schema 3, schema 2,
 `implementations.bundles`, and `--implementation-bundle` fail with an explicit
 migration diagnostic; delivery must not retain aliases or a dual decoder.
+The shared implementation certification environment is selected once through
+`implementations.certificationSources` or repeatable
+`--implementation-certification-source` and is consumed by every selected
+package and callable verifier.
 
 ## Checkpoint Evidence
 

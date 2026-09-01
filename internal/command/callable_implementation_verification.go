@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/config"
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/emit/callableimplementation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -17,7 +18,13 @@ func verifyCallableImplementationContracts(
 	plan printPlan,
 	outputDirectory string,
 ) (printPlan, error) {
-	prepared, err := prepareCallableImplementations(project)
+	certificationSources, err := implementationcontract.LoadCertificationSources(
+		project.ImplementationCertificationSources(),
+	)
+	if err != nil {
+		return printPlan{}, err
+	}
+	prepared, err := prepareCallableImplementations(project, certificationSources)
 	if err != nil {
 		return printPlan{}, err
 	}
@@ -56,12 +63,12 @@ func verifyCallableImplementationContracts(
 		}
 		var err error
 		certificationSources := make(
-			[]callableimplementation.CertificationSource,
+			[]implementationcontract.CertificationSource,
 			len(module.certificationSources),
 		)
 		for sourceIndex, source := range module.certificationSources {
 			certificationSources[sourceIndex], err =
-				callableimplementation.NewCertificationSource(
+				implementationcontract.NewCertificationSource(
 					source.sourcePath,
 					source.sourceDigest,
 				)
@@ -246,7 +253,7 @@ func exactJoinPreparedCallablePlan(
 
 func sameCallableCertificationSources(
 	actual []callableImplementationCertificationSource,
-	expected []callableimplementation.CertificationSource,
+	expected []implementationcontract.CertificationSource,
 ) bool {
 	if len(actual) != len(expected) {
 		return false

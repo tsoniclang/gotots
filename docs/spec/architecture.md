@@ -1731,25 +1731,29 @@ Real path/name collisions add the shortest deterministic source-derived
 qualifier. This layout uses no runtime registry, dynamic import, bundler
 dependency, erased lookup, digest-sharded fallback, or hash-named support path.
 
-Schema version 3 has the closed top-level sections `distribution`, `source`,
+Schema version 4 has the closed top-level sections `distribution`, `source`,
 `go`, `semantics`, `providers`, `implementations`, `output`, and `tools`.
 `distribution.root` identifies the installed GoToTS distribution that owns the
 default pinned TS-Go module context and checked providers; it is operational
 path evidence and is excluded from semantic identity. `tools.go`,
 `tools.tsgo`, and `tools.cache` select the operational tools and cache root.
 `source` selects one package pattern and root mode.
-`implementations.packages` contains exact package-contract paths and
+`implementations.certificationSources` contains the sorted project-selected
+declaration-only TypeScript snapshots shared by every selected implementation
+verifier. `implementations.packages` contains exact package-contract paths and
 `implementations.callables` contains exact callable-body-contract paths. Every
 field except `schemaVersion` has one registered CLI counterpart, including
-repeatable `--tag`, `--package-implementation`, and
-`--callable-implementation` flags. The two implementation classes are never
-inferred from a document's spelling or filesystem location.
+repeatable `--tag`, `--implementation-certification-source`,
+`--package-implementation`, and `--callable-implementation` flags. The two
+implementation classes are never inferred from a document's spelling or
+filesystem location.
 
-Schema 3 is a one-way replacement of schema 2. The removed
+Schema 4 is a one-way replacement of schema 3. Schema 3 and the removed
 `implementations.bundles` field and `--implementation-bundle` flag have no
 alias, compatibility decoder, or automatic rewrite. A schema-2 document or
-removed spelling fails at configuration ownership with a migration diagnostic;
-only `implementations.packages`, `implementations.callables`,
+schema-3 document fails at configuration ownership with a migration diagnostic;
+only `implementations.certificationSources`, `implementations.packages`,
+`implementations.callables`, `--implementation-certification-source`,
 `--package-implementation`, and `--callable-implementation` are current.
 
 The loader owns one immutable selected-source snapshot before emission starts.
@@ -1808,15 +1812,17 @@ are read from the exact immutable source text embedded in TS-Go's official AST
 evidence, never from a filesystem reread. Their presence anywhere in an
 authored contract is outside the admitted source envelope.
 
-An authored callable module may name sorted, contract-owned `.d.ts`
-certification sources needed only to typecheck its imports. Preparation hashes
-those declaration snapshots into the callable contract; their absolute paths
-and digests cross the compile-worker boundary as sealed evidence. Staged
-verification rechecks each digest and materializes one deterministic,
-content-deduplicated copy in verification scratch. Certification declarations
-never become generated output, runtime dependencies, or an alternate semantic
-owner. Missing, changed, executable, escaping, or unsealed sources fail before
-printing.
+The project may select sorted config-relative `.d.ts` certification sources
+needed by every authored implementation. A package or callable contract may
+add sorted contract-owned sources private to that bundle. Preparation hashes
+the shared and local declaration snapshots into each affected implementation
+certificate; their absolute paths and digests cross process boundaries as
+sealed evidence. Verification rechecks each digest and materializes only the
+declaration environment required for the isolated strict project. Callable
+verification content-deduplicates byte-identical declarations in scratch.
+Certification declarations never become generated output, runtime
+dependencies, or an alternate semantic owner. Missing, changed, executable,
+escaping, duplicated, unselected, or unsealed sources fail before printing.
 
 The initial callable contract admits only ordinary synchronous variants that
 emit as module functions or static class methods, plus explicit generic

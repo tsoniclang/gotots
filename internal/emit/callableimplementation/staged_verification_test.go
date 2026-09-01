@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"github.com/tsoniclang/gotots/internal/toolchain"
 )
@@ -262,7 +263,7 @@ func TestStagedVerificationRejectsEveryAuthoredSourceEscape(t *testing.T) {
 func TestStagedVerificationUsesOnlyCertifiedDeclarationSources(t *testing.T) {
 	t.Run("executable source is rejected", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "runtime-contract.ts")
-		if _, err := NewCertificationSource(path, strings.Repeat("0", 64)); err == nil {
+		if _, err := implementationcontract.NewCertificationSource(path, strings.Repeat("0", 64)); err == nil {
 			t.Fatal("executable certification source was accepted")
 		}
 	})
@@ -293,8 +294,7 @@ func TestStagedVerificationUsesOnlyCertifiedDeclarationSources(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, err := VerifyStagedGeneratedContracts(config)
-		if err == nil || !strings.Contains(err.Error(), "certification source") ||
-			!strings.Contains(err.Error(), "source digest changed") {
+		if err == nil || !strings.Contains(err.Error(), "source digest changed") {
 			t.Fatalf("certification source mutation error = %v", err)
 		}
 	})
@@ -312,8 +312,25 @@ func TestStagedVerificationUsesOnlyCertifiedDeclarationSources(t *testing.T) {
 			t.Fatal(err)
 		}
 		digest := sha256.Sum256(payload)
-		config.Modules[0].certificationSources[0].sourceDigest =
-			hex.EncodeToString(digest[:])
+		changed, sourceErr := implementationcontract.NewCertificationSource(
+			certificationPath,
+			hex.EncodeToString(digest[:]),
+		)
+		if sourceErr != nil {
+			t.Fatal(sourceErr)
+		}
+		module := config.Modules[0]
+		module, sourceErr = NewStagedModule(
+			module.sourcePath,
+			module.outputPath,
+			module.sourceDigest,
+			module.exports,
+			[]implementationcontract.CertificationSource{changed},
+		)
+		if sourceErr != nil {
+			t.Fatal(sourceErr)
+		}
+		config.Modules[0] = module
 		_, err := VerifyStagedGeneratedContracts(config)
 		if err == nil || !strings.Contains(err.Error(), "diagnostic-suppression") {
 			t.Fatalf("certification source policy error = %v", err)
@@ -508,7 +525,7 @@ func (f *stagedVerificationFixture) configWithCertificationSource(
 		t.Fatal(err)
 	}
 	digest := sha256.Sum256(payload)
-	certificationSource, err := NewCertificationSource(
+	certificationSource, err := implementationcontract.NewCertificationSource(
 		certificationPath,
 		hex.EncodeToString(digest[:]),
 	)
@@ -521,7 +538,7 @@ func (f *stagedVerificationFixture) configWithCertificationSource(
 		module.outputPath,
 		module.sourceDigest,
 		module.exports,
-		[]CertificationSource{certificationSource},
+		[]implementationcontract.CertificationSource{certificationSource},
 	)
 	if err != nil {
 		t.Fatal(err)

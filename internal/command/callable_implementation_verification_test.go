@@ -28,6 +28,20 @@ func TestPreparedCallablePlanExactJoinRejectsHandoffOmission(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	sharedCertificationPath := filepath.Join(root, "shared-core.d.ts")
+	if err := os.WriteFile(
+		sharedCertificationPath,
+		[]byte("declare module \"@fixture/core.js\" {}\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	sharedCertificationSources, err := implementationcontract.LoadCertificationSources(
+		[]string{sharedCertificationPath},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	profile, err := load.NewBuildProfileForToolchain(
 		"go1.25.0",
 		"linux",
@@ -76,8 +90,10 @@ func TestPreparedCallablePlanExactJoinRejectsHandoffOmission(t *testing.T) {
 		t.Fatal(err)
 	}
 	prepared, err := callableimplementation.PrepareAll(callableimplementation.Config{
-		ContractPaths: []string{contractPath}, BuildProfile: profile,
-		Compilation: document.Compilation,
+		ContractPaths:        []string{contractPath},
+		CertificationSources: sharedCertificationSources,
+		BuildProfile:         profile,
+		Compilation:          document.Compilation,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -100,23 +116,33 @@ func TestPreparedCallablePlanExactJoinRejectsHandoffOmission(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := callableimplementation.PrepareAll(callableimplementation.Config{
-		ContractPaths: []string{contractPath, changedContractPath},
-		BuildProfile:  profile,
-		Compilation:   document.Compilation,
+		ContractPaths:        []string{contractPath, changedContractPath},
+		CertificationSources: sharedCertificationSources,
+		BuildProfile:         profile,
+		Compilation:          document.Compilation,
 	}); err == nil || !strings.Contains(err.Error(), "different source snapshots") {
 		t.Fatalf("mixed source snapshots error = %v", err)
 	}
 	module := prepared.Modules()[0]
-	certificationSource := module.CertificationSources()[0]
+	certificationSources := module.CertificationSources()
+	if len(certificationSources) != 2 {
+		t.Fatalf("merged certification sources = %d, want 2", len(certificationSources))
+	}
+	stagedCertificationSources := make(
+		[]callableImplementationCertificationSource,
+		len(certificationSources),
+	)
+	for index, source := range certificationSources {
+		stagedCertificationSources[index] = callableImplementationCertificationSource{
+			sourcePath: source.SourcePath(), sourceDigest: source.SourceDigest(),
+		}
+	}
 	plan := callableImplementationPrintPlan{
 		sourceProgramDigest: document.SourceProgramDigest,
 		modules: []callableImplementationModule{{
 			sourcePath: module.SourcePath(), outputPath: module.OutputPath(),
 			sourceDigest: module.SourceDigest(), exports: []string{claim.Export},
-			certificationSources: []callableImplementationCertificationSource{{
-				sourcePath:   certificationSource.SourcePath(),
-				sourceDigest: certificationSource.SourceDigest(),
-			}},
+			certificationSources: stagedCertificationSources,
 		}},
 		targets: []callableImplementationTarget{{
 			sourceIdentity: claim.SourceIdentity, sourceSignature: claim.SourceSignature,

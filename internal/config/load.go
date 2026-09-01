@@ -50,8 +50,9 @@ type providersDocument struct {
 	Externals       *bool `json:"externals"`
 }
 type implementationsDocument struct {
-	Packages  []string `json:"packages"`
-	Callables []string `json:"callables"`
+	CertificationSources []string `json:"certificationSources"`
+	Packages             []string `json:"packages"`
+	Callables            []string `json:"callables"`
 }
 type outputDocument struct {
 	Directory *string `json:"directory"`
@@ -112,11 +113,18 @@ func rejectRemovedConfiguration(payload []byte) error {
 	if err := json.Unmarshal(payload, &probe); err != nil {
 		return projectError("decode config", "", err.Error())
 	}
+	if probe.SchemaVersion == 3 {
+		return projectError(
+			"migrate config",
+			"schemaVersion",
+			"schema 3 was replaced by schema 4; select shared implementation declarations with implementations.certificationSources",
+		)
+	}
 	if probe.SchemaVersion == 2 {
 		return projectError(
 			"migrate config",
 			"schemaVersion",
-			"schema 2 was replaced by schema 3; split implementations.bundles into implementations.packages and implementations.callables",
+			"schema 2 was replaced by schema 4; split implementations.bundles and select shared implementation declarations explicitly",
 		)
 	}
 	if _, removed := probe.Implementations["bundles"]; removed {
@@ -202,6 +210,22 @@ func resolve(path string, selected document, overrides Overrides) (Project, erro
 	if err != nil {
 		return Project{}, err
 	}
+	certificationSources, err := resolvePaths(
+		base,
+		"implementations.certificationSources",
+		selected.Implementations.CertificationSources,
+	)
+	if err != nil {
+		return Project{}, err
+	}
+	if len(certificationSources) != 0 &&
+		len(packageImplementations) == 0 && len(callableImplementations) == 0 {
+		return Project{}, projectError(
+			"validate config",
+			"implementations.certificationSources",
+			"shared declarations have no selected implementation consumer",
+		)
+	}
 	if *selected.Source.Package == "" {
 		return Project{}, projectError("validate config", "source.package", "value is empty")
 	}
@@ -228,6 +252,7 @@ func resolve(path string, selected document, overrides Overrides) (Project, erro
 		externals:               *selected.Providers.Externals,
 		packageImplementations:  packageImplementations,
 		callableImplementations: callableImplementations,
+		certificationSources:    certificationSources,
 		outputDirectory:         outputDirectory,
 	}, nil
 }
@@ -283,6 +308,9 @@ func applyOverrides(selected *document, overrides Overrides) {
 	}
 	if overrides.CallableImplementationsSet {
 		selected.Implementations.Callables = slices.Clone(overrides.CallableImplementations)
+	}
+	if overrides.CertificationSourcesSet {
+		selected.Implementations.CertificationSources = slices.Clone(overrides.CertificationSources)
 	}
 	applyString(overrides.OutputDirectory, &selected.Output.Directory)
 }

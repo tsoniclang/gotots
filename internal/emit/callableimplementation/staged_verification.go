@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sort"
 
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -201,8 +202,8 @@ func validateStagedModules(
 			digestErr != nil || len(digest) != sha256.Size || len(module.exports) == 0 ||
 			!sort.StringsAreSorted(module.exports) ||
 			!sort.SliceIsSorted(module.certificationSources, func(left, right int) bool {
-				return module.certificationSources[left].sourcePath <
-					module.certificationSources[right].sourcePath
+				return module.certificationSources[left].SourcePath() <
+					module.certificationSources[right].SourcePath()
 			}) {
 			return nil, &Error{
 				Operation: "validate staged module", Subject: module.outputPath,
@@ -210,8 +211,8 @@ func validateStagedModules(
 			}
 		}
 		for index, source := range module.certificationSources {
-			if !source.Valid() || source.sourcePath == module.sourcePath ||
-				index > 0 && module.certificationSources[index-1].sourcePath == source.sourcePath {
+			if !source.Valid() || source.SourcePath() == module.sourcePath ||
+				index > 0 && module.certificationSources[index-1].SourcePath() == source.SourcePath() {
 				return nil, &Error{
 					Operation: "validate staged module", Subject: module.outputPath,
 					Reason: "certification source is invalid",
@@ -342,18 +343,11 @@ func materializeCertificationSources(
 	byDigest := make(map[string][]byte)
 	for _, module := range modules {
 		for _, source := range module.certificationSources {
-			payload, err := os.ReadFile(source.sourcePath)
+			payload, err := implementationcontract.VerifyCertificationSource(source)
 			if err != nil {
-				return nil, contractError("read certification source", source.sourcePath, err)
+				return nil, err
 			}
-			digest := sha256.Sum256(payload)
-			if hex.EncodeToString(digest[:]) != source.sourceDigest {
-				return nil, &Error{
-					Operation: "verify certification source", Subject: source.sourcePath,
-					Reason: "source digest changed",
-				}
-			}
-			byDigest[source.sourceDigest] = payload
+			byDigest[source.SourceDigest()] = payload
 		}
 	}
 	if len(byDigest) == 0 {

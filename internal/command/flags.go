@@ -24,6 +24,7 @@ func (i Invocation) Overrides() config.Overrides {
 	result.BuildTags = slices.Clone(result.BuildTags)
 	result.PackageImplementations = slices.Clone(result.PackageImplementations)
 	result.CallableImplementations = slices.Clone(result.CallableImplementations)
+	result.CertificationSources = slices.Clone(result.CertificationSources)
 	return result
 }
 func (i Invocation) PrintResolvedConfig() bool { return i.printResolved }
@@ -119,6 +120,8 @@ func bindDescriptor(
 		flags.Var(&listValue{target: &overrides.PackageImplementations, selected: &overrides.PackageImplementationsSet}, descriptor.Flag(), description)
 	case config.OptionCallableImplementations:
 		flags.Var(&listValue{target: &overrides.CallableImplementations, selected: &overrides.CallableImplementationsSet}, descriptor.Flag(), description)
+	case config.OptionImplementationCertificationSources:
+		flags.Var(&listValue{target: &overrides.CertificationSources, selected: &overrides.CertificationSourcesSet}, descriptor.Flag(), description)
 	case config.OptionOutputDirectory:
 		flags.Var(newStringValue(&overrides.OutputDirectory), descriptor.Flag(), description)
 	case config.OptionExternals:
