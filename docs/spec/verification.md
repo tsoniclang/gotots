@@ -1248,6 +1248,11 @@ gate. Rebuilding over a populated output directory must replace the
 complete compiler-owned artifact set: a seeded obsolete source file and an old
 target `tsconfig` must both disappear, and the sorted manifest membership
 (including the manifest itself) must exact-join the physical file set.
+Inject a write failure after one staged artifact exists. The prior published
+output must remain byte-identical, the partial artifact must remain absent from
+that published output, and the typed error must identify a retained staging
+directory containing the exact partial artifact. Mutating the lifecycle back
+to unconditional deferred cleanup must make this gate fail.
 
 The output-lifecycle gate proves a distinct compilation worker seals and
 officially encodes the complete TS-Go AST, writes its validated handoff, and

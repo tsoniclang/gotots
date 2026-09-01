@@ -1692,6 +1692,13 @@ selected marker fact, and the selected target then strict-typechecks the
 executable artifact. The configured output directory is compiler-owned and is
 reconstructed through a staged replacement; a successful build cannot retain
 an artifact from an earlier canonical build.
+The output transaction removes scratch only after successful publication. If
+compilation, contract verification, printing, or installation fails while its
+staging directory still exists, that exact directory is retained outside the
+published output and its path is carried by the returned typed failure. A
+failure therefore preserves the immutable protocol, generated source, and
+verification scratch that produced it without exposing a partial build as the
+selected product.
 
 Compilation-scoped generated support definitions retain their full semantic
 artifact identities. Physical paths expose only semantic family and exact
