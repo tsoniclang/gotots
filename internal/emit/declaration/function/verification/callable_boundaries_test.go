@@ -149,7 +149,7 @@ func TestVariadicCallablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	if !strings.Contains(source, "return Sum(1, values.$value);") {
 		t.Fatalf("defined-slice spread was not projected directly:\n%s", source)
 	}
-	if !strings.Contains(source, "const __gotots_results_") ||
+	if !strings.Contains(source, "const results") ||
 		!strings.Contains(source, "RuntimeSlice.literal<int32>") {
 		t.Fatalf("tuple-adjusted variadic call was not packed after tuple expansion:\n%s", source)
 	}
@@ -191,7 +191,7 @@ func TestVariadicArgumentsPreserveTheDeclaredSliceParameter(t *testing.T) {
 	source := ""
 	for _, file := range emission.Files() {
 		if file.Kind() == emit.TargetFileSource {
-			source += printExecutableTargetFile(t, file.SourceFile(), t.TempDir())
+			source += printTargetFile(t, file.SourceFile(), t.TempDir())
 		}
 	}
 	if strings.Count(source, "values: RuntimeSlice<int32>") < 3 {

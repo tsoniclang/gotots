@@ -12,7 +12,6 @@ import (
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
-	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
@@ -48,59 +47,6 @@ func (s *programSession) validateAnonymousStructArtifact(
 		}
 	}
 	return nil
-}
-
-func (s *programSession) attachSelectedMethodSourceFacts(
-	builder *targetFileBuilder,
-	context api.Context,
-	owner types.Object,
-	methods []*types.Func,
-	statements []tsgo.Statement,
-	requests []api.RootRequest,
-) ([]tsgo.Statement, []api.RootRequest, error) {
-	if len(methods) == 0 {
-		return statements, requests, nil
-	}
-	var err error
-	statements, err = s.attachClassMemberContributions(
-		builder,
-		owner,
-		statements,
-		methods,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, method := range methods {
-		site, exists := s.sites[method.Origin()]
-		if !exists {
-			return nil, nil, &ScheduleError{
-				Object: method.FullName(),
-				Reason: "concrete method has no source declaration site",
-			}
-		}
-		origin, originErr := canonicalsourcefact.Origin(
-			site.Source,
-			site.SourceFile,
-			site.OutputPath,
-			site.Occurrence,
-		)
-		if originErr != nil {
-			return nil, nil, originErr
-		}
-		fact, factErr := canonicalsourcefact.ConcreteMethod(
-			context,
-			method,
-			origin,
-			statements,
-		)
-		if factErr != nil {
-			return nil, nil, factErr
-		}
-		statements = append(statements, fact.Statements()...)
-		requests = append(requests, fact.Requests()...)
-	}
-	return statements, requests, nil
 }
 
 func (s *programSession) reconstructAnonymousStruct(
@@ -183,14 +129,17 @@ func (s *programSession) buildAnonymousStructRevision(
 			Reason: "anonymous struct has no concrete name owner",
 		}
 	}
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	replayCommitted := false
 	if !reconstruction {
 		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.SnapshotTemporaries()
-		names.RestoreTemporaries(temporaryStart)
-		defer names.FinishTemporaryReplay(current)
+		finishReplay, replayErr := names.BeginTemporaryReplay(owner, temporaryStart)
+		if replayErr != nil {
+			return artifactRevision{}, replayErr
+		}
+		defer func() { finishReplay(replayCommitted) }()
 	}
-	owner := api.MustGeneratedArtifactOwner(artifact)
 	finish, err := names.BeginArtifact(owner, nil, nil, "")
 	if err != nil {
 		return artifactRevision{}, err
@@ -226,33 +175,15 @@ func (s *programSession) buildAnonymousStructRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	statements, requests, err := canonicalsourcefact.IncludeGeneratedArtifact(
-		context,
-		artifact,
-		emission.Declarations(),
-		emission.Requests(),
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
-	operationFacts, err := canonicalsourcefact.AnonymousStructOperations(
-		context,
-		artifact,
-		operations,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
-	statements = append(statements, operationFacts.Statements()...)
-	requests = append(requests, operationFacts.Requests()...)
 	placement, dependencies, requirements, err :=
 		s.consumeArtifactRequests(
 			owner,
-			requests,
+			emission.Requests(),
 		)
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	statements := emission.Declarations()
 	contract, err := artifactstate.ProjectContract(
 		s.factory,
 		statements,
@@ -260,6 +191,7 @@ func (s *programSession) buildAnonymousStructRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	replayCommitted = true
 	return artifactRevision{
 		statements:     statements,
 		placement:      placement,

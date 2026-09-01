@@ -4,7 +4,6 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
@@ -274,15 +273,10 @@ func (n *File) InterfaceMethodName(method *types.Func) (string, error) {
 			Reason: "interface method signature is invalid",
 		}
 	}
-	if method.Exported() {
+	if method.Exported() || method.Pkg() == nil {
 		return portableIdentifier(method.Name()), nil
 	}
-	qualifier, err := n.generatedPackageToken(method.Pkg())
-	if err != nil {
-		return "", err
-	}
-	return "$go$private$" + qualifier + "$" +
-		semanticname.Identifier(method.Name()), nil
+	return n.owner.registry.privateMethodName(method)
 }
 
 func (n *File) MethodTarget(

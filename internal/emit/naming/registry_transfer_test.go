@@ -9,6 +9,10 @@ import (
 
 func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 	registry := NewRegistry()
+	adapterPath, err := output.InterfaceAdapterSupportPath("language/scalars")
+	if err != nil {
+		t.Fatal(err)
+	}
 	registry.interfaceContracts["retained-contract"] =
 		map[string]interfaceContractSelection{}
 	registry.interfaceAdapterNames[generatedArtifactNameScope(
@@ -16,7 +20,7 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 		generatedArtifactPlacement{
 			kind: api.GeneratedArtifactPlacementCompilation,
 		},
-		output.InterfaceAdapterSupportPath,
+		adapterPath,
 	)] = "adapter"
 	registry.providerInterfaceCapabilityDemands["capability"] =
 		providerInterfaceCapabilityBinding{}

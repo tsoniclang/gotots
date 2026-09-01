@@ -123,7 +123,7 @@ func Package(value int32) (int32, bool) {
 	)
 	for _, required := range []string{
 		"let pointer: Pointer<Child> | undefined",
-		"projectPointer<Child$Storage, Child>(addressOf<Child$Storage>(__gotots_store_0.Child)",
+		"projectPointer<Child$Storage, Child>(addressOf<Child$Storage>(storeTarget.Child)",
 		"loadPointer<Child>",
 		"equalPointer<Child>",
 	} {

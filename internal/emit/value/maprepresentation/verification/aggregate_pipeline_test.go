@@ -122,8 +122,8 @@ func TestAggregateMapArtifactsIgnoreRootOrderAndUnreachableShapes(t *testing.T) 
 	}
 	assertSameArtifacts(
 		t,
-		withoutSourceFactApplicationsByPath(materializedContents(t, first)),
-		withoutSourceFactApplicationsByPath(materializedContents(t, withoutUnreachable)),
+		materializedContents(t, first),
+		materializedContents(t, withoutUnreachable),
 		"unreachable map shape",
 	)
 }
@@ -418,25 +418,6 @@ func materializedContents(
 		result[filepath.ToSlash(relative)] = readFile(t, targetPath)
 	}
 	return result
-}
-
-func withoutSourceFactApplicationsByPath(contents map[string]string) map[string]string {
-	result := make(map[string]string, len(contents))
-	for path, content := range contents {
-		result[path] = withoutSourceFactApplications(content)
-	}
-	return result
-}
-
-func withoutSourceFactApplications(source string) string {
-	var result strings.Builder
-	for _, line := range strings.SplitAfter(source, "\n") {
-		if strings.HasPrefix(line, "attribute<") {
-			continue
-		}
-		result.WriteString(line)
-	}
-	return result.String()
 }
 
 func assertSameArtifacts(

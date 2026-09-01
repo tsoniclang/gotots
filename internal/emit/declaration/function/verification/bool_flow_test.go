@@ -34,7 +34,7 @@ func TestBoolFlowPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 		}
 	})
 	printed, err := client.PrintNode(
-		executableTargetFile(targetFile),
+		targetFile,
 		tsgo.PrintOptions{},
 	)
 	if err != nil {

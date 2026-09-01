@@ -32,8 +32,8 @@ func TestZeroMethodInterfaceAdaptersShareBoundedCommonMachinery(t *testing.T) {
 			large.factoryBytes,
 		)
 	}
-	// Per-adapter growth includes its canonical declaration and implementation
-	// facts; the executable TypeScript target erases those statements.
+	// Per-adapter growth contains only the executable adapter declaration; the
+	// shared factory remains constant as implementer count grows.
 	if countDelta != 24 || byteDelta/countDelta > 2_100 ||
 		nodeDelta/countDelta > 210 {
 		t.Fatalf(
@@ -100,11 +100,11 @@ func measureZeroMethodAdapters(
 	waveThreeTypecheck(t, targetDirectory, artifacts.paths)
 	measurement := zeroMethodAdapterMeasurement{count: count}
 	for _, size := range artifacts.sizes {
-		switch size.path {
-		case output.InterfaceAdapterSupportPath:
-			measurement.bytes = size.bytes
-			measurement.nodes = size.nodes
-		case "runtime/interface-value.ts":
+		switch {
+		case strings.HasPrefix(size.path, output.InterfaceAdapterSupportRoot+"/"):
+			measurement.bytes += size.bytes
+			measurement.nodes += size.nodes
+		case size.path == "runtime/interface-value.ts":
 			measurement.factoryBytes = size.bytes
 		}
 	}

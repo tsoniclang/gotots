@@ -29,29 +29,6 @@ func definedNumberOptions() emit.Options {
 	}
 }
 
-func definedExecutableSource(source tsgo.SourceFile) tsgo.SourceFile {
-	statements := make([]tsgo.Statement, 0, len(source.Statements()))
-	for _, statement := range source.Statements() {
-		if declaration, ok := statement.(tsgo.ImportDeclaration); ok {
-			module, moduleOK := declaration.ModuleSpecifier().(tsgo.StringLiteral)
-			if moduleOK && (strings.HasSuffix(module.Text(), "/source-fact.js") ||
-				module.Text() == "@tsonic/core/lang.js") {
-				continue
-			}
-		}
-		if _, fact := statement.(tsgo.ExpressionStatement); fact {
-			continue
-		}
-		statements = append(statements, statement)
-	}
-	factory := tsgo.NewFactory()
-	return factory.SourceFile(
-		statements,
-		source.EndOfFileToken(),
-		source.SourceData(),
-	)
-}
-
 func printDefined(
 	t *testing.T,
 	workingDirectory string,

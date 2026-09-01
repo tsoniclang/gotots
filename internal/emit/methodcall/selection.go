@@ -220,6 +220,10 @@ func (s Selection) Requests() []api.RootRequest {
 	return api.CombineRequests(s.requests, s.target.Requests())
 }
 
+func (s Selection) ProviderBoundary() bool {
+	return s.target.ProviderBoundary()
+}
+
 func (s Selection) Invoke(
 	context api.Context,
 	children api.ChildEmitter,

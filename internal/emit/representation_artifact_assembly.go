@@ -14,7 +14,6 @@ import (
 	providerinterfacebridge "github.com/tsoniclang/gotots/internal/emit/declaration/providerinterfacebridge"
 	reflectiontypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/reflectiontype"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
-	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -181,14 +180,17 @@ func (s *programSession) buildRepresentationArtifactRevision(
 			Reason: "representation artifact has no concrete name owner",
 		}
 	}
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	replayCommitted := false
 	if !reconstruction {
 		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.SnapshotTemporaries()
-		names.RestoreTemporaries(temporaryStart)
-		defer names.FinishTemporaryReplay(current)
+		finishReplay, replayErr := names.BeginTemporaryReplay(owner, temporaryStart)
+		if replayErr != nil {
+			return artifactRevision{}, replayErr
+		}
+		defer func() { finishReplay(replayCommitted) }()
 	}
-	owner := api.MustGeneratedArtifactOwner(artifact)
 	finish, err := names.BeginArtifact(owner, nil, nil, "")
 	if err != nil {
 		return artifactRevision{}, err
@@ -236,29 +238,6 @@ func (s *programSession) buildRepresentationArtifactRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	statements, requests, err = canonicalsourcefact.IncludeGeneratedArtifact(
-		context,
-		artifact,
-		statements,
-		requests,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
-	if artifact.Kind() == api.GeneratedArtifactInterfaceAdapter {
-		implementations, implementationErr :=
-			canonicalsourcefact.InterfaceImplementations(
-				context,
-				artifact,
-				requirements,
-				statements,
-			)
-		if implementationErr != nil {
-			return artifactRevision{}, implementationErr
-		}
-		statements = append(statements, implementations.Statements()...)
-		requests = append(requests, implementations.Requests()...)
-	}
 	placement, dependencies, requestRoots, err :=
 		s.consumeArtifactRequests(
 			owner,
@@ -271,6 +250,7 @@ func (s *programSession) buildRepresentationArtifactRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	replayCommitted = true
 	return artifactRevision{
 		statements:     statements,
 		placement:      placement,

@@ -19,7 +19,7 @@ func TestPackageConstantsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	targetFiles := emitPackageConstantsProject(t, loaded, workingDirectory)
 	for name, targetFile := range targetFiles {
-		printed := printExecutableTargetFile(t, targetFile, workingDirectory)
+		printed := printTargetFile(t, targetFile, workingDirectory)
 		expected, err := os.ReadFile(filepath.Join(
 			packageConstantsProjectDirectory(),
 			"expected-"+name+".ts",

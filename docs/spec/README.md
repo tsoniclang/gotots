@@ -37,54 +37,65 @@ selected target are downstream consumers, not Go semantic truth owners.
 
 ## Information-Preservation Law
 
-Canonical GoToTS output is information-lossless for every selected downstream
-target. Before the selected Go AST and its one checker graph are released, each
-encountered target-relevant Go distinction must have exactly one preservation
-disposition:
+Canonical GoToTS output is information-complete for its explicit selected
+profile. Before the selected Go AST and its one checker graph are released,
+each distinction required by that profile must have exactly one semantic
+carrier:
 
 1. ordinary checked TypeScript preserves the distinction completely; or
-2. one accepted canonical marker produces one finalized typed fact on the
-   exact corresponding TS-Go AST subject.
+2. one accepted Tsonic-owned target-neutral marker produces one finalized typed
+   fact on the exact corresponding TS-Go AST subject.
 
-No third disposition exists. A generated helper name, runtime implementation,
-comment, source-text convention, target heuristic, or sidecar manifest is not
-semantic preservation. If neither disposition is available, canonical
-compilation fails before publication.
+No third semantic carrier exists. GoToTS-specific metadata, a generated helper
+name, comment, source-text convention, target heuristic, or sidecar manifest is
+not semantic preservation. Private certificates may prove source selection and
+implementation equivalence, but are never target input. If neither semantic
+carrier is available, compilation fails before publication.
 
-The closed preservation classes include selected build and compilation
-identity; package, module, declaration, defined-type, alias, receiver, field,
-and source identity; exact scalar kind and source width; callable shape;
+The closed preservation classes include exact scalar kind and selected width;
+callable shape;
 struct, array, slice, map, interface, pointer, channel, and function-value
 shape; addressability, storage, alias, copy, mutation, escape, capture, and
 loop-lifetime obligations; Go evaluation order; interface boxing and typed nil;
-panic/defer/recover; goroutine, channel, and select intent; unsafe/layout
-operations; reflection identity; and selected implementation/provider identity.
+panic/defer/recover; selected goroutine, channel, and select behavior, plus
+concurrency intent only for a profile that admits it; unsafe/layout
+operations; and observable reflection identity.
 Each existing closed AST/type/runtime handler owns total disposition of the
-class it encounters. An unhandled form or incomplete fact constructor is a
-compiler error; GoToTS does not materialize a second semantic denominator.
+class it encounters. An unhandled form or incomplete preservation or marker
+construction is a compiler error; GoToTS does not materialize a second
+semantic denominator.
 
-Canonical shapes use an exact public `@tsonic/core` contract whenever that
-contract completely owns the target-neutral meaning, including primitives and
-typed locations. Go-only meaning remains GoToTS-owned and is attached through
-the shared finalized attribute mechanism using exact GoToTS declaration
-identity. Those attributes are small closed fact families, not a serialized Go
-program. One semantic field has one owner: for example, a selected shared
-primitive fact owns fixed width and signedness while a Go native-integer
-companion owns only the source-native role and selected source width.
+Canonical shapes use an exact public `@tsonic/core` contract only when that
+contract completely owns target-neutral meaning, including primitives and
+typed locations. GoToTS does not publish a Go-specific marker vocabulary. Go
+behavior without a shared marker remains exact ordinary TypeScript for the
+selected profile; if another selected target requires a representation choice
+that ordinary TypeScript cannot preserve, shared Tsonic authority must define
+the neutral marker before that profile is accepted.
 
-Targets consume only the checked canonical TS-Go AST, finalized facts on its
-exact nodes, and their immutable target profile. A target may choose a
+Build/package/module/file identity, source digests, selected implementation and
+provider identity, and equivalence envelopes remain private certification
+evidence. They exact-join selection before publication and do not appear in
+canonical TypeScript.
+
+Targets consume only the checked canonical TS-Go AST, finalized
+Tsonic-neutral facts on its exact nodes, and their immutable target profile. A
+target may choose a
 different executable carrier, but it may not recover Go meaning from helper or
 member spelling. Every selected target must either consume each reached fact or
 reject it with a typed unsupported diagnostic.
 
-For the executable TypeScript target, retaining GoToTS's already-emitted
-ordinary TypeScript carrier and exact-erasing the finalized compile-time
-attribute is one closed consumption disposition. That target exact-joins every
-application, import, and removable fact declaration but need not reinterpret a
-Go payload merely to preserve the carrier's behavior. A target that replaces a
-carrier, including C# or Rust, must instead consume the relevant fact family or
-reject it; generic metadata erasure cannot authorize a native representation.
+For the executable TypeScript target, retaining GoToTS's ordinary TypeScript
+carrier is a closed disposition. It consumes only reached Tsonic-neutral facts
+needed for representation lowering and lowers or erases only their exact
+marker occurrences. C# and Rust consume the same neutral contracts; no target
+is coupled to GoToTS-private payload schemas.
+
+An intentional profile envelope is not universal canonical input. For example,
+the TSTS synchronous profile may select serial execution and state that it is
+not exact concurrent Go. A future native-concurrency profile must retain
+concurrency intent through ordinary semantics or an accepted neutral marker;
+it cannot recover that intent from the synchronous artifact.
 
 ## One Compilation Model
 
@@ -165,8 +176,8 @@ the selected `go/types.Signature` as its public/source-facing contract.
   not become extra public type parameters.
 
 Compiler mechanics may appear only in compiler-owned private support artifacts
-that do not claim a Go source identity. Such artifacts may be selected by exact
-Go identity and imported statically, but they may not leak through package
+that do not project a Go source callable. Such artifacts may be selected by
+private exact Go identity and imported statically, but they may not leak through package
 assembly, environment declarations, function values, interfaces, or ordinary
 source calls. In particular, translated source contracts never contain hidden
 operation functions, recovery authorities, provider policies, bridge sets,

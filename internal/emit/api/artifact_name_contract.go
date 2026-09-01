@@ -250,101 +250,101 @@ type TypeRepresentationNames interface {
 func TemporaryPrefix(kind TemporaryKind) (string, error) {
 	switch kind {
 	case TemporaryAssignmentValue:
-		return "__gotots_assign_", nil
+		return "assignmentValue", nil
 	case TemporaryMultipleResults:
-		return "__gotots_results_", nil
+		return "results", nil
 	case TemporaryCompositeField:
-		return "__gotots_field_", nil
+		return "fieldValue", nil
 	case TemporaryStructSource:
-		return "__gotots_struct_", nil
+		return "structValue", nil
 	case TemporaryReceiverValue:
-		return "__gotots_receiver_", nil
+		return "receiver", nil
 	case TemporaryCallArgument:
-		return "__gotots_argument_", nil
+		return "argument", nil
 	case TemporaryCallCallee:
-		return "__gotots_callee_", nil
+		return "callee", nil
 	case TemporaryArrayReceiver:
-		return "__gotots_array_", nil
+		return "arrayValue", nil
 	case TemporarySliceElement:
-		return "__gotots_slice_element_", nil
+		return "sliceElement", nil
 	case TemporarySliceReceiver:
-		return "__gotots_slice_receiver_", nil
+		return "sliceValue", nil
 	case TemporarySliceOperand:
-		return "__gotots_slice_operand_", nil
+		return "sliceOperand", nil
 	case TemporaryStoreOperand:
-		return "__gotots_store_", nil
+		return "storeTarget", nil
 	case TemporaryMapOperand:
-		return "__gotots_map_", nil
+		return "mapValue", nil
 	case TemporaryAddressOperand:
-		return "__gotots_address_", nil
+		return "addressValue", nil
 	case TemporaryConversionOperand:
-		return "__gotots_conversion_", nil
+		return "convertedValue", nil
 	case TemporaryArrayComparison:
-		return "__gotots_array_equal_", nil
+		return "arrayComparison", nil
 	case TemporaryEqualityOperand:
-		return "__gotots_equal_operand_", nil
+		return "equalityOperand", nil
 	case TemporaryBinaryOperand:
-		return "__gotots_binary_operand_", nil
+		return "binaryOperand", nil
 	case TemporaryLogicalResult:
-		return "__gotots_logical_result_", nil
+		return "logicalResult", nil
 	case TemporaryArrayHash:
-		return "__gotots_array_hash_", nil
+		return "arrayHash", nil
 	case TemporaryArrayConstruction:
-		return "__gotots_array_build_", nil
+		return "arrayBuilder", nil
 	case TemporarySliceConstruction:
-		return "__gotots_slice_build_", nil
+		return "sliceBuilder", nil
 	case TemporaryRangeOperand:
-		return "__gotots_range_", nil
+		return "rangeSource", nil
 	case TemporaryRangeIndex:
-		return "__gotots_range_index_", nil
+		return "rangeIndex", nil
 	case TemporaryRangeValue:
-		return "__gotots_range_value_", nil
+		return "rangeValue", nil
 	case TemporaryRangeKeys:
-		return "__gotots_range_keys_", nil
+		return "rangeKeys", nil
 	case TemporaryRangeDecode:
-		return "__gotots_range_decode_", nil
+		return "rangeDecoded", nil
 	case TemporarySwitchTag:
-		return "__gotots_switch_tag_", nil
+		return "switchTag", nil
 	case TemporarySwitchSelection:
-		return "__gotots_switch_selection_", nil
+		return "switchSelection", nil
 	case TemporarySwitchMatch:
-		return "__gotots_switch_match_", nil
+		return "switchMatch", nil
 	case TemporaryTypeSwitchValue:
-		return "__gotots_type_switch_", nil
+		return "typeSwitchValue", nil
 	case TemporaryForFirstIteration:
-		return "__gotots_for_first_", nil
+		return "firstIteration", nil
 	case TemporaryRangeState:
-		return "__gotots_range_state_", nil
+		return "rangeState", nil
 	case TemporaryDeferStack:
-		return "__gotots_defers_", nil
+		return "deferredCalls", nil
 	case TemporaryDeferredCall:
-		return "__gotots_deferred_", nil
+		return "deferredCall", nil
 	case TemporaryRecoveryAuthority:
-		return "__gotots_recovery_", nil
+		return "recovery", nil
 	case TemporaryActivePanic:
-		return "__gotots_panic_", nil
+		return "activePanic", nil
 	case TemporaryCaughtPanic:
-		return "__gotots_caught_", nil
+		return "caughtPanic", nil
 	case TemporaryReturnResult:
-		return "__gotots_return_", nil
+		return "returnValue", nil
 	case TemporaryReturnLabel:
-		return "__gotots_return_block_", nil
+		return "returnBlock", nil
 	case TemporaryControlTarget:
-		return "__gotots_control_target_", nil
+		return "controlTarget", nil
 	case TemporaryGotoTarget:
-		return "__gotots_goto_target_", nil
+		return "gotoTarget", nil
 	case TemporaryGotoState:
-		return "__gotots_goto_state_", nil
+		return "gotoState", nil
 	case TemporaryGotoDispatch:
-		return "__gotots_goto_dispatch_", nil
+		return "gotoDispatch", nil
 	case TemporaryChannelOperand:
-		return "__gotots_channel_", nil
+		return "channelValue", nil
 	case TemporaryChannelResult:
-		return "__gotots_receive_", nil
+		return "receivedValue", nil
 	case TemporarySelectCase:
-		return "__gotots_select_", nil
+		return "selectCase", nil
 	case TemporaryRangeReturn:
-		return "__gotots_range_return_", nil
+		return "rangeResult", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

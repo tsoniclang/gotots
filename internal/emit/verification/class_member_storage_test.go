@@ -99,15 +99,13 @@ func assertClassMemberMethodAST(
 			methods[name.Text()] = method
 		}
 	}
-	for _, name := range []string{"Bump", "Read", "Reset"} {
+	for _, name := range []string{"Bump", "Read", "Reset", "value"} {
 		if methods[name] == nil {
 			t.Fatalf("Counter.%s is absent", name)
 		}
 	}
-	for name := range methods {
-		if strings.HasPrefix(name, "$go$private$") {
-			t.Fatalf("unreached private method %q entered Counter", name)
-		}
+	if methods["unused"] != nil {
+		t.Fatal("unreached private method Counter.unused entered the class")
 	}
 	bumpBody := methods["Bump"].Body().(tsgo.Block).Statements()
 	readBody := methods["Read"].Body().(tsgo.Block).Statements()
@@ -116,6 +114,21 @@ func assertClassMemberMethodAST(
 	}
 	if _, ok := readBody[0].(tsgo.ReturnStatement); !ok {
 		t.Fatalf("Counter.Read first statement = %T, want direct this read", readBody[0])
+	}
+	readReturn := readBody[0].(tsgo.ReturnStatement)
+	readCall, ok := readReturn.Expression().(tsgo.CallExpression)
+	if !ok {
+		t.Fatalf("Counter.Read result = %T, want private method call", readReturn.Expression())
+	}
+	readTarget, ok := readCall.Expression().(tsgo.PropertyAccessExpression)
+	if !ok {
+		t.Fatalf("Counter.Read target = %T, want property access", readCall.Expression())
+	}
+	readName, named := readTarget.Name().(tsgo.Identifier)
+	if !named ||
+		readTarget.Expression().Kind() != tsgo.SyntaxKindThisKeyword ||
+		readName.Text() != "value" {
+		t.Fatalf("Counter.Read target = %T, want this.value", readCall.Expression())
 	}
 	if hasStaticModifier(methods["Bump"]) ||
 		hasStaticModifier(methods["Read"]) ||
@@ -365,8 +378,7 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 		"Value(): T;",
 		"Value(): int32;",
 		"export function GenericInterfaceAudit(): int32",
-		"const __gotots_argument_0 = goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value();",
-		"return $go$copy$",
+		"return $go$copy$T0_to_T0(goInterfaceNonNil<GenericValue<T>>(value).Value());",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf(

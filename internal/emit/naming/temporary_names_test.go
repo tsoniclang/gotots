@@ -15,7 +15,7 @@ func TestTemporaryNameAvoidsSourceImportAndGeneratedBindings(t *testing.T) {
 	reserved := types.NewVar(
 		token.NoPos,
 		nil,
-		"__gotots_field_0",
+		"fieldValue",
 		types.Typ[types.Int],
 	)
 	functionScope.Insert(reserved)
@@ -27,60 +27,45 @@ func TestTemporaryNameAvoidsSourceImportAndGeneratedBindings(t *testing.T) {
 		temporaries:    make(map[api.TemporaryKind]uint64),
 		generatedNames: make(map[string]struct{}),
 		importNames: map[string]struct{}{
-			"__gotots_field_1": {},
+			"fieldValue2": {},
 		},
 	}
 
 	name, err := file.Temporary(api.TemporaryCompositeField)
-	if err != nil || name != "__gotots_field_2" {
-		t.Fatalf("temporary = %q, %v; want __gotots_field_2", name, err)
+	if err != nil || name != "fieldValue3" {
+		t.Fatalf("temporary = %q, %v; want fieldValue3", name, err)
 	}
 	if imported := file.allocateProviderImportName(name); imported == name {
 		t.Fatalf("provider import reused generated binding %q", name)
 	}
 }
 
-func TestTemporarySnapshotRestoresAllocatedNameSet(t *testing.T) {
+func TestTemporaryReplayReservesOtherArtifactBindings(t *testing.T) {
 	file := &File{
-		owner:          newNameOwner(nil, nil),
-		temporaries:    make(map[api.TemporaryKind]uint64),
-		generatedNames: make(map[string]struct{}),
-		importNames:    make(map[string]struct{}),
+		owner:           newNameOwner(nil, nil),
+		temporaries:     make(map[api.TemporaryKind]uint64),
+		generatedNames:  make(map[string]struct{}),
+		temporaryOwners: make(map[string]api.ArtifactOwner),
+		importNames:     make(map[string]struct{}),
 	}
+	firstOwner := temporaryTestOwner("First")
+	secondOwner := temporaryTestOwner("Second")
+	file.artifactOwner = firstOwner
 	start := file.SnapshotTemporaries()
 	first, err := file.Temporary(api.TemporaryCompositeField)
 	if err != nil {
 		t.Fatal(err)
 	}
-	current := file.SnapshotTemporaries()
-
-	file.RestoreTemporaries(start)
-	replayed, err := file.Temporary(api.TemporaryCompositeField)
-	if err != nil || replayed != first {
-		t.Fatalf("replayed temporary = %q, %v; want %q", replayed, err, first)
-	}
-	file.RestoreTemporaries(current)
-	next, err := file.Temporary(api.TemporaryCompositeField)
-	if err != nil || next == first {
-		t.Fatalf("next temporary = %q, %v; must differ from %q", next, err, first)
-	}
-}
-
-func TestTemporaryReplayRetainsNewlyAllocatedNames(t *testing.T) {
-	file := &File{
-		owner:          newNameOwner(nil, nil),
-		temporaries:    make(map[api.TemporaryKind]uint64),
-		generatedNames: make(map[string]struct{}),
-		importNames:    make(map[string]struct{}),
-	}
-	start := file.SnapshotTemporaries()
-	first, err := file.Temporary(api.TemporaryCompositeField)
+	file.artifactOwner = secondOwner
+	second, err := file.Temporary(api.TemporaryCompositeField)
 	if err != nil {
 		t.Fatal(err)
 	}
-	current := file.SnapshotTemporaries()
-
-	file.RestoreTemporaries(start)
+	finish, err := file.BeginTemporaryReplay(firstOwner, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file.artifactOwner = firstOwner
 	replayed, err := file.Temporary(api.TemporaryCompositeField)
 	if err != nil || replayed != first {
 		t.Fatalf("replayed temporary = %q, %v; want %q", replayed, err, first)
@@ -89,13 +74,93 @@ func TestTemporaryReplayRetainsNewlyAllocatedNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file.FinishTemporaryReplay(current)
+	if additional == first || additional == second {
+		t.Fatalf(
+			"replay allocation %q collides with %q / %q",
+			additional,
+			first,
+			second,
+		)
+	}
+	finish(true)
+	if file.temporaryOwners[first] != firstOwner ||
+		file.temporaryOwners[second] != secondOwner ||
+		file.temporaryOwners[additional] != firstOwner {
+		t.Fatal("temporary ownership was not preserved across replay")
+	}
+}
 
-	if imported := file.allocateProviderImportName(additional); imported == additional {
-		t.Fatalf("provider import reused replay-added binding %q", additional)
+func TestTemporaryReplayRemovesRetiredArtifactBindings(t *testing.T) {
+	file := &File{
+		owner:           newNameOwner(nil, nil),
+		temporaries:     make(map[api.TemporaryKind]uint64),
+		generatedNames:  make(map[string]struct{}),
+		temporaryOwners: make(map[string]api.ArtifactOwner),
+		importNames:     make(map[string]struct{}),
 	}
-	next, err := file.Temporary(api.TemporaryCompositeField)
-	if err != nil || next == first || next == additional {
-		t.Fatalf("next temporary = %q, %v; collides with replayed names", next, err)
+	owner := temporaryTestOwner("Owner")
+	file.artifactOwner = owner
+	start := file.SnapshotTemporaries()
+	retired, err := file.Temporary(api.TemporaryCompositeField)
+	if err != nil {
+		t.Fatal(err)
 	}
+	finish, err := file.BeginTemporaryReplay(owner, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file.artifactOwner = owner
+	replacement, err := file.Temporary(api.TemporaryAssignmentValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finish(true)
+	if _, retained := file.generatedNames[retired]; retained {
+		t.Fatalf("retired temporary %q remains reserved", retired)
+	}
+	if _, retained := file.generatedNames[replacement]; !retained {
+		t.Fatalf("replacement temporary %q was not retained", replacement)
+	}
+}
+
+func TestTemporaryReplayRollsBackFailedReconstruction(t *testing.T) {
+	file := &File{
+		owner:           newNameOwner(nil, nil),
+		temporaries:     make(map[api.TemporaryKind]uint64),
+		generatedNames:  make(map[string]struct{}),
+		temporaryOwners: make(map[string]api.ArtifactOwner),
+		importNames:     make(map[string]struct{}),
+	}
+	owner := temporaryTestOwner("Owner")
+	file.artifactOwner = owner
+	start := file.SnapshotTemporaries()
+	original, err := file.Temporary(api.TemporaryCompositeField)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finish, err := file.BeginTemporaryReplay(owner, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file.artifactOwner = owner
+	partial, err := file.Temporary(api.TemporaryAssignmentValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finish(false)
+	if file.temporaryOwners[original] != owner {
+		t.Fatalf("original temporary %q was not restored", original)
+	}
+	if _, retained := file.generatedNames[partial]; retained {
+		t.Fatalf("failed replay temporary %q remains reserved", partial)
+	}
+}
+
+func temporaryTestOwner(name string) api.ArtifactOwner {
+	return api.MustSourceArtifactOwner(types.NewVar(
+		token.NoPos,
+		types.NewPackage("example/"+name, "example"),
+		name,
+		types.Typ[types.Int],
+	))
 }

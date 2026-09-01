@@ -72,9 +72,9 @@ allocated by the file name owner. The owner reserves the portable target
 spellings of every explicit and implicit Go binding in the complete package,
 every selected import alias, and every generated binding already allocated;
 it therefore avoids a source name even when that declaration occurs later or
-inside a descendant scope. For example, a source parameter named
-`__gotots_field_0` forces the first composite-literal capture to use
-`__gotots_field_1` or the next available name. Generated member names use the
+inside a descendant scope. For example, a source parameter named `fieldValue`
+forces the first composite-literal capture to use `fieldValue2` or the next
+available name. Generated member names use the
 struct member owner under the same no-duplicate rule. The owner reserves the
 lowercase member `then`: JavaScript uses that property for Promise assimilation,
 which has no Go-language counterpart. A legal Go field named `then` therefore
@@ -280,12 +280,14 @@ zero-on-miss. The index expression does not decide this alone.
 ### Canonical Preservation Dispositions
 
 Type and operation emission records no second source model. While emitting the
-one TS-Go AST, each closed semantic owner chooses `ordinary-typescript`,
-`shared-source-fact`, or `gotots-source-fact` for every relevant form it
-handles. The first is valid only when ordinary checked TypeScript retains the
-complete distinction; the other two construct the exact marker AST at that
-owner. Unknown variants and incomplete fact construction fail before checker
-evidence is released; no root preservation inventory duplicates the source.
+one TS-Go AST, each closed semantic owner chooses `ordinary-typescript` or
+`tsonic-neutral-marker` for every distinction required by the selected
+profile. The first is valid only when ordinary checked TypeScript retains the
+complete selected-profile behavior; the second constructs the exact accepted
+marker AST at that owner. There is no `gotots-source-fact` disposition.
+Unknown variants and incomplete neutral marker construction fail before
+checker evidence is released; no root preservation inventory duplicates the
+source.
 
 ```go
 type UserID int64
@@ -294,37 +296,45 @@ type Record struct {
 }
 ```
 
-The numeric carrier is not the semantic owner. The canonical type reference
-retains signed 64-bit primitive evidence; the `UserID` declaration carries its
-Go declaration/defined-type identity; the record carries value-struct shape;
-and the field companion carries only the Go field identity and tag. A C# target
-may select `long`, Rust may select `i64`, and the TypeScript target may select
-`bigint` or a named bounded envelope without re-reading Go.
+The numeric carrier is not the semantic owner. A profile that promises exact
+cross-target width retains signed 64-bit primitive evidence through the
+accepted neutral primitive contract and selects a carrier that represents its
+complete range. The ordinary declaration and class shape retain the selected
+`UserID` and record structure. A C# target may then select `long`, Rust may
+select `i64`, and the TypeScript target may select `bigint` or another exact
+bounded carrier without re-reading Go. A profile that deliberately maps
+`int64` to JavaScript `number` is a named lossy envelope: it does not claim the
+exact shared `int64` marker, and that artifact is not input to C# or Rust.
+Source file identity and provider history stay in private certification rather
+than the generated declaration.
 
 ```go
 var table map[string][]*Record
 ```
 
 The canonical type retains map key/value, slice element, pointer pointee, nil,
-and copy/alias obligations. Existing GoToTS runtime classes may remain the
-ordinary TypeScript carrier, but their exact declarations carry closed Go
-aggregate facts and every semantically meaningful operation resolves to an
-exact fact-bearing declaration. `GoMapValue` or `RuntimeSlice` spelling is not
-evidence.
+and copy/alias behavior in ordinary checked types and operations, using an
+accepted neutral pointer marker where representation may change. Existing
+GoToTS runtime classes may remain the ordinary TypeScript carrier. Their
+spelling is not evidence, and GoToTS does not add aggregate metadata solely for
+a hypothetical target optimization.
 
 ```go
 go consume(ch)
 ```
 
-Canonical output retains a goroutine operation and the channel's element and
-direction facts. A synchronous TypeScript profile may lower the operation to a
-serial call; a C# or Rust profile may select a task/thread/channel runtime. The
-serial result is a target artifact and cannot be reused as canonical input.
+The selected synchronous TSTS profile emits the serial call and exact channel
+behavior it declares; it is not claimed as exact concurrent Go and cannot be
+reused as canonical input for a native-concurrency target. A future C# or Rust
+profile that preserves goroutine intent must select an accepted neutral
+concurrency contract before publication rather than infer intent from this
+serial artifact.
 
 The canonical profile always preserves Go evaluation order. A direct target
 projection may eliminate temporaries only after proving that complete
 observable order is unchanged. Numeric carrier and evaluation-order settings
-are target preferences, never permission to omit source facts.
+are explicit profile decisions, never permission to omit required neutral
+semantics.
 
 ### Source-Implementation Pointers
 
@@ -361,11 +371,23 @@ them before runtime execution. Provider source itself never imports or calls
 
 ### Basic Types
 
-Go basic identities map to GoToTS-owned aliases over TypeScript primitives.
+Go basic identities map to GoToTS-owned aliases over the selected exact carrier.
 The default integer profile is `bigint`; the explicit `number` and
 `fixed64-bigint` executable profiles retain their named precision envelopes.
 No runtime marker compensates for values already lost by an executable
 carrier. Such an artifact cannot serve as canonical input to another target.
+
+An exact fixed primitive retains the accepted neutral declaration while the
+local alias keeps the Go name:
+
+```ts
+import type { int32 as TsonicInt32 } from "@tsonic/core/types.js";
+export type int32 = TsonicInt32;
+```
+
+A 64-bit integer selected as `number` instead emits an ordinary local alias and
+is certified only under that profile's named precision envelope; it does not
+pretend to carry the exact neutral `int64` contract.
 
 Each BigInt-carrier profile is exact for operations whose selected carrier is
 `bigint`. Their arithmetic, bitwise, shift, unary, compound-assignment, and
@@ -454,8 +476,10 @@ operation artifacts are not source declarations.
 A source-owned, non-generic defined type whose underlying type is `int8`,
 `uint8`, `int16`, `uint16`, `int32`, or `uint32` uses one plain named scalar
 alias regardless of its method sets. Go methods do not give numeric values
-object identity. The alias declaration and source-facing references retain the
-source identity in the TS-Go AST; ordinary values remain native scalars.
+object identity. The emitted declaration and source-facing references retain
+one nominal target identity in the TS-Go AST; ordinary values remain native
+scalars. Go source provenance remains private certification rather than target
+metadata.
 Methods on this representation are emitted as source functions: a value
 receiver is the first value parameter, while a pointer receiver is the first
 `Pointer<T> | undefined` parameter. Direct method calls, method expressions,
@@ -1089,9 +1113,14 @@ already allocated for their lexical scope (`Local`, or `Local__shadow_...`
 when the other binding is visible) and remain distinct through their exact
 private Go-identity keys and lexical placement. Disjoint scopes may reuse the
 same readable name.
-Semantic contracts never carry a pre-rendered TypeScript suffix.
-Unexported interface-method member names and token constants use that same
-readable package qualifier; they do not independently encode `types.Id` paths.
+Semantic contracts never carry a pre-rendered TypeScript suffix. An unexported
+method keeps its portable source spelling when that spelling is unique and safe
+in the complete selected method universe. Only a real cross-package,
+private/private or exported/private portable-escaping collision, static class
+member hazard, `constructor`, or Promise-assimilation collision adds the
+shortest readable package qualifier and deterministic ordinal. Class members,
+interface members, method values, calls, and generated method tokens all query
+that one target-name owner; none independently encodes `types.Id` paths.
 
 The same rule covers representation-disjoint builtin forms. For
 `B ~[]byte | ~string`, `append(dst, src...)` requests exactly one internal
@@ -1254,16 +1283,18 @@ entry, while absence uses the ordinary provider callable.
 
 ### Channels, Goroutines, And Select
 
-Channel types use one typed canonical runtime identity whose declaration and
-operations retain exact channel facts. A goroutine is emitted as a call to the
-fact-bearing `goSpawn` declaration, never as an unmarked direct call. The
-selected TypeScript serial envelope executes that call immediately; ready
+Channel types use one typed GoToTS runtime identity for the selected serial
+profile. A goroutine is emitted as a call to `goSpawn`, the single runtime owner
+that executes the operation immediately in that profile; the helper is not a
+portable marker. Ready
 buffered send/receive and ready/default select complete synchronously. A nil,
 unbuffered, full, empty, or otherwise unready operation that would suspend
 raises the typed serial-blocking panic in that envelope instead of fabricating
 progress. Canonical callable signatures contain no `Promise`, `async`, or
-`await`; other targets consume the finalized concurrency facts before choosing
-their scheduler, task, thread, or channel representation.
+`await`. This serial artifact is not input to another target. A future native
+concurrency profile requires an accepted neutral concurrency contract before
+GoToTS releases its Go evidence; it cannot infer scheduler, task, thread, or
+channel semantics from `goSpawn` or another runtime name.
 Explicit event-based provider APIs such as timers retain their separately
 certified host callback behavior without changing the source call's direct
 signature.

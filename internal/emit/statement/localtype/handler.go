@@ -31,11 +31,7 @@ func Emit(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	type localDeclaration struct {
-		object *types.TypeName
-		source *ast.TypeSpec
-	}
-	typeDeclarations := make([]localDeclaration, 0, len(declaration.Specs))
+	typeNames := make([]*types.TypeName, 0, len(declaration.Specs))
 	for _, candidate := range declaration.Specs {
 		spec, ok := candidate.(*ast.TypeSpec)
 		if !ok {
@@ -61,16 +57,12 @@ func Emit(
 		if _, err := context.Names().Declare(typeName); err != nil {
 			return api.StatementEmission{}, err
 		}
-		typeDeclarations = append(typeDeclarations, localDeclaration{
-			object: typeName,
-			source: spec,
-		})
+		typeNames = append(typeNames, typeName)
 	}
 
 	var statements []tsgo.Statement
 	var requests []api.RootRequest
-	for _, selected := range typeDeclarations {
-		typeName := selected.object
+	for _, typeName := range typeNames {
 		requirements := localTypeRequirements(context, typeName)
 		target, handled, err := interfacetype.Emit(
 			context.WithRole(api.RoleLocalDeclaration),
@@ -115,21 +107,8 @@ func Emit(
 					source,
 				)
 		}
-		declarations := target.Declarations()
-		facts, err := localTypeSourceFacts(
-			context,
-			typeName,
-			selected.source,
-			declarations,
-			requirements,
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
-		statements = append(statements, declarations...)
-		statements = append(statements, facts.Statements()...)
+		statements = append(statements, target.Declarations()...)
 		requests = append(requests, target.Requests()...)
-		requests = append(requests, facts.Requests()...)
 		artifacts := make(
 			map[*api.GeneratedArtifact][]api.DeclarationRequirement,
 		)
@@ -168,20 +147,8 @@ func Emit(
 				return api.StatementEmission{},
 					api.WrapGeneratedArtifactError(artifact, err)
 			}
-			declarations := generated.Declarations()
-			facts, err := lexicalArtifactSourceFacts(
-				context,
-				artifact,
-				artifacts[artifact],
-				declarations,
-			)
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
-			statements = append(statements, declarations...)
-			statements = append(statements, facts.Statements()...)
+			statements = append(statements, generated.Declarations()...)
 			requests = append(requests, generated.Requests()...)
-			requests = append(requests, facts.Requests()...)
 		}
 	}
 	return api.NewStatementEmission(statements, requests)

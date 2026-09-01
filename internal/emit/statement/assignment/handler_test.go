@@ -38,10 +38,7 @@ func TestParallelIdentifierAssignmentPrintsTypechecksAndExecutesDifferentially(
 			t.Errorf("close TS-Go client: %v", err)
 		}
 	})
-	printed, err := client.PrintNode(
-		assignmentExecutableSource(targetFile),
-		tsgo.PrintOptions{},
-	)
+	printed, err := client.PrintNode(targetFile, tsgo.PrintOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,9 +82,9 @@ func TestParallelAssignmentCreatesCapturesBeforeStores(t *testing.T) {
 		DeclarationList().Declarations()[0]
 	secondCapture := statements[1].(tsgo.VariableStatement).
 		DeclarationList().Declarations()[0]
-	if identifierText(firstCapture.Name()) != "__gotots_assign_0" ||
+	if identifierText(firstCapture.Name()) != "assignmentValue" ||
 		identifierText(firstCapture.Initializer()) != "right" ||
-		identifierText(secondCapture.Name()) != "__gotots_assign_1" ||
+		identifierText(secondCapture.Name()) != "assignmentValue2" ||
 		identifierText(secondCapture.Initializer()) != "left" {
 		t.Fatal("right sides were not captured in source order before stores")
 	}
@@ -101,9 +98,9 @@ func TestParallelAssignmentCreatesCapturesBeforeStores(t *testing.T) {
 	secondStore := statements[3].(tsgo.ExpressionStatement).
 		Expression().(tsgo.BinaryExpression)
 	if identifierText(firstStore.Left()) != "left" ||
-		identifierText(firstStore.Right()) != "__gotots_assign_0" ||
+		identifierText(firstStore.Right()) != "assignmentValue" ||
 		identifierText(secondStore.Left()) != "right" ||
-		identifierText(secondStore.Right()) != "__gotots_assign_1" {
+		identifierText(secondStore.Right()) != "assignmentValue2" {
 		t.Fatal("stores do not consume captures in left-to-right target order")
 	}
 }
@@ -184,29 +181,6 @@ func assignmentFunctionByName(
 	}
 	t.Fatalf("target function %q is absent", name)
 	return nil
-}
-
-func assignmentExecutableSource(source tsgo.SourceFile) tsgo.SourceFile {
-	statements := make([]tsgo.Statement, 0, len(source.Statements()))
-	for _, statement := range source.Statements() {
-		if declaration, ok := statement.(tsgo.ImportDeclaration); ok {
-			module, moduleOK := declaration.ModuleSpecifier().(tsgo.StringLiteral)
-			if moduleOK && (strings.HasSuffix(module.Text(), "/source-fact.js") ||
-				module.Text() == "@tsonic/core/lang.js") {
-				continue
-			}
-		}
-		if _, fact := statement.(tsgo.ExpressionStatement); fact {
-			continue
-		}
-		statements = append(statements, statement)
-	}
-	factory := tsgo.NewFactory()
-	return factory.SourceFile(
-		statements,
-		source.EndOfFileToken(),
-		source.SourceData(),
-	)
 }
 
 func TestPrimitiveAccessorCompoundAndIncrementAreOwned(t *testing.T) {

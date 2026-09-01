@@ -500,7 +500,7 @@ func compileDefinedSource(t *testing.T, source string) string {
 			continue
 		}
 		target, err := client.PrintNode(
-			definedExecutableSource(file.SourceFile()),
+			file.SourceFile(),
 			tsgo.PrintOptions{},
 		)
 		if err != nil {

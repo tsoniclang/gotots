@@ -58,8 +58,8 @@ func TestSerialStructuredForClausesStayInTheEnclosingCallable(
 			t.Fatalf("structured for function is not synchronous:\n%s", target)
 		}
 		for _, forbidden := range []string{
-			"__gotots_for_condition_",
-			"__gotots_for_post_",
+			"forCondition",
+			"forPost",
 		} {
 			if strings.Contains(target, forbidden) {
 				t.Fatalf(
@@ -72,8 +72,8 @@ func TestSerialStructuredForClausesStayInTheEnclosingCallable(
 	}
 	post := waveNineFunctionText(t, artifacts.printed, "CooperativePost")
 	for _, required := range []string{
-		"let __gotots_for_first_",
-		"if (__gotots_for_first_",
+		"let firstIteration",
+		"if (firstIteration",
 		"else {",
 		"next(",
 	} {
@@ -182,7 +182,7 @@ func TestSerialIteratorCallbackPropagatesThroughCallableABIs(
 	for _, required := range []string{
 		"export function CooperativeAudit(",
 		"($argument0: int32): bool =>",
-		"__gotots_range_",
+		"rangeSource",
 	} {
 		if !strings.Contains(channelBacked, required) {
 			t.Fatalf(
@@ -199,7 +199,7 @@ func TestSerialIteratorCallbackPropagatesThroughCallableABIs(
 	)
 	for _, required := range []string{
 		"export function SynchronousAudit(): int32",
-		"__gotots_range_",
+		"rangeSource",
 	} {
 		if !strings.Contains(synchronous, required) {
 			t.Fatalf(
@@ -347,7 +347,7 @@ func TestOrdinaryMultiPackageProgramsUseOneDemandEmissionPath(t *testing.T) {
 				t.Fatal(err)
 			}
 			files := emission.Files()
-			if len(files) != 7 {
+			if len(files) != 6 {
 				t.Fatalf(
 					"emitted files = %d, want source, assembly, program, and scalar modules",
 					len(files),
@@ -379,14 +379,12 @@ func TestOrdinaryMultiPackageProgramsUseOneDemandEmissionPath(t *testing.T) {
 						"expected.ts",
 					)
 				case emit.TargetFileSupport:
-					if file.OutputPath() != "runtime/source-fact.ts" {
-						expectedPath = filepath.Join(
-							repositoryRoot(),
-							"testdata",
-							"support",
-							project.support,
-						)
-					}
+					expectedPath = filepath.Join(
+						repositoryRoot(),
+						"testdata",
+						"support",
+						project.support,
+					)
 				case emit.TargetFilePackageAssembly,
 					emit.TargetFileProgramInitialization:
 					expectedPath = ""
@@ -402,12 +400,11 @@ func TestOrdinaryMultiPackageProgramsUseOneDemandEmissionPath(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					executable := withoutSourceFactApplications(printed)
-					if executable != string(expected) {
+					if printed != string(expected) {
 						t.Fatalf(
 							"%s TypeScript:\n%s\nwant:\n%s",
 							file.PackageName(),
-							executable,
+							printed,
 							expected,
 						)
 					}

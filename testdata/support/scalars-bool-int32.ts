@@ -1,3 +1,3 @@
-import type { bool as $go$core$bool, int32 as $go$core$int32 } from "@tsonic/core/types.js";
-export type bool = $go$core$bool;
-export type int32 = $go$core$int32;
+import type { bool as TsonicBool, int32 as TsonicInt32 } from "@tsonic/core/types.js";
+export type bool = TsonicBool;
+export type int32 = TsonicInt32;

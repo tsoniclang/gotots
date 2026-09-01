@@ -11,6 +11,19 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
+var interfaceDemandPackage = types.NewPackage("example.com/demand", "demand")
+
+func newInterfaceDemandRegistry(t *testing.T) *Registry {
+	t.Helper()
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers(
+		[]*types.Package{interfaceDemandPackage},
+	); err != nil {
+		t.Fatal(err)
+	}
+	return registry
+}
+
 func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	t *testing.T,
 ) {
@@ -21,7 +34,7 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 		kind: api.GeneratedArtifactPlacementCompilation,
 	}
 
-	adapterFirst := NewRegistry()
+	adapterFirst := newInterfaceDemandRegistry(t)
 	binding, err := adapterFirst.internInterfaceAdapter(
 		strings.Repeat("a", 64),
 		sourceType,
@@ -82,7 +95,7 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 		)
 	}
 
-	transitionFirst := NewRegistry()
+	transitionFirst := newInterfaceDemandRegistry(t)
 	beforeAdapter, err := transitionFirst.recordInterfaceContractDemand(
 		firstDemand,
 		secondDemand,
@@ -137,7 +150,7 @@ func TestRepeatedInterfaceDemandSharesOneImmutableClosure(t *testing.T) {
 	sourceType, first, second := interfaceDemandTypes()
 	firstDemand := interfaceDemandSelection("first", first)
 	secondDemand := interfaceDemandSelection("second", second)
-	registry := NewRegistry()
+	registry := newInterfaceDemandRegistry(t)
 	placement := generatedArtifactPlacement{
 		kind: api.GeneratedArtifactPlacementCompilation,
 	}
@@ -248,16 +261,15 @@ func namedInterfaceDemandType(
 	name string,
 	contract *types.Interface,
 ) *types.Named {
-	owner := types.NewPackage("example.com/demand", "demand")
 	return types.NewNamed(
-		types.NewTypeName(token.NoPos, owner, name, nil),
+		types.NewTypeName(token.NoPos, interfaceDemandPackage, name, nil),
 		contract,
 		nil,
 	)
 }
 
 func interfaceDemandTypes() (types.Type, *types.Interface, *types.Interface) {
-	sourcePackage := types.NewPackage("example.com/demand", "demand")
+	sourcePackage := interfaceDemandPackage
 	typeName := types.NewTypeName(
 		token.NoPos,
 		sourcePackage,

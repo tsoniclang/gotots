@@ -20,7 +20,7 @@ func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 	placement := generatedArtifactPlacement{
 		kind: api.GeneratedArtifactPlacementCompilation,
 	}
-	registry := NewRegistry()
+	registry := newInterfaceDemandRegistry(t)
 
 	firstBinding := internDemandAdapter(t, registry, "a", firstSource, placement)
 	firstRequests, err := registry.interfaceAdapterContractRequests(
@@ -96,7 +96,7 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 		kind: api.GeneratedArtifactPlacementCompilation,
 	}
 
-	adapterFirst := NewRegistry()
+	adapterFirst := newInterfaceDemandRegistry(t)
 	firstBinding := internDemandAdapter(
 		t,
 		adapterFirst,
@@ -124,7 +124,7 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 	}
 	assertReflectionValueJoin(t, "adapter-first", after)
 
-	contractFirst := NewRegistry()
+	contractFirst := newInterfaceDemandRegistry(t)
 	before, err = contractFirst.recordReflectionValueContract(
 		demand,
 		reflectionType,
@@ -156,7 +156,7 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 
 func TestReflectionReplaySelectsOnlyObservedExactSurfaces(t *testing.T) {
 	source, contract, _ := interfaceDemandTypes()
-	registry := NewRegistry()
+	registry := newInterfaceDemandRegistry(t)
 	placement := generatedArtifactPlacement{
 		kind: api.GeneratedArtifactPlacementCompilation,
 	}
@@ -222,7 +222,7 @@ func assertReflectionValueJoin(
 }
 
 func namedDemandType(name string, methods ...string) *types.Named {
-	pkg := types.NewPackage("example.com/demand", "demand")
+	pkg := interfaceDemandPackage
 	typeName := types.NewTypeName(token.NoPos, pkg, name, nil)
 	named := types.NewNamed(typeName, types.NewStruct(nil, nil), nil)
 	for _, methodName := range methods {

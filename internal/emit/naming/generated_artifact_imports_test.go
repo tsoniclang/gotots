@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -42,6 +43,9 @@ func TestGeneratedArtifactNamesUseTheUniqueReadablePackageQualifier(t *testing.T
 func TestPrivateMethodNamesUseTheUniqueReadablePackageQualifier(t *testing.T) {
 	firstPackage := types.NewPackage("example.com/first/model", "model")
 	secondPackage := types.NewPackage("example.com/second/model", "model")
+	signature := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	firstMethod := installPrivateInterfaceMethod(t, firstPackage, "First", "visit", signature)
+	secondMethod := installPrivateInterfaceMethod(t, secondPackage, "Second", "visit", signature)
 	registry := NewRegistry()
 	if err := registry.indexPackageQualifiers(
 		[]*types.Package{firstPackage, secondPackage},
@@ -49,27 +53,16 @@ func TestPrivateMethodNamesUseTheUniqueReadablePackageQualifier(t *testing.T) {
 		t.Fatal(err)
 	}
 	file := &File{owner: &Owner{registry: registry}}
-	signature := types.NewSignatureType(nil, nil, nil, nil, nil, false)
-	first, err := file.InterfaceMethodName(types.NewFunc(
-		token.NoPos,
-		firstPackage,
-		"visit",
-		signature,
-	))
+	first, err := file.InterfaceMethodName(firstMethod)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := file.InterfaceMethodName(types.NewFunc(
-		token.NoPos,
-		secondPackage,
-		"visit",
-		signature,
-	))
+	second, err := file.InterfaceMethodName(secondMethod)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != "$go$private$model$visit" ||
-		second != "$go$private$model__package_1$visit" {
+	if first != "model$visit" ||
+		second != "model__package_1$visit" {
 		t.Fatalf("private method names = %q / %q", first, second)
 	}
 	if strings.Contains(first+second, "example") {
@@ -77,7 +70,7 @@ func TestPrivateMethodNamesUseTheUniqueReadablePackageQualifier(t *testing.T) {
 	}
 	firstToken, err := file.semanticGeneratedMethodName(
 		"$goInterfaceMethod$",
-		types.NewFunc(token.NoPos, firstPackage, "visit", signature),
+		firstMethod,
 		signature,
 	)
 	if err != nil {
@@ -85,7 +78,7 @@ func TestPrivateMethodNamesUseTheUniqueReadablePackageQualifier(t *testing.T) {
 	}
 	secondToken, err := file.semanticGeneratedMethodName(
 		"$goInterfaceMethod$",
-		types.NewFunc(token.NoPos, secondPackage, "visit", signature),
+		secondMethod,
 		signature,
 	)
 	if err != nil {
@@ -95,6 +88,309 @@ func TestPrivateMethodNamesUseTheUniqueReadablePackageQualifier(t *testing.T) {
 		secondToken != "$goInterfaceMethod$model__package_1$visit$void_to_void" {
 		t.Fatalf("private method tokens = %q / %q", firstToken, secondToken)
 	}
+}
+
+func TestPrivateMethodNameStaysSourceLikeWithoutSemanticCollision(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	signature := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	method := installPrivateInterfaceMethod(t, sourcePackage, "Contract", "visit", signature)
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers([]*types.Package{sourcePackage}); err != nil {
+		t.Fatal(err)
+	}
+	file := &File{owner: &Owner{registry: registry}}
+	name, err := file.InterfaceMethodName(method)
+	if err != nil || name != "visit" {
+		t.Fatalf("private method name = %q, %v; want visit", name, err)
+	}
+}
+
+func TestPrivateMethodNameIndexesAnonymousCallableContract(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	method := types.NewFunc(
+		token.NoPos,
+		sourcePackage,
+		"visit",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	)
+	contract := types.NewInterfaceType([]*types.Func{method}, nil).Complete()
+	parameter := types.NewVar(token.NoPos, sourcePackage, "value", contract)
+	callable := types.NewFunc(
+		token.NoPos,
+		sourcePackage,
+		"Use",
+		types.NewSignatureType(
+			nil,
+			nil,
+			nil,
+			types.NewTuple(parameter),
+			nil,
+			false,
+		),
+	)
+	if previous := sourcePackage.Scope().Insert(callable); previous != nil {
+		t.Fatal("callable was already present")
+	}
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers([]*types.Package{sourcePackage}); err != nil {
+		t.Fatal(err)
+	}
+	file := &File{owner: &Owner{registry: registry}}
+	name, err := file.InterfaceMethodName(method)
+	if err != nil || name != "visit" {
+		t.Fatalf("anonymous contract method name = %q, %v; want visit", name, err)
+	}
+}
+
+func TestPrivateMethodNameIndexesFunctionLocalInterface(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	method := types.NewFunc(
+		token.NoPos,
+		sourcePackage,
+		"visit",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	)
+	contract := types.NewInterfaceType([]*types.Func{method}, nil).Complete()
+	object := types.NewTypeName(token.Pos(3), sourcePackage, "Local", nil)
+	types.NewNamed(object, contract, nil)
+	information := &types.Info{
+		Defs: map[*ast.Ident]types.Object{
+			{Name: "Local", NamePos: token.Pos(3)}: object,
+		},
+	}
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers(
+		[]*types.Package{sourcePackage},
+		information,
+	); err != nil {
+		t.Fatal(err)
+	}
+	file := &File{owner: &Owner{registry: registry}}
+	name, err := file.InterfaceMethodName(method)
+	if err != nil || name != "visit" {
+		t.Fatalf("local contract method name = %q, %v; want visit", name, err)
+	}
+}
+
+func TestPrivateMethodNamesQualifyTargetLanguageHazards(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	signature := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	hazards := []string{
+		"constructor",
+		"then",
+		"name",
+		"length",
+		"caller",
+		"arguments",
+		"prototype",
+	}
+	methods := make([]*types.Func, 0, len(hazards))
+	for index, hazard := range hazards {
+		methods = append(methods, installPrivateInterfaceMethod(
+			t,
+			sourcePackage,
+			"HazardContract"+strconv.Itoa(index),
+			hazard,
+			signature,
+		))
+	}
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers([]*types.Package{sourcePackage}); err != nil {
+		t.Fatal(err)
+	}
+	file := &File{owner: &Owner{registry: registry}}
+	for index, method := range methods {
+		name, err := file.InterfaceMethodName(method)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if expected := "model$" + hazards[index]; name != expected {
+			t.Fatalf("hazard method name = %q, want %q", name, expected)
+		}
+	}
+}
+
+func TestPrivateMethodNamesDisambiguatePortableIdentifierCollisions(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	signature := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	escaped := installPrivateInterfaceMethod(
+		t,
+		sourcePackage,
+		"EscapedContract",
+		"π",
+		signature,
+	)
+	literal := installPrivateInterfaceMethod(
+		t,
+		sourcePackage,
+		"LiteralContract",
+		"__u3c0_",
+		signature,
+	)
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers([]*types.Package{sourcePackage}); err != nil {
+		t.Fatal(err)
+	}
+	file := &File{owner: &Owner{registry: registry}}
+	escapedName, err := file.InterfaceMethodName(escaped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	literalName, err := file.InterfaceMethodName(literal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if escapedName == literalName ||
+		escapedName != "model$__u3c0___method_2" ||
+		literalName != "model$__u3c0_" {
+		t.Fatalf("colliding private method names = %q / %q", escapedName, literalName)
+	}
+}
+
+func TestPrivateMethodNamesDoNotCollideWithExportedPortableIdentifier(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	signature := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	exported := installPrivateInterfaceMethod(
+		t,
+		sourcePackage,
+		"ExportedContract",
+		"Π",
+		signature,
+	)
+	private := installPrivateInterfaceMethod(
+		t,
+		sourcePackage,
+		"PrivateContract",
+		"__u3a0_",
+		signature,
+	)
+	if !exported.Exported() || private.Exported() {
+		t.Fatal("portable collision foil export status is invalid")
+	}
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers([]*types.Package{sourcePackage}); err != nil {
+		t.Fatal(err)
+	}
+	file := &File{owner: &Owner{registry: registry}}
+	exportedName, err := file.InterfaceMethodName(exported)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privateName, err := file.InterfaceMethodName(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exportedName != "__u3a0_" ||
+		privateName != "model$__u3a0_" {
+		t.Fatalf(
+			"exported/private portable collision = %q / %q",
+			exportedName,
+			privateName,
+		)
+	}
+}
+
+func TestInterfaceAdapterSupportModulesFollowSemanticOwnership(t *testing.T) {
+	modelPackage := types.NewPackage("example.com/model", "model")
+	dependencyPackage := types.NewPackage("example.com/dependency", "dependency")
+	modelType := installNamedStructType(t, modelPackage, "Item")
+	dependencyType := installNamedStructType(t, dependencyPackage, "Value")
+	genericModelType := installGenericNamedStructType(t, modelPackage, "Box")
+	instantiatedModelType, err := types.Instantiate(
+		nil,
+		genericModelType,
+		[]types.Type{dependencyType},
+		true,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers([]*types.Package{
+		modelPackage,
+		dependencyPackage,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	composite := types.NewStruct(
+		[]*types.Var{
+			types.NewVar(token.NoPos, nil, "Item", modelType),
+			types.NewVar(token.NoPos, nil, "Value", dependencyType),
+		},
+		nil,
+	)
+	for _, test := range []struct {
+		name   string
+		source types.Type
+		want   string
+	}{
+		{name: "language scalar", source: types.Typ[types.Int32], want: "language/scalars"},
+		{name: "package-associated named type", source: modelType, want: "packages/model"},
+		{name: "cross-package generic instance", source: instantiatedModelType, want: "composites/structs"},
+		{name: "cross-package composite", source: composite, want: "composites/structs"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := registry.interfaceAdapterSupportModule(test.source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != test.want {
+				t.Fatalf("support module = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func installNamedStructType(
+	t *testing.T,
+	sourcePackage *types.Package,
+	name string,
+) *types.Named {
+	t.Helper()
+	object := types.NewTypeName(token.NoPos, sourcePackage, name, nil)
+	named := types.NewNamed(object, types.NewStruct(nil, nil), nil)
+	if previous := sourcePackage.Scope().Insert(object); previous != nil {
+		t.Fatalf("type %s was already present", name)
+	}
+	return named
+}
+
+func installGenericNamedStructType(
+	t *testing.T,
+	sourcePackage *types.Package,
+	name string,
+) *types.Named {
+	t.Helper()
+	parameterName := types.NewTypeName(token.NoPos, sourcePackage, "T", nil)
+	parameter := types.NewTypeParam(
+		parameterName,
+		types.NewInterfaceType(nil, nil).Complete(),
+	)
+	object := types.NewTypeName(token.NoPos, sourcePackage, name, nil)
+	named := types.NewNamed(object, types.NewStruct(nil, nil), nil)
+	named.SetTypeParams([]*types.TypeParam{parameter})
+	if previous := sourcePackage.Scope().Insert(object); previous != nil {
+		t.Fatalf("type %s was already present", name)
+	}
+	return named
+}
+
+func installPrivateInterfaceMethod(
+	t *testing.T,
+	sourcePackage *types.Package,
+	typeName string,
+	methodName string,
+	signature *types.Signature,
+) *types.Func {
+	t.Helper()
+	method := types.NewFunc(token.NoPos, sourcePackage, methodName, signature)
+	contract := types.NewInterfaceType([]*types.Func{method}, nil).Complete()
+	object := types.NewTypeName(token.NoPos, sourcePackage, typeName, nil)
+	types.NewNamed(object, contract, nil)
+	if previous := sourcePackage.Scope().Insert(object); previous != nil {
+		t.Fatalf("type %s was already present", typeName)
+	}
+	return method
 }
 
 func TestGeneratedArtifactLocalTokensRespectVisibleShadowing(t *testing.T) {

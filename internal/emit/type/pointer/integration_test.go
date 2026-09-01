@@ -114,7 +114,7 @@ func TestScalarPointerMarkersPrintAndTypecheck(t *testing.T) {
 	target := string(printed)
 	for _, required := range []string{
 		`import type { Pointer } from "@tsonic/core/types.js"`,
-		`import { allocatePointer, attribute, equalPointer, loadPointer, storePointer } from "@tsonic/core/lang.js"`,
+		`import { allocatePointer, equalPointer, loadPointer, storePointer } from "@tsonic/core/lang.js"`,
 		"allocatePointer<int32>(0)",
 		"loadPointer<int32>((pointer ?? GoPanic.raiseRuntime",
 		"storePointer((pointer ?? GoPanic.raiseRuntime",

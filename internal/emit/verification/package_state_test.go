@@ -59,8 +59,8 @@ func TestPackageStatePrintsTypechecksAndExecutesCheckerInitializationOrder(
 	var apiAssembly emit.TargetFile
 	var targetPaths []string
 	files := emission.Files()
-	if len(files) != 9 {
-		t.Fatalf("target files = %d, want nine exact package-state artifacts", len(files))
+	if len(files) != 8 {
+		t.Fatalf("target files = %d, want eight exact package-state artifacts", len(files))
 	}
 	for _, file := range files {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
@@ -257,9 +257,9 @@ func TestPackageInitializationHandlesMultipleResultsInitFunctionsAndBlankImports
 	var assemblyPath string
 	var targetPaths []string
 	files := emission.Files()
-	if len(files) != 13 {
+	if len(files) != 12 {
 		t.Fatalf(
-			"target files = %d, want thirteen exact initialization artifacts",
+			"target files = %d, want twelve exact initialization artifacts",
 			len(files),
 		)
 	}

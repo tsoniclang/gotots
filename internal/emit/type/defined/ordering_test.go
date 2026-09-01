@@ -66,13 +66,13 @@ func assertCompoundArtifactShape(t *testing.T, printed string) {
 	if next := strings.Index(body[len(startMarker):], "\nexport function "); next >= 0 {
 		body = body[:len(startMarker)+next]
 	}
-	if got := strings.Count(body, "const __gotots_store_"); got != 2 {
+	if got := strings.Count(body, "const storeTarget"); got != 2 {
 		t.Fatalf("accessor compound location captures = %d, want 2:\n%s", got, body)
 	}
-	if got := strings.Count(body, "const __gotots_assign_"); got != 1 {
+	if got := strings.Count(body, "const assignmentValue"); got != 1 {
 		t.Fatalf("accessor compound right captures = %d, want 1:\n%s", got, body)
 	}
-	right := strings.Index(body, "const __gotots_assign_")
+	right := strings.Index(body, "const assignmentValue")
 	rightEnd := -1
 	if right >= 0 {
 		rightEnd = strings.Index(body[right:], ";")
@@ -83,7 +83,7 @@ func assertCompoundArtifactShape(t *testing.T, printed string) {
 			body[right:right+rightEnd],
 			`?? GoPanic.raiseRuntime("call of nil function")`,
 		) ||
-		!strings.Contains(body[right:right+rightEnd], "= (__gotots_callee_") {
+		!strings.Contains(body[right:right+rightEnd], "= (callee") {
 		t.Fatalf("accessor compound has no captured guarded-call result:\n%s", body)
 	}
 	compound := body[right:]

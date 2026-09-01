@@ -7,7 +7,6 @@ import (
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
-	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"go/ast"
@@ -390,12 +389,18 @@ func (s *programSession) buildPackageInitializerRevision(
 			Reason: "package initializer has no concrete name owner",
 		}
 	}
+	replayCommitted := false
 	if !reconstruction {
 		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.SnapshotTemporaries()
-		names.RestoreTemporaries(temporaryStart)
-		defer names.FinishTemporaryReplay(current)
+		finishReplay, replayErr := names.BeginTemporaryReplay(
+			owner,
+			temporaryStart,
+		)
+		if replayErr != nil {
+			return artifactRevision{}, replayErr
+		}
+		defer func() { finishReplay(replayCommitted) }()
 	}
 	sourcePath, err := targetoutput.SourcePath(
 		site.Source,
@@ -415,17 +420,8 @@ func (s *programSession) buildPackageInitializerRevision(
 	}
 	defer finish()
 	requirements := s.requirements.SelectedFor(owner)
-	evidence, err := canonicalsourcefact.PackageEvidence(
-		site.Source,
-		sourcePath,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
 	context, err := emitnaming.WithLexicalTypeRequirements(
-		builder.assemblyContext.
-			WithSourceEvidence(evidence).
-			WithArtifactOwner(owner),
+		builder.assemblyContext.WithArtifactOwner(owner),
 		site.Declaration,
 		owner,
 		requirements,
@@ -461,6 +457,7 @@ func (s *programSession) buildPackageInitializerRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	replayCommitted = true
 	return artifactRevision{
 		statements:     emission.Statements(),
 		placement:      placement,

@@ -1,31 +1,31 @@
 import type { int32 } from "@gotots/runtime/scalars.js";
 export function SwapLeft(left: int32, right: int32): int32 {
-    const __gotots_assign_0 = right;
-    const __gotots_assign_1 = left;
-    left = __gotots_assign_0;
-    right = __gotots_assign_1;
+    const assignmentValue = right;
+    const assignmentValue2 = left;
+    left = assignmentValue;
+    right = assignmentValue2;
     return left;
 }
 export function Rotate(current: int32, next: int32): int32 {
-    const __gotots_assign_2 = next;
-    const __gotots_assign_3 = current;
-    current = __gotots_assign_2;
-    let previous = __gotots_assign_3;
+    const assignmentValue3 = next;
+    const assignmentValue4 = current;
+    current = assignmentValue3;
+    let previous = assignmentValue4;
     return previous;
 }
 export function Declare(left: int32, right: int32): int32 {
-    const __gotots_assign_4 = left;
-    const __gotots_assign_5 = right;
-    let first = __gotots_assign_4;
-    let second = __gotots_assign_5;
+    const assignmentValue5 = left;
+    const assignmentValue6 = right;
+    let first = assignmentValue5;
+    let second = assignmentValue6;
     return first + second;
 }
 export function Shadow(value: int32): int32 {
     if (true) {
-        const __gotots_assign_6 = value + 1;
-        const __gotots_assign_7 = value;
-        let value__shadow_1 = __gotots_assign_6;
-        let previous = __gotots_assign_7;
+        const assignmentValue7 = value + 1;
+        const assignmentValue8 = value;
+        let value__shadow_1 = assignmentValue7;
+        let previous = assignmentValue8;
         return value__shadow_1 + previous;
     }
     return 0;

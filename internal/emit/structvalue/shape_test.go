@@ -318,9 +318,9 @@ func TestNamedStructCallArgumentsPlacePrerequisitesInSourceOrder(t *testing.T) {
 	))
 	function := targetFunction(t, source, "CompositeSecondArgument")
 	statements := function.Body().(tsgo.Block).Statements()
-	if len(statements) != 7 {
+	if len(statements) != 6 {
 		t.Fatalf(
-			"CompositeSecondArgument statements = %d, want six captures and one call",
+			"CompositeSecondArgument statements = %d, want one argument capture, four field prerequisites, and one call",
 			len(statements),
 		)
 	}
@@ -328,18 +328,16 @@ func TestNamedStructCallArgumentsPlacePrerequisitesInSourceOrder(t *testing.T) {
 	if !ok || targetName(firstCall.Expression()) != "DirectValue" {
 		t.Fatal("first argument was not evaluated before second-argument prerequisites")
 	}
-	box, ok := capturedValue(t, statements[5]).(tsgo.NewExpression)
-	if !ok || targetName(box.Expression()) != "Box" || len(box.Arguments()) != 2 {
-		t.Fatalf("captured second argument = %T, want direct new Box", capturedValue(t, statements[5]))
-	}
-	call := statements[6].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
+	call := statements[5].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
 	if len(call.Arguments()) != 2 {
 		t.Fatalf("CompositeSecondArgument arguments = %d, want two", len(call.Arguments()))
 	}
-	for index, argument := range call.Arguments() {
-		if _, ok := argument.(tsgo.Identifier); !ok {
-			t.Fatalf("final call argument %d = %T, want captured identifier", index, argument)
-		}
+	if _, ok := call.Arguments()[0].(tsgo.Identifier); !ok {
+		t.Fatalf("first call argument = %T, want captured identifier", call.Arguments()[0])
+	}
+	box, ok := call.Arguments()[1].(tsgo.NewExpression)
+	if !ok || targetName(box.Expression()) != "Box" || len(box.Arguments()) != 2 {
+		t.Fatalf("second call argument = %T, want direct new Box", call.Arguments()[1])
 	}
 }
 

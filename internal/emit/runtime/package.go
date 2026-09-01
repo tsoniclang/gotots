@@ -5,16 +5,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"path"
 	"slices"
 	"sort"
 	"strings"
 
-	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
-	"github.com/tsoniclang/gotots/internal/emit/runtime/sourcefact"
+	scalarcontract "github.com/tsoniclang/gotots/internal/emit/runtime/scalar"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -143,35 +141,7 @@ func assemblePackage(
 			}
 		}
 	}
-	requested = maps.Clone(requested)
-	if requested == nil {
-		requested = make(map[api.RuntimeSymbol]struct{})
-	}
-	primitives := make([]sourcefact.Primitive, len(aliases))
-	companionCount := 0
-	for index, alias := range aliases {
-		primitive, err := sourcefact.DescribePrimitive(alias, scalar)
-		if err != nil {
-			return Package{}, err
-		}
-		primitives[index] = primitive
-		if primitive.RequiresCompanion() {
-			companionCount++
-		}
-	}
-	if companionCount != 0 {
-		requested[api.RuntimeSourceBasicFact] = struct{}{}
-	}
 	closed, err := dependencyClosure(requested)
-	if err != nil {
-		return Package{}, err
-	}
-	for symbol := range closed {
-		for _, fact := range sourcefact.FactSymbols(symbol) {
-			requested[fact] = struct{}{}
-		}
-	}
-	closed, err = dependencyClosure(requested)
 	if err != nil {
 		return Package{}, err
 	}
@@ -205,50 +175,49 @@ func assemblePackage(
 		return modules[left] < modules[right]
 	})
 	files := make([]PackageFile, 0, len(modules)+1)
-	statements := make([]tsgo.Statement, 0, len(aliases)*2+2)
-	aliasDeclarations := make([]tsgo.Statement, 0, len(aliases))
-	for index, alias := range aliases {
+	statements := make([]tsgo.Statement, 0, len(aliases)+1)
+	var scalarImports []api.RootRequest
+	for _, alias := range aliases {
 		name, keyword, err := api.PrimitiveAliasRepresentation(alias, scalar)
 		if err != nil {
 			return Package{}, err
 		}
 		underlying := tsgo.TypeNode(factory.KeywordTypeNode(keyword))
-		if shared, selected, err := primitives[index].SharedDeclaration(); err != nil {
+		shared, selected, err := scalarcontract.SharedDeclaration(alias, scalar)
+		if err != nil {
 			return Package{}, err
-		} else if selected {
+		}
+		if selected {
+			localName := sharedPrimitiveLocalName(shared.Export())
 			underlying = factory.TypeReferenceNode(
-				factory.Identifier(sharedPrimitiveLocalName(shared.Export())),
+				factory.Identifier(localName),
 				nil,
 			)
+			request, requestErr := api.NewImportRequest(
+				factory,
+				api.ImportPhaseType,
+				shared.Module(),
+				shared.Export(),
+				localName,
+			)
+			if requestErr != nil {
+				return Package{}, requestErr
+			}
+			scalarImports = append(scalarImports, request)
 		}
-		declaration := factory.TypeAliasDeclaration(
+		statements = append(statements, factory.TypeAliasDeclaration(
 			[]tsgo.ModifierLike{factory.ExportKeyword()},
 			factory.Identifier(name),
 			nil,
 			underlying,
-		)
-		aliasDeclarations = append(aliasDeclarations, declaration)
-		statements = append(statements, declaration)
+		))
 	}
 	if len(statements) != 0 {
-		imports, err := scalarSourceFactImports(
-			factory,
-			primitives,
-			companionCount != 0,
-		)
-		if err != nil {
+		placement := targetplacement.New()
+		if err := placement.Apply(scalarImports); err != nil {
 			return Package{}, err
 		}
-		annotations, err := scalarSourceFactAnnotations(
-			factory,
-			aliases,
-			primitives,
-			aliasDeclarations,
-		)
-		if err != nil {
-			return Package{}, err
-		}
-		statements = append(imports, append(statements, annotations...)...)
+		statements = append(placement.Statements(factory), statements...)
 		file, err := packageSourceFile(
 			factory,
 			targetoutput.ScalarSupportPath,
@@ -277,16 +246,6 @@ func assemblePackage(
 		if err != nil {
 			return Package{}, err
 		}
-		annotations, err := sourceFactAnnotations(
-			factory,
-			module,
-			symbols,
-			statements,
-		)
-		if err != nil {
-			return Package{}, err
-		}
-		statements = append(statements, annotations...)
 		imports, err := moduleImports(
 			factory,
 			paths[module],
@@ -322,179 +281,8 @@ func assemblePackage(
 	}, nil
 }
 
-func scalarSourceFactImports(
-	factory tsgo.Factory,
-	primitives []sourcefact.Primitive,
-	companions bool,
-) ([]tsgo.Statement, error) {
-	placement := targetplacement.New()
-	var requests []api.RootRequest
-	for _, primitive := range primitives {
-		declaration, selected, err := primitive.SharedDeclaration()
-		if err != nil {
-			return nil, err
-		}
-		if !selected {
-			continue
-		}
-		request, err := api.NewImportRequest(
-			factory,
-			api.ImportPhaseType,
-			declaration.Module(),
-			declaration.Export(),
-			sharedPrimitiveLocalName(declaration.Export()),
-		)
-		if err != nil {
-			return nil, err
-		}
-		requests = append(requests, request)
-	}
-	if companions {
-		attribute, err := tsoniccore.Resolve(tsoniccore.SymbolAttribute)
-		if err != nil {
-			return nil, err
-		}
-		attributeRequest, err := api.NewImportRequest(
-			factory,
-			api.ImportPhaseValue,
-			attribute.Module(),
-			attribute.Export(),
-			attribute.Export(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		fact, err := api.RuntimeContract(api.RuntimeSourceBasicFact)
-		if err != nil {
-			return nil, err
-		}
-		factRequest, err := api.NewRuntimeImportRequest(
-			factory,
-			api.ImportPhaseValue,
-			"./source-fact.js",
-			api.RuntimeSourceBasicFact,
-			fact.ExportedName(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		requests = append(requests, attributeRequest, factRequest)
-	}
-	if err := placement.Apply(requests); err != nil {
-		return nil, err
-	}
-	return placement.Statements(factory), nil
-}
-
 func sharedPrimitiveLocalName(exportedName string) string {
-	return "$go$core$" + exportedName
-}
-
-func scalarSourceFactAnnotations(
-	factory tsgo.Factory,
-	aliases []api.PrimitiveAlias,
-	primitives []sourcefact.Primitive,
-	declarations []tsgo.Statement,
-) ([]tsgo.Statement, error) {
-	if len(aliases) != len(primitives) || len(aliases) != len(declarations) {
-		return nil, &AssemblyError{Reason: "primitive fact denominator is not exact"}
-	}
-	fact, err := api.RuntimeContract(api.RuntimeSourceBasicFact)
-	if err != nil {
-		return nil, err
-	}
-	annotations := make([]tsgo.Statement, 0, len(aliases))
-	for index, alias := range aliases {
-		primitive := primitives[index]
-		if !primitive.RequiresCompanion() {
-			continue
-		}
-		name, err := api.PrimitiveAliasName(alias)
-		if err != nil {
-			return nil, err
-		}
-		arguments, err := sourcefact.PrimitiveArguments(factory, primitive)
-		if err != nil {
-			return nil, err
-		}
-		annotation, err := sourcefact.AnnotationWithArguments(
-			factory,
-			name,
-			fact.ExportedName(),
-			declarations[index],
-			arguments...,
-		)
-		if err != nil {
-			return nil, err
-		}
-		annotations = append(annotations, annotation)
-	}
-	return annotations, nil
-}
-
-func sourceFactAnnotations(
-	factory tsgo.Factory,
-	module api.RuntimeModule,
-	symbols []api.RuntimeSymbol,
-	statements []tsgo.Statement,
-) ([]tsgo.Statement, error) {
-	if module == api.RuntimeModuleSourceFact {
-		return nil, nil
-	}
-	if len(symbols) != len(statements) {
-		return nil, &AssemblyError{
-			Module: module,
-			Reason: "source-fact annotation input is not exact",
-		}
-	}
-	annotations := make([]tsgo.Statement, 0, len(symbols))
-	operationFact, err := api.RuntimeContract(api.RuntimeSourceOperationFact)
-	if err != nil {
-		return nil, err
-	}
-	for index, symbol := range symbols {
-		fact, ok := sourcefact.FactSymbol(symbol)
-		if !ok {
-			continue
-		}
-		contract, err := api.RuntimeContract(symbol)
-		if err != nil {
-			return nil, err
-		}
-		factContract, err := api.RuntimeContract(fact)
-		if err != nil {
-			return nil, err
-		}
-		identity, err := sourcefact.Identity(symbol)
-		if err != nil {
-			return nil, err
-		}
-		annotation, err := sourcefact.Annotation(
-			factory,
-			contract.ExportedName(),
-			factContract.ExportedName(),
-			identity,
-			uint16(symbol),
-			statements[index],
-		)
-		if err != nil {
-			return nil, err
-		}
-		annotations = append(annotations, annotation)
-		memberAnnotations, err := sourcefact.MemberAnnotations(
-			factory,
-			contract.ExportedName(),
-			operationFact.ExportedName(),
-			identity,
-			uint16(symbol),
-			statements[index],
-		)
-		if err != nil {
-			return nil, err
-		}
-		annotations = append(annotations, memberAnnotations...)
-	}
-	return annotations, nil
+	return "Tsonic" + strings.ToUpper(exportedName[:1]) + exportedName[1:]
 }
 
 func packageSourceFile(

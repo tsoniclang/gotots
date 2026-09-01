@@ -19,7 +19,6 @@ const (
 	SymbolBindRawPointer
 	SymbolEqualRawPointer
 	SymbolHashRawPointer
-	SymbolAttribute
 	SymbolBool
 	SymbolInt8
 	SymbolUint8
@@ -95,8 +94,6 @@ func Resolve(symbol Symbol) (Declaration, error) {
 		return value("equalRawPointer"), nil
 	case SymbolHashRawPointer:
 		return value("hashRawPointer"), nil
-	case SymbolAttribute:
-		return value("attribute"), nil
 	case SymbolBool:
 		return typeDeclaration("bool"), nil
 	case SymbolInt8:

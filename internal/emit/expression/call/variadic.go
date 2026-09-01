@@ -89,7 +89,7 @@ func emitVariadicArguments(
 		emissions = append(emissions, emission)
 	}
 	if captureAll || variadicEmissionsNeedCapture(emissions) {
-		return captureArguments(context, children, source, signature, emissions)
+		return captureArguments(context, children, source, signature, emissions, captureAll)
 	}
 	arguments := make([]tsgo.Expression, 0, len(emissions))
 	var requests []api.RootRequest
@@ -184,6 +184,7 @@ func emitVariadicSlice(
 			source,
 			nil,
 			values,
+			false,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err

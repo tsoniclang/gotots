@@ -36,15 +36,16 @@ func Apply(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	receiverName, err := context.Names().Temporary(
-		api.TemporaryReceiverValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	before := append(
-		receiver.Before(),
-		context.Factory().VariableStatement(
+	receiverValue := receiver.Value()
+	before := receiver.Before()
+	if len(argumentBefore) != 0 {
+		receiverName, nameErr := context.Names().Temporary(
+			api.TemporaryReceiverValue,
+		)
+		if nameErr != nil {
+			return api.ExpressionEmission{}, nameErr
+		}
+		before = append(before, context.Factory().VariableStatement(
 			nil,
 			context.Factory().VariableDeclarationList(
 				[]tsgo.VariableDeclaration{
@@ -52,13 +53,14 @@ func Apply(
 						context.Factory().Identifier(receiverName),
 						nil,
 						nil,
-						receiver.Value(),
+						receiverValue,
 					),
 				},
 				tsgo.NodeFlagsConst,
 			),
-		),
-	)
+		))
+		receiverValue = context.Factory().Identifier(receiverName)
+	}
 	before = append(before, argumentBefore...)
 	nonNil, err := context.Names().Runtime(
 		api.RuntimeInterfaceNonNil,
@@ -76,7 +78,7 @@ func Apply(
 		nil,
 		[]tsgo.TypeNode{receiverContract.Value()},
 		[]tsgo.Expression{
-			context.Factory().Identifier(receiverName),
+			receiverValue,
 		},
 		tsgo.NodeFlagsNone,
 	)

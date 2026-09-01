@@ -61,7 +61,7 @@ func TestGenericAppendSpreadTypeFamiliesExecuteDifferentially(t *testing.T) {
 		"typeof ",
 		"instanceof ",
 	} {
-		if strings.Contains(withoutGenericSourceFacts(printed), forbidden) {
+		if strings.Contains(printed, forbidden) {
 			t.Fatalf("generic append-spread artifact contains %q:\n%s", forbidden, printed)
 		}
 	}
@@ -95,17 +95,6 @@ console.log(StringResult());
 			goOutput,
 		)
 	}
-}
-
-func withoutGenericSourceFacts(source string) string {
-	var result strings.Builder
-	for _, line := range strings.SplitAfter(source, "\n") {
-		if strings.HasPrefix(line, "attribute<") {
-			continue
-		}
-		result.WriteString(line)
-	}
-	return result.String()
 }
 
 func materialize(

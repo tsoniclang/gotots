@@ -58,7 +58,7 @@ func TestDemandProgramPrintsTypechecksAndExecutesReachableDefinitions(t *testing
 		t.Fatal(err)
 	}
 	files := emission.Files()
-	if len(files) != 10 {
+	if len(files) != 9 {
 		t.Fatalf(
 			"emitted files = %d, want source, package, state, program, and support modules",
 			len(files),
@@ -90,14 +90,7 @@ func TestDemandProgramPrintsTypechecksAndExecutesReachableDefinitions(t *testing
 				"expected.ts",
 			)
 		case emit.TargetFileSupport:
-			if file.OutputPath() == "runtime/source-fact.ts" {
-				expectedPath = filepath.Join(
-					demandProgramDirectory(),
-					"expected-source-fact.ts",
-				)
-			} else {
-				expectedPath = filepath.Join(repositoryRoot(), "testdata", "support", "scalars-int32.ts")
-			}
+			expectedPath = filepath.Join(repositoryRoot(), "testdata", "support", "scalars-int32.ts")
 		case emit.TargetFilePackageState,
 			emit.TargetFilePackageAssembly,
 			emit.TargetFileProgramInitialization:
@@ -228,7 +221,7 @@ func TestDemandProgramRetainsExplicitReferencedFunctionTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := emission.Files()
-	if len(files) != 6 {
+	if len(files) != 5 {
 		t.Fatalf("explicit target files = %v", files)
 	}
 	var functions []string
@@ -426,10 +419,10 @@ func TestGenericReceiverMethodWithoutRecoverDefersThroughOrdinaryEntry(t *testin
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
 			for _, required := range []string{
 				"export class Box<T>",
-				"static $go$private$",
+				"static store$kernel<T>(",
 				"export function Box$store$int32",
 				"$kernel<int32>($argument0, ($argument0: int32): int32 =>",
-				"__gotots_deferred_0",
+				"deferredCall",
 				"$go$recovery",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
@@ -441,7 +434,7 @@ func TestGenericReceiverMethodWithoutRecoverDefersThroughOrdinaryEntry(t *testin
 				}
 			}
 			for _, forbidden := range []string{
-				"__gotots_defers_",
+				"deferredCalls",
 				"export function Box_store(",
 				"$kernel$deferred",
 				"$deferred($go$recovery",

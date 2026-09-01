@@ -263,6 +263,16 @@ func NewOrder(mutex *sync.Mutex) binary.ByteOrder {
 	return blockingOrder{mutex: mutex}
 }
 
+var providerArgumentOrder string
+func NextProviderReader() io.Reader { providerArgumentOrder += "reader"; return strings.NewReader("\x00\x01") }
+func NextProviderOrder() binary.ByteOrder { providerArgumentOrder += "order"; return binary.BigEndian }
+func NextProviderTarget() any { providerArgumentOrder += "target"; return new(uint16) }
+func ProviderArgumentOrder() string {
+	providerArgumentOrder = ""
+	_ = binary.Read(NextProviderReader(), NextProviderOrder(), NextProviderTarget())
+	return providerArgumentOrder
+}
+
 func RootFactory() func(string) fs.FS { return os.DirFS }
 
 func Visit(fileSystem fs.FS, callback fs.WalkDirFunc) error {
@@ -290,6 +300,7 @@ func Visit(fileSystem fs.FS, callback fs.WalkDirFunc) error {
 			mustProviderRoot(t, scope.Lookup("Kill")),
 			mustProviderRoot(t, scope.Lookup("Decode")),
 			mustProviderRoot(t, scope.Lookup("NewOrder")),
+			mustProviderRoot(t, scope.Lookup("ProviderArgumentOrder")),
 			mustProviderRoot(t, scope.Lookup("RootFactory")),
 			mustProviderRoot(t, scope.Lookup("Visit")),
 		},
@@ -304,7 +315,7 @@ func Visit(fileSystem fs.FS, callback fs.WalkDirFunc) error {
 	if !strings.Contains(
 		artifacts.printed,
 		"this.$go$value.Read($argument0)",
-	) || !strings.Contains(artifacts.printed, ".$from(__gotots_results_") {
+	) || !strings.Contains(artifacts.printed, ".$from(results") {
 		t.Fatalf(
 			"provider method adapter did not preserve the public call and bridge its result:\n%s",
 			artifacts.printed,
@@ -332,6 +343,22 @@ func Visit(fileSystem fs.FS, callback fs.WalkDirFunc) error {
 			"recursive fs.DirEntry slice boundary is not projected at the provider bridge:\n%s",
 			artifacts.printed,
 		)
+	}
+	previous := -1
+	for _, statement := range []string{
+		" = NextProviderReader();",
+		" = NextProviderOrder();",
+		" = NextProviderTarget();",
+	} {
+		position := strings.Index(artifacts.printed, statement)
+		if position <= previous {
+			t.Fatalf(
+				"provider argument captures do not preserve source order at %q:\n%s",
+				statement,
+				artifacts.printed,
+			)
+		}
+		previous = position
 	}
 }
 

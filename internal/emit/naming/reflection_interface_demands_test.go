@@ -16,7 +16,7 @@ func TestReflectionInterfaceDemandsFlushAsExactBatch(t *testing.T) {
 	)
 	missingMethod := types.NewFunc(
 		token.NoPos,
-		types.NewPackage("example.com/demand", "demand"),
+		interfaceDemandPackage,
 		"Missing",
 		types.NewSignatureType(nil, nil, nil, nil, nil, false),
 	)
@@ -30,7 +30,7 @@ func TestReflectionInterfaceDemandsFlushAsExactBatch(t *testing.T) {
 		interfaceDemandSelection("second", second),
 	}
 	for _, exposureFirst := range []bool{false, true} {
-		registry := NewRegistry()
+		registry := newInterfaceDemandRegistry(t)
 		binding := internDemandAdapter(
 			t,
 			registry,

@@ -155,9 +155,13 @@ func TestGenericArtifactsUseSemanticModules(t *testing.T) {
 }
 
 func TestGeneratedArtifactsUseBoundedSemanticFamilyModules(t *testing.T) {
+	interfaceAdapterPath, err := InterfaceAdapterSupportPath("packages/model")
+	if err != nil {
+		t.Fatal(err)
+	}
 	want := map[string]string{
 		"map":                        "support/maps.ts",
-		"interface adapter":          "support/interface-adapters.ts",
+		"interface adapter":          "support/interface-adapters/packages/model.ts",
 		"anonymous interface":        "support/interface-contracts.ts",
 		"provider interface":         "support/provider-interface-bridges.ts",
 		"provider state":             "support/provider-stateful-representations.ts",
@@ -165,7 +169,7 @@ func TestGeneratedArtifactsUseBoundedSemanticFamilyModules(t *testing.T) {
 	}
 	got := map[string]string{
 		"map":                        MapSpecializationSupportPath,
-		"interface adapter":          InterfaceAdapterSupportPath,
+		"interface adapter":          interfaceAdapterPath,
 		"anonymous interface":        AnonymousInterfaceSupportPath,
 		"provider interface":         ProviderInterfaceBridgeSupportPath,
 		"provider state":             ProviderStatefulRepresentationSupportPath,

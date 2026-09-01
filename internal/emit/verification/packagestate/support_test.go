@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func runProgram(t *testing.T, directory, name string, arguments ...string) string {
@@ -38,29 +36,4 @@ func writeProgramFile(t *testing.T, path, content string) {
 
 func repositoryRoot() string {
 	return filepath.Join("..", "..", "..", "..")
-}
-
-func isSourceFactApplication(statement tsgo.Statement) bool {
-	expression, ok := statement.(tsgo.ExpressionStatement)
-	if !ok {
-		return false
-	}
-	call, ok := expression.Expression().(tsgo.CallExpression)
-	if !ok {
-		return false
-	}
-	return expressionRootedAtAttribute(call.Expression())
-}
-
-func expressionRootedAtAttribute(expression tsgo.Expression) bool {
-	switch selected := expression.(type) {
-	case tsgo.Identifier:
-		return selected.Text() == "attribute"
-	case tsgo.CallExpression:
-		return expressionRootedAtAttribute(selected.Expression())
-	case tsgo.PropertyAccessExpression:
-		return expressionRootedAtAttribute(selected.Expression())
-	default:
-		return false
-	}
 }

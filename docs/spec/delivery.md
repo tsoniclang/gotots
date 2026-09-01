@@ -5,36 +5,36 @@
 Delivery is construct-driven, test-first, and dependency-ordered. Milestones
 are capability checkpoints, not alternate compiler phases. Every milestone
 uses the same direct Go AST/`go/types` to typed TS-Go AST architecture for
-canonical source, followed by the one selected fact-driven target boundary.
+canonical source, followed by the one selected neutral-fact-driven target
+boundary.
 
-## Lossless Preservation Closure
+## Canonical Preservation Closure
 
 Before adding or optimizing another executable construct family, close the
 canonical preservation boundary in this order:
 
 1. make each existing semantic dispatcher total over its closed input class and
-   require an ordinary-TypeScript or exact-fact disposition at that owner;
-2. map all generated scalar aliases to shared primitive facts and add only the
-   Go string/complex/source-native companions that shared facts cannot own;
-3. conserve declaration, defined/alias, generic, receiver, callable, package,
-   module, and source identities on exact declaration subjects;
-4. conserve struct/field/tag/embedding, fixed-array length, slice, map,
-   interface, pointer, function-value, and channel facts;
-5. conserve storage/alias/copy/mutation/escape/capture/loop-lifetime facts;
-6. conserve evaluation, panic/defer/recover, goroutine/channel/select,
-   unsafe/layout, reflection, and implementation/provider operation facts;
-7. make executable integer carriers, direct evaluation, serial concurrency,
-   and target-specific implementation selection fact-replaceable and require
-   the selected target to retain, lower, or reject each choice explicitly; and
-8. require every selected target to consume or explicitly reject every reached
-   fact, then delete early-lowering and helper-spelling routes.
+   require an ordinary-TypeScript or accepted Tsonic-neutral-marker disposition
+   at that owner;
+2. map generated scalar aliases, typed locations, and fixed arrays to accepted
+   shared contracts only where target-neutral representation choice exists;
+3. preserve callable, aggregate, interface, storage, copy, alias, mutation,
+   evaluation, panic/defer/recover, reflection, and selected concurrency
+   behavior in exact checked TypeScript or accepted neutral markers;
+4. keep build/source/declaration provenance and selected implementation or
+   provider envelopes in private certification, never generated metadata;
+5. require each target to consume or explicitly reject every reached neutral
+   fact, then delete helper-spelling and duplicate metadata routes; and
+6. fail a profile whose required distinction has neither exact ordinary
+   TypeScript semantics nor an accepted shared neutral contract.
 
-Each step replaces its old route atomically. A fact may not be added as a
+Each step replaces its old route atomically. A marker may not be added as a
 decorative sibling to an earlier lossy path. The phase exits only when every
-closed owner fails on an omitted or duplicated disposition, every emitted fact
-is consumed exactly once, and the Go AST/checker graph can be released without
-removing a choice available to C#, Rust, TypeScript, or another selected target.
-A second whole-program semantic inventory is forbidden.
+closed owner fails on an omitted or duplicated disposition, every emitted
+neutral fact is consumed exactly once, and the Go AST/checker graph can be
+released without removing a choice required by the selected profile. A second
+whole-program semantic inventory and a GoToTS-specific target fact schema are
+forbidden.
 
 For each construct family:
 
@@ -42,7 +42,7 @@ For each construct family:
 2. observe the focused test fail at the owning unsupported boundary;
 3. implement the highest shared semantic owner;
 4. delete any superseded path in the same change;
-5. prove canonical AST, finalized-fact totality, and exact-node ownership;
+5. prove canonical AST, neutral-fact totality, and exact-node ownership;
 6. run focused target-AST, strict, differential, and mutation proof;
 7. inspect canonical and executable artifacts and cost;
 8. run broader gates before checkpointing.
@@ -169,13 +169,13 @@ control demand remain artifact-stable.
 
 ## 6. Canonical Synchronous ABI And Serial TypeScript Envelope
 
-Install one direct synchronous callable ABI plus exact concurrency facts and
-the explicit TypeScript serial envelope:
+Install one direct synchronous callable ABI and the explicit selected TSTS
+serial envelope:
 
 - one direct callable ABI for functions, methods, literals, callable values,
   interface methods, callbacks, deferred entries, and package initialization;
-- one fact-bearing `goSpawn` operation for every `go` call, with serial
-  execution only in the selected TypeScript envelope;
+- one direct serial operation for every `go` call under this explicitly
+  non-concurrent profile;
 - buffered channel send, receive, close, range, and atomic ready/default
   `select` operations;
 - typed serial-blocking panics for every operation that would suspend;
@@ -185,9 +185,10 @@ the explicit TypeScript serial envelope:
 
 Exit: generated and provider-facing callable surfaces contain no `Promise`,
 `async`, `await`, awaitable union, scheduler, blocked-operation queue, or
-callable-ABI variant; every concurrency operation retains exact canonical
-facts before the TypeScript target selects the serial envelope, and ready
-channel differentials plus every blocking, close, nil, and panic boundary pass.
+callable-ABI variant; the selected profile explicitly owns serial execution,
+and ready-channel differentials plus every blocking, close, nil, and panic
+boundary pass. This artifact is never reported as exact concurrent Go input for
+another target.
 
 ## 7. Language Closure
 
@@ -342,7 +343,8 @@ Performance delivery follows measured ownership rather than corpus rules:
    generated declaration and all callers remain unchanged and the translated
    body is absent;
 5. executable-representation optimizations belong to the selected target and
-   consume finalized exact-node facts plus complete-flow evidence; and
+   consume finalized exact-node Tsonic-neutral facts plus complete-flow
+   evidence; and
 6. the next change is selected from measured source-size, typecheck, memory,
    startup, or runtime evidence at the highest owner that eliminates the class.
 

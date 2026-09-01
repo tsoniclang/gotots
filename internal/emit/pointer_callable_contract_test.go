@@ -46,7 +46,7 @@ func Deferred(value *int) {
 		"return Read(addressOf<int>(current));",
 		"return Read(value);",
 		"(($0: Pointer<int> | undefined) => int)",
-		"Read(__gotots_argument_",
+		"Read(argument",
 	} {
 		if !strings.Contains(target, required) {
 			t.Fatalf("canonical pointer callable lacks %q:\n%s", required, target)
@@ -72,8 +72,8 @@ func Apply(counter Counter, value *int) {
 	`)
 	for _, required := range []string{
 		"Increment(value: Pointer<int> | undefined): void",
-		"const __gotots_store_0 = (value ?? GoPanic.raiseRuntime",
-		"storePointer(__gotots_store_0, goInt64(loadPointer(__gotots_store_0) + 1n));",
+		"const storeTarget = (value ?? GoPanic.raiseRuntime",
+		"storePointer(storeTarget, goInt64(loadPointer(storeTarget) + 1n));",
 		"counter.Increment(value);",
 	} {
 		if !strings.Contains(target, required) {
@@ -126,7 +126,7 @@ func ThroughInterface(value *int) int {
 		"return receiver.Read(addressOf<int>(current));",
 		"return receiver.Read(value);",
 		"this.$go$value.Read($argument0)",
-		"goInterfaceNonNil<Contract>(__gotots_receiver_2).Read(__gotots_argument_3)",
+		"goInterfaceNonNil<Contract>(contract).Read(value)",
 	} {
 		if !strings.Contains(target, required) {
 			t.Fatalf("pointer method callable lacks %q:\n%s", required, target)

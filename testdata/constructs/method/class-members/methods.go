@@ -6,6 +6,10 @@ func (counter Counter) Bump() int32 {
 }
 
 func (counter Counter) Read() int32 {
+	return counter.value()
+}
+
+func (counter Counter) value() int32 {
 	return counter.Value
 }
 

@@ -430,7 +430,7 @@ func TestWaveSevenIteratorLabelControlFailsAtExactBoundary(t *testing.T) {
 func assertIteratorRangeShape(t *testing.T, printed string) {
 	t.Helper()
 	for _, required := range []string{
-		"__gotots_range_state_",
+		"rangeState",
 		"range function continued iteration after function for loop body returned false",
 		"range function continued iteration after loop body panic",
 		"range function continued iteration after whole loop exit",
@@ -458,7 +458,7 @@ func assertIteratorRangeShape(t *testing.T, printed string) {
 	}
 	if count := strings.Count(
 		printed,
-		"let __gotots_range_return_",
+		"let rangeResult",
 	); count != 8 {
 		t.Fatalf(
 			"iterator-return carrier declarations = %d, want 8:\n%s",

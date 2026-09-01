@@ -435,7 +435,7 @@ func TestPromotedPointerInterfaceAdapterPreservesReceiverAddress(
 				"loadPointer<Outer__from_promotedpointer>",
 			) || !strings.Contains(
 				artifacts.printed,
-				"addressOf<Inner__from_promotedpointer>(__gotots_store_0.Inner)",
+				"addressOf<Inner__from_promotedpointer>(storeTarget.Inner)",
 			) {
 				t.Fatalf(
 					"promoted pointer adapter lacks direct typed receiver projection:\n%s",

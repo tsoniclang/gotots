@@ -395,7 +395,7 @@ dependency, unconditional rescan, or duplicate old/new path.
 
 ## Source-Shape Conservation
 
-Every target callable that claims a Go source identity directly projects the
+Every target callable that projects a Go source callable directly projects the
 selected `go/types.Signature`.
 
 - Ordinary value parameters preserve order and cardinality.
@@ -416,68 +416,90 @@ operation function, provider policy, bridge set, scheduler state, storage
 facet, profile selector, or digest-named parameter/variant.
 
 Compiler-owned private support definitions may have implementation parameters
-only when they claim no Go source identity and are not exposed through package
-assembly. Every generated source call still has the source argument list.
+only when they do not project a Go source callable and are not exposed through
+package assembly. Every generated source call still has the source argument
+list.
 
-## Lossless Source-Fact Boundary
+## Canonical Semantic Boundary
 
 Each closed semantic owner performs one total preservation decision while the
-selected Go AST and checker evidence are live. Every target-relevant
+selected Go AST and checker evidence are live. Every selected-profile
 distinction that owner encounters is preserved exactly once by either:
 
 - an ordinary TS-Go AST shape whose checked TypeScript semantics retain the
   distinction completely; or
-- one exact marker occurrence whose finalized fact retains the distinction on
-  the corresponding TS-Go AST subject.
+- one exact Tsonic-owned target-neutral marker occurrence whose finalized fact
+  retains the distinction on the corresponding TS-Go AST subject.
 
 The existing AST/type/runtime dispatchers are the denominators for their own
 classes: unknown variants fail, constructors reject incomplete facts, and the
 root seals output only after every requested artifact has been consumed. No
 production pass copies those rows into a whole-program semantic inventory or
 re-walks the checker graph. A helper call, class name, source comment, manifest
-row, or executable implementation is not a preservation disposition.
+row, GoToTS-specific metadata payload, or implementation provenance is not a
+semantic preservation disposition.
 
-When canonical output selects a shared source-core primitive, pointer,
-fixed-array, struct/field, reference, borrow, move, or default contract, that
-contract owns its complete language-neutral meaning. GoToTS owns every Go-only
-remainder. It expresses that remainder as closed attribute families on exact
-declarations or exact semantic helper declarations through the canonical
-`@tsonic/core/lang.js` `attribute` marker. The fact class has an exact
-GoToTS-owned declaration identity; its arguments are typed TS-Go AST values.
-TSTS finalizes the application, and targets select it by fact and declaration
-identity rather than generated spelling.
+When canonical output selects a shared source-core primitive or pointer
+contract, that contract owns its complete language-neutral meaning. GoToTS
+owns Go language decisions while the AST/checker graph is live, but it does not
+export a GoToTS-owned target metadata schema. Every remaining selected-profile
+behavior is expressed as ordinary checked TypeScript. If a selected-profile
+distinction is not expressible by ordinary TypeScript or the accepted neutral
+vocabulary, compilation fails until shared Tsonic authority adds the neutral
+contract.
 
-The TypeScript executable target may retain the ordinary canonical carrier and
-erase its finalized attributes as compile-time metadata. That is a closed
-target disposition only because no Go representation decision is reconstructed
-or changed: every exact application is consumed, and metadata-only bindings are
-removed only after an exact reference join. A C# or Rust target that changes a
-carrier must interpret the relevant exact fact class and schema or reject it.
+The TypeScript executable target may retain an ordinary carrier and lower or
+erase reached neutral markers. C# and Rust may replace a carrier only by
+consuming the same exact Tsonic-owned fact. No target imports, parses, or
+recognizes `GoCompilationFact`, `GoDeclarationFact`,
+`GoBasicFact`, `GoAggregateFact`, `GoCallableFact`, `GoInterfaceFact`,
+`GoStorageFact`, `GoOperationFact`, `GoImplementationFact`, or any successor.
 
-The Go-only families are:
+Build identity, source location/digests, package and declaration provenance,
+selected provider/implementation identity, and equivalence envelopes are
+private certification evidence. They exact-join configuration and source
+before output is sealed. They are not embedded into canonical TypeScript and
+are not available to a target.
 
-| Family | Sole content |
-|---|---|
-| compilation | Go version, build profile, native widths, language profile |
-| declaration | package/module/source identity, declaration kind, alias/defined/generic identity |
-| basic extension | Go string, complex, and source-native integer role not owned by shared primitives |
-| aggregate | tags/embedding/blank fields, array length, slice/map/channel roles |
-| callable | receiver kind, variadic/result shape, method/interface source identity |
-| interface | exact method-set identity, implicit implementation, typed-nil/boxing/copy contract |
-| storage and flow | addressability, alias/storage identity, copy, mutation, escape, capture, loop lifetime |
-| operation | only Go operations not completely expressed by ordinary TypeScript |
-| implementation | exact selected source/provider body and named equivalence envelope |
+One semantic field has one owner. A neutral marker never repeats meaning
+already present in ordinary checked TypeScript, and private certification never
+pretends to be semantic target input. A target resolves neutral operations by
+finalized Tsonic fact and declaration identity, never helper/member spelling.
 
-One field has one owner. A Go companion never repeats meaning already supplied
-by the exact shared contract selected in that canonical shape. Runtime helpers
-that denote Go-only operations carry the operation attribute on their
-declaration; a target resolves the called declaration and reads the finalized
-fact. It never classifies a call by helper/member spelling.
+### Neutral Marker Selection
 
-Canonical compilation preserves source evaluation order and concurrency
-intent. JavaScript integer carriers, temporary elimination, serial execution,
-package implementations, and other executable choices are target-profile
-lowerings after fact finalization. A lossy executable projection may be a named
+The current compiler selects shared primitive markers only when the selected
+carrier is exact, and selects the safe typed-pointer/raw-pointer contracts for
+their exact type and operation sites. Other declarations that happen to exist
+in `@tsonic/core` are not a menu to attach speculatively:
+
+- an ordinary Go function value remains an ordinary TypeScript callable because
+  it may close over storage; `FunctionPointer` would assert a stronger native
+  ABI fact that GoToTS has not selected;
+- a Go fixed array remains the exact executable `GoArray<T, N>` class for this
+  profile, with `N` present as a literal type argument. The class does not
+  claim the structurally different `FixedArray<T, N>` contract. A target must
+  compile the ordinary class unless a future representation owner selects that
+  neutral marker before publication;
+- `struct`, `field`, and `defaultValue` are not annotations for generated
+  classes. Existing class declarations and explicit copy/zero operations are
+  the ordinary carrier for this profile; and
+- reference-mode, borrow, and move markers are selected only by a future owner
+  that proves their complete target-neutral contract. They are not inferred
+  from Go pointer spelling or added as optimization hints.
+
+Consequently a target may compile `GoArray`, a generated class, or an ordinary
+callable according to its checked TypeScript semantics, but it may not
+recognize those names and silently replace them with a native fixed array,
+value struct, or function pointer. Such a replacement first requires the
+corresponding accepted neutral marker and an exact source-side selection.
+
+Canonical compilation always preserves source evaluation order. It preserves
+concurrency intent only for a profile with an accepted neutral concurrency
+contract; the selected TSTS profile instead chooses its declared serial
+envelope before publication. JavaScript integer carriers, temporary
+elimination, package implementations, and other executable choices are
+selected-profile decisions. A lossy executable projection may be a named
 target envelope, but its output is not canonical input for another target.
 
 ## Callable Representation
@@ -542,12 +564,23 @@ GoToTS-owned scalar aliases preserve every selected Go basic identity. In
 particular, `int`, `uint`, and `uintptr` remain distinct aliases rather than
 being rewritten as `int32`/`int64` or `uint32`/`uint64`. Their carrier width is
 derived once from the selected package graph's `types.Sizes`; inconsistent
-width evidence in one compilation fails before emission. The `number` profile
-maps every integer alias to `number`. The `fixed64-bigint` profile maps
-`int64` and `uint64` to `bigint` while retaining `number` for native-sized and
-narrower aliases. The `bigint` profile additionally maps 64-bit native
-`int`, `uint`, and `uintptr` to `bigint`. Generated output imports no unrelated
-compiler.
+width evidence in one compilation fails before emission. When the selected
+carrier exactly matches a public Tsonic primitive, the runtime module imports
+that canonical type under a readable private name and keeps the Go-facing
+alias, for example:
+
+```ts
+import type { int32 as TsonicInt32 } from "@tsonic/core/types.js";
+export type int32 = TsonicInt32;
+```
+
+The `number` profile maps every integer alias to `number`, but deliberately
+does not claim the target-neutral `int64`/`uint64` contract for those lossy
+carriers. The `fixed64-bigint` profile maps `int64` and `uint64` to their exact
+shared BigInt types while retaining `number` for native-sized and narrower
+aliases. The `bigint` profile additionally maps 64-bit native `int`, `uint`,
+and `uintptr` to the corresponding exact shared BigInt type. Generated output
+imports no unrelated compiler and never publishes a Go-specific scalar fact.
 
 Profile selection also fixes the overflow contract. The direct `number`
 profile retains its declared precision/overflow tradeoff. Both explicit
@@ -633,8 +666,8 @@ remain exact. A local decision at one call site is forbidden.
 For example, the TypeScript target may turn a complete non-escaping read-only
 `Pointer<int>` flow into a `number`, while a flow with two mutating aliases uses
 one shared runtime location. Canonical source is unchanged in both cases, and a
-native target consumes the same finalized facts without reverse-engineering a
-Node-oriented carrier.
+native target consumes the same finalized Tsonic pointer facts without
+reverse-engineering a Node-oriented carrier.
 
 The canonical pointer boundary is fixed before target selection. Its complete
 source contract is:
@@ -655,7 +688,7 @@ The callable-signature facet conserves every `*T` parameter/result as this
 canonical type, and every direct call, method value/expression, callback,
 interface adapter, deferred entry, provider bridge, and export subscribes to
 that facet. GoToTS does not scalarize a read-only body, add a cell, or change a
-caller. The TypeScript target may do so only from the finalized fact graph and
+caller. The TypeScript target may do so only from finalized Tsonic-neutral facts and
 only by replacing the complete definition/reference/alias/call component.
 Hashing, binding, and projection are not optimization escape hatches: they
 join the same pointer component and force canonical retention unless the target
@@ -1136,21 +1169,23 @@ Native target control is used where structurally exact. Only genuinely
 non-structural `goto` selects a linear statement state machine assembled from
 already-created TS-Go statements. No CFG or control IR is retained.
 
-## Canonical Concurrency Carrier And Serial TypeScript Envelope
+## Selected Serial Concurrency Envelope
 
-Canonical source has one direct synchronous callable ABI, but synchronous ABI
-does not erase a Go concurrency operation. A `go` statement evaluates the
+The selected TSTS profile has one direct synchronous callable ABI and an
+explicit non-concurrent execution envelope. A `go` statement evaluates the
 callee and arguments in Go order and calls the exact `goSpawn` runtime
-declaration. That declaration and call retain the goroutine operation through
-the canonical operation fact before any target acts. A direct unmarked call is
-not an admissible canonical representation of `go`.
+declaration; that declaration executes the operation immediately. `goSpawn` is
+the single GoToTS runtime owner of this selected serial behavior. Its spelling
+is not portable semantic evidence, and no target may reinterpret it as a
+goroutine marker.
 
-The GoToTS runtime supplies a synchronous serial reference carrier so canonical
-TypeScript remains executable. The TypeScript target may explicitly select
-that envelope by retaining the carrier after fact finalization. Another target
-must replace the fact-bearing operation with its task, thread, or scheduler
-representation, or reject it. The serial helper body is never concurrency
-authority and its output cannot become canonical input to a different target.
+GoToTS selects this envelope before canonical output is sealed. The TypeScript
+target neither chooses nor reconstructs it. This output is exact only for the
+declared serial profile and cannot become input to a native-concurrency target.
+A future profile for C#, Rust, or another concurrent target must select an
+accepted Tsonic-owned neutral concurrency contract while the Go AST and checker
+evidence are live, or fail before publication. Until that contract exists,
+there is no native-concurrency canonical profile.
 
 One `GoChannel<T>` identity owns capacity, FIFO buffered values, close state,
 length, capacity, copy/zero behavior, and ready select operations. A send,
@@ -1176,8 +1211,9 @@ not part of source channel semantics.
 An event-backed provider such as a timer or OS signal may register a host
 callback internally while preserving its direct public Go call contract. This
 TypeScript serial execution envelope is intentional and must not be described
-as Go concurrency parity. Channel direction, operation, close, readiness, and
-select facts remain available before the target chooses that envelope.
+as Go concurrency parity. Its generated channel shapes and operations express
+only the selected serial behavior; they are not a portable concurrency fact
+store.
 
 ## Provider And External Boundary
 
@@ -1703,10 +1739,13 @@ selected product.
 Compilation-scoped generated support definitions retain their full semantic
 artifact identities. Physical paths expose only semantic family and exact
 source/type ownership. Closed generated-support families whose definitions
-share one runtime contract use one bounded readable family module
-(`support/maps.ts`, `support/interface-adapters.ts`, and their declared
-siblings); every definition in that module keeps its full injective semantic
-export name. Source-owned generic concretizations may use one readable module
+share one runtime contract use bounded readable semantic modules. Maps use
+`support/maps.ts`; interface adapters are partitioned beneath
+`support/interface-adapters/` by their one associated package when exactly one
+is present, or by language/composite type family otherwise. Placement never
+claims that an anonymous composite is declared by an associated package. Every
+definition keeps its full injective semantic export name. Source-owned generic
+concretizations may use one readable module
 per exact source declaration because that declaration is already the real
 semantic sub-owner. A large owner is divided only by such a real semantic
 sub-owner already present in the source/type graph, never by a digest byte,
@@ -1847,7 +1886,8 @@ its declaration-requirement requests; every translated statement and
 non-declaration request is discarded. This preserves canonical operation,
 representation, concretization, and caller coordination without retaining a
 second executable body. A source-variant contract cannot suppress a kernel ABI
-required by those retained source facts.
+required by retained ordinary TypeScript consumers or accepted neutral marker
+contracts.
 The final exact-consumption gate rejects an absent or second selected target. Instance
 value-receiver bodies and recovery-aware deferred
 entries remain unsupported until their private implementation ABI is specified

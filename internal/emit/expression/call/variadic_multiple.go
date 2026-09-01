@@ -100,6 +100,7 @@ func emitVariadicMultipleArgument(
 			source,
 			signature,
 			emissions,
+			captureAll,
 		)
 		return arguments,
 			append(capture.Statements(), captured...),

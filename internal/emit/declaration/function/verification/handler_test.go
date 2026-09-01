@@ -27,7 +27,7 @@ func TestAddConstructCreatesExactTargetTree(t *testing.T) {
 	loaded := loadAddProject(t)
 	targetFile := emitAdd(t, loaded)
 
-	statements := executableTargetFile(targetFile).Statements()
+	statements := targetFile.Statements()
 	if len(statements) != 2 {
 		t.Fatalf("target statements = %d, want 2", len(statements))
 	}
@@ -89,7 +89,7 @@ func TestAddConstructPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 		}
 	})
 	printed, err := client.PrintNode(
-		executableTargetFile(targetFile),
+		targetFile,
 		tsgo.PrintOptions{},
 	)
 	if err != nil {

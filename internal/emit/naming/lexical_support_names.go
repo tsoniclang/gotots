@@ -422,12 +422,14 @@ func (n *File) Runtime(
 type TemporarySnapshot struct {
 	counters map[api.TemporaryKind]uint64
 	names    map[string]struct{}
+	owners   map[string]api.ArtifactOwner
 }
 
 func (n *File) SnapshotTemporaries() TemporarySnapshot {
 	snapshot := TemporarySnapshot{
 		counters: make(map[api.TemporaryKind]uint64, len(n.temporaries)),
 		names:    make(map[string]struct{}, len(n.generatedNames)),
+		owners:   make(map[string]api.ArtifactOwner, len(n.temporaryOwners)),
 	}
 	for kind, value := range n.temporaries {
 		snapshot.counters[kind] = value
@@ -435,10 +437,13 @@ func (n *File) SnapshotTemporaries() TemporarySnapshot {
 	for name := range n.generatedNames {
 		snapshot.names[name] = struct{}{}
 	}
+	for name, owner := range n.temporaryOwners {
+		snapshot.owners[name] = owner
+	}
 	return snapshot
 }
 
-func (n *File) RestoreTemporaries(snapshot TemporarySnapshot) {
+func (n *File) restoreTemporaries(snapshot TemporarySnapshot) {
 	n.temporaries = make(map[api.TemporaryKind]uint64, len(snapshot.counters))
 	for kind, value := range snapshot.counters {
 		n.temporaries[kind] = value
@@ -447,14 +452,74 @@ func (n *File) RestoreTemporaries(snapshot TemporarySnapshot) {
 	for name := range snapshot.names {
 		n.generatedNames[name] = struct{}{}
 	}
+	n.temporaryOwners = make(
+		map[string]api.ArtifactOwner,
+		len(snapshot.owners),
+	)
+	for name, owner := range snapshot.owners {
+		n.temporaryOwners[name] = owner
+	}
 }
 
-func (n *File) FinishTemporaryReplay(current TemporarySnapshot) {
-	replayedNames := n.generatedNames
-	n.RestoreTemporaries(current)
-	for name := range replayedNames {
-		n.generatedNames[name] = struct{}{}
+func (n *File) BeginTemporaryReplay(
+	owner api.ArtifactOwner,
+	start TemporarySnapshot,
+) (func(bool), error) {
+	if n == nil || !owner.Valid() {
+		return nil, &api.NameError{
+			Name:   owner.Name(),
+			Reason: "temporary replay owner is invalid",
+		}
 	}
+	current := n.SnapshotTemporaries()
+	n.restoreTemporaries(current)
+	n.temporaries = make(
+		map[api.TemporaryKind]uint64,
+		len(start.counters),
+	)
+	for kind, value := range start.counters {
+		n.temporaries[kind] = value
+	}
+	for name, selectedOwner := range n.temporaryOwners {
+		if selectedOwner != owner {
+			continue
+		}
+		delete(n.generatedNames, name)
+		delete(n.temporaryOwners, name)
+	}
+	return func(commit bool) {
+		replayed := n.SnapshotTemporaries()
+		n.restoreTemporaries(current)
+		if !commit {
+			return
+		}
+		for name, selectedOwner := range n.temporaryOwners {
+			if selectedOwner != owner {
+				continue
+			}
+			delete(n.generatedNames, name)
+			delete(n.temporaryOwners, name)
+		}
+		for name, selectedOwner := range replayed.owners {
+			if selectedOwner != owner {
+				continue
+			}
+			n.generatedNames[name] = struct{}{}
+			n.temporaryOwners[name] = owner
+		}
+		for kind, value := range replayed.counters {
+			if value > n.temporaries[kind] {
+				n.temporaries[kind] = value
+			}
+		}
+	}, nil
+}
+
+func (n *File) temporaryOwner() api.ArtifactOwner {
+	if n == nil {
+		return api.ArtifactOwner{}
+	}
+	return n.artifactOwner
 }
 
 func (n *File) sourceNameExists(name string) bool {
@@ -491,14 +556,21 @@ func (n *File) Temporary(kind api.TemporaryKind) (string, error) {
 	for {
 		index := n.temporaries[kind]
 		n.temporaries[kind] = index + 1
-		candidate := prefix + strconv.FormatUint(index, 10)
+		candidate := prefix
+		if index != 0 {
+			candidate += strconv.FormatUint(index+1, 10)
+		}
 		if n.lexicalNameExists(candidate) {
 			continue
 		}
 		if n.generatedNames == nil {
 			n.generatedNames = make(map[string]struct{})
 		}
+		if n.temporaryOwners == nil {
+			n.temporaryOwners = make(map[string]api.ArtifactOwner)
+		}
 		n.generatedNames[candidate] = struct{}{}
+		n.temporaryOwners[candidate] = n.temporaryOwner()
 		return candidate, nil
 	}
 }

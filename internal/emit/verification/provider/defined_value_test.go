@@ -183,7 +183,7 @@ func RewindMapIterator(value reflect.Value) bool {
 		"scalars.int64",
 		"private static $projectKey($key: time.Duration): scalars.int64",
 		"new Map<scalars.int64",
-		"let __gotots_range_index_0 = 0n",
+		"let rangeIndex = 0n",
 		"goIntegerMax",
 		"TimeDurationValueOperations.$wrap(goInt64(-named_time.TimeDurationValueOperations.$project($argument0)))",
 		"values.get(named_time.TimeDurationValueOperations.$project(index))",
@@ -198,10 +198,10 @@ func RewindMapIterator(value reflect.Value) bool {
 		"ReflectMapIterOperations.$assign",
 		"cancel: (() => void) | undefined",
 		"callback: (($0: gostring, $1:",
-		"const __gotots_callee_0 = cancel;",
-		"const __gotots_callee_1 = callback;",
-		"(__gotots_callee_0 ?? GoPanic.raiseRuntime(\"call of nil function\"))();",
-		"return (__gotots_callee_1 ?? GoPanic.raiseRuntime(\"call of nil function\"))(",
+		"const callee = cancel;",
+		"const callee2 = callback;",
+		"(callee ?? GoPanic.raiseRuntime(\"call of nil function\"))();",
+		"return (callee2 ?? GoPanic.raiseRuntime(\"call of nil function\"))(",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("provider defined-value artifact lacks %q:\n%s", required, printed)

@@ -323,9 +323,9 @@ func TimeAddress() time.Time {
 		"export function ContainsOpen(",
 		"Pointer<T>",
 		"addressOf<GoArray<GoContainerStorage<T>, 1>>(values)",
-		"BigInt.asIntN(64, goNumberToBigInt(count))",
+		"BigInt.asIntN(64, goNumberToBigInt(argument3))",
 		"BigInt.asIntN(64, goNumberToBigInt($argument1))",
-		"BigInt.asIntN(64, goNumberToBigInt(__gotots_argument_1))",
+		"BigInt.asIntN(64, goNumberToBigInt(argument27))",
 	} {
 		if !strings.Contains(printed, exact) {
 			t.Fatalf("provider generic projection lacks %q:\n%s", exact, printed)

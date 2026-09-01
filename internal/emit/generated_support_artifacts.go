@@ -7,7 +7,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	genericconcretization "github.com/tsoniclang/gotots/internal/emit/generic/concretization"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
-	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"go/token"
@@ -90,14 +89,17 @@ func (s *programSession) buildProviderStatefulRevision(
 			Reason: "provider stateful representation has no concrete name owner",
 		}
 	}
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	replayCommitted := false
 	if !reconstruction {
 		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.SnapshotTemporaries()
-		names.RestoreTemporaries(temporaryStart)
-		defer names.FinishTemporaryReplay(current)
+		finishReplay, replayErr := names.BeginTemporaryReplay(owner, temporaryStart)
+		if replayErr != nil {
+			return artifactRevision{}, replayErr
+		}
+		defer func() { finishReplay(replayCommitted) }()
 	}
-	owner := api.MustGeneratedArtifactOwner(artifact)
 	finish, err := names.BeginArtifact(owner, nil, nil, "")
 	if err != nil {
 		return artifactRevision{}, err
@@ -193,15 +195,6 @@ func (s *programSession) buildProviderStatefulRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	statements, buildRequests, err = canonicalsourcefact.IncludeGeneratedArtifact(
-		context,
-		artifact,
-		statements,
-		buildRequests,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
 	placement, dependencies, nextRequirements, err :=
 		s.consumeArtifactRequests(
 			owner,
@@ -218,6 +211,7 @@ func (s *programSession) buildProviderStatefulRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	replayCommitted = true
 	return artifactRevision{
 		statements:     statements,
 		placement:      placement,
@@ -330,14 +324,17 @@ func (s *programSession) buildGenericConcretizationRevision(
 			Reason: "generic concretization has no concrete name owner",
 		}
 	}
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	replayCommitted := false
 	if !reconstruction {
 		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.SnapshotTemporaries()
-		names.RestoreTemporaries(temporaryStart)
-		defer names.FinishTemporaryReplay(current)
+		finishReplay, replayErr := names.BeginTemporaryReplay(owner, temporaryStart)
+		if replayErr != nil {
+			return artifactRevision{}, replayErr
+		}
+		defer func() { finishReplay(replayCommitted) }()
 	}
-	owner := api.MustGeneratedArtifactOwner(artifact)
 	finish, err := names.BeginArtifact(owner, nil, nil, "")
 	if err != nil {
 		return artifactRevision{}, err
@@ -361,15 +358,6 @@ func (s *programSession) buildGenericConcretizationRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	statements, requests, err = canonicalsourcefact.IncludeGeneratedArtifact(
-		context,
-		artifact,
-		statements,
-		requests,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
 	placement, dependencies, requirements, err :=
 		s.consumeArtifactRequests(owner, requests)
 	if err != nil {
@@ -379,6 +367,7 @@ func (s *programSession) buildGenericConcretizationRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	replayCommitted = true
 	return artifactRevision{
 		statements:     statements,
 		placement:      placement,
@@ -484,14 +473,17 @@ func (s *programSession) buildDeferredCallableRegistryRevision(
 			Reason: "deferred-callable registry has no concrete name owner",
 		}
 	}
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	replayCommitted := false
 	if !reconstruction {
 		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.SnapshotTemporaries()
-		names.RestoreTemporaries(temporaryStart)
-		defer names.FinishTemporaryReplay(current)
+		finishReplay, replayErr := names.BeginTemporaryReplay(owner, temporaryStart)
+		if replayErr != nil {
+			return artifactRevision{}, replayErr
+		}
+		defer func() { finishReplay(replayCommitted) }()
 	}
-	owner := api.MustGeneratedArtifactOwner(artifact)
 	finish, err := names.BeginArtifact(owner, nil, nil, "")
 	if err != nil {
 		return artifactRevision{}, err
@@ -531,15 +523,6 @@ func (s *programSession) buildDeferredCallableRegistryRevision(
 		return artifactRevision{}, err
 	}
 	statements := []tsgo.Statement{statement}
-	statements, requests, err = canonicalsourcefact.IncludeGeneratedArtifact(
-		context,
-		artifact,
-		statements,
-		requests,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
 	placement, dependencies, nextRequirements, err :=
 		s.consumeArtifactRequests(owner, requests)
 	if err != nil {
@@ -553,6 +536,7 @@ func (s *programSession) buildDeferredCallableRegistryRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	replayCommitted = true
 	return artifactRevision{
 		statements:     statements,
 		placement:      placement,

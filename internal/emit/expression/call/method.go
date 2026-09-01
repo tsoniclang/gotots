@@ -148,7 +148,7 @@ func emitMethod(
 		children,
 		source,
 		signature,
-		detached,
+		detached || invocation.ProviderBoundary(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -262,7 +262,7 @@ func emitConcretizedConstraintMethod(
 		children,
 		source,
 		concrete,
-		detached,
+		detached || invocation.ProviderBoundary(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

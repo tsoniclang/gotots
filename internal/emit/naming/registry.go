@@ -207,6 +207,7 @@ type Registry struct {
 	packageVariables                    map[*types.Var]packageVariableBinding
 	assemblyPathByPackage               map[*types.Package]string
 	importQualifierByPackage            map[*types.Package]string
+	privateMethodNames                  map[privateMethodIdentity]string
 	anonymousStructs                    map[string]anonymousStructBinding
 	anonymousStructNames                map[genericGeneratedNameScope]string
 	mapSpecializations                  map[string]mapSpecializationBinding
@@ -296,6 +297,7 @@ func NewRegistry() *Registry {
 		packageVariables:                    make(map[*types.Var]packageVariableBinding),
 		assemblyPathByPackage:               make(map[*types.Package]string),
 		importQualifierByPackage:            make(map[*types.Package]string),
+		privateMethodNames:                  make(map[privateMethodIdentity]string),
 		anonymousStructs:                    make(map[string]anonymousStructBinding),
 		anonymousStructNames:                make(map[genericGeneratedNameScope]string),
 		mapSpecializations:                  make(map[string]mapSpecializationBinding),

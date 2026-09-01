@@ -75,7 +75,6 @@ type Site struct {
 	Source      *load.Package
 	SourceFile  load.File
 	Declaration ast.Decl
-	Occurrence  ast.Node
 	OutputPath  string
 }
 
@@ -117,7 +116,6 @@ func Program(source *load.Program) (map[types.Object]Site, error) {
 						object,
 						sourcePackage,
 						sourceFile,
-						declaration,
 						declaration,
 						outputPath,
 					); err != nil {
@@ -181,7 +179,6 @@ func indexGeneralDeclaration(
 					sourcePackage,
 					sourceFile,
 					declaration,
-					name,
 					outputPath,
 				); err != nil {
 					return err
@@ -220,7 +217,6 @@ func indexGeneralDeclaration(
 						sourcePackage,
 						sourceFile,
 						declaration,
-						name,
 						outputPath,
 					); err != nil {
 						return err
@@ -242,7 +238,6 @@ func indexGeneralDeclaration(
 					sourcePackage,
 					sourceFile,
 					declaration,
-					name,
 					statePath,
 				); err != nil {
 					return err
@@ -275,7 +270,6 @@ func indexGeneralDeclaration(
 				sourcePackage,
 				sourceFile,
 				declaration,
-				typeSpec,
 				outputPath,
 			); err != nil {
 				return err
@@ -291,16 +285,8 @@ func addSite(
 	sourcePackage *load.Package,
 	sourceFile load.File,
 	declaration ast.Decl,
-	occurrence ast.Node,
 	outputPath string,
 ) error {
-	if occurrence == nil || occurrence.Pos() < declaration.Pos() ||
-		occurrence.End() > declaration.End() {
-		return &api.InvariantError{
-			Role:   api.RoleFileDeclaration,
-			Reason: "declaration occurrence is invalid",
-		}
-	}
 	if _, duplicate := sites[object]; duplicate {
 		return &DuplicateError{Object: object.Name()}
 	}
@@ -309,7 +295,6 @@ func addSite(
 		Source:      sourcePackage,
 		SourceFile:  sourceFile,
 		Declaration: declaration,
-		Occurrence:  occurrence,
 		OutputPath:  outputPath,
 	}
 	return nil

@@ -239,7 +239,7 @@ func emit(
 		children,
 		source,
 		signature,
-		guardNil || captureInvocation,
+		guardNil || captureInvocation || providerBoundary,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

@@ -44,7 +44,7 @@ func emitInterfaceMethod(
 		children,
 		source,
 		signature,
-		true,
+		nativeProvider,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

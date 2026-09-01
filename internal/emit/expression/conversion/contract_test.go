@@ -58,7 +58,7 @@ func TestConversionASTUsesDirectAndBoundaryShapes(t *testing.T) {
 		"BigInt.asUintN(64",
 		"goNumberToBigInt",
 		"goFloat32",
-		"__gotots_conversion_",
+		"convertedValue",
 		"GoComplex128.make",
 		"GoComplex64.make",
 	} {

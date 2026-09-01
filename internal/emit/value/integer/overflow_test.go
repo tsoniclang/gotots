@@ -66,7 +66,7 @@ func TestIntegerBigIntCarrierProfilesWrapFixedWidthOperationsDifferentially(t *t
 		nativeAlias    string
 	}{
 		{"fixed64-bigint", emit.IntegerRepresentationFixed64BigInt, "export type int = number;"},
-		{"bigint", emit.IntegerRepresentationBigInt, "export type int = $go$core$int64;"},
+		{"bigint", emit.IntegerRepresentationBigInt, "export type int = TsonicInt64;"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			options := integerOptions(test.representation)

@@ -9,18 +9,14 @@ import (
 	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
-func (f File) Path() string           { return f.path }
-func (f File) SourceIdentity() string { return f.sourceIdentity }
-func (f File) SourceDigest() string   { return f.sourceDigest }
-func (f File) Syntax() *ast.File      { return f.syntax }
+func (f File) Path() string      { return f.path }
+func (f File) Syntax() *ast.File { return f.syntax }
 
 func (p *Package) Path() string          { return p.path }
 func (p *Package) Name() string          { return p.name }
 func (p *Package) ModulePath() string    { return p.modulePath }
 func (p *Package) ModuleVersion() string { return p.moduleVersion }
 func (p *Package) SourceRoot() string    { return p.sourceRoot }
-func (p *Package) Owner() PackageOwner   { return p.owner }
-func (p *Package) OwnerKey() string      { return p.ownerKey }
 
 func (p *Package) ToolchainKey() string {
 	if p.kind != PackageStandardLibraryContract {

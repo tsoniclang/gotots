@@ -29,13 +29,13 @@ func TestWaveFourRangeAndSwitchScaleWithSourceSyntax(t *testing.T) {
 		targetNodes[index] = nodes
 		if loops := strings.Count(
 			target,
-			"for (let __gotots_range_index_",
+			"for (let rangeIndex",
 		); loops != 1 {
 			t.Fatalf("range loops at %d cases = %d, want one", count, loops)
 		}
 		if checks := strings.Count(
 			target,
-			"let __gotots_switch_match_",
+			"let switchMatch",
 		); checks != count {
 			t.Fatalf(
 				"switch checks at %d cases = %d, want %d",
@@ -421,7 +421,7 @@ func measureWaveEightScale(
 	target := printed.String()
 	for name, got := range map[string]int{
 		"defer registrations": strings.Count(target, ".push("),
-		"goto states":         strings.Count(target, "let __gotots_goto_state_"),
+		"goto states":         strings.Count(target, "let gotoState"),
 		"source body stores":  strings.Count(target, "result += value;"),
 	} {
 		if got != count {

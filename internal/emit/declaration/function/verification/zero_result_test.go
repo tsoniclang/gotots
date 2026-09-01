@@ -21,7 +21,7 @@ func TestZeroResultCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "void-calls.ts")
 	targetFile := emitZeroResultProject(t, loaded)
-	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
+	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(zeroResultProjectDirectory(), "expected.ts"))
 	if err != nil {

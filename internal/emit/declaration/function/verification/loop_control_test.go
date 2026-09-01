@@ -22,7 +22,7 @@ func TestLoopControlPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "loop.ts")
 	targetFile := emitLoopControl(t, loaded)
-	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
+	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(loopControlProjectDirectory(), "expected.ts"))
 	if err != nil {

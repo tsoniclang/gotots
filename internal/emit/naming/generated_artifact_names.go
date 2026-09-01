@@ -374,11 +374,11 @@ func (n *File) semanticGeneratedMethodName(
 	method = method.Origin()
 	identity := semanticname.Identifier(method.Name())
 	if !method.Exported() && method.Pkg() != nil {
-		qualifier, qualifierErr := n.generatedPackageToken(method.Pkg())
-		if qualifierErr != nil {
-			return "", qualifierErr
+		var identityErr error
+		identity, identityErr = n.owner.registry.privateMethodName(method)
+		if identityErr != nil {
+			return "", identityErr
 		}
-		identity = qualifier + "$" + identity
 	}
 	return prefix + identity + "$" + contract, nil
 }

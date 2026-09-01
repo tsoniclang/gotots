@@ -20,7 +20,7 @@ func TestMultipleResultsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "multiple-results.ts")
 	targetFile := emitMultipleResultsProject(t, loaded)
-	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
+	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(multipleResultsProjectDirectory(), "expected.ts"))
 	if err != nil {
@@ -65,7 +65,7 @@ func TestMultipleResultsCreateDirectTupleTreeAndSingleEvaluation(t *testing.T) {
 	}
 	capture := consumeStatements[0].(tsgo.VariableStatement).
 		DeclarationList().Declarations()[0]
-	if capture.Name().(tsgo.Identifier).Text() != "__gotots_results_0" {
+	if capture.Name().(tsgo.Identifier).Text() != "results" {
 		t.Fatalf("capture name = %q", capture.Name().(tsgo.Identifier).Text())
 	}
 	if capture.Type() != nil {

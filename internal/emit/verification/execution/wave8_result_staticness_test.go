@@ -96,8 +96,8 @@ func TestWaveEightControlDemandDoesNotRewriteOrdinaryFunction(t *testing.T) {
 			}
 			for _, forbidden := range []string{
 				"$go$recovery",
-				"__gotots_defers_",
-				"__gotots_goto_state_",
+				"deferredCalls",
+				"gotoState",
 				"try {",
 				"finally {",
 			} {
@@ -128,7 +128,7 @@ func TestWaveEightControlDemandDoesNotRewriteOrdinaryFunction(t *testing.T) {
 				}
 			}
 			if !strings.Contains(deferredFunction, "finally {") ||
-				strings.Count(deferredFunction, "__gotots_deferred_") < 2 {
+				strings.Count(deferredFunction, "deferredCall") < 2 {
 				t.Fatalf(
 					"single-entry static defer lacks direct slots:\n%s",
 					deferredFunction,
@@ -194,7 +194,7 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 	}
 	ordinary := targetFunctionText(t, artifacts.printed, "recoveredTrace")
 	ordinaryCallee := regexp.MustCompile(
-		`const (__gotots_callee_[0-9]+) = invoke;`,
+		`const (callee[0-9]*) = invoke;`,
 	).FindStringSubmatch(ordinary)
 	if len(ordinaryCallee) != 2 ||
 		!strings.Contains(
@@ -211,12 +211,12 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 	} {
 		target := targetFunctionText(t, artifacts.printed, name)
 		callee := regexp.MustCompile(
-			`const (__gotots_callee_[0-9]+).* = `,
+			`const (callee[0-9]*).* = `,
 		).FindStringSubmatch(target)
 		if len(callee) != 2 ||
 			!strings.Contains(target, ".resolve("+callee[1]+")") ||
 			!regexp.MustCompile(
-				`__gotots_deferred_[0-9]+\(\$go\$recovery, __gotots_argument_[0-9]+\)`,
+				`deferredCall[0-9]*\(\$go\$recovery, argument[0-9]*\)`,
 			).MatchString(target) ||
 			strings.Contains(target, callee[1]+"($go$recovery") {
 			t.Fatalf(
@@ -232,7 +232,7 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 		"recoverDefinedFunction",
 	)
 	definedCallee := regexp.MustCompile(
-		`const (__gotots_callee_[0-9]+): .* = selected\.\$value;`,
+		`const (callee[0-9]*): .* = selected\.\$value;`,
 	).FindStringSubmatch(defined)
 	if len(definedCallee) != 2 ||
 		!strings.Contains(
@@ -240,7 +240,7 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 			".resolve("+definedCallee[1]+")",
 		) ||
 		!regexp.MustCompile(
-			`__gotots_deferred_[0-9]+\(\$go\$recovery, __gotots_argument_[0-9]+\)`,
+			`deferredCall[0-9]*\(\$go\$recovery, argument[0-9]*\)`,
 		).MatchString(defined) {
 		t.Fatalf(
 			"defined deferred callable did not consume the private registry ABI:\n%s",
@@ -312,7 +312,7 @@ func TestWaveEightNestedGotoDispatchPreservesSourceControlTargets(
 		artifacts.printed,
 		"GotoSwitchStateFallthrough",
 	)
-	if !strings.Contains(fallthroughTarget, "__gotots_goto_state_") ||
+	if !strings.Contains(fallthroughTarget, "gotoState") ||
 		!strings.Contains(fallthroughTarget, "case 2:") {
 		t.Fatalf(
 			"switch fallthrough did not follow its clause-local state:\n%s",
@@ -324,7 +324,7 @@ func TestWaveEightNestedGotoDispatchPreservesSourceControlTargets(
 		artifacts.printed,
 		"GotoTypeSwitchClause",
 	)
-	if strings.Contains(directTypeSwitch, "__gotots_goto_state_") {
+	if strings.Contains(directTypeSwitch, "gotoState") {
 		t.Fatalf(
 			"direct type-switch goto selected a state machine:\n%s",
 			directTypeSwitch,
@@ -353,11 +353,11 @@ func TestWaveEightStateTransitionsOnlyFollowFallthrough(t *testing.T) {
 	artifacts := materializeArtifacts(t, emission, t.TempDir())
 	target := targetFunctionText(t, artifacts.printed, "GotoState")
 	for description, pattern := range map[string]string{
-		"goto": `continue __gotots_goto_dispatch_[0-9]+;\s+` +
-			`__gotots_goto_state_[0-9]+ = [0-9]+;\s+` +
-			`continue __gotots_goto_dispatch_[0-9]+;`,
+		"goto": `continue gotoDispatch[0-9]*;\s+` +
+			`gotoState[0-9]* = [0-9]+;\s+` +
+			`continue gotoDispatch[0-9]*;`,
 		"return": `return [^;]+;\s+` +
-			`__gotots_goto_state_[0-9]+ = [0-9]+;`,
+			`gotoState[0-9]* = [0-9]+;`,
 	} {
 		if regexp.MustCompile(pattern).MatchString(target) {
 			t.Fatalf(
@@ -377,7 +377,7 @@ func assertWaveEightControlTarget(
 ) {
 	t.Helper()
 	pattern := regexp.MustCompile(
-		`(__gotots_control_target_[0-9]+): ` + construct,
+		`(controlTarget[0-9]*): ` + construct,
 	)
 	match := pattern.FindStringSubmatch(target)
 	if len(match) != 2 {
@@ -488,7 +488,7 @@ func waveEightResultCaptures(
 			for _, declaration := range statement.DeclarationList().Declarations() {
 				name, ok := declaration.Name().(tsgo.Identifier)
 				if ok &&
-					strings.HasPrefix(name.Text(), "__gotots_results_") &&
+					strings.HasPrefix(name.Text(), "results") &&
 					declaration.Initializer() != nil {
 					if _, ok := declaration.Initializer().(tsgo.ArrayLiteralExpression); ok {
 						result = append(result, declaration)

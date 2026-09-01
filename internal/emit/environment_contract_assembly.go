@@ -12,7 +12,6 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
-	environmentsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact/environment"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -411,17 +410,8 @@ func (s *programSession) environmentTargetFiles(
 		if err != nil {
 			return nil, err
 		}
-		factOwner, err := environmentsourcefact.New(
-			builder.context,
-			builder.sourcePackage,
-			builder.outputPath,
-			s.source.SourceDigest(),
-			s.registry,
-			s.standardLibrary,
-		)
-		if err != nil {
-			return nil, err
-		}
+		requirements.observe(placement)
+		statements := placement.Statements(s.factory)
 		declarations := make(
 			[]environmentDeclaration,
 			0,
@@ -436,63 +426,9 @@ func (s *programSession) environmentTargetFiles(
 				declarations[right].object,
 			) < 0
 		})
-		var sourceFacts []tsgo.Statement
-		for _, declaration := range declarations {
-			if !declaration.providerCoverage {
-				continue
-			}
-			use, useErr := s.settledEnvironmentUse(declaration.object)
-			if useErr != nil {
-				return nil, useErr
-			}
-			facts, selected, factErr := factOwner.ProviderDeclaration(
-				declaration.object,
-				use.selections,
-			)
-			if factErr != nil {
-				return nil, factErr
-			}
-			if use.route == environmentidentity.RouteProvider && !selected {
-				return nil, &ScheduleError{
-					Object: declaration.object.Name(),
-					Reason: "provider route has no exact source-fact target",
-				}
-			}
-			if selected {
-				if err := placement.Apply(facts.Requests()); err != nil {
-					return nil, err
-				}
-				sourceFacts = append(sourceFacts, facts.Statements()...)
-			}
-		}
-		variables := make(
-			[]*types.Var,
-			0,
-			len(builder.stateFields),
-		)
-		for variable := range builder.stateFields {
-			variables = append(variables, variable)
-		}
-		sort.Slice(variables, func(left, right int) bool {
-			return variables[left].Name() < variables[right].Name()
-		})
-		var stateFacts []tsgo.Statement
-		for _, variable := range variables {
-			fact, factErr := factOwner.State(variable)
-			if factErr != nil {
-				return nil, factErr
-			}
-			if err := placement.Apply(fact.Requests()); err != nil {
-				return nil, err
-			}
-			stateFacts = append(stateFacts, fact.Statements()...)
-		}
-		requirements.observe(placement)
-		statements := placement.Statements(s.factory)
 		for _, declaration := range declarations {
 			statements = append(statements, declaration.statements...)
 		}
-		statements = append(statements, sourceFacts...)
 		projectionNames := make(
 			[]string,
 			0,
@@ -507,11 +443,18 @@ func (s *programSession) environmentTargetFiles(
 				statements,
 				builder.projections[name].statement,
 			)
-			statements = append(
-				statements,
-				builder.projections[name].facts...,
-			)
 		}
+		variables := make(
+			[]*types.Var,
+			0,
+			len(builder.stateFields),
+		)
+		for variable := range builder.stateFields {
+			variables = append(variables, variable)
+		}
+		sort.Slice(variables, func(left, right int) bool {
+			return variables[left].Name() < variables[right].Name()
+		})
 		if len(variables) != 0 {
 			fields := make([]tsgo.TypeElement, 0, len(variables))
 			for _, variable := range variables {
@@ -524,11 +467,10 @@ func (s *programSession) environmentTargetFiles(
 					fields,
 				),
 			)
-			statements = append(statements, stateFacts...)
 		}
 		if s.standardLibrary != nil &&
 			builder.sourcePackage.Kind() == load.PackageStandardLibraryContract &&
-			len(builder.projections) == 0 && len(sourceFacts) == 0 {
+			len(statements) == 0 {
 			continue
 		}
 		kind := TargetFileEnvironmentContract

@@ -112,7 +112,7 @@ func assertWideNativeMapCarrier(
 	scalars := readFile(t, artifacts.file(t, "runtime/scalars.ts"))
 	wantCarrier := carrier
 	if carrier == "bigint" {
-		wantCarrier = "$go$core$uint64"
+		wantCarrier = "TsonicUint64"
 	}
 	if !strings.Contains(scalars, "export type uint64 = "+wantCarrier+";") {
 		t.Fatalf("uint64 carrier is not %s:\n%s", carrier, scalars)

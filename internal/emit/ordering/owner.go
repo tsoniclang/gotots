@@ -21,7 +21,10 @@ func CompareUseSelections(left, right gostdlib.UseSelection) int {
 		return strings.Compare(string(leftKind), string(rightKind))
 	}
 	if leftCapability != rightCapability {
-		return strings.Compare(string(leftCapability), string(rightCapability))
+		return strings.Compare(
+			string(leftCapability),
+			string(rightCapability),
+		)
 	}
 	leftKey, _ := left.ProfileKey()
 	rightKey, _ := right.ProfileKey()
