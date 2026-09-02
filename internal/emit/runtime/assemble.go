@@ -12,7 +12,6 @@ import (
 	floatruntime "github.com/tsoniclang/gotots/internal/emit/runtime/float"
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
 	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
-	sourcefactruntime "github.com/tsoniclang/gotots/internal/emit/runtime/sourcefact"
 	storagefacetruntime "github.com/tsoniclang/gotots/internal/emit/runtime/storagefacet"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
 	unsaferuntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafeoperation"
@@ -345,29 +344,6 @@ func Build(
 			return nil, err
 		}
 		return []Definition{definition}, nil
-	}
-	if module == api.RuntimeModuleSourceFact {
-		definitions := make([]Definition, 0, len(symbols))
-		for _, symbol := range symbols {
-			contract, err := api.RuntimeContract(symbol)
-			if err != nil {
-				return nil, err
-			}
-			statement, err := sourcefactruntime.Build(
-				factory,
-				symbol,
-				contract.ExportedName(),
-			)
-			if err != nil {
-				return nil, err
-			}
-			definition, err := NewDefinition(symbol, statement)
-			if err != nil {
-				return nil, err
-			}
-			definitions = append(definitions, definition)
-		}
-		return definitions, nil
 	}
 	if module == api.RuntimeModuleChannel {
 		return buildChannel(factory, symbols)

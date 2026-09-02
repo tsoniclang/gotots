@@ -186,7 +186,7 @@ func prepareGenericReceiverMethodCall(
 		children,
 		source,
 		concrete,
-		capture,
+		capture || invocation.ProviderBoundary(),
 	)
 	if err != nil {
 		return genericReceiverMethodCall{}, err

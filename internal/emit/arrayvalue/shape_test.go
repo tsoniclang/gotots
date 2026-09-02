@@ -35,7 +35,7 @@ func TestMultiResultPrerequisiteCapturesEachResultInOrder(t *testing.T) {
 		}
 		for _, declaration := range variable.DeclarationList().Declarations() {
 			name, ok := declaration.Name().(tsgo.Identifier)
-			if ok && strings.HasPrefix(name.Text(), "__gotots_results_") {
+			if ok && strings.HasPrefix(name.Text(), "results") {
 				captures = append(captures, name.Text())
 			}
 		}

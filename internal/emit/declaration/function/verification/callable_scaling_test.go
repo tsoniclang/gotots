@@ -182,7 +182,7 @@ func assertCallableScalingTree(t *testing.T, source tsgo.SourceFile, count int) 
 		t.Fatalf("Run callable check = %T, want nullish expression", parenthesized.Expression())
 	}
 	callee, ok := checked.Left().(tsgo.Identifier)
-	if !ok || !strings.HasPrefix(callee.Text(), "__gotots_callee_") {
+	if !ok || !strings.HasPrefix(callee.Text(), "callee") {
 		t.Fatalf("Run checked value = %T, want captured callable", checked.Left())
 	}
 	if len(runStatements) != 4 {

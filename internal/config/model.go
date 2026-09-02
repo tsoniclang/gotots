@@ -9,7 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 type RootMode string
 
@@ -47,6 +47,8 @@ type Overrides struct {
 	PackageImplementationsSet  bool
 	CallableImplementations    []string
 	CallableImplementationsSet bool
+	CertificationSources       []string
+	CertificationSourcesSet    bool
 	OutputDirectory            *string
 }
 
@@ -71,6 +73,7 @@ type Project struct {
 	externals               bool
 	packageImplementations  []string
 	callableImplementations []string
+	certificationSources    []string
 	outputDirectory         string
 }
 
@@ -92,6 +95,9 @@ func (p Project) PackageImplementations() []string {
 }
 func (p Project) CallableImplementations() []string {
 	return slices.Clone(p.callableImplementations)
+}
+func (p Project) ImplementationCertificationSources() []string {
+	return slices.Clone(p.certificationSources)
 }
 func (p Project) OutputDirectory() string { return p.outputDirectory }
 

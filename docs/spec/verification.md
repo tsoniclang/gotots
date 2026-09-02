@@ -23,23 +23,23 @@ mandatory evidence.
 
 Production conservation is owner-local. Existing closed AST/type/runtime
 dispatchers provide the denominator for their own semantic class; tests mutate
-each dispatcher and fact constructor to prove omitted, duplicated, and unknown
-forms fail closed. Runtime and generated-artifact assemblers exact-join their
-requested declarations, members, and fact applications. The selected target
-then exact-joins planned source-attribute applications and metadata-only import
-bindings to the nodes it erases or lowers.
+each dispatcher and preservation or marker constructor to prove omitted,
+duplicated, and unknown forms fail closed. Runtime and generated-artifact assemblers exact-join their
+requested declarations, members, and neutral-marker applications. The selected
+target then exact-joins reached Tsonic-owned neutral facts to the exact nodes it
+erases or lowers.
 
-The TypeScript-target control may consume a fact by exact-erasing its
-compile-time attribute while retaining the canonical executable carrier. Its
-proof exact-joins applications, metadata-only imports, and removable fact
-declarations, and preserves local same-spelled calls and every live binding.
-Native targets may not use this control as proof for a changed representation.
+The TypeScript-target control may consume a neutral fact by lowering or erasing
+its exact marker while retaining the canonical executable carrier. Its proof
+exact-joins selected marker occurrences and marker-only imports, and
+preserves local same-spelled calls and every live binding. Native targets may
+not use this control as proof for a changed representation.
 
 Independent verification uses bounded fixtures that derive each semantic
 family through a structurally different path and compare exact emitted AST and
-finalized facts. It must not build a second production semantic inventory,
-re-run the checker, or claim universal whole-program coverage from a duplicate
-Go graph walk.
+reached Tsonic-neutral facts. It must not build a second production semantic
+inventory, re-run the checker, or claim universal whole-program coverage from
+a duplicate Go graph walk.
 
 The matrix includes:
 
@@ -55,28 +55,30 @@ The matrix includes:
 - reflection identity, unsafe/layout boundaries, and selected provider/body
   implementations.
 
-TSTS must finalize every emitted marker on its exact TS-Go AST subject. For
-GoToTS-owned attributes, tests select the attribute type by exact canonical
-declaration identity and inspect its typed arguments; a local same-spelled
-attribute class and helper are foils. Every selected target then exact-joins all
-reached facts to either a lowering disposition or one typed unsupported
-diagnostic. Silent ordinary-carrier fallback fails.
+TSTS must finalize every emitted marker on its exact TS-Go AST subject. Tests
+select each accepted Tsonic-owned marker by exact canonical declaration
+identity and inspect its typed arguments; a local same-spelled declaration is a
+foil. Every selected target then exact-joins all reached facts to either a
+lowering disposition or one typed unsupported diagnostic. Silent
+ordinary-carrier fallback fails.
 
-Required mutations omit one owner disposition; double-own one field in a shared
-and Go companion fact; change primitive width/signedness; drop defined-type or
-field-tag identity; collapse two array lengths; erase channel direction; turn a
-typed nil into an untyped nil; change a copy into an alias; move an
-evaluation-order prerequisite; replace a fact-bearing goroutine operation with
-an unmarked direct call before fact finalization;
+Required mutations omit one owner disposition; duplicate one distinction in an
+ordinary carrier and a neutral fact; change primitive width/signedness; drop
+defined-type or field-tag identity; collapse two array lengths; erase channel
+direction; turn a typed nil into an untyped nil; change a copy into an alias;
+move an evaluation-order prerequisite; admit a native-concurrency profile
+without an accepted neutral concurrency contract;
 select a target implementation in canonical source; classify a runtime helper
 by spelling; and reuse a lossy target artifact as another target's input. Each
 must fail at its single owner.
 
 Broad searches reject semantic source comments, helper-name recognition,
 target-side Go parsing/checking, a serialized source-operation manifest,
-duplicate fact stores, direct-evaluation canonical mode, and an unmarked
-canonical serial-concurrency route. Artifact review shows source -> disposition -> exact
-TS-Go node -> finalized fact -> target decision for every fact family.
+duplicate fact stores, GoToTS-specific target metadata, direct-evaluation
+canonical mode, and an undeclared serial-concurrency route. Artifact review
+shows source -> selected-profile decision -> exact TS-Go node -> ordinary
+carrier or neutral fact -> target decision for every neutral family. Private
+certification is reviewed separately and never appears as target input.
 
 ## Baseline Gates
 
@@ -262,8 +264,8 @@ type/arity, or move an arm prerequisite outside short-circuit control.
 
 ## Source-Shape Conservation Gate
 
-Every emitted callable claiming a Go source identity is mechanically joined to
-its selected `go/types.Signature`.
+Every emitted callable projecting a Go source callable is mechanically joined
+to its selected `go/types.Signature`.
 
 Every generated concrete interface adapter and provider-interface bridge is
 also exact-joined to the declaration-referenceable Go-facing TypeScript
@@ -306,7 +308,7 @@ linear in selected methods. A foil reflected `*sync.Mutex` must not demand
 
 For each function, literal, concrete method, interface method, function type,
 method value/expression, provider/environment callable, and generic
-concretization, record:
+concretization, privately record for certification:
 
 - exact Go identity;
 - receiver mapping;
@@ -325,7 +327,7 @@ The gate asserts:
 - package exports expose each demanded cross-package representation binding
   exactly once and expose no private or undemanded support declaration;
 - indirect callable/interface ABI preserves the direct result contract;
-- private deferred/concretized/facade helpers claim no source identity.
+- private deferred/concretized/facade helpers do not project a source callable.
 
 Static searches reject source-facing occurrences of:
 
@@ -419,7 +421,13 @@ distinct `int`, `uint`, and `uintptr`, and checks their carrier matrix under
 32-bit and 64-bit `types.Sizes`. A mutation that restores native-to-fixed alias
 collapse fails before printing. All complete runtime packages are generated
 through TS-Go AST and strict-typechecked; artifacts must show source alias
-names unchanged and only their primitive carrier changed.
+names unchanged and only their primitive carrier changed. Every exact shared
+primitive uses its canonical `@tsonic/core/types.js` declaration through a
+readable collision-owned local such as `TsonicInt32`; a mutation that replaces
+that exact import with an ordinary `number` fails the neutral-contract shape
+gate. A number-carried `int64`/`uint64` must not import the exact shared wide
+type, and generated scalar support must contain neither the retired
+`$go$core$...` names nor any Go-specific scalar fact.
 
 Both BigInt-carrier profiles additionally differentially prove fixed-width
 overflow for wide signed and unsigned binary operations, shifts, unary
@@ -569,8 +577,9 @@ preserve-Go reordered-literal fixture places the would-be first capture name
 in the enclosing function signature; generated TypeScript must select a
 different binding, strict-typecheck, and remain differential-equal to Go.
 Mutations that omit any namespace from the join, restore a raw source-scope
-counter, duplicate a temporary prefix, or lose the allocated-name set across
-artifact reconstruction must fail at this gate.
+counter, duplicate a temporary prefix, lose the allocated-name set across
+successful artifact reconstruction, or commit partial names after failed
+reconstruction must fail at this gate.
 
 A late-demand fixture constructs a struct before taking its address in the
 same Go function. Artifact inspection proves that the final class owns the
@@ -1290,12 +1299,19 @@ structurally exact-joins the complete ordinary and installed canonical sets.
 That final join consumes only the compiler worker's official encoded protocol
 and flattened expected exports after the worker has exited; no live TS-Go
 process or certificate crosses the compilation lifetime boundary.
-For callable-body modules, mutate an admitted `.d.ts` certification source
-after preparation, omit it from the compile-worker handoff, duplicate it under
-a second contract, and replace it with executable TypeScript. Digest drift,
-unsealed evidence, and a non-declaration source must fail before the staged
-project is printed; byte-identical declarations from multiple modules are
-materialized once in scratch and never appear in final output.
+For the shared implementation environment, mutate an admitted `.d.ts`
+certification source after preparation, omit it from either implementation
+verifier, duplicate it in the shared selection, select it with no
+implementation consumer, and replace it with executable TypeScript. Digest
+drift, unsealed evidence, an unused source, and a non-declaration source must
+fail before output. Callable-local byte-identical declarations are materialized
+once in scratch; no certification declaration appears in final output.
+An exact ambient declaration with an `unknown` formal or result is a positive
+control: exact authored arguments and results pass without classifying the
+declaration itself as executable transport. Mutating the declaration to
+explicit `any`, adding a suppression directive, or letting an ambient broad
+result enter authored storage, arguments, or output fails at the declaration or
+executable-source owner respectively.
 Mutate a selected Go callable body without changing its identity or signature.
 Its canonical body digest must fail the post-load join before emission; omit or
 change that digest across the compile-worker handoff and the parent exact join
@@ -1417,8 +1433,9 @@ generated body, and selected authored body over representative and adversarial
 inputs; an equivalence envelope bounds every intentional algorithmic
 difference.
 
-Configuration mutations select schema 2, `implementations.bundles`, and
-`--implementation-bundle`; all must fail with the current migration diagnostic.
+Configuration mutations select schema 3, schema 2,
+`implementations.bundles`, and `--implementation-bundle`; all must fail with
+the current migration diagnostic.
 A no-callable-implementation control proves the ordinary source digest and
 output path remain singular and byte-stable.
 
@@ -1494,10 +1511,14 @@ Generated-size evidence also fails if full import paths are repeated inside
 ordinary generated identifiers; a mutation replacing the package qualifier
 with the complete path must exceed the owning source-size/line bound.
 Naming-owner tests include same-named packages, same-spelled local types in
-disjoint lexical scopes, and truly shadowing local types. Mutations that use a semantic contract's private key
-as target spelling, move display suffixes into semantic APIs, or bypass the
-registry qualifier/token owner—including the unexported interface-method token
-path—fail before generated output is sealed.
+disjoint lexical scopes, truly shadowing local types, unique unexported methods,
+cross-package private-method collisions, target-language hazards,
+exported/private escaped-identifier collisions, and two private Go spellings
+that escape to the same portable identifier. Mutations that use a
+semantic contract's private key as target spelling, qualify every private
+method, omit a real qualifier/ordinal, move display suffixes into semantic APIs,
+or bypass the registry qualifier/token owner fail before generated output is
+sealed.
 
 Product evidence reports support definitions separately from physical support
 modules, the largest semantic module, ESM startup time/RSS, and minimal-compile

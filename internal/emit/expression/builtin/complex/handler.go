@@ -54,7 +54,7 @@ func emitConstruct(
 ) (api.ExpressionEmission, error) {
 	resultType := context.TypesInfo().TypeOf(source)
 	expectedType := context.ExpectedType()
-	sourceFacts, factsOK := context.TypesInfo().TypeAndValue(source)
+	constantFacts, factsOK := context.TypesInfo().TypeAndValue(source)
 	if discarded ||
 		len(source.Args) != 2 ||
 		expectedType == nil ||
@@ -63,12 +63,12 @@ func emitConstruct(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if factsOK && sourceFacts.Value != nil {
+	if factsOK && constantFacts.Value != nil {
 		return constantvalue.EmitValue(
 			context,
 			source,
 			expectedType,
-			sourceFacts.Value,
+			constantFacts.Value,
 		)
 	}
 	carrier, ok := complexvalue.Describe(resultType)
@@ -166,19 +166,19 @@ func emitComponent(
 	}
 	resultType := context.TypesInfo().TypeOf(source)
 	expectedType := context.ExpectedType()
-	sourceFacts, factsOK := context.TypesInfo().TypeAndValue(source)
+	constantFacts, factsOK := context.TypesInfo().TypeAndValue(source)
 	if resultType == nil ||
 		expectedType == nil ||
 		!types.AssignableTo(resultType, expectedType) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if factsOK && sourceFacts.Value != nil {
+	if factsOK && constantFacts.Value != nil {
 		return constantvalue.EmitValue(
 			context,
 			source,
 			expectedType,
-			sourceFacts.Value,
+			constantFacts.Value,
 		)
 	}
 	argumentType := context.TypesInfo().TypeOf(source.Args[0])

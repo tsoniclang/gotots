@@ -1,16 +1,10 @@
 package emit
 
 import (
-	"context"
 	"go/types"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/tsoniclang/gotots/internal/emit/api"
-	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
-	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -83,128 +77,5 @@ func assertOneFinalDeclarationAssembly(
 		if count != 1 {
 			t.Fatalf("%s.%s final definition count = %d, want one", owner, name, count)
 		}
-	}
-}
-
-func TestContextualConstantFactsExactJoinEmittedProjectionBindings(t *testing.T) {
-	directory := t.TempDir()
-	if err := os.WriteFile(
-		filepath.Join(directory, "go.mod"),
-		[]byte("module example.com/constantfacts\n\ngo 1.26.4\n"),
-		0o600,
-	); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(directory, "source.go"),
-		[]byte("package constantfacts\n\nconst Huge = 1 << 63\nconst Other = 1\n"),
-		0o600,
-	); err != nil {
-		t.Fatal(err)
-	}
-	program, err := load.Load(context.Background(), load.Request{
-		Directory: directory,
-		Pattern:   ".",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	sourcePackage := program.Roots()[0]
-	constant := sourcePackage.Types().Scope().Lookup("Huge").(*types.Const)
-	other := sourcePackage.Types().Scope().Lookup("Other").(*types.Const)
-	session, err := newProgramSession(program, DefaultOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	site := session.sites[constant]
-	emitter := session.emitters[sourcePackage]
-	context, err := emitter.fileContext(site.SourceFile.Syntax(), site.OutputPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	origin, err := canonicalsourcefact.Origin(
-		site.Source,
-		site.SourceFile,
-		site.OutputPath,
-		site.Occurrence,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	baseName, err := context.Names().Declare(constant)
-	if err != nil {
-		t.Fatal(err)
-	}
-	projectionName, err := api.ConstantProjectionName(baseName, types.Uint64)
-	if err != nil {
-		t.Fatal(err)
-	}
-	statement := session.factory.VariableStatement(
-		[]tsgo.ModifierLike{session.factory.ExportKeyword()},
-		session.factory.VariableDeclarationList(
-			[]tsgo.VariableDeclaration{session.factory.VariableDeclaration(
-				session.factory.Identifier(projectionName),
-				nil,
-				nil,
-				session.factory.BigIntLiteral("9223372036854775808n", tsgo.TokenFlagsNone),
-			)},
-			tsgo.NodeFlagsConst,
-		),
-	)
-	requirement, err := api.NewConstantProjectionRequirement(constant, types.Uint64)
-	if err != nil {
-		t.Fatal(err)
-	}
-	facts, err := canonicalsourcefact.DeclarationWithRequirements(
-		context,
-		constant,
-		origin,
-		[]tsgo.Statement{statement},
-		[]api.DeclarationRequirement{requirement},
-		[]string{projectionName},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(facts.Statements()) != 2 {
-		t.Fatalf("contextual constant fact statements = %d, want 2", len(facts.Statements()))
-	}
-	for name, mutation := range map[string]struct {
-		requirements []api.DeclarationRequirement
-		bindings     []string
-	}{
-		"missing binding": {[]api.DeclarationRequirement{requirement}, nil},
-		"wrong binding":   {[]api.DeclarationRequirement{requirement}, []string{projectionName + "$wrong"}},
-		"duplicate projection": {
-			[]api.DeclarationRequirement{requirement, requirement},
-			[]string{projectionName},
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			if _, err := canonicalsourcefact.DeclarationWithRequirements(
-				context,
-				constant,
-				origin,
-				[]tsgo.Statement{statement},
-				mutation.requirements,
-				mutation.bindings,
-			); err == nil {
-				t.Fatal("inexact contextual constant fact denominator was admitted")
-			}
-		})
-	}
-	foreign, err := api.NewConstantProjectionRequirement(other, types.Uint64)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := canonicalsourcefact.DeclarationWithRequirements(
-		context,
-		constant,
-		origin,
-		[]tsgo.Statement{statement},
-		[]api.DeclarationRequirement{foreign},
-		[]string{projectionName},
-	); err == nil {
-		t.Fatal("foreign contextual constant fact requirement was admitted")
 	}
 }

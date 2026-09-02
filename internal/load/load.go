@@ -2,6 +2,8 @@ package load
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -28,10 +30,8 @@ type Request struct {
 }
 
 type File struct {
-	path           string
-	sourceIdentity string
-	sourceDigest   string
-	syntax         *ast.File
+	path   string
+	syntax *ast.File
 }
 
 type Package struct {
@@ -42,8 +42,6 @@ type Package struct {
 	sourceRoot    string
 	contractKey   string
 	kind          PackageKind
-	owner         PackageOwner
-	ownerKey      string
 	files         []File
 	otherFiles    []string
 	fileSet       *token.FileSet
@@ -138,16 +136,6 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 	if err != nil {
 		return nil, err
 	}
-	toolchainPackages, err := loadToolchainPackageMembership(
-		ctx,
-		selectedGo,
-		buildProfile,
-		request.Directory,
-	)
-	if err != nil {
-		return nil, &Error{Pattern: request.Pattern, Reason: err.Error()}
-	}
-
 	fileSet := token.NewFileSet()
 	loaded, err := GoPackages(selectedGo, buildProfile, PackageRequest{
 		Context:   ctx,
@@ -230,9 +218,6 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 			request.Pattern,
 			current,
 			fileSet,
-			request.Overlay,
-			toolchainKey,
-			toolchainPackages,
 		)
 		if err != nil {
 			return nil, err
@@ -265,8 +250,6 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 			fileSet,
 			kind,
 			contractKey,
-			toolchainKey,
-			toolchainPackages,
 		)
 		if err != nil {
 			return nil, err
@@ -316,8 +299,6 @@ func wrapEnvironmentPackage(
 	fileSet *token.FileSet,
 	kind PackageKind,
 	contractKey string,
-	toolchainKey string,
-	toolchainPackages toolchainPackageMembership,
 ) (*Package, error) {
 	if selected == nil ||
 		selected.Fset != fileSet ||
@@ -340,15 +321,6 @@ func wrapEnvironmentPackage(
 		moduleVersion = selected.Module.Version
 		sourceRoot = selected.Module.Dir
 	}
-	owner, ownerKey, err := classifyPackageOwner(
-		selected,
-		toolchainKey,
-		toolchainPackages,
-		true,
-	)
-	if err != nil {
-		return nil, &Error{Pattern: pattern, Reason: err.Error()}
-	}
 	return &Package{
 		path:          selected.PkgPath,
 		name:          selected.Name,
@@ -357,8 +329,6 @@ func wrapEnvironmentPackage(
 		sourceRoot:    sourceRoot,
 		contractKey:   contractKey,
 		kind:          kind,
-		owner:         owner,
-		ownerKey:      ownerKey,
 		fileSet:       selected.Fset,
 		typesPackage:  selected.Types,
 		typesInfo:     &types.Info{},
@@ -374,13 +344,15 @@ func currentToolchainKey(profile BuildProfile) string {
 	return key
 }
 
+func moduleContractKey(modulePath string, moduleVersion string) string {
+	digest := sha256.Sum256([]byte(modulePath + "\x00" + moduleVersion))
+	return hex.EncodeToString(digest[:])
+}
+
 func wrapPackage(
 	pattern string,
 	selected *packages.Package,
 	fileSet *token.FileSet,
-	overlay map[string][]byte,
-	toolchainKey string,
-	toolchainPackages toolchainPackageMembership,
 ) (*Package, error) {
 	if selected.Fset != fileSet || selected.Types == nil ||
 		selected.TypesInfo == nil || selected.TypesSizes == nil {
@@ -402,22 +374,9 @@ func wrapPackage(
 	}
 	files := make([]File, len(selected.Syntax))
 	for index := range selected.Syntax {
-		identity, digest, err := checkedSourceMetadata(
-			selected,
-			index,
-			overlay,
-		)
-		if err != nil {
-			return nil, &Error{
-				Pattern: pattern,
-				Reason:  selected.PkgPath + ": " + err.Error(),
-			}
-		}
 		files[index] = File{
-			path:           selected.CompiledGoFiles[index],
-			sourceIdentity: identity,
-			sourceDigest:   digest,
-			syntax:         selected.Syntax[index],
+			path:   selected.CompiledGoFiles[index],
+			syntax: selected.Syntax[index],
 		}
 	}
 	syntaxParents, err := buildSyntaxParents(files)
@@ -435,15 +394,6 @@ func wrapPackage(
 		moduleVersion = selected.Module.Version
 		sourceRoot = selected.Module.Dir
 	}
-	owner, ownerKey, err := classifyPackageOwner(
-		selected,
-		toolchainKey,
-		toolchainPackages,
-		false,
-	)
-	if err != nil {
-		return nil, &Error{Pattern: pattern, Reason: err.Error()}
-	}
 	embeds, err := resolvePackageEmbeds(selected)
 	if err != nil {
 		return nil, &Error{
@@ -458,8 +408,6 @@ func wrapPackage(
 		moduleVersion: moduleVersion,
 		sourceRoot:    sourceRoot,
 		kind:          PackageSource,
-		owner:         owner,
-		ownerKey:      ownerKey,
 		files:         files,
 		otherFiles:    slices.Clone(selected.OtherFiles),
 		fileSet:       selected.Fset,

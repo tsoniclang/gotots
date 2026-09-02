@@ -301,9 +301,9 @@ func interfaceContractDemandAdapter(
 ) string {
 	t.Helper()
 	for _, path := range paths {
-		if !strings.HasSuffix(
+		if !strings.Contains(
 			filepath.ToSlash(path),
-			"/"+output.InterfaceAdapterSupportPath,
+			"/"+output.InterfaceAdapterSupportRoot+"/",
 		) {
 			continue
 		}
@@ -421,7 +421,7 @@ func TestEmbeddedInterfacePromotionUsesInterfaceDispatch(t *testing.T) {
 				"loadPointer<Holder__from_embeddedinterface>",
 				"equalPointer<Holder__from_embeddedinterface>",
 				"hashPointer<Holder__from_embeddedinterface>",
-				").Reader;",
+				").Reader).Read()",
 				"goInterfaceNonNil",
 				".Read()",
 				".Read$deferred($go$recovery)",
@@ -474,9 +474,9 @@ func TestEmbeddedInterfacePromotionUsesInterfaceDispatch(t *testing.T) {
 func embeddedInterfaceAdapter(t *testing.T, paths []string) string {
 	t.Helper()
 	for _, path := range paths {
-		if !strings.HasSuffix(
+		if !strings.Contains(
 			filepath.ToSlash(path),
-			"/"+output.InterfaceAdapterSupportPath,
+			"/"+output.InterfaceAdapterSupportRoot+"/",
 		) {
 			continue
 		}

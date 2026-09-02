@@ -1,6 +1,7 @@
 package verify
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -98,7 +99,7 @@ func verifyProductionFile(relative string, sourcePath string) error {
 		switch element {
 		case "ir", "plan", "lower", "catalog", "inventory", "legacy", "compat",
 			"fallback", "util", "utils", "helper", "helpers", "misc", "common",
-			"shared":
+			"shared", "sourcefact":
 			return &wallError{source: relative, reason: "forbidden package directory " + element}
 		}
 	}
@@ -109,6 +110,9 @@ func verifyProductionFile(relative string, sourcePath string) error {
 	file, err := parser.ParseFile(token.NewFileSet(), sourcePath, nil, 0)
 	if err != nil {
 		return &wallError{source: relative, reason: err.Error()}
+	}
+	if err := verifyNoGoTargetFactSchema(relative, file); err != nil {
+		return err
 	}
 	importAliases := make(map[string]string)
 	for _, sourceImport := range file.Imports {
@@ -187,6 +191,32 @@ func verifyProductionFile(relative string, sourcePath string) error {
 	return nil
 }
 
+func verifyNoGoTargetFactSchema(relative string, file *ast.File) error {
+	var forbidden string
+	ast.Inspect(file, func(node ast.Node) bool {
+		if forbidden != "" {
+			return false
+		}
+		identifier, ok := node.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		if strings.HasPrefix(identifier.Name, "Go") &&
+			strings.HasSuffix(identifier.Name, "Fact") {
+			forbidden = identifier.Name
+			return false
+		}
+		return true
+	})
+	if forbidden == "" {
+		return nil
+	}
+	return &wallError{
+		source: relative,
+		reason: "Go-specific target fact schema is forbidden: " + forbidden,
+	}
+}
+
 func TestArchitectureWallMutationControls(t *testing.T) {
 	for name, fixture := range map[string]struct {
 		relative string
@@ -230,6 +260,12 @@ const leak = "value.call(receiver)"
 `,
 		},
 		"raw generated temporary": {relative: "internal/emit/expression/leak.go", source: "package expression\nconst leak = \"__gotots_field_0\"\n"},
+		"Go-specific target fact schema": {
+			relative: "internal/emit/api/leak.go",
+			source: `package api
+type GoCallableFact struct{}
+`,
+		},
 		"runtime throw outside panic owner": {
 			relative: "internal/emit/runtime/array/leak.go",
 			source: `package array

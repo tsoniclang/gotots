@@ -4,10 +4,6 @@ import { $initialize as $initialize__b } from "./packages/example.com/package-gl
 import { $initialize as $initialize__registry } from "./packages/example.com/package-global-order/registry/package.js";
 import { $initialize as $initialize____u3c0_ } from "./packages/example.com/package-global-order/y/package.js";
 import { $initialize as $initialize____u3c0___package_1 } from "./packages/example.com/package-global-order/z/package.js";
-import { GoCompilationFact } from "@gotots/runtime/source-fact.js";
-import { attribute } from "@tsonic/core/lang.js";
-type $GoCompilation = never;
-attribute<$GoCompilation>().add(GoCompilationFact, "gotots-go-source-compilation-fact-v1", "d897c46ca6ec6acdb5e95aed706d7d114ca80042333d0b32b72f3c64fce68320", "go1.26.4", "linux", "amd64", false, 64, "little-endian", "bigint", "preserve-go", "go-concurrency", "serial-synchronous-execution-envelope", "", "", "", "", 0);
 $initialize__registry();
 $initialize____u3c0_();
 $initialize__b();

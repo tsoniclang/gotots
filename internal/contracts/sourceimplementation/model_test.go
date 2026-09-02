@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"github.com/tsoniclang/gotots/internal/toolchain"
@@ -28,7 +29,14 @@ import "example.test/app/fast"
 func main() { _ = fast.Sum("value") }
 `)
 	implementation := filepath.Join(root, "implementation")
-	writeFixture(t, filepath.Join(implementation, "package.ts"), `export type Digest$Storage = { Hi: bigint; Lo: bigint };
+	sharedCertificationPath := filepath.Join(root, "shared", "core.d.ts")
+	writeFixture(t, sharedCertificationPath, `declare module "@fixture/core.js" {
+	  export interface CoreValue { readonly value: unknown; }
+	}
+`)
+	writeFixture(t, filepath.Join(implementation, "package.ts"), `import type { CoreValue } from "@fixture/core.js";
+type SelectedCore = CoreValue;
+export type Digest$Storage = { Hi: bigint; Lo: bigint };
 export class Digest {}
 export function Sum(value: string): Digest { return new Digest(); }
 export function $initialize(): void {}
@@ -44,7 +52,7 @@ export type DigestView = { value: Digest };
     "strict": true,
     "noEmit": true
   },
-	  "files": ["package.ts", "private.ts"]
+	  "files": ["../shared/core.d.ts", "package.ts", "private.ts"]
 }
 `)
 	repository, err := filepath.Abs(filepath.Join("..", "..", ".."))
@@ -102,11 +110,18 @@ export type DigestView = { value: Digest };
 	if err != nil {
 		t.Fatal(err)
 	}
+	certificationSources, err := implementationcontract.LoadCertificationSources(
+		[]string{sharedCertificationPath},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	prepared, err := PrepareAll(Config{
-		RepositoryRoot: repository,
-		ContractPaths:  []string{contractPath},
-		ScratchRoot:    filepath.Join(root, ".scratch"),
-		BuildProfile:   buildProfile,
+		RepositoryRoot:       repository,
+		ContractPaths:        []string{contractPath},
+		CertificationSources: certificationSources,
+		ScratchRoot:          filepath.Join(root, ".scratch"),
+		BuildProfile:         buildProfile,
 		Compilation: CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct",
 		},
@@ -196,10 +211,11 @@ export const Marker = 1;
 	}
 	writeFixture(t, contractPath, string(payload)+"\n")
 	if _, err := PrepareAll(Config{
-		RepositoryRoot: repository,
-		ContractPaths:  []string{contractPath},
-		ScratchRoot:    filepath.Join(root, ".mutation-scratch"),
-		BuildProfile:   buildProfile,
+		RepositoryRoot:       repository,
+		ContractPaths:        []string{contractPath},
+		CertificationSources: certificationSources,
+		ScratchRoot:          filepath.Join(root, ".mutation-scratch"),
+		BuildProfile:         buildProfile,
 		Compilation: CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct",
 		},

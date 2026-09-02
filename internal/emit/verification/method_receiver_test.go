@@ -174,7 +174,7 @@ func assertWaveFiveShape(t *testing.T, printed string) {
 		"static Add(base:",
 		"static Name(derived:",
 		".Read()",
-		"Base.Add(__gotots_receiver_",
+		"Base.Add(receiver",
 		"return Base.Name(base);",
 		"__go_constructor",
 	} {

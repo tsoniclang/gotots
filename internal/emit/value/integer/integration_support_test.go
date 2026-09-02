@@ -197,10 +197,11 @@ func assertIntegerAliases(
 				}
 				identifier, ok := reference.TypeName().(tsgo.Identifier)
 				if !ok {
-					t.Fatalf("%s carrier name = %T, want identifier $go$core$%s", alias.Name().Text(), reference.TypeName(), sharedName)
+					t.Fatalf("%s carrier name = %T, want shared identifier for %s", alias.Name().Text(), reference.TypeName(), sharedName)
 				}
-				if identifier.Text() != "$go$core$"+sharedName {
-					t.Fatalf("%s carrier = %q, want $go$core$%s", alias.Name().Text(), identifier.Text(), sharedName)
+				want := "Tsonic" + strings.ToUpper(sharedName[:1]) + sharedName[1:]
+				if identifier.Text() != want {
+					t.Fatalf("%s carrier = %q, want %s", alias.Name().Text(), identifier.Text(), want)
 				}
 				got = append(got, alias.Name().Text())
 				continue

@@ -36,7 +36,7 @@ func TestCertifiedExternalModuleLinksBodylessFunctionExactly(t *testing.T) {
 			resultLiteral: "0",
 			required: []string{
 				"goNumberToBigInt($argument0)",
-				"globalThis.Number(BigInt.asUintN(64, __gotots_results_0[0]))",
+				"globalThis.Number(BigInt.asUintN(64, results[0]))",
 			},
 		},
 		{
@@ -48,7 +48,7 @@ func TestCertifiedExternalModuleLinksBodylessFunctionExactly(t *testing.T) {
 			},
 			forbidden: []string{
 				"unix.Syscall(BigInt.asUintN(64, goNumberToBigInt(trap))",
-				"globalThis.Number(BigInt.asUintN(64, __gotots_results_0[0]))",
+				"globalThis.Number(BigInt.asUintN(64, results[0]))",
 			},
 		},
 	}

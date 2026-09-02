@@ -10,6 +10,7 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	providerprofile "github.com/tsoniclang/gotots/internal/emit/naming/providerprofile"
 	"github.com/tsoniclang/gotots/internal/output"
 )
 
@@ -46,13 +47,24 @@ func (r *Registry) internInterfaceAdapter(
 		}
 		return existing, nil
 	}
+	outputPath := ""
+	if placement.kind == api.GeneratedArtifactPlacementCompilation {
+		module, err := r.interfaceAdapterSupportModule(sourceType)
+		if err != nil {
+			return interfaceAdapterBinding{}, err
+		}
+		outputPath, err = output.InterfaceAdapterSupportPath(module)
+		if err != nil {
+			return interfaceAdapterBinding{}, err
+		}
+	}
 	if err := reserveGeneratedScopedName(
 		r.interfaceAdapterNames,
 		name,
 		artifactKey,
 		"interface-adapter",
 		placement,
-		output.InterfaceAdapterSupportPath,
+		outputPath,
 	); err != nil {
 		return interfaceAdapterBinding{}, err
 	}
@@ -61,6 +73,7 @@ func (r *Registry) internInterfaceAdapter(
 		artifactKey,
 		name,
 		placement,
+		outputPath,
 	)
 	if err != nil {
 		return interfaceAdapterBinding{}, err
@@ -205,11 +218,11 @@ func (r *Registry) internProviderProfileInterfaceBridge(
 			Reason: "provider-profile bridge source is not an interface",
 		}
 	}
-	selected, err := providerProfileBridgeClosure(sourceType, profile)
+	selected, err := providerprofile.BridgeClosure(sourceType, profile)
 	if err != nil {
 		return providerInterfaceBridgeBinding{}, err
 	}
-	semanticParts, err := providerProfileBridgeSemanticParts(selected)
+	semanticParts, err := providerprofile.BridgeSemanticParts(selected)
 	if err != nil {
 		return providerInterfaceBridgeBinding{}, err
 	}
@@ -270,7 +283,7 @@ func providerProfileBridgeTargetName(
 			Reason: "provider-profile bridge semantic name is invalid",
 		}
 	}
-	parts, err := providerProfileBridgeNameParts(selected)
+	parts, err := providerprofile.BridgeNameParts(selected)
 	if err != nil {
 		return "", err
 	}
@@ -284,8 +297,8 @@ func sameProviderProfileInterfaces(
 	if len(left) != len(right) {
 		return false
 	}
-	leftParts, leftErr := providerProfileBridgeSemanticParts(left)
-	rightParts, rightErr := providerProfileBridgeSemanticParts(right)
+	leftParts, leftErr := providerprofile.BridgeSemanticParts(left)
+	rightParts, rightErr := providerprofile.BridgeSemanticParts(right)
 	if leftErr != nil || rightErr != nil {
 		return false
 	}
@@ -498,6 +511,7 @@ func newInterfaceAdapterArtifact(
 	artifactKey string,
 	name string,
 	placement generatedArtifactPlacement,
+	outputPath string,
 ) (*api.GeneratedArtifact, error) {
 	if placement.kind == api.GeneratedArtifactPlacementLexical {
 		return api.NewLexicalGeneratedArtifact(
@@ -514,7 +528,7 @@ func newInterfaceAdapterArtifact(
 		sourceType,
 		artifactKey,
 		name,
-		output.InterfaceAdapterSupportPath,
+		outputPath,
 	)
 }
 

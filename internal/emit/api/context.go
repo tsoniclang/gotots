@@ -9,7 +9,6 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	controlcontract "github.com/tsoniclang/gotots/internal/emit/api/control"
-	"github.com/tsoniclang/gotots/internal/emit/api/sourceevidence"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -134,28 +133,6 @@ type Context struct {
 	iteratorRangeControls          []IteratorRangeControl
 	valueReceiver                  *ValueReceiverBinding
 	sourceImplementationContract   bool
-	sourceEvidence                 sourceevidence.Package
-}
-
-func (c Context) WithSourceEvidence(
-	evidence sourceevidence.Package,
-) Context {
-	if !evidence.Valid() || c.sourceEvidence.Valid() {
-		panic("source evidence context is invalid")
-	}
-	c.sourceEvidence = evidence
-	return c
-}
-
-func (c Context) SourceOccurrence(
-	source ast.Node,
-) (sourceevidence.Occurrence, error) {
-	if !c.sourceEvidence.Valid() {
-		return sourceevidence.Occurrence{}, &ContextError{
-			Reason: "source evidence is absent",
-		}
-	}
-	return c.sourceEvidence.Occurrence(source)
 }
 
 func (c Context) WithSourceImplementationContract() Context {

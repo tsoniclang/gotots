@@ -121,7 +121,7 @@ func Audit() (int, int, int, int, int) {
 		artifacts.printed,
 		"LoopInsideSwitch",
 	)
-	if strings.Contains(fallthroughTarget, "__gotots_switch_match_") {
+	if strings.Contains(fallthroughTarget, "switchMatch") {
 		t.Fatalf(
 			"primitive fallthrough switch retained conditional matching:\n%s",
 			fallthroughTarget,
@@ -134,7 +134,7 @@ func Audit() (int, int, int, int, int) {
 		)
 	}
 	arrayTarget := targetFunctionText(t, artifacts.printed, "ArraySwitch")
-	if !strings.Contains(arrayTarget, "__gotots_switch_match_") {
+	if !strings.Contains(arrayTarget, "switchMatch") {
 		t.Fatalf(
 			"custom-equality fallthrough switch lost conditional matching:\n%s",
 			arrayTarget,
@@ -142,7 +142,7 @@ func Audit() (int, int, int, int, int) {
 	}
 	if strings.Contains(
 		artifacts.printed,
-		"break __gotots_control_target_0;\n                }\n                total",
+		"break controlTarget;\n                }\n                total",
 	) {
 		t.Fatalf("inner loop break escaped to the outer switch:\n%s", artifacts.printed)
 	}

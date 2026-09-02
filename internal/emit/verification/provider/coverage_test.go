@@ -265,8 +265,8 @@ func assertProviderReceiverProjection(
 		"GoPointer.",
 		"await sync__from_gostdlib.Mutex.Lock(",
 		"await strings__from_gostdlib.Builder.Len(",
-		"SyncMutexOperations.$fromStorage(__gotots_receiver_",
-		"StringsBuilderOperations.$fromStorage(__gotots_receiver_",
+		"SyncMutexOperations.$fromStorage(receiver",
+		"StringsBuilderOperations.$fromStorage(receiver",
 		"Builder.Grow(named_strings.StringsBuilderOperations.$copy(builder$storage)",
 		"Builder.WriteString(named_strings.StringsBuilderOperations.$copy(builder$storage)",
 		"Builder.WriteRune(named_strings.StringsBuilderOperations.$copy(builder$storage)",
@@ -318,9 +318,9 @@ func Use(mutex *sync.Mutex, builder *strings.Builder) int {
 	}
 	printed := materializeArtifacts(t, emission, t.TempDir()).printed
 	for _, direct := range []string{
-		"Mutex.Lock(__gotots_receiver_0 === void 0 ? void 0 : loadPointer<sync__from_gostdlib.Mutex>(__gotots_receiver_0))",
+		"Mutex.Lock(receiver === void 0 ? void 0 : loadPointer<sync__from_gostdlib.Mutex>(receiver))",
 		"recovery_sync.SyncMutexUnlock(",
-		"Builder.Len(__gotots_receiver_3 === void 0 ? void 0 : loadPointer<strings__from_gostdlib.Builder>(__gotots_receiver_3))",
+		"Builder.Len(receiver4 === void 0 ? void 0 : loadPointer<strings__from_gostdlib.Builder>(receiver4))",
 	} {
 		if !strings.Contains(printed, direct) {
 			t.Fatalf("direct provider receiver lacks %q:\n%s", direct, printed)
@@ -451,7 +451,7 @@ func assertProviderRepresentationABI(
 			if !selected {
 				continue
 			}
-			call := singleFunctionCall(t, function)
+			call, captures := finalFunctionCall(t, function)
 			member, ok := call.Expression().(tsgo.PropertyAccessExpression)
 			if !ok || memberNameText(t, member.Name()) != expectation.member {
 				t.Fatalf(
@@ -461,7 +461,7 @@ func assertProviderRepresentationABI(
 					call.Expression(),
 				)
 			}
-			if providerStateRead(t, member.Expression()) != expectation.state {
+			if providerStateRead(t, member.Expression(), captures) != expectation.state {
 				t.Fatalf(
 					"%s receiver = %T %v",
 					function.Name().Text(),
@@ -494,9 +494,19 @@ func assertProviderRepresentationABI(
 	}
 }
 
-func providerStateRead(t *testing.T, source tsgo.Expression) string {
+func providerStateRead(
+	t *testing.T,
+	source tsgo.Expression,
+	captures map[string]tsgo.Expression,
+) string {
 	t.Helper()
 	switch selected := source.(type) {
+	case tsgo.Identifier:
+		captured, ok := captures[selected.Text()]
+		if !ok {
+			t.Fatalf("provider state capture %q is absent", selected.Text())
+		}
+		return providerStateRead(t, captured, captures)
 	case tsgo.PropertyAccessExpression:
 		return memberNameText(t, selected.Name())
 	case tsgo.CallExpression:
@@ -517,7 +527,7 @@ func providerStateRead(t *testing.T, source tsgo.Expression) string {
 				len(selected.Arguments()),
 			)
 		}
-		return providerStateRead(t, selected.Arguments()[0])
+		return providerStateRead(t, selected.Arguments()[0], captures)
 	default:
 		t.Fatalf("provider state receiver = %T %v", source, source)
 	}
@@ -533,17 +543,31 @@ func memberNameText(t *testing.T, name tsgo.MemberName) string {
 	return identifier.Text()
 }
 
-func singleFunctionCall(
+func finalFunctionCall(
 	t *testing.T,
 	function tsgo.FunctionDeclaration,
-) tsgo.CallExpression {
+) (tsgo.CallExpression, map[string]tsgo.Expression) {
 	t.Helper()
 	body, ok := function.Body().(tsgo.Block)
-	if !ok || len(body.Statements()) != 1 {
+	if !ok || len(body.Statements()) == 0 {
 		t.Fatalf("%s body = %T", function.Name().Text(), function.Body())
 	}
+	captures := make(map[string]tsgo.Expression)
+	for _, statement := range body.Statements()[:len(body.Statements())-1] {
+		variables, ok := statement.(tsgo.VariableStatement)
+		if !ok {
+			t.Fatalf("%s pre-call statement = %T", function.Name().Text(), statement)
+		}
+		for _, declaration := range variables.DeclarationList().Declarations() {
+			name, ok := declaration.Name().(tsgo.Identifier)
+			if !ok || declaration.Initializer() == nil {
+				t.Fatalf("%s capture = %T", function.Name().Text(), declaration.Name())
+			}
+			captures[name.Text()] = declaration.Initializer()
+		}
+	}
 	var expression tsgo.Expression
-	switch statement := body.Statements()[0].(type) {
+	switch statement := body.Statements()[len(body.Statements())-1].(type) {
 	case tsgo.ExpressionStatement:
 		expression = statement.Expression()
 	case tsgo.ReturnStatement:
@@ -555,5 +579,5 @@ func singleFunctionCall(
 	if !ok {
 		t.Fatalf("%s expression = %T", function.Name().Text(), expression)
 	}
-	return call
+	return call, captures
 }

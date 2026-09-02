@@ -22,7 +22,7 @@ func TestLocalVariablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "local-variables.ts")
 	targetFile := emitLocalVariables(t, loaded)
-	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
+	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(localVariablesProjectDirectory(), "expected.ts"))
 	if err != nil {
@@ -76,7 +76,7 @@ func TestLocalVariablesCreateExactScopedTargetTree(t *testing.T) {
 	if name := unicode.Name().(tsgo.Identifier).Text(); name != "__u3c0_" {
 		t.Fatalf("portable Unicode name = %q, want __u3c0_", name)
 	}
-	for index, expected := range []string{"__gotots_assign_0", "__gotots_assign_1"} {
+	for index, expected := range []string{"assignmentValue", "assignmentValue2"} {
 		capture := inner[index+3].(tsgo.VariableStatement).
 			DeclarationList().
 			Declarations()[0]

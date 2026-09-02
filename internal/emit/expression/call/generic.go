@@ -173,6 +173,17 @@ func emitGeneric(
 		}
 	}
 	if reference.ProviderBoundary() {
+		if !detached {
+			arguments, before, argumentRequests, err = captureArgumentExpressions(
+				context,
+				arguments,
+				before,
+				argumentRequests,
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, true, err
+			}
+		}
 		var providerBefore []tsgo.Statement
 		var providerRequests []api.RootRequest
 		arguments, providerBefore, providerRequests, err =

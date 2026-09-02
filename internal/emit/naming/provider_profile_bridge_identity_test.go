@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	providerprofile "github.com/tsoniclang/gotots/internal/emit/naming/providerprofile"
+
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
@@ -128,7 +130,7 @@ func TestProviderProfileBridgeIdentityIncludesReachableInterfaceABI(
 	if !ok {
 		t.Fatal("io.Reader type is not named")
 	}
-	closure, err := providerProfileBridgeClosure(
+	closure, err := providerprofile.BridgeClosure(
 		reader,
 		direct.Interfaces(),
 	)

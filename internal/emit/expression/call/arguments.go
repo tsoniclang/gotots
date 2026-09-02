@@ -134,7 +134,7 @@ func emitArgumentsWithProviderCallableParameters(
 		emissions = append(emissions, target)
 	}
 	if requiresCapture || captureAll {
-		return captureArguments(context, children, source, signature, emissions)
+		return captureArguments(context, children, source, signature, emissions, captureAll)
 	}
 	arguments := make([]tsgo.Expression, 0, len(emissions))
 	var requests []api.RootRequest
@@ -190,11 +190,26 @@ func captureArguments(
 	_ *ast.CallExpr,
 	_ *types.Signature,
 	emissions []api.ExpressionEmission,
+	captureAll bool,
 ) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
+	capture := make([]bool, len(emissions))
+	laterHasPrerequisites := false
+	for index := len(emissions) - 1; index >= 0; index-- {
+		capture[index] = captureAll || laterHasPrerequisites
+		if len(emissions[index].Before()) != 0 {
+			laterHasPrerequisites = true
+		}
+	}
 	arguments := make([]tsgo.Expression, 0, len(emissions))
 	var before []tsgo.Statement
 	var requests []api.RootRequest
-	for _, emission := range emissions {
+	for index, emission := range emissions {
+		before = append(before, emission.Before()...)
+		requests = append(requests, emission.Requests()...)
+		if !capture[index] {
+			arguments = append(arguments, emission.Value())
+			continue
+		}
 		temporaryName, err := context.Names().Temporary(api.TemporaryCallArgument)
 		if err != nil {
 			return nil, nil, nil, err
@@ -205,7 +220,6 @@ func captureArguments(
 			nil,
 			emission.Value(),
 		)
-		before = append(before, emission.Before()...)
 		before = append(
 			before,
 			context.Factory().VariableStatement(
@@ -220,7 +234,6 @@ func captureArguments(
 			arguments,
 			context.Factory().Identifier(temporaryName),
 		)
-		requests = append(requests, emission.Requests()...)
 	}
 	return arguments, before, requests, nil
 }

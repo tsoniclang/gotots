@@ -19,15 +19,16 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
 	root := t.TempDir()
 	configDirectory := filepath.Join(root, "project")
 	writeProjectConfig(t, filepath.Join(configDirectory, "gotots.json"), `{
-  "schemaVersion": 3,
+	  "schemaVersion": 4,
   "distribution": {"root": "../distribution"},
   "source": {"root": "../source", "package": "./cmd/app", "mode": "main"},
   "go": {"goos": "linux", "goarch": "amd64", "cgo": false, "tags": ["noasm"]},
   "tools": `+testToolsDocument(t)+`,
   "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": true, "externals": false},
-  "implementations": {
-    "packages": ["implementations/fast/contract.json"],
+	  "implementations": {
+	    "certificationSources": ["implementations/core.d.ts"],
+	    "packages": ["implementations/fast/contract.json"],
     "callables": ["implementations/hot/contract.json"]
   },
   "output": {"directory": "generated"}
@@ -76,6 +77,11 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
 	}) {
 		t.Fatalf("callable implementations = %v", got)
 	}
+	if got := project.ImplementationCertificationSources(); !slices.Equal(got, []string{
+		filepath.Join(configDirectory, "implementations", "core.d.ts"),
+	}) {
+		t.Fatalf("implementation certification sources = %v", got)
+	}
 	if !project.StandardLibraryEnabled() || project.ExternalsEnabled() {
 		t.Fatal("provider selection differs")
 	}
@@ -88,7 +94,7 @@ func TestLoadDefaultsToolsAndBuildProfileFromSelectedGo(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 3,
+	  "schemaVersion": 4,
   "distribution": {"root": `+quoteJSON(t, repository)+`},
   "source": {"root": ".", "package": ".", "mode": "main"},
   "go": {"cgo": false, "tags": []},
@@ -119,7 +125,7 @@ func TestLoadRejectsCgoWithoutSelectedExternalToolContract(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 3,
+	  "schemaVersion": 4,
   "distribution": {"root": `+quoteJSON(t, repository)+`},
   "source": {"root": ".", "package": ".", "mode": "main"},
   "go": {"cgo": true, "tags": []},
@@ -140,15 +146,16 @@ func TestLoadSelectsExternalImplementationContractsFromCLI(t *testing.T) {
 	externalBundle := filepath.Join(t.TempDir(), "fast", "contract.json")
 	path := filepath.Join(projectDirectory, "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 3,
+	  "schemaVersion": 4,
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
   "tools": `+testToolsDocument(t)+`,
   "semantics": {"integers": "number", "evaluationOrder": "direct"},
   "providers": {"standardLibrary": false, "externals": false},
-  "implementations": {
-    "packages": ["local/package.json"],
+	  "implementations": {
+	    "certificationSources": ["local/core.d.ts"],
+	    "packages": ["local/package.json"],
     "callables": ["local/callable.json"]
   },
   "output": {"directory": "output"}
@@ -161,6 +168,8 @@ func TestLoadSelectsExternalImplementationContractsFromCLI(t *testing.T) {
 			PackageImplementations:     []string{externalBundle},
 			CallableImplementationsSet: true,
 			CallableImplementations:    []string{externalBundle + ".callable"},
+			CertificationSourcesSet:    true,
+			CertificationSources:       []string{externalBundle + ".d.ts"},
 		},
 	})
 	if err != nil {
@@ -172,11 +181,14 @@ func TestLoadSelectsExternalImplementationContractsFromCLI(t *testing.T) {
 	if got := project.CallableImplementations(); !slices.Equal(got, []string{externalBundle + ".callable"}) {
 		t.Fatalf("callable implementations = %v", got)
 	}
+	if got := project.ImplementationCertificationSources(); !slices.Equal(got, []string{externalBundle + ".d.ts"}) {
+		t.Fatalf("implementation certification sources = %v", got)
+	}
 }
 
 func TestLoadRejectsUnknownFieldAndVersion(t *testing.T) {
 	for name, source := range map[string]string{
-		"unknown": `{"schemaVersion":3,"surprise":true}`,
+		"unknown": `{"schemaVersion":4,"surprise":true}`,
 		"version": `{"schemaVersion":2}`,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -196,13 +208,18 @@ func TestLoadRejectsRemovedConfigurationWithMigrationDiagnostic(t *testing.T) {
 		want    string
 	}{
 		{
+			name:    "schema three",
+			payload: `{"schemaVersion":3}`,
+			want:    "schema 3 was replaced by schema 4",
+		},
+		{
 			name:    "schema two",
 			payload: `{"schemaVersion":2}`,
-			want:    "schema 2 was replaced by schema 3",
+			want:    "schema 2 was replaced by schema 4",
 		},
 		{
 			name:    "implementation bundles",
-			payload: `{"schemaVersion":3,"implementations":{"bundles":[]}}`,
+			payload: `{"schemaVersion":4,"implementations":{"bundles":[]}}`,
 			want:    "implementations.bundles",
 		},
 	} {
@@ -215,6 +232,30 @@ func TestLoadRejectsRemovedConfigurationWithMigrationDiagnostic(t *testing.T) {
 				t.Fatalf("migration error = %v", err)
 			}
 		})
+	}
+}
+
+func TestLoadRejectsUnusedImplementationCertificationSources(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gotots.json")
+	writeProjectConfig(t, path, `{
+  "schemaVersion": 4,
+  "distribution": {"root": "distribution"},
+  "source": {"root": "source", "package": ".", "mode": "main"},
+  "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
+  "tools": `+testToolsDocument(t)+`,
+  "semantics": {"integers": "number", "evaluationOrder": "direct"},
+  "providers": {"standardLibrary": false, "externals": false},
+  "implementations": {
+    "certificationSources": ["core.d.ts"],
+    "packages": [],
+    "callables": []
+  },
+  "output": {"directory": "generated"}
+}
+`)
+	_, err := Load(Request{ConfigPath: path})
+	if err == nil || !strings.Contains(err.Error(), "no selected implementation consumer") {
+		t.Fatalf("unused certification source error = %v", err)
 	}
 }
 
@@ -371,7 +412,7 @@ func loadMinimalProject(t *testing.T, directory string, output string) Project {
 	t.Helper()
 	path := filepath.Join(directory, "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 3,
+	  "schemaVersion": 4,
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
@@ -396,7 +437,7 @@ func loadProjectWithTools(t *testing.T, directory, goPath, tsgoPath string) Proj
 	t.Helper()
 	path := filepath.Join(directory, "gotots.json")
 	writeProjectConfig(t, path, `{
-  "schemaVersion": 3,
+	  "schemaVersion": 4,
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},

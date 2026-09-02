@@ -50,6 +50,8 @@ func TestParseArgumentsBindsSemanticAndRepeatedOverrides(t *testing.T) {
 		"--package-implementation", "package-two.json",
 		"--callable-implementation", "callable-one.json",
 		"--callable-implementation", "callable-two.json",
+		"--implementation-certification-source", "core-one.d.ts",
+		"--implementation-certification-source", "core-two.d.ts",
 		"--go", "/tools/go-selected",
 		"--tsgo", "/tools/tsgo-selected",
 		"--tool-cache", "/project/.temp/cache/tools",
@@ -66,6 +68,7 @@ func TestParseArgumentsBindsSemanticAndRepeatedOverrides(t *testing.T) {
 		!overrides.BuildTagsSet || len(overrides.BuildTags) != 2 ||
 		!overrides.PackageImplementationsSet || len(overrides.PackageImplementations) != 2 ||
 		!overrides.CallableImplementationsSet || len(overrides.CallableImplementations) != 2 ||
+		!overrides.CertificationSourcesSet || len(overrides.CertificationSources) != 2 ||
 		overrides.StandardLibrary == nil || *overrides.StandardLibrary ||
 		overrides.Externals == nil || !*overrides.Externals ||
 		overrides.GoExecutable == nil || *overrides.GoExecutable != "/tools/go-selected" ||

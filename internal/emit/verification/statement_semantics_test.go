@@ -135,6 +135,16 @@ func materializeArtifacts(
 			".apply(",
 			".bind(",
 			"import(",
+			"GoCompilationFact",
+			"GoDeclarationFact",
+			"GoBasicFact",
+			"GoAggregateFact",
+			"GoCallableFact",
+			"GoInterfaceFact",
+			"GoStorageFact",
+			"GoOperationFact",
+			"GoImplementationFact",
+			"gotots-source-fact",
 		} {
 			if strings.Contains(printed, forbidden) {
 				t.Fatalf(
@@ -185,8 +195,8 @@ func materializeArtifacts(
 func assertWaveFourArtifactShape(t *testing.T, printed string) {
 	t.Helper()
 	for _, required := range []string{
-		"__gotots_switch_selection_",
-		"__gotots_range_keys_",
+		"switchSelection",
+		"rangeKeys",
 		".keys()",
 		"outer:",
 		"continue outer;",
@@ -196,12 +206,12 @@ func assertWaveFourArtifactShape(t *testing.T, printed string) {
 		}
 	}
 	direct := regexp.MustCompile(
-		`for \(const __gotots_range_value_[0-9]+ of __gotots_range_keys_[0-9]+\)`,
+		`for \(const rangeValue[0-9]* of rangeKeys[0-9]*\)`,
 	)
 	if !direct.MatchString(printed) {
 		t.Fatalf("map range lacks its direct key iteration:\n%s", printed)
 	}
-	if strings.Contains(printed, "GoDenseIndex.get(__gotots_range_keys_") {
+	if strings.Contains(printed, "GoDenseIndex.get(rangeKeys") {
 		t.Fatalf("map range retained its redundant dense-index helper:\n%s", printed)
 	}
 	rangeFunction := targetFunctionText(
@@ -214,7 +224,7 @@ func assertWaveFourArtifactShape(t *testing.T, printed string) {
 		printed,
 		"constantLengthDoesNotEvaluate",
 	)
-	rangeCapture := regexp.MustCompile(`const __gotots_range_[0-9]+ =`)
+	rangeCapture := regexp.MustCompile(`const rangeSource[0-9]* =`)
 	if rangeCapture.MatchString(constantRangeFunction) {
 		t.Fatalf(
 			"constant-length key-only range evaluated its operand:\n%s",
@@ -228,7 +238,7 @@ func assertWaveFourArtifactShape(t *testing.T, printed string) {
 		)
 	}
 	callee := regexp.MustCompile(
-		`const (__gotots_callee_[0-9]+) = makeArray;`,
+		`const (callee[0-9]*) = makeArray;`,
 	).FindStringSubmatch(rangeFunction)
 	if len(callee) != 2 {
 		t.Fatalf(

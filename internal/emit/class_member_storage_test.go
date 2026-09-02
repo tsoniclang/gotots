@@ -106,7 +106,7 @@ func TestClassMemberContributionReconstructsTheTypeOwnedClass(t *testing.T) {
 	}
 }
 
-func TestClassMethodLocalTypeRetainsItsSiblingSourceFile(t *testing.T) {
+func TestClassMethodLocalTypeCompilesFromItsSiblingSourceFile(t *testing.T) {
 	program := loadClassMemberAssemblyFixture(t)
 	use, err := NewRoot(program.Roots()[0].Types().Scope().Lookup("Use"))
 	if err != nil {
@@ -124,13 +124,14 @@ func TestClassMethodLocalTypeRetainsItsSiblingSourceFile(t *testing.T) {
 		}
 		encoded.Write(payload)
 	}
-	for _, required := range []string{
-		"checked-syntax:method.go",
-		"gotots-go-source-declaration-fact-v1",
-		"local",
-	} {
+	for _, required := range []string{"local", "Use"} {
 		if !strings.Contains(encoded.String(), required) {
-			t.Fatalf("cross-file method source facts omit %q", required)
+			t.Fatalf("cross-file method output omits %q", required)
+		}
+	}
+	for _, forbidden := range []string{"GoDeclarationFact", "gotots-go-source"} {
+		if strings.Contains(encoded.String(), forbidden) {
+			t.Fatalf("cross-file method output retains removed metadata %q", forbidden)
 		}
 	}
 }

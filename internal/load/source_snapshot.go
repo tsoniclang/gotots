@@ -169,35 +169,6 @@ func checkedSyntaxSnapshot(selected *packages.Package) ([]sourceSnapshotFile, er
 	return result, nil
 }
 
-func checkedSourceMetadata(
-	selected *packages.Package,
-	index int,
-	overlay map[string][]byte,
-) (string, string, error) {
-	if selected == nil || index < 0 || index >= len(selected.Syntax) ||
-		index >= len(selected.CompiledGoFiles) || selected.Syntax[index] == nil {
-		return "", "", fmt.Errorf("checked source index %d is invalid", index)
-	}
-	identity, err := snapshotFileIdentity(
-		selected,
-		"checked-syntax",
-		selected.CompiledGoFiles[index],
-		true,
-	)
-	if err != nil {
-		return "", "", err
-	}
-	payload, err := selectedSourceBytes(
-		selected.CompiledGoFiles[index],
-		overlay,
-	)
-	if err != nil {
-		return "", "", fmt.Errorf("read checked source %q: %w", identity, err)
-	}
-	digest := sha256.Sum256(payload)
-	return identity, hex.EncodeToString(digest[:]), nil
-}
-
 func readSnapshotFiles(
 	selected *packages.Package,
 	category string,

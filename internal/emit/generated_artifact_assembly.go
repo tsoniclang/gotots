@@ -9,7 +9,6 @@ import (
 	genericcapability "github.com/tsoniclang/gotots/internal/emit/generic/capability"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
-	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	maprepresentation "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -197,14 +196,17 @@ func (s *programSession) buildMapSpecializationRevision(
 			Reason: "map specialization has no concrete name owner",
 		}
 	}
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	replayCommitted := false
 	if !reconstruction {
 		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.SnapshotTemporaries()
-		names.RestoreTemporaries(temporaryStart)
-		defer names.FinishTemporaryReplay(current)
+		finishReplay, replayErr := names.BeginTemporaryReplay(owner, temporaryStart)
+		if replayErr != nil {
+			return artifactRevision{}, replayErr
+		}
+		defer func() { finishReplay(replayCommitted) }()
 	}
-	owner := api.MustGeneratedArtifactOwner(artifact)
 	finish, err := names.BeginArtifact(owner, nil, nil, "")
 	if err != nil {
 		return artifactRevision{}, err
@@ -283,15 +285,6 @@ func (s *programSession) buildMapSpecializationRevision(
 		valueType.Requests(),
 		specialization.Requests(),
 	)
-	statements, requests, err := canonicalsourcefact.IncludeGeneratedArtifact(
-		context,
-		artifact,
-		[]tsgo.Statement{statement},
-		requests,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
 	placement, dependencies, requirements, err :=
 		s.consumeArtifactRequests(owner, requests)
 	if err != nil {
@@ -299,13 +292,14 @@ func (s *programSession) buildMapSpecializationRevision(
 	}
 	contract, err := artifactstate.ProjectContract(
 		s.factory,
-		statements,
+		[]tsgo.Statement{statement},
 	)
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	replayCommitted = true
 	return artifactRevision{
-		statements:     statements,
+		statements:     []tsgo.Statement{statement},
 		placement:      placement,
 		dependencies:   dependencies,
 		requestRoots:   requirements,
@@ -432,14 +426,17 @@ func (s *programSession) buildGenericCapabilityRevision(
 			Reason: "generic capability has no concrete name owner",
 		}
 	}
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	replayCommitted := false
 	if !reconstruction {
 		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.SnapshotTemporaries()
-		names.RestoreTemporaries(temporaryStart)
-		defer names.FinishTemporaryReplay(current)
+		finishReplay, replayErr := names.BeginTemporaryReplay(owner, temporaryStart)
+		if replayErr != nil {
+			return artifactRevision{}, replayErr
+		}
+		defer func() { finishReplay(replayCommitted) }()
 	}
-	owner := api.MustGeneratedArtifactOwner(artifact)
 	finish, err := names.BeginArtifact(owner, nil, nil, "")
 	if err != nil {
 		return artifactRevision{}, err
@@ -463,15 +460,6 @@ func (s *programSession) buildGenericCapabilityRevision(
 		return artifactRevision{}, err
 	}
 	statements := []tsgo.Statement{statement}
-	statements, requests, err = canonicalsourcefact.IncludeGeneratedArtifact(
-		context,
-		artifact,
-		statements,
-		requests,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
 	placement, dependencies, requirements, err :=
 		s.consumeArtifactRequests(
 			owner,
@@ -484,6 +472,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	replayCommitted = true
 	return artifactRevision{
 		statements:     statements,
 		placement:      placement,

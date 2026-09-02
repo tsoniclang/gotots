@@ -18,9 +18,10 @@ import (
 )
 
 type Config struct {
-	ContractPaths []string
-	BuildProfile  load.BuildProfile
-	Compilation   CompilationDocument
+	ContractPaths        []string
+	CertificationSources []implementationcontract.CertificationSource
+	BuildProfile         load.BuildProfile
+	Compilation          CompilationDocument
 }
 
 func PrepareAll(config Config) (*Prepared, error) {
@@ -124,17 +125,21 @@ func prepareOne(config Config, contractPath string) (Module, error) {
 	digest.Write(canonical)
 	digest.Write([]byte{0})
 	digest.Write(source)
-	certificationSources := make([]CertificationSource, len(certificationPaths))
-	for index, path := range certificationPaths {
-		evidence, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return Module{}, contractError("read certification source", path, readErr)
-		}
-		evidenceHash := sha256.Sum256(evidence)
-		certificationSources[index], readErr = NewCertificationSource(
-			path,
-			hex.EncodeToString(evidenceHash[:]),
-		)
+	localCertificationSources, err := implementationcontract.LoadCertificationSources(
+		certificationPaths,
+	)
+	if err != nil {
+		return Module{}, err
+	}
+	certificationSources, err := implementationcontract.MergeCertificationSources(
+		config.CertificationSources,
+		localCertificationSources,
+	)
+	if err != nil {
+		return Module{}, err
+	}
+	for _, selected := range certificationSources {
+		evidence, readErr := implementationcontract.VerifyCertificationSource(selected)
 		if readErr != nil {
 			return Module{}, readErr
 		}

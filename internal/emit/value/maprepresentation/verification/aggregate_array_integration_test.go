@@ -61,7 +61,7 @@ func TestUnnamedArrayKeyOperationsInlineStaticTypedSemantics(t *testing.T) {
 			source := printAggregateSpecialization(t, factory, class)
 			for _, required := range []string{
 				"private static $hash($key: ArrayKey): number",
-				"for (let __gotots_array_hash_",
+				"for (let arrayHash",
 				testCase.hashMember,
 				"private static $equal($left: ArrayKey, $right: ArrayKey): boolean",
 				"private static $copyKey($key: ArrayKey): ArrayKey",

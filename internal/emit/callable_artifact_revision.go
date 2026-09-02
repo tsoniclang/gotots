@@ -10,7 +10,6 @@ import (
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/emit/callableimplementation"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
-	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -534,60 +533,4 @@ func ownerName(owner *types.Func) string {
 		return ""
 	}
 	return owner.FullName()
-}
-
-func (s *programSession) callableImplementationSourceFact(
-	context api.Context,
-	function *types.Func,
-	statements []tsgo.Statement,
-) (api.StatementEmission, bool, error) {
-	if s.callableImplementations == nil {
-		return api.StatementEmission{}, false, nil
-	}
-	selected, ok := s.callableImplementations.ForFunction(function)
-	if !ok {
-		return api.StatementEmission{}, false, nil
-	}
-	emission, err := canonicalsourcefact.CallableImplementation(
-		context,
-		function,
-		selected,
-		statements,
-	)
-	return emission, true, err
-}
-
-func (s *programSession) appendImplementationSourceFacts(
-	context api.Context,
-	functions []*types.Func,
-	statements []tsgo.Statement,
-	requests []api.RootRequest,
-) ([]tsgo.Statement, []api.RootRequest, error) {
-	for _, function := range functions {
-		callable, selected, err := s.callableImplementationSourceFact(
-			context,
-			function,
-			statements,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		if selected {
-			statements = append(statements, callable.Statements()...)
-			requests = append(requests, callable.Requests()...)
-		}
-		external, selected, err := s.externalImplementationSourceFact(
-			context,
-			function,
-			statements,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		if selected {
-			statements = append(statements, external.Statements()...)
-			requests = append(requests, external.Requests()...)
-		}
-	}
-	return statements, requests, nil
 }

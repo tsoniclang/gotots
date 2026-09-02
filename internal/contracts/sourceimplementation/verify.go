@@ -13,17 +13,19 @@ import (
 	"slices"
 	"strings"
 
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type Config struct {
-	RepositoryRoot string
-	ContractPaths  []string
-	ScratchRoot    string
-	BuildProfile   load.BuildProfile
-	Compilation    CompilationDocument
-	TSGoTool       tsgo.Tool
+	RepositoryRoot       string
+	ContractPaths        []string
+	CertificationSources []implementationcontract.CertificationSource
+	ScratchRoot          string
+	BuildProfile         load.BuildProfile
+	Compilation          CompilationDocument
+	TSGoTool             tsgo.Tool
 }
 
 func PrepareAll(config Config) (
@@ -124,6 +126,19 @@ func verifyOne(
 	if err != nil {
 		return Implementation{}, err
 	}
+	localCertificationSources, err := implementationcontract.LoadCertificationSources(
+		certificationPaths,
+	)
+	if err != nil {
+		return Implementation{}, err
+	}
+	certificationSources, err := implementationcontract.MergeCertificationSources(
+		config.CertificationSources,
+		localCertificationSources,
+	)
+	if err != nil {
+		return Implementation{}, err
+	}
 	privatePaths := make([]string, len(document.PrivateModules))
 	for index, module := range document.PrivateModules {
 		privatePaths[index], err = resolveOwnedPath(directory, module.Source)
@@ -132,7 +147,9 @@ func verifyOne(
 		}
 	}
 	projectSources := append([]string{sourcePath}, privatePaths...)
-	projectSources = append(projectSources, certificationPaths...)
+	for _, selected := range certificationSources {
+		projectSources = append(projectSources, selected.SourcePath())
+	}
 	tsconfig, err := verifyTSConfig(tsconfigPath, directory, projectSources)
 	if err != nil {
 		return Implementation{}, err
@@ -148,6 +165,25 @@ func verifyOne(
 	project, err := client.OpenProject(tsconfigPath)
 	if err != nil {
 		return Implementation{}, err
+	}
+	for _, selected := range certificationSources {
+		violations, violationErr := project.ImplementationSourceViolations(
+			selected.SourcePath(),
+			tsgo.ImplementationSourceCertificationDeclaration,
+		)
+		if violationErr != nil {
+			return Implementation{}, violationErr
+		}
+		if len(violations) != 0 {
+			return Implementation{}, &Error{
+				Operation: "validate certification source",
+				Subject:   selected.SourcePath(),
+				Reason: fmt.Sprintf(
+					"authored contract violates declaration policy %v",
+					violations,
+				),
+			}
+		}
 	}
 	projectExports, err := project.Exports(sourcePath)
 	if err != nil {
@@ -190,14 +226,10 @@ func verifyOne(
 	implementationHash.Write(sourceHash[:])
 	implementationHash.Write([]byte{0})
 	implementationHash.Write(tsconfig)
-	for _, certificationPath := range certificationPaths {
-		payload, readErr := os.ReadFile(certificationPath)
+	for _, selected := range certificationSources {
+		payload, readErr := implementationcontract.VerifyCertificationSource(selected)
 		if readErr != nil {
-			return Implementation{}, implementationError(
-				"read certification source",
-				certificationPath,
-				readErr,
-			)
+			return Implementation{}, readErr
 		}
 		implementationHash.Write([]byte{0})
 		implementationHash.Write(payload)

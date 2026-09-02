@@ -21,7 +21,7 @@ func TestStructuredControlPrintsTypechecksAndExecutesDifferentially(t *testing.T
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "structured-control.ts")
 	targetFile := emitStructuredControl(t, loaded)
-	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
+	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(structuredControlProjectDirectory(), "expected.ts"))
 	if err != nil {

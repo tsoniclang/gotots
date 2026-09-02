@@ -16,7 +16,7 @@ func TestNamedResultsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	loaded := loadNamedResultsProject(t)
 	workingDirectory := t.TempDir()
 	targetFile := compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
-	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
+	printed := printTargetFile(t, targetFile, workingDirectory)
 	if printed == "" {
 		t.Fatal("named-result target is empty")
 	}

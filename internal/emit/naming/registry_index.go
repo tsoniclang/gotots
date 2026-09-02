@@ -57,6 +57,11 @@ func (r *Registry) IndexCompilationTargets(
 		0,
 		len(sourcePackages)+len(environmentPackages),
 	)
+	typeInformation := make(
+		[]*types.Info,
+		0,
+		len(sourcePackages)+len(environmentPackages),
+	)
 	for _, sourcePackage := range sourcePackages {
 		if sourcePackage == nil || sourcePackage.Types() == nil {
 			return &api.NameError{Reason: "source package identity is nil"}
@@ -74,6 +79,7 @@ func (r *Registry) IndexCompilationTargets(
 		}
 		r.assemblyPathByPackage[typesPackage] = assemblyPath
 		packages = append(packages, typesPackage)
+		typeInformation = append(typeInformation, sourcePackage.TypesInfo())
 	}
 	var provider standardLibraryProvider
 	if certificate != nil {
@@ -131,13 +137,14 @@ func (r *Registry) IndexCompilationTargets(
 			return err
 		}
 		packages = append(packages, typesPackage)
+		typeInformation = append(typeInformation, environmentPackage.TypesInfo())
 	}
 	if provider != nil {
 		if err := r.indexProviderInterfaceCapabilities(); err != nil {
 			return err
 		}
 	}
-	return r.indexPackageQualifiers(packages)
+	return r.indexPackageQualifiers(packages, typeInformation...)
 }
 
 func (r *Registry) indexEnvironmentPackage(
@@ -464,6 +471,7 @@ func allocatePackageName(
 
 func (r *Registry) indexPackageQualifiers(
 	sourcePackages []*types.Package,
+	typeInformation ...*types.Info,
 ) error {
 	if r == nil {
 		return &api.NameError{Reason: "declaration registry is nil"}
@@ -499,6 +507,9 @@ func (r *Registry) indexPackageQualifiers(
 		}
 		used[qualifier] = struct{}{}
 		r.importQualifierByPackage[sourcePackage] = qualifier
+	}
+	if err := r.indexPrivateMethodNames(packages, typeInformation); err != nil {
+		return err
 	}
 	return nil
 }

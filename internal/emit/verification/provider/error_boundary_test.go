@@ -376,7 +376,8 @@ func Message(failure error) string { return failure.Error() }
 	}
 	for _, required := range []string{
 		"Error(",
-		"errors__from_gostdlib.New(\"provider\")",
+		"const argument = \"provider\";",
+		"errors__from_gostdlib.New(argument)",
 		"extends GoProviderInterfaceBridge<GoError> implements GoInterface",
 	} {
 		if !strings.Contains(artifacts.printed, required) {

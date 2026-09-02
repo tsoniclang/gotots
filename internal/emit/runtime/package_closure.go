@@ -6,7 +6,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
-	"github.com/tsoniclang/gotots/internal/emit/runtime/sourcefact"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -117,62 +116,6 @@ func moduleImports(
 	symbols []api.RuntimeSymbol,
 ) ([]tsgo.Statement, error) {
 	placement := targetplacement.New()
-	if module != api.RuntimeModuleSourceFact {
-		attribute, err := tsoniccore.Resolve(tsoniccore.SymbolAttribute)
-		if err != nil {
-			return nil, err
-		}
-		request, err := api.NewImportRequest(
-			factory,
-			api.ImportPhaseValue,
-			attribute.Module(),
-			attribute.Export(),
-			attribute.Export(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		if err := placement.Apply([]api.RootRequest{request}); err != nil {
-			return nil, err
-		}
-		facts := make(map[api.RuntimeSymbol]struct{})
-		for _, symbol := range symbols {
-			for _, fact := range sourcefact.FactSymbols(symbol) {
-				facts[fact] = struct{}{}
-			}
-		}
-		orderedFacts := make([]api.RuntimeSymbol, 0, len(facts))
-		for fact := range facts {
-			orderedFacts = append(orderedFacts, fact)
-		}
-		slices.Sort(orderedFacts)
-		for _, fact := range orderedFacts {
-			contract, err := api.RuntimeContract(fact)
-			if err != nil {
-				return nil, err
-			}
-			modulePath, err := targetoutput.ModuleSpecifier(
-				outputPath,
-				contract.OutputPath(),
-			)
-			if err != nil {
-				return nil, err
-			}
-			request, err := api.NewRuntimeImportRequest(
-				factory,
-				api.ImportPhaseValue,
-				modulePath,
-				fact,
-				contract.ExportedName(),
-			)
-			if err != nil {
-				return nil, err
-			}
-			if err := placement.Apply([]api.RootRequest{request}); err != nil {
-				return nil, err
-			}
-		}
-	}
 	for _, symbol := range symbols {
 		contract, err := api.RuntimeContract(symbol)
 		if err != nil {

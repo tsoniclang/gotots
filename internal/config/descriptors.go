@@ -13,6 +13,7 @@ const (
 	OptionTags
 	OptionPackageImplementations
 	OptionCallableImplementations
+	OptionImplementationCertificationSources
 	OptionOutputDirectory
 	OptionExternals
 	OptionStandardLibrary
@@ -45,6 +46,7 @@ var descriptors = []Descriptor{
 	{OptionGOOS, "go.goos", "goos", false},
 	{OptionTags, "go.tags", "tag", true},
 	{OptionCallableImplementations, "implementations.callables", "callable-implementation", true},
+	{OptionImplementationCertificationSources, "implementations.certificationSources", "implementation-certification-source", true},
 	{OptionPackageImplementations, "implementations.packages", "package-implementation", true},
 	{OptionOutputDirectory, "output.directory", "output", false},
 	{OptionExternals, "providers.externals", "externals", false},

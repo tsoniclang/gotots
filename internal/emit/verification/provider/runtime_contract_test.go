@@ -258,8 +258,8 @@ func TestSelectedProviderContributesCertifiedRuntimeClosure(t *testing.T) {
 	for _, required := range []string{
 		"runtime/complex.ts",
 		"export class GoComplex128",
-		"export type int32 = $go$core$int32;",
-		"export type float64 = $go$core$float64;",
+		"export type int32 = TsonicInt32;",
+		"export type float64 = TsonicFloat64;",
 		"reflect__from_gostdlib.Type",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
@@ -316,7 +316,7 @@ func TestSelectedProviderSupportsCertifiedBigIntProfile(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		".Field(__gotots_argument_0)",
+		".Field(argument)",
 		".NumField()",
 	} {
 		if !strings.Contains(rootSource, required) {
@@ -327,8 +327,8 @@ func TestSelectedProviderSupportsCertifiedBigIntProfile(t *testing.T) {
 			)
 		}
 	}
-	if !strings.Contains(artifacts.printed, "export type int = $go$core$int64;") ||
-		!strings.Contains(artifacts.printed, "export type int64 = $go$core$int64;") {
+	if !strings.Contains(artifacts.printed, "export type int = TsonicInt64;") ||
+		!strings.Contains(artifacts.printed, "export type int64 = TsonicInt64;") {
 		t.Fatalf("bigint provider profile lacks exact scalar aliases:\n%s", artifacts.printed)
 	}
 	reflectionSource := readGeneratedArtifact(

@@ -194,7 +194,7 @@ func TestWaveEightDirectGotoCompilesThroughPublicPipeline(t *testing.T) {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	if strings.Contains(artifacts.printed, "__gotots_goto_state_") {
+	if strings.Contains(artifacts.printed, "gotoState") {
 		t.Fatalf(
 			"direct goto fixtures used the state machine:\n%s",
 			artifacts.printed,
@@ -295,7 +295,7 @@ func TestWaveEightStateGotoCompilesThroughPublicPipeline(t *testing.T) {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	if !strings.Contains(artifacts.printed, "__gotots_goto_state_") {
+	if !strings.Contains(artifacts.printed, "gotoState") {
 		t.Fatalf("non-structural goto lacks a state machine:\n%s", artifacts.printed)
 	}
 	runner := filepath.Join(workingDirectory, "runner.ts")

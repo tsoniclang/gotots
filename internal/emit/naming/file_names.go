@@ -22,6 +22,7 @@ type File struct {
 	observer                EnvironmentObserver
 	temporaries             map[api.TemporaryKind]uint64
 	generatedNames          map[string]struct{}
+	temporaryOwners         map[string]api.ArtifactOwner
 	importNames             map[string]struct{}
 	importAliases           map[types.Object]string
 	derivedImports          map[string]string
@@ -91,6 +92,7 @@ func (n *Owner) ForFile(
 		observer:                observer,
 		temporaries:             make(map[api.TemporaryKind]uint64),
 		generatedNames:          make(map[string]struct{}),
+		temporaryOwners:         make(map[string]api.ArtifactOwner),
 		importNames:             make(map[string]struct{}),
 		importAliases:           make(map[types.Object]string),
 		derivedImports:          make(map[string]string),

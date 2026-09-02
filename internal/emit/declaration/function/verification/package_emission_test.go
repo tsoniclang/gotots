@@ -30,7 +30,7 @@ func TestPackageWideCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	})
 	for baseName, targetFile := range targetFiles {
 		printed, err := client.PrintNode(
-			executableTargetFile(targetFile),
+			targetFile,
 			tsgo.PrintOptions{},
 		)
 		if err != nil {
@@ -65,7 +65,7 @@ func TestPackageWideCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 func TestPackageWideImportsAreExactAndDeduplicated(t *testing.T) {
 	loaded := loadBoolMultifileProject(t)
 	targetFiles := emitBoolMultifile(t, loaded, t.TempDir())
-	entry := executableTargetFile(targetFiles["entry"])
+	entry := targetFiles["entry"]
 	statements := entry.Statements()
 	if len(statements) != 5 {
 		t.Fatalf("entry statements = %d, want two imports plus three functions", len(statements))
@@ -110,7 +110,7 @@ func TestPackageWideImportUsesGoObjectOwnership(t *testing.T) {
 	call.Fun.(*ast.Ident).Name = "identity"
 
 	targetFile := compileSourceFile(t, loaded, entryFile)
-	executable := executableTargetFile(targetFile)
+	executable := targetFile
 	valueImport := executable.Statements()[1].(tsgo.ImportDeclaration)
 	imported := valueImport.ImportClause().NamedBindings().(tsgo.NamedImports).Elements()
 	if len(imported) != 1 || imported[0].Name().Text() != "flip" {

@@ -55,31 +55,31 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	}
 
 	nilCall := printedFunction(t, printed, "NilCallOrder")
-	callee := strings.Index(nilCall, "const __gotots_callee_")
-	argument := strings.Index(nilCall, "const __gotots_argument_")
+	callee := strings.Index(nilCall, "const callee")
+	argument := strings.Index(nilCall, "const argument")
 	guard := strings.Index(nilCall, `?? GoPanic.raiseRuntime("call of nil function")`)
-	call := strings.LastIndex(nilCall, ")(__gotots_argument_")
+	call := strings.LastIndex(nilCall, ")(argument")
 	if callee < 0 || argument < 0 || guard < 0 || call < 0 ||
 		!(callee < argument && argument < guard && guard < call) {
 		t.Fatalf("nil call order is not callee -> arguments -> guard -> direct call:\n%s", nilCall)
 	}
-	if strings.Contains(nilCall, "function (__gotots_callee_") {
+	if strings.Contains(nilCall, "function (callee") {
 		t.Fatalf("ordinary nil call contains an IIFE wrapper:\n%s", nilCall)
 	}
 	nilVoidCall := printedFunction(t, printed, "NilVoidCallOrder")
-	voidCallee := strings.Index(nilVoidCall, "const __gotots_callee_")
-	voidArgument := strings.Index(nilVoidCall, "const __gotots_argument_")
+	voidCallee := strings.Index(nilVoidCall, "const callee")
+	voidArgument := strings.Index(nilVoidCall, "const argument")
 	voidGuard := strings.Index(nilVoidCall, `?? GoPanic.raiseRuntime("call of nil function")`)
-	voidCall := strings.LastIndex(nilVoidCall, ")(__gotots_argument_")
+	voidCall := strings.LastIndex(nilVoidCall, ")(argument")
 	if voidCallee < 0 || voidArgument < 0 || voidGuard < 0 || voidCall < 0 ||
 		!(voidCallee < voidArgument &&
 			voidArgument < voidGuard &&
 			voidGuard < voidCall) ||
-		strings.Contains(nilVoidCall, "function (__gotots_callee_") {
+		strings.Contains(nilVoidCall, "function (callee") {
 		t.Fatalf("discarded nil call is not callee -> arguments -> guard -> direct call:\n%s", nilVoidCall)
 	}
 	shortCircuit := printedFunction(t, printed, "ShortCircuit")
-	if strings.Contains(shortCircuit, "function (__gotots_callee_") {
+	if strings.Contains(shortCircuit, "function (callee") {
 		t.Fatalf("short-circuit callable path contains an IIFE:\n%s", shortCircuit)
 	}
 
@@ -268,8 +268,8 @@ func TestCallableNilGuardMutationsFailOwningEvidence(t *testing.T) {
 		sourcePath := materializedSourcePath(t, artifacts, "source.ts")
 		printed := readFile(t, sourcePath)
 		function := printedFunction(t, printed, "NilCallOrder")
-		argumentStart := strings.Index(function, "const __gotots_argument_")
-		returnStart := strings.LastIndex(function, "return (__gotots_callee_")
+		argumentStart := strings.Index(function, "const argument")
+		returnStart := strings.LastIndex(function, "return (callee")
 		if argumentStart < 0 || returnStart < 0 || argumentStart >= returnStart {
 			t.Fatalf("nil-call mutation cannot locate owning statements:\n%s", function)
 		}
@@ -279,7 +279,7 @@ func TestCallableNilGuardMutationsFailOwningEvidence(t *testing.T) {
 		}
 		returnEnd += returnStart + 1
 		returnStatement := function[returnStart:returnEnd]
-		callBoundary := strings.LastIndex(returnStatement, ")(__gotots_argument_")
+		callBoundary := strings.LastIndex(returnStatement, ")(argument")
 		if callBoundary < 0 {
 			t.Fatalf("nil-call mutation cannot locate guarded callee:\n%s", function)
 		}
@@ -288,9 +288,9 @@ func TestCallableNilGuardMutationsFailOwningEvidence(t *testing.T) {
 			"return ",
 		)
 		mutatedFunction := function[:argumentStart] +
-			"const __gotots_guarded_mutation = " + guardedCallee + ";\n    " +
+			"const guardedMutation = " + guardedCallee + ";\n    " +
 			function[argumentStart:returnStart] +
-			"return __gotots_guarded_mutation" +
+			"return guardedMutation" +
 			returnStatement[callBoundary+1:] +
 			function[returnEnd:]
 		writeFile(
@@ -331,7 +331,7 @@ try {
 		sourcePath := materializedSourcePath(t, artifacts, "source.ts")
 		printed := readFile(t, sourcePath)
 		function := printedFunction(t, printed, "NilCallOrder")
-		returnStart := strings.LastIndex(function, "return (__gotots_callee_")
+		returnStart := strings.LastIndex(function, "return (callee")
 		if returnStart < 0 {
 			t.Fatalf("nil-call mutation cannot locate guard:\n%s", function)
 		}
@@ -341,7 +341,7 @@ try {
 		}
 		returnEnd += returnStart + 1
 		returnStatement := function[returnStart:returnEnd]
-		callBoundary := strings.LastIndex(returnStatement, ")(__gotots_argument_")
+		callBoundary := strings.LastIndex(returnStatement, ")(argument")
 		const checkPrefix = "return ("
 		const guardSuffix = ` ?? GoPanic.raiseRuntime("call of nil function")`
 		guardBoundary := strings.Index(returnStatement, guardSuffix)

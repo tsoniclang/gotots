@@ -265,10 +265,10 @@ func assertDirectIntegerArtifact(t *testing.T, printed string, bigint bool) {
 		}
 	}
 	if bigint && (!strings.Contains(printed, "1n") ||
-		!strings.Contains(printed, "export type int32 = $go$core$int32;") ||
-		!strings.Contains(printed, "export type int64 = $go$core$int64;") ||
+		!strings.Contains(printed, "export type int32 = TsonicInt32;") ||
+		!strings.Contains(printed, "export type int64 = TsonicInt64;") ||
 		strconv.IntSize == 64 &&
-			!strings.Contains(printed, "export type int = $go$core$int64;")) {
+			!strings.Contains(printed, "export type int = TsonicInt64;")) {
 		t.Fatalf("exact-width artifact lacks its number/BigInt carrier split:\n%s", printed)
 	}
 	if !bigint && regexp.MustCompile(`[0-9]n(?:\W|$)`).MatchString(printed) {

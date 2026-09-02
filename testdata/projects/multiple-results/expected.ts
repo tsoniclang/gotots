@@ -12,9 +12,9 @@ export function Forward(value: int32): [
     return Pair(value);
 }
 export function Consume(value: int32): int32 {
-    const __gotots_results_0 = Pair(value);
-    let next = __gotots_results_0[0];
-    let positive = __gotots_results_0[1];
+    const results = Pair(value);
+    let next = results[0];
+    let positive = results[1];
     if (positive) {
         return next;
     }
@@ -23,17 +23,17 @@ export function Consume(value: int32): int32 {
 export function Reassign(value: int32): int32 {
     let next = value;
     let positive = false;
-    const __gotots_results_1 = Pair(value);
-    next = __gotots_results_1[0];
-    positive = __gotots_results_1[1];
+    const results2 = Pair(value);
+    next = results2[0];
+    positive = results2[1];
     if (positive) {
         return next;
     }
     return value;
 }
 export function KeepFirst(value: int32): int32 {
-    const __gotots_results_2 = Pair(value);
-    let next = __gotots_results_2[0];
+    const results3 = Pair(value);
+    let next = results3[0];
     return next;
 }
 export function Discard(value: int32): int32 {
@@ -50,6 +50,6 @@ export function Add(left: int32, right: int32): int32 {
     return left + right;
 }
 export function AddPair(value: int32): int32 {
-    const __gotots_results_3 = Numbers(value);
-    return Add(__gotots_results_3[0], __gotots_results_3[1]);
+    const results4 = Numbers(value);
+    return Add(results4[0], results4[1]);
 }

@@ -1,10 +1,6 @@
 import { $initialize as $initialize__api } from "./packages/example.com/package-initialization/api/package.js";
 import { $initialize as $initialize__sideeffect } from "./packages/example.com/package-initialization/sideeffect/package.js";
 import { $initialize as $initialize__sink } from "./packages/example.com/package-initialization/sink/package.js";
-import { GoCompilationFact } from "@gotots/runtime/source-fact.js";
-import { attribute } from "@tsonic/core/lang.js";
-type $GoCompilation = never;
-attribute<$GoCompilation>().add(GoCompilationFact, "gotots-go-source-compilation-fact-v1", "90e111ba62574d08dc1c9677dea7c643dfd558d05351bc197f0b42f7eba324b0", "go1.26.4", "linux", "amd64", false, 64, "little-endian", "bigint", "preserve-go", "go-concurrency", "serial-synchronous-execution-envelope", "", "", "", "", 0);
 $initialize__sink();
 $initialize__sideeffect();
 $initialize__api();

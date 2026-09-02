@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestResolutionFixtureIsCompleteAndOnlyMetadataIsInert(t *testing.T) {
+func TestResolutionFixtureIsComplete(t *testing.T) {
 	root := t.TempDir()
 	if err := InstallResolutionOnly(root); err != nil {
 		t.Fatal(err)
@@ -38,11 +38,6 @@ func TestResolutionFixtureIsCompleteAndOnlyMetadataIsInert(t *testing.T) {
 			!strings.Contains(string(runtime), `unsupported("`+name+`")`) {
 			t.Fatalf("resolution fixture lacks %s", name)
 		}
-	}
-	if !strings.Contains(string(declarations), "function attribute") ||
-		!strings.Contains(string(runtime), "export const attribute = () => attributeBuilder") ||
-		strings.Contains(string(runtime), `unsupported("attribute")`) {
-		t.Fatal("resolution fixture does not isolate inert source metadata")
 	}
 	types, err := os.ReadFile(filepath.Join(module, "types.d.ts"))
 	if err != nil {

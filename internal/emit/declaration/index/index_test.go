@@ -33,7 +33,6 @@ func TestAddSiteRejectsDuplicateObjectOwnership(t *testing.T) {
 		nil,
 		load.File{},
 		declaration,
-		declaration,
 		"modules/key/index/run.ts",
 	); err != nil {
 		t.Fatal(err)
@@ -43,7 +42,6 @@ func TestAddSiteRejectsDuplicateObjectOwnership(t *testing.T) {
 		object,
 		nil,
 		load.File{},
-		declaration,
 		declaration,
 		"modules/key/index/other.ts",
 	); err == nil {

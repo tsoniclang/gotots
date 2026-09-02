@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -40,7 +41,7 @@ type StagedModule struct {
 	outputPath           string
 	sourceDigest         string
 	exports              []string
-	certificationSources []CertificationSource
+	certificationSources []implementationcontract.CertificationSource
 }
 
 func NewStagedModule(
@@ -48,7 +49,7 @@ func NewStagedModule(
 	outputPath string,
 	sourceDigest string,
 	exports []string,
-	certificationSources []CertificationSource,
+	certificationSources []implementationcontract.CertificationSource,
 ) (StagedModule, error) {
 	selectedExports := slices.Clone(exports)
 	selectedCertificationSources := slices.Clone(certificationSources)
@@ -58,8 +59,8 @@ func NewStagedModule(
 		digestErr != nil || len(digest) != sha256.Size || len(selectedExports) == 0 ||
 		!sort.StringsAreSorted(selectedExports) ||
 		!sort.SliceIsSorted(selectedCertificationSources, func(left, right int) bool {
-			return selectedCertificationSources[left].sourcePath <
-				selectedCertificationSources[right].sourcePath
+			return selectedCertificationSources[left].SourcePath() <
+				selectedCertificationSources[right].SourcePath()
 		}) {
 		return StagedModule{}, &Error{
 			Operation: "stage module",
@@ -77,8 +78,8 @@ func NewStagedModule(
 		}
 	}
 	for index, source := range selectedCertificationSources {
-		if !source.Valid() || source.sourcePath == sourcePath ||
-			index > 0 && selectedCertificationSources[index-1].sourcePath == source.sourcePath {
+		if !source.Valid() || source.SourcePath() == sourcePath ||
+			index > 0 && selectedCertificationSources[index-1].SourcePath() == source.SourcePath() {
 			return StagedModule{}, &Error{
 				Operation: "stage module",
 				Subject:   outputPath,

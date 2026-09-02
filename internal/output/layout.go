@@ -19,7 +19,7 @@ const (
 	ScalarSupportPath                         = "runtime/scalars.ts"
 	AnonymousStructSupportPath                = "support/anonymous-structs.ts"
 	MapSpecializationSupportPath              = "support/maps.ts"
-	InterfaceAdapterSupportPath               = "support/interface-adapters.ts"
+	InterfaceAdapterSupportRoot               = "support/interface-adapters"
 	AnonymousInterfaceSupportPath             = "support/interface-contracts.ts"
 	InterfaceMethodSupportPath                = "support/interface-methods.ts"
 	InterfaceTypeSupportPath                  = "support/interface-types.ts"
@@ -185,6 +185,10 @@ func PackageStatePath(sourcePackage *load.Package) (string, error) {
 
 func GenericCapabilityPath(module string) (string, error) {
 	return semanticGeneratedArtifactPath("generics/capabilities", module)
+}
+
+func InterfaceAdapterSupportPath(module string) (string, error) {
+	return semanticGeneratedArtifactPath("interface-adapters", module)
 }
 
 func GenericConcretizationPath(module string) (string, error) {

@@ -92,11 +92,9 @@ func TestWaveNineSerialExecutionCompilesWithoutAsyncArtifacts(t *testing.T) {
 			t.Fatalf("serial artifacts lack %q", required)
 		}
 	}
-	if artifacts.executableBytes > 133_000 || artifacts.executableLargest > 30_000 {
+	if artifacts.bytes > 133_000 || artifacts.largest > 30_000 {
 		t.Fatalf(
-			"serial executable artifact bounds exceeded: total=%d largest=%d canonical=%d/%d",
-			artifacts.executableBytes,
-			artifacts.executableLargest,
+			"serial artifact bounds exceeded: total=%d largest=%d",
 			artifacts.bytes,
 			artifacts.largest,
 		)
@@ -207,7 +205,7 @@ func TestImmediateFunctionLiteralAndDeferRemainSynchronous(t *testing.T) {
 	}
 	for _, required := range []string{
 		"export function ImmediateLiteralABIIsolation(): gostring",
-		"__gotots_deferred_0",
+		"deferredCall",
 		"($go$recovery: GoRecovery): void =>",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
@@ -245,16 +243,12 @@ func waveNineFunctionText(t *testing.T, printed, name string) string {
 	}
 	rest := printed[start:]
 	end := strings.Index(rest[len("export "):], "\nexport ")
-	factEnd := strings.Index(rest, "\nattribute<")
 	artifactEnd := strings.Index(rest, "\n\n// ")
 	if end >= 0 {
 		end += len("export ")
 	}
 	if artifactEnd >= 0 && (end < 0 || artifactEnd < end) {
 		end = artifactEnd
-	}
-	if factEnd >= 0 && (end < 0 || factEnd < end) {
-		end = factEnd
 	}
 	if end >= 0 {
 		return rest[:end]

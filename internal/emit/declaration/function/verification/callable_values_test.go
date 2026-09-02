@@ -56,7 +56,7 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	loaded := loadCallableValuesProject(t)
 	workingDirectory := t.TempDir()
 	targetFile := compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
-	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
+	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	for _, forbidden := range []string{".call(", ".apply(", ".bind(", "any", "unknown"} {
 		if strings.Contains(printed, forbidden) {
@@ -82,8 +82,8 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		t.Fatalf("printed callable artifact contains wide synthetic parameter names:\n%s", printed)
 	}
 	ordered := printedFunction(t, printed, "OrderedCalleeAndArguments")
-	calleeCapture := strings.Index(ordered, "const __gotots_callee_")
-	argumentCapture := strings.Index(ordered, "const __gotots_results_")
+	calleeCapture := strings.Index(ordered, "const callee")
+	argumentCapture := strings.Index(ordered, "const results")
 	guard := strings.Index(ordered, `?? GoPanic.raiseRuntime("call of nil function")`)
 	if calleeCapture < 0 ||
 		argumentCapture < 0 ||
@@ -131,7 +131,7 @@ func TestCallableValuesCreateNativeTargetTrees(t *testing.T) {
 		t.Fatalf("Apply callable check has the wrong target shape")
 	}
 	callee, ok := checked.Left().(tsgo.Identifier)
-	if !ok || !strings.HasPrefix(callee.Text(), "__gotots_callee_") {
+	if !ok || !strings.HasPrefix(callee.Text(), "callee") {
 		t.Fatalf("Apply checked value = %T %#v, want captured callable", checked.Left(), checked.Left())
 	}
 	if _, ok := checked.Right().(tsgo.CallExpression); !ok {
@@ -329,7 +329,7 @@ func TestKnownDirectCallableArtifactIsExact(t *testing.T) {
 	loaded := loadCallableValuesProject(t)
 	workingDirectory := t.TempDir()
 	targetFile := compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
-	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
+	printed := printTargetFile(t, targetFile, workingDirectory)
 	const expected = `export function UseNamed(value: int32): int32 {
     return Apply(Double, value);
 }`

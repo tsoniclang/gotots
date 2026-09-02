@@ -20,13 +20,13 @@ func TestDirectSeamsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	loaded := loadDirectSeamsProject(t)
 	workingDirectory := t.TempDir()
 	targetFile := compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
-	printed := printExecutableTargetFile(t, targetFile, workingDirectory)
+	printed := printTargetFile(t, targetFile, workingDirectory)
 	for _, expected := range []string{
 		"const low: int32 = 3;",
 		"if (value < low)",
 		"for (current = 0; current < limit; current = current + 1)",
 		"for (Touch(); value < 2; Touch())",
-		"let __gotots_for_first_",
+		"let firstIteration",
 		"for (;;)",
 	} {
 		if !strings.Contains(printed, expected) {

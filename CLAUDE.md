@@ -151,25 +151,37 @@ representation of the source program.
   and every selected target either lowers that fact or rejects it explicitly.
   Marker spelling, a local same-named declaration, or a no-op JavaScript body
   never establishes semantics.
-- The TypeScript target may exact-erase finalized attributes while retaining
-  the canonical ordinary-TypeScript carrier; that is its closed consumption
-  disposition. A target that changes representation must consume the relevant
-  fact family or reject it. Generic metadata erasure never authorizes a native
-  C# or Rust carrier.
-- Canonical output is information-lossless across selected targets. Before the
+- The TypeScript target may lower or erase a finalized neutral marker while
+  retaining the canonical ordinary-TypeScript carrier; that is its closed
+  consumption disposition. A target that changes representation must consume
+  the relevant fact family or reject it. Generic marker erasure never
+  authorizes a native C# or Rust carrier.
+- Canonical output is information-complete for its explicit selected profile.
+  Before the
   Go AST and checker graph are released, the closed semantic handler that
-  encounters each target-relevant Go distinction must preserve it either in an
-  ordinary TypeScript shape or in one finalized fact on its exact TS-Go AST
-  subject. Handler dispatch and fact construction are total and fail closed;
-  they do not feed a second whole-program semantic inventory. Runtime helper
-  spelling, generated names, source comments, and executable target behavior
-  are never preservation evidence.
+  encounters each distinction required by the selected profile must preserve
+  it either in an ordinary TypeScript shape or through one accepted
+  Tsonic-owned target-neutral marker on its exact TS-Go AST subject. GoToTS
+  never publishes Go-specific fact classes, payload schemas, implementation
+  provenance, or source identity for targets to interpret. Handler dispatch
+  and neutral marker construction are total and fail closed; they do not feed
+  a second whole-program semantic inventory. Runtime helper spelling,
+  generated names, source comments, and sidecar metadata are never semantic
+  preservation evidence.
 - Carrier choice is not source meaning. Integer carriers, direct-expression
   simplification, serial concurrency, package implementations, and other
-  executable policies may be selected only after canonical facts retain the
-  source numeric kind, evaluation obligation, concurrency operation,
-  declaration identity, aggregate shape, storage/flow contract, and provider
-  identity needed by every target.
+  executable policies belong to an explicit selected profile. A profile that
+  intentionally selects an equivalence envelope is not reusable as exact Go
+  input for another target. Cross-target canonical output may select a
+  representation only after ordinary TypeScript or accepted target-neutral
+  markers retain every distinction that the selected targets require.
+- Build identity, source identity and digests, selected implementation/provider
+  identity, and equivalence envelopes are private certification evidence. They
+  gate publication but never appear in canonical TypeScript or target input.
+  A lossy profile artifact is never input to another target. If ordinary
+  TypeScript and the accepted neutral marker vocabulary cannot
+  express a required distinction, compilation fails until shared Tsonic
+  authority defines that neutral contract.
 
 ## Environment Ownership
 

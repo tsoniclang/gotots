@@ -70,19 +70,12 @@ func TestSafeIntegerConstantPrintsTypechecksAndExecutesDifferentially(t *testing
 			)
 		}
 		if expectedPath != "" {
-			executable, printErr := client.PrintNode(
-				executableTargetFile(file.SourceFile()),
-				tsgo.PrintOptions{},
-			)
-			if printErr != nil {
-				t.Fatal(printErr)
-			}
 			expected, err := os.ReadFile(expectedPath)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if executable != string(expected) {
-				t.Fatalf("%s:\n%s\nwant:\n%s", file.OutputPath(), executable, expected)
+			if printed != string(expected) {
+				t.Fatalf("%s:\n%s\nwant:\n%s", file.OutputPath(), printed, expected)
 			}
 		}
 		targetPath := filepath.Join(workingDirectory, filepath.FromSlash(file.OutputPath()))
@@ -173,8 +166,8 @@ func TestBigIntProfileTypechecksAndExecutesBeyondSafeNumberRange(t *testing.T) {
 			t.Fatal(err)
 		}
 		if file.OutputPath() == "runtime/scalars.ts" &&
-			(!strings.Contains(printed, "int64 as $go$core$int64") ||
-				!strings.Contains(printed, "export type int64 = $go$core$int64;")) {
+			(!strings.Contains(printed, "int64 as TsonicInt64") ||
+				!strings.Contains(printed, "export type int64 = TsonicInt64;")) {
 			t.Fatalf("BigInt support artifact:\n%s", printed)
 		}
 		if file.Kind() == emit.TargetFileSource {
@@ -419,7 +412,7 @@ func loadIntegerConstantsProject(t *testing.T) *load.Package {
 	return loaded
 }
 
-func printExecutableTargetFile(
+func printTargetFile(
 	t *testing.T,
 	targetFile tsgo.SourceFile,
 	workingDirectory string,
@@ -434,34 +427,11 @@ func printExecutableTargetFile(
 			t.Errorf("close TS-Go client: %v", err)
 		}
 	})
-	printed, err := client.PrintNode(executableTargetFile(targetFile), tsgo.PrintOptions{})
+	printed, err := client.PrintNode(targetFile, tsgo.PrintOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return printed
-}
-
-func executableTargetFile(targetFile tsgo.SourceFile) tsgo.SourceFile {
-	statements := make([]tsgo.Statement, 0, len(targetFile.Statements()))
-	for _, statement := range targetFile.Statements() {
-		if declaration, ok := statement.(tsgo.ImportDeclaration); ok {
-			module, moduleOK := declaration.ModuleSpecifier().(tsgo.StringLiteral)
-			if moduleOK && (strings.HasSuffix(module.Text(), "/source-fact.js") ||
-				module.Text() == "@tsonic/core/lang.js") {
-				continue
-			}
-		}
-		if _, fact := statement.(tsgo.ExpressionStatement); fact {
-			continue
-		}
-		statements = append(statements, statement)
-	}
-	factory := tsgo.NewFactory()
-	return factory.SourceFile(
-		statements,
-		targetFile.EndOfFileToken(),
-		targetFile.SourceData(),
-	)
 }
 
 func executeSafeIntegerGo(t *testing.T, workingDirectory string) string {

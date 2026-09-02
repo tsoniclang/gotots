@@ -89,7 +89,7 @@ func mark(value int32) int32 {
 	return value
 }
 
-func Run(__gotots_field_0 int32) int32 {
+func Run(fieldValue int32) int32 {
 	trace = 0
 	value := Record{Second: mark(2), First: mark(1)}
 	return trace*100 + value.First*10 + value.Second
@@ -110,7 +110,7 @@ func Run(__gotots_field_0 int32) int32 {
 			t.Fatalf("capture %d = %T, want variable statement", index, statement)
 		}
 		name := targetName(declaration.DeclarationList().Declarations()[0].Name())
-		if name == "__gotots_field_0" {
+		if name == "fieldValue" {
 			t.Fatal("generated field capture masks the visible source parameter")
 		}
 	}

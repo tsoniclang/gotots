@@ -5,10 +5,10 @@ export function Compute(input: int32): int32 {
         let base__shadow_1 = base + 1;
         let left = base__shadow_1, right = base__shadow_1 + 1;
         let __u3c0_ = left + right;
-        const __gotots_assign_0 = right;
-        const __gotots_assign_1 = left;
-        left = __gotots_assign_0;
-        right = __gotots_assign_1;
+        const assignmentValue = right;
+        const assignmentValue2 = left;
+        left = assignmentValue;
+        right = assignmentValue2;
         return __u3c0_;
     }
 }

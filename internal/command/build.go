@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/config"
 	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
+	implementationcontract "github.com/tsoniclang/gotots/internal/contracts/implementation"
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/emit/callableimplementation"
@@ -81,11 +82,23 @@ func prepareBuild(
 	project config.Project,
 	outputDirectory string,
 ) (printPlan, string, error) {
-	preparedImplementations, err := prepareSourceImplementations(project)
+	certificationSources, err := implementationcontract.LoadCertificationSources(
+		project.ImplementationCertificationSources(),
+	)
 	if err != nil {
 		return printPlan{}, "", err
 	}
-	preparedCallables, err := prepareCallableImplementations(project)
+	preparedImplementations, err := prepareSourceImplementations(
+		project,
+		certificationSources,
+	)
+	if err != nil {
+		return printPlan{}, "", err
+	}
+	preparedCallables, err := prepareCallableImplementations(
+		project,
+		certificationSources,
+	)
 	if err != nil {
 		return printPlan{}, "", err
 	}
@@ -159,14 +172,16 @@ func prepareBuild(
 
 func prepareCallableImplementations(
 	project config.Project,
+	certificationSources []implementationcontract.CertificationSource,
 ) (*callableimplementation.Prepared, error) {
 	contracts := project.CallableImplementations()
 	if len(contracts) == 0 {
 		return nil, nil
 	}
 	return callableimplementation.PrepareAll(callableimplementation.Config{
-		ContractPaths: contracts,
-		BuildProfile:  project.BuildProfile(),
+		ContractPaths:        contracts,
+		CertificationSources: certificationSources,
+		BuildProfile:         project.BuildProfile(),
 		Compilation: callableimplementation.CompilationDocument{
 			Integers:        project.IntegerRepresentation().String(),
 			EvaluationOrder: project.EvaluationOrder().String(),
@@ -176,15 +191,17 @@ func prepareCallableImplementations(
 
 func prepareSourceImplementations(
 	project config.Project,
+	certificationSources []implementationcontract.CertificationSource,
 ) (*sourceimplementation.Prepared, error) {
 	contracts := project.PackageImplementations()
 	if len(contracts) == 0 {
 		return nil, nil
 	}
 	return sourceimplementation.PrepareAll(sourceimplementation.Config{
-		RepositoryRoot: project.DistributionRoot(),
-		ContractPaths:  contracts,
-		BuildProfile:   project.BuildProfile(),
+		RepositoryRoot:       project.DistributionRoot(),
+		ContractPaths:        contracts,
+		CertificationSources: certificationSources,
+		BuildProfile:         project.BuildProfile(),
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers:        project.IntegerRepresentation().String(),
 			EvaluationOrder: project.EvaluationOrder().String(),

@@ -1,4 +1,4 @@
-package naming
+package providerprofile
 
 import (
 	"go/types"
@@ -18,7 +18,7 @@ type providerProfileProjection struct {
 	visited      map[types.Type]struct{}
 }
 
-func providerProfileBridgeClosure(
+func BridgeClosure(
 	source *types.Named,
 	profile []gostdlib.ProviderCallableProfileInterface,
 ) ([]gostdlib.ProviderCallableProfileInterface, error) {
@@ -83,7 +83,7 @@ func providerProfileBridgeClosure(
 	return selected, nil
 }
 
-func providerProfileBridgeSemanticParts(
+func BridgeSemanticParts(
 	selected []gostdlib.ProviderCallableProfileInterface,
 ) ([]string, error) {
 	if len(selected) == 0 {
@@ -102,7 +102,7 @@ func providerProfileBridgeSemanticParts(
 	return parts, nil
 }
 
-func providerProfileBridgeNameParts(
+func BridgeNameParts(
 	selected []gostdlib.ProviderCallableProfileInterface,
 ) ([]string, error) {
 	if len(selected) == 0 {
@@ -463,97 +463,4 @@ func (p *providerProfileProjection) collectSignature(
 		return err
 	}
 	return p.collect(signature.Results())
-}
-
-type ProviderTarget struct {
-	module             string
-	export             string
-	member             string
-	access             gostdlib.AccessKind
-	representation     bool
-	typeRepresentation gostdlib.RepresentationKind
-	definedValue       gostdlib.DefinedValueRepresentationKind
-	effect             gostdlib.EffectKind
-}
-
-func (r *Registry) ProviderTarget(object types.Object) (ProviderTarget, bool, error) {
-	if r == nil || object == nil {
-		return ProviderTarget{}, false, &api.NameError{
-			Reason: "provider fact target identity is invalid",
-		}
-	}
-	if function, ok := object.(*types.Func); ok {
-		object = function.Origin()
-	}
-	binding, ok := r.byObject[object]
-	if !ok || binding.kind == targetBindingEnvironment ||
-		binding.kind == targetBindingMissingProvider {
-		return ProviderTarget{}, false, nil
-	}
-	if binding.kind != targetBindingProvider ||
-		binding.providerModule == "" || binding.providerExport == "" ||
-		!binding.providerAccess.Valid() {
-		return ProviderTarget{}, true, &api.NameError{
-			Name: object.Name(), Reason: "provider fact target is incomplete",
-		}
-	}
-	if binding.providerAccess == gostdlib.AccessExport &&
-		binding.providerMember != "" {
-		return ProviderTarget{}, true, &api.NameError{
-			Name: object.Name(), Reason: "provider export unexpectedly names a member",
-		}
-	}
-	if binding.providerAccess != gostdlib.AccessExport &&
-		binding.providerMember == "" {
-		return ProviderTarget{}, true, &api.NameError{
-			Name: object.Name(), Reason: "provider member target has no member identity",
-		}
-	}
-	return ProviderTarget{
-		module:             binding.providerModule,
-		export:             binding.providerExport,
-		member:             binding.providerMember,
-		access:             binding.providerAccess,
-		representation:     binding.providerRepresentation,
-		typeRepresentation: binding.providerTypeRepresentation,
-		definedValue:       binding.providerDefinedValue,
-		effect:             binding.providerEffect,
-	}, true, nil
-}
-
-func (t ProviderTarget) Module() string              { return t.module }
-func (t ProviderTarget) Export() string              { return t.export }
-func (t ProviderTarget) Member() string              { return t.member }
-func (t ProviderTarget) Access() gostdlib.AccessKind { return t.access }
-func (t ProviderTarget) Representation() bool        { return t.representation }
-func (t ProviderTarget) TypeRepresentation() gostdlib.RepresentationKind {
-	return t.typeRepresentation
-}
-func (t ProviderTarget) DefinedValueRepresentation() gostdlib.DefinedValueRepresentationKind {
-	return t.definedValue
-}
-func (t ProviderTarget) Effect() gostdlib.EffectKind { return t.effect }
-
-func (n *File) ExternalProviderFunction(
-	module string,
-	export string,
-) (api.NameReference, error) {
-	return n.ProviderSymbol(module, export, api.ImportPhaseValue)
-}
-
-func (n *File) ProviderSymbol(
-	module string,
-	export string,
-	phase api.ImportPhase,
-) (api.NameReference, error) {
-	if export == "" {
-		return api.NameReference{}, &api.NameError{
-			Reason: "external provider export is empty",
-		}
-	}
-	qualifier, request, err := n.providerImport(module, phase)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	return api.NewQualifiedNameReference(qualifier, export, request)
 }

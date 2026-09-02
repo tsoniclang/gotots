@@ -13,7 +13,6 @@ import (
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
-	canonicalsourcefact "github.com/tsoniclang/gotots/internal/emit/sourcefact"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -377,14 +376,20 @@ func (s *programSession) buildArtifactRevision(
 			Reason: "target artifact has no concrete name owner",
 		}
 	}
+	artifactOwner := api.MustSourceArtifactOwner(owner)
+	replayCommitted := false
 	if !reconstruction {
 		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.SnapshotTemporaries()
-		names.RestoreTemporaries(temporaryStart)
-		defer names.FinishTemporaryReplay(current)
+		finishReplay, replayErr := names.BeginTemporaryReplay(
+			artifactOwner,
+			temporaryStart,
+		)
+		if replayErr != nil {
+			return artifactRevision{}, replayErr
+		}
+		defer func() { finishReplay(replayCommitted) }()
 	}
-	artifactOwner := api.MustSourceArtifactOwner(owner)
 	finish, err := names.BeginArtifact(
 		artifactOwner,
 		site.Declaration,
@@ -424,57 +429,10 @@ func (s *programSession) buildArtifactRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	statements := result.Declarations()
-	requests := result.Requests()
-	if result.Disposition() == api.DeclarationDispositionMaterialized {
-		origin, originErr := canonicalsourcefact.Origin(
-			site.Source,
-			site.SourceFile,
-			site.OutputPath,
-			site.Occurrence,
-		)
-		if originErr != nil {
-			return artifactRevision{}, originErr
-		}
-		facts, factErr := canonicalsourcefact.SourceDeclaration(
-			context,
-			owner,
-			site.Occurrence,
-			origin,
-			statements,
-			handlerRequirements,
-			result.AdditionalPackageBindings(),
-		)
-		if factErr != nil {
-			return artifactRevision{}, factErr
-		}
-		statements = append(statements, facts.Statements()...)
-		requests = append(requests, facts.Requests()...)
-		if function, ok := owner.(*types.Func); ok {
-			statements, requests, err = s.appendImplementationSourceFacts(
-				context,
-				[]*types.Func{function},
-				statements,
-				requests,
-			)
-			if err != nil {
-				return artifactRevision{}, err
-			}
-		}
-	}
-	statements, requests, err = s.appendImplementationSourceFacts(
-		context,
-		selectedMethods,
-		statements,
-		requests,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
-	requests, err = s.classArtifactRequests(
+	requests, err := s.classArtifactRequests(
 		owner,
 		selectedMethods,
-		requests,
+		result.Requests(),
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -504,17 +462,6 @@ func (s *programSession) buildArtifactRevision(
 		}
 		requests = append(requests, request)
 	}
-	statements, requests, err = s.attachSelectedMethodSourceFacts(
-		builder,
-		context,
-		owner,
-		selectedMethods,
-		statements,
-		requests,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
 	placement, dependencies, declarationRequirements, err :=
 		s.consumeArtifactRequests(
 			artifactOwner,
@@ -522,6 +469,18 @@ func (s *programSession) buildArtifactRevision(
 		)
 	if err != nil {
 		return artifactRevision{}, err
+	}
+	statements := result.Declarations()
+	if len(selectedMethods) != 0 {
+		statements, err = s.attachClassMemberContributions(
+			builder,
+			owner,
+			statements,
+			selectedMethods,
+		)
+		if err != nil {
+			return artifactRevision{}, err
+		}
 	}
 	var contract artifactstate.Contract
 	switch result.Disposition() {
@@ -581,6 +540,7 @@ func (s *programSession) buildArtifactRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	replayCommitted = true
 	return artifactRevision{
 		statements:        statements,
 		placement:         placement,
