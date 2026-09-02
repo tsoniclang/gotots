@@ -14,7 +14,7 @@ export function $initialize(): void {
         $state.B = mark(2);
     }
     {
-        $state.A = $state.B + mark(1);
+        $state.A = $state.B + mark(1) | 0;
     }
     {
         $state.hidden = mark(3);

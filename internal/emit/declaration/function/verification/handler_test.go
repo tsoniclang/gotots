@@ -62,9 +62,16 @@ func TestAddConstructCreatesExactTargetTree(t *testing.T) {
 	if !ok {
 		t.Fatalf("body statement = %T, want tsgo.ReturnStatement", bodyStatements[0])
 	}
-	addition, ok := returnStatement.Expression().(tsgo.BinaryExpression)
+	normalization, ok := returnStatement.Expression().(tsgo.BinaryExpression)
 	if !ok {
-		t.Fatalf("return expression = %T, want direct binary addition", returnStatement.Expression())
+		t.Fatalf("return expression = %T, want normalized binary addition", returnStatement.Expression())
+	}
+	if normalization.OperatorToken().Kind() != tsgo.SyntaxKindBarToken {
+		t.Fatalf("result operator = %d, want int32 normalization", normalization.OperatorToken().Kind())
+	}
+	addition, ok := normalization.Left().(tsgo.BinaryExpression)
+	if !ok {
+		t.Fatalf("normalized operand = %T, want binary addition", normalization.Left())
 	}
 	if addition.OperatorToken().Kind() != tsgo.SyntaxKindPlusToken {
 		t.Fatalf("binary operator = %d, want plus", addition.OperatorToken().Kind())
@@ -141,7 +148,8 @@ func TestAddReferencesUseGoObjectIdentity(t *testing.T) {
 	targetDeclaration := targetFunction(t, targetFile, "Add")
 	targetBody := targetDeclaration.Body().(tsgo.Block)
 	targetReturn := targetBody.Statements()[0].(tsgo.ReturnStatement)
-	targetBinary := targetReturn.Expression().(tsgo.BinaryExpression)
+	normalization := targetReturn.Expression().(tsgo.BinaryExpression)
+	targetBinary := normalization.Left().(tsgo.BinaryExpression)
 	assertIdentifier(t, targetBinary.Left(), "left")
 }
 

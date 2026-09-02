@@ -264,8 +264,9 @@ rejects stale or mismatched provider scalar contracts before target sealing.
 Runtime parity is certified only under a profile that can preserve every
 reached integer-dependent identity and control decision. If the product reaches
 exact fixed-width 64-bit arithmetic, the runtime replay selects at least
-`fixed64-bigint`; if it reaches exact native 64-bit overflow, it selects
-`bigint`. A successful `number` typecheck is not runtime-equivalence evidence.
+`fixed64-bigint`; if it reaches narrow fixed-width or native 64-bit overflow,
+it selects `bigint`. A successful `number` typecheck is not
+runtime-equivalence evidence.
 
 ## 9. Product Proof
 

@@ -54,12 +54,16 @@ func emitCompound(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if !context.ScalarABI().UsesBigInt(target.SourceType()) &&
+	integerAlias, supportsInteger := basictype.IntegerAlias(
+		context.TypesSizes(),
+		target.SourceType(),
+	)
+	if supportsInteger &&
+		!context.ScalarABI().RequiresExactIntegerResult(integerAlias) &&
 		!target.IsAccessor() &&
 		!target.IsProperty() &&
 		(!target.UsesCanonicalStorage() || !requiresStorageProjection) &&
 		source.Tok == token.ADD_ASSIGN &&
-		basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
 		types.AssignableTo(
 			context.TypesInfo().TypeOf(source.Rhs[0]),
 			target.SourceType(),

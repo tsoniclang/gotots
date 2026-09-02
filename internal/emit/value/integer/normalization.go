@@ -26,7 +26,7 @@ func NormalizeFixedWidth(
 		return normalizeBigInt(context, carrier, value)
 	case api.IntegerCarrierNumber:
 		return api.DirectExpression(
-			normalizeNumber(context.Factory(), carrier, value),
+			NormalizeNumber(context.Factory(), carrier, value),
 		), nil
 	default:
 		return api.ExpressionEmission{}, &api.IntegerCarrierError{
@@ -66,7 +66,7 @@ func normalizeBigInt(
 	), nil
 }
 
-func normalizeNumber(
+func NormalizeNumber(
 	factory tsgo.Factory,
 	carrier Carrier,
 	value tsgo.Expression,

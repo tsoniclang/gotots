@@ -143,7 +143,7 @@ func TestIntegerRepresentationDefaultsToLosslessProfileWithNarrowCarriers(t *tes
 		t.Fatal(err)
 	}
 	assertIntegerCarrier(t, emission, map[string]string{"int32": "int32"})
-	assertEmissionHasNoIntegerNoise(t, emission)
+	assertCanonicalNarrowIntegerOperations(t, printIntegerEmission(t, emission))
 }
 
 func TestBigIntProfilePreservesNarrowIntegerCarriers(t *testing.T) {
@@ -164,7 +164,7 @@ func TestBigIntProfilePreservesNarrowIntegerCarriers(t *testing.T) {
 	if strings.Contains(printed, "0n") || strings.Contains(printed, "1n") {
 		t.Fatalf("narrow-only BigInt-profile emission contains BigInt syntax:\n%s", printed)
 	}
-	assertNoIntegerNoise(t, printed)
+	assertCanonicalNarrowIntegerOperations(t, printed)
 }
 
 func TestInvalidIntegerRepresentationFailsAtCompilationEntry(t *testing.T) {
@@ -315,22 +315,20 @@ func assertIntegerCarrier(
 	}
 }
 
-func assertEmissionHasNoIntegerNoise(t *testing.T, emission emit.ProgramEmission) {
-	t.Helper()
-	assertNoIntegerNoise(t, printIntegerEmission(t, emission))
-}
-
-func assertNoIntegerNoise(t *testing.T, printed string) {
+func assertCanonicalNarrowIntegerOperations(t *testing.T, printed string) {
 	t.Helper()
 	for _, forbidden := range []string{
 		" as int32",
 		" as int64",
 		"Math.imul",
-		") | 0",
+		" += ",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("generated TypeScript contains %q:\n%s", forbidden, printed)
 		}
+	}
+	if !strings.Contains(printed, " | 0") {
+		t.Fatalf("canonical int32 result normalization is absent:\n%s", printed)
 	}
 }
 

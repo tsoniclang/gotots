@@ -65,7 +65,8 @@ func TestLocalVariablesCreateExactScopedTargetTree(t *testing.T) {
 		t.Fatalf("shadow name = %q, want base__shadow_1", name)
 	}
 	initializer := shadowDeclaration.Initializer().(tsgo.BinaryExpression)
-	if name := initializer.Left().(tsgo.Identifier).Text(); name != "base" {
+	addition := initializer.Left().(tsgo.BinaryExpression)
+	if name := addition.Left().(tsgo.Identifier).Text(); name != "base" {
 		t.Fatalf("shadow initializer reference = %q, want outer base", name)
 	}
 	pair := inner[1].(tsgo.VariableStatement).DeclarationList().Declarations()
@@ -119,7 +120,8 @@ func TestLocalVariablesUseGoObjectIdentityAcrossShadowing(t *testing.T) {
 		DeclarationList().
 		Declarations()[0]
 	initializer := declaration.Initializer().(tsgo.BinaryExpression)
-	if name := initializer.Left().(tsgo.Identifier).Text(); name != "base" {
+	addition := initializer.Left().(tsgo.BinaryExpression)
+	if name := addition.Left().(tsgo.Identifier).Text(); name != "base" {
 		t.Fatalf("shadow initializer reference = %q, want outer base", name)
 	}
 }

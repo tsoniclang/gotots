@@ -3,7 +3,7 @@ export function Pair(value: int32): [
     int32,
     bool
 ] {
-    return [value + 1, value >= 0];
+    return [value + 1 | 0, value >= 0];
 }
 export function Forward(value: int32): [
     int32,
@@ -44,10 +44,10 @@ export function Numbers(value: int32): [
     int32,
     int32
 ] {
-    return [value, value + 2];
+    return [value, value + 2 | 0];
 }
 export function Add(left: int32, right: int32): int32 {
-    return left + right;
+    return left + right | 0;
 }
 export function AddPair(value: int32): int32 {
     const results4 = Numbers(value);

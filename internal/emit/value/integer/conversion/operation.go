@@ -69,7 +69,11 @@ func Convert(
 			if floatSource {
 				value = mathCall(context, "trunc", value)
 			}
-			value = normalizeNumber(context, targetCarrier, value)
+			value = integervalue.NormalizeNumber(
+				context.Factory(),
+				targetCarrier,
+				value,
+			)
 		} else {
 			value, requests, err = normalizeNumber64(
 				context,
@@ -158,66 +162,6 @@ func ConvertRepresentation(
 		value,
 		requests,
 	)
-}
-
-func normalizeNumber(
-	context api.Context,
-	target integervalue.Carrier,
-	value tsgo.Expression,
-) tsgo.Expression {
-	factory := context.Factory()
-	zero := factory.NumericLiteral("0", tsgo.TokenFlagsNone)
-	switch {
-	case target.Signed() && target.Width() == 8:
-		return binary(
-			factory,
-			binary(
-				factory,
-				value,
-				tsgo.BinaryOperatorLessThanLessThanToken,
-				factory.NumericLiteral("24", tsgo.TokenFlagsNone),
-			),
-			tsgo.BinaryOperatorGreaterThanGreaterThanToken,
-			factory.NumericLiteral("24", tsgo.TokenFlagsNone),
-		)
-	case target.Signed() && target.Width() == 16:
-		return binary(
-			factory,
-			binary(
-				factory,
-				value,
-				tsgo.BinaryOperatorLessThanLessThanToken,
-				factory.NumericLiteral("16", tsgo.TokenFlagsNone),
-			),
-			tsgo.BinaryOperatorGreaterThanGreaterThanToken,
-			factory.NumericLiteral("16", tsgo.TokenFlagsNone),
-		)
-	case target.Signed() && target.Width() == 32:
-		return binary(factory, value, tsgo.BinaryOperatorBarToken, zero)
-	case !target.Signed() && target.Width() == 8:
-		return binary(
-			factory,
-			value,
-			tsgo.BinaryOperatorAmpersandToken,
-			factory.NumericLiteral("255", tsgo.TokenFlagsNone),
-		)
-	case !target.Signed() && target.Width() == 16:
-		return binary(
-			factory,
-			value,
-			tsgo.BinaryOperatorAmpersandToken,
-			factory.NumericLiteral("65535", tsgo.TokenFlagsNone),
-		)
-	case !target.Signed() && target.Width() == 32:
-		return binary(
-			factory,
-			value,
-			tsgo.BinaryOperatorGreaterThanGreaterThanGreaterThanToken,
-			zero,
-		)
-	default:
-		panic("number normalization target is not 8, 16, or 32 bits")
-	}
 }
 
 func normalizeNumber64(
@@ -337,20 +281,5 @@ func globalCall(
 		nil,
 		[]tsgo.Expression{argument},
 		tsgo.NodeFlagsNone,
-	)
-}
-
-func binary(
-	factory tsgo.Factory,
-	left tsgo.Expression,
-	operator tsgo.BinaryOperator,
-	right tsgo.Expression,
-) tsgo.Expression {
-	return factory.BinaryExpression(
-		nil,
-		left,
-		nil,
-		factory.BinaryOperatorToken(operator),
-		right,
 	)
 }

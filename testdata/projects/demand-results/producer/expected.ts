@@ -3,5 +3,5 @@ export function Pair(value: int32): [
     int32,
     bool
 ] {
-    return [value + 1, value === 0];
+    return [value + 1 | 0, value === 0];
 }

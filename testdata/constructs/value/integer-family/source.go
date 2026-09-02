@@ -95,6 +95,8 @@ func NumberVariableUnsignedShift(value uint32, count uint8) (uint32, uint32) {
 
 type DefinedShiftCount uint8
 
+type NarrowCounter int8
+
 func DefinedShift(value int64, count DefinedShiftCount) (int64, int64) {
 	return value << count, value >> count
 }
@@ -197,6 +199,29 @@ func BigOverflowUpdate(value uint64) (uint64, uint64, uint64) {
 	multiplied := value
 	value++
 	return added, multiplied, value
+}
+
+func NarrowOverflowBinary(maxSigned, minSigned int32, maxUnsigned uint32, maxSigned16 int16, maxUnsigned16 uint16, maxSmall int8, maxUnsigned8 uint8) (int32, int32, uint32, int16, uint16, int8, uint8, int32, uint32, int32, int8, int32) {
+	return maxSigned + 1,
+		minSigned - 1,
+		maxUnsigned + 1,
+		maxSigned16 + 1,
+		maxUnsigned16 + 1,
+		maxSmall + 1,
+		maxUnsigned8 + 1,
+		maxSigned * maxSigned,
+		maxUnsigned * maxUnsigned,
+		-minSigned,
+		maxSmall << 1,
+		minSigned / -1
+}
+
+func NarrowOverflowUpdate(maxSigned int32, maxUnsigned uint32, maxSmall int8, minCounter NarrowCounter) (int32, uint32, int8, NarrowCounter) {
+	maxSigned++
+	maxUnsigned += 1
+	maxSmall *= 2
+	minCounter--
+	return maxSigned, maxUnsigned, maxSmall, minCounter
 }
 
 func WideHash(value string) uint64 {

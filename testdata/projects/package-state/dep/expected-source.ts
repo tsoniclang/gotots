@@ -27,10 +27,10 @@ export class Cell {
     declare private readonly then?: never;
 }
 export function mark(value: int32): int32 {
-    $state.Trace = $state.Trace * 10 + value;
-    $state.__go___proto__++;
+    $state.Trace = globalThis.Math.imul($state.Trace, 10) + value | 0;
+    $state.__go___proto__ = $state.__go___proto__ + 1 | 0;
     return value;
 }
 export function Snapshot(): int32 {
-    return $state.A * 10000 + $state.B * 1000 + $state.Trace * 10 + $state.hidden + $state.__go___proto__ + Cell.$storageOf(Cell.$fromStorage($state.Empty)).Value + Cell.$storageOf(Cell.$fromStorage($state.Filled)).Value;
+    return (((((globalThis.Math.imul($state.A, 10000) + globalThis.Math.imul($state.B, 1000) | 0) + globalThis.Math.imul($state.Trace, 10) | 0) + $state.hidden | 0) + $state.__go___proto__ | 0) + Cell.$storageOf(Cell.$fromStorage($state.Empty)).Value | 0) + Cell.$storageOf(Cell.$fromStorage($state.Filled)).Value | 0;
 }

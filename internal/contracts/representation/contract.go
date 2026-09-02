@@ -104,6 +104,13 @@ func (a ScalarABI) UsesBigInt(source types.Type) bool {
 	return err == nil && carrier == IntegerCarrierBigInt
 }
 
+func (a ScalarABI) RequiresExactIntegerResult(alias PrimitiveAlias) bool {
+	carrier, err := a.Carrier(alias)
+	return err == nil &&
+		(a.integer == IntegerRepresentationBigInt ||
+			carrier == IntegerCarrierBigInt)
+}
+
 func (r IntegerRepresentation) String() string {
 	switch r {
 	case IntegerRepresentationNumber:

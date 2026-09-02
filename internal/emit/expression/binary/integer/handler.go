@@ -161,11 +161,12 @@ func normalizeExactResult(
 	carrier integervalue.Carrier,
 	result api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if !integervalue.UsesBigInt(
+	if !integervalue.RequiresExactResult(
 		context.IntegerRepresentation(),
 		carrier,
 	) ||
-		isComparison(operator) {
+		isComparison(operator) ||
+		alreadyNormalizedNumberResult(context, carrier, operator) {
 		return result, nil
 	}
 	normalized, err := integervalue.NormalizeFixedWidth(
@@ -373,6 +374,13 @@ func target(
 		)
 		operator = token.AND
 	}
+	if operator == token.MUL &&
+		integervalue.RequiresExactNumberMultiplication(
+			context.IntegerRepresentation(),
+			carrier,
+		) {
+		return exactNumberMultiplication(context, left, right), true
+	}
 	targetOperator, ok := targetOperator(context, operator, carrier)
 	if !ok {
 		return nil, false
@@ -400,6 +408,56 @@ func target(
 		)
 	}
 	return target, true
+}
+
+func exactNumberMultiplication(
+	context api.Context,
+	left tsgo.Expression,
+	right tsgo.Expression,
+) tsgo.Expression {
+	factory := context.Factory()
+	return factory.CallExpression(
+		factory.PropertyAccessExpression(
+			api.TargetIntrinsicMath.Expression(factory),
+			nil,
+			factory.Identifier("imul"),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		[]tsgo.Expression{left, right},
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func alreadyNormalizedNumberResult(
+	context api.Context,
+	carrier integervalue.Carrier,
+	operator token.Token,
+) bool {
+	if operator == token.MUL &&
+		carrier.Signed() &&
+		integervalue.RequiresExactNumberMultiplication(
+			context.IntegerRepresentation(),
+			carrier,
+		) {
+		return true
+	}
+	representation, ok := integervalue.CarrierRepresentation(
+		context.IntegerRepresentation(),
+		carrier,
+	)
+	if !ok || representation != api.IntegerCarrierNumber ||
+		carrier.Width() != 32 {
+		return false
+	}
+	switch operator {
+	case token.AND, token.OR, token.XOR, token.AND_NOT,
+		token.SHL, token.SHR:
+		return true
+	default:
+		return false
+	}
 }
 
 func needsUint32Normalization(

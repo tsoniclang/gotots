@@ -55,8 +55,12 @@ func EmitExpression(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	if !context.ScalarABI().UsesBigInt(target.SourceType()) &&
-		basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
+	integerAlias, supportsInteger := basictype.IntegerAlias(
+		context.TypesSizes(),
+		target.SourceType(),
+	)
+	if supportsInteger &&
+		!context.ScalarABI().RequiresExactIntegerResult(integerAlias) &&
 		!target.IsAccessor() &&
 		!target.IsProperty() &&
 		(!target.UsesCanonicalStorage() || !requiresStorageProjection) {

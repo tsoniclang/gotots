@@ -66,6 +66,16 @@ func SupportsInteger(sizes types.Sizes, sourceType types.Type) bool {
 	return ok
 }
 
+func IntegerAlias(
+	sizes types.Sizes,
+	sourceType types.Type,
+) (api.PrimitiveAlias, bool) {
+	if !SupportsInteger(sizes, sourceType) {
+		return api.PrimitiveInvalid, false
+	}
+	return PrimitiveAlias(sizes, sourceType)
+}
+
 func PrimitiveAlias(
 	_ types.Sizes,
 	sourceType types.Type,

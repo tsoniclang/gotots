@@ -432,16 +432,25 @@ type, and generated scalar support must contain neither the retired
 Both BigInt-carrier profiles additionally differentially prove fixed-width
 overflow for wide signed and unsigned binary operations, shifts, unary
 operations, division's minimum-value edge, compound assignments, and
-increments. Narrow and native number carriers remain direct where selected and
-are checked against an artifact-shape gate.
-Artifact inspection requires normalization at the wide result owner, not at
-selected call sites, and requires exactly one demand-generated definition for
-each selected signedness rather than repeated intrinsic spellings. An
-independent source-available hash fixture must produce distinct, byte-exact Go
-hash values for multiple inputs; a mutation removing result normalization must
-collapse or change those keys and fail before product runtime certification.
-The same fixture under `number` is recorded as profile boundary evidence,
-never as parity.
+increments. The canonical `bigint` profile also proves the same operation
+classes for every number-carried fixed width, including signed and unsigned
+8/16/32-bit results, defined integers, and a 32-bit multiplication whose low
+bits are lost by direct binary64 multiplication. Artifact inspection requires
+`globalThis.Math.imul` only for exact 32-bit multiplication and requires all
+other narrow normalization at the shared integer result owner. Mutations that
+restore direct multiplication, direct `++`/`--`, direct compound update, or
+omit result normalization must change the Go differential.
+Broad ownership inspection must find one number width/sign normalization
+implementation shared by result and conversion paths.
+
+The `number` and `fixed64-bigint` profiles retain direct narrow/native number
+carriers and are checked against an artifact-shape gate. Wide normalization
+requires exactly one demand-generated definition per selected signedness rather
+than repeated intrinsic spellings. An independent source-available hash
+fixture must produce distinct, byte-exact Go hash values for multiple inputs;
+a mutation removing wide result normalization must collapse or change those
+keys and fail before product runtime certification. The same fixture under
+`number` is recorded as profile boundary evidence, never as parity.
 
 Host-boundary string proof writes valid multibyte UTF-8, NUL, and invalid UTF-8
 through the selected `os.File.WriteString` provider and exact-compares the raw

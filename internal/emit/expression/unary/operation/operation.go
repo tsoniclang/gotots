@@ -116,7 +116,7 @@ func integerOperation(
 			tsgo.PrefixUnaryExpressionOperatorKindMinusToken,
 			target,
 		)
-		if integervalue.UsesBigInt(
+		if integervalue.RequiresExactResult(
 			context.IntegerRepresentation(),
 			carrier,
 		) {
@@ -162,7 +162,7 @@ func normalizeComplement(
 	target tsgo.Expression,
 ) (api.ExpressionEmission, error) {
 	switch {
-	case integervalue.UsesBigInt(
+	case integervalue.RequiresExactResult(
 		context.IntegerRepresentation(),
 		carrier,
 	):

@@ -582,19 +582,23 @@ aliases. The `bigint` profile additionally maps 64-bit native `int`, `uint`,
 and `uintptr` to the corresponding exact shared BigInt type. Generated output
 imports no unrelated compiler and never publishes a Go-specific scalar fact.
 
-Profile selection also fixes the overflow contract. The direct `number`
-profile retains its declared precision/overflow tradeoff. Both explicit
-BigInt-carrier profiles normalize every `int64` and `uint64` operation to its Go
-width at the integer value owner. The `bigint` profile does the same for
-64-bit native integers; `fixed64-bigint` deliberately retains the direct
-number-profile tradeoff for native `int`, `uint`, and `uintptr`. A reached
-identity or control decision that depends on exact fixed-width 64-bit
-arithmetic therefore requires at least `fixed64-bigint`; one that depends on
-exact 64-bit native-integer overflow requires `bigint`. There is no package
-allowlist, adaptive representation heuristic, or hidden per-call profile.
-Wide-result normalization requests one of the two demand-generated integer
-runtime operations; repeated source sites do not duplicate the target
-intrinsic expression.
+Profile selection also fixes the overflow contract. The canonical `bigint`
+profile normalizes every fixed-width integer result at the integer value owner.
+BigInt carriers request one of the two demand-generated wide normalizers;
+number carriers use constant-size width/sign operations, and exact 32-bit
+multiplication uses `globalThis.Math.imul` before normalization so rounded
+binary64 products cannot destroy low bits. Repeated source sites do not
+duplicate runtime definitions. Integer conversions call the same number
+width/sign normalizer; they do not maintain a conversion-local copy.
+
+The explicit `number` profile retains its declared precision/overflow tradeoff.
+`fixed64-bigint` normalizes `int64` and `uint64` while deliberately retaining
+the direct number-profile tradeoff for narrower integers and native `int`,
+`uint`, and `uintptr`. A reached identity or control decision that depends on
+exact fixed-width 64-bit arithmetic therefore requires at least
+`fixed64-bigint`; one that depends on narrow fixed-width or 64-bit native
+integer overflow requires `bigint`. There is no package allowlist, adaptive
+representation heuristic, or hidden per-call profile.
 
 A canonical Go string is represented as one target code unit per Go byte. It
 is not a host-Unicode string. The portable UTF-8 boundary is the sole owner of
