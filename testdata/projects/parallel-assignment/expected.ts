@@ -18,19 +18,20 @@ export function Declare(left: int32, right: int32): int32 {
     const assignmentValue6 = right;
     let first = assignmentValue5;
     let second = assignmentValue6;
-    return first + second;
+    return first + second | 0;
 }
 export function Shadow(value: int32): int32 {
     if (true) {
-        const assignmentValue7 = value + 1;
+        const assignmentValue7 = value + 1 | 0;
         const assignmentValue8 = value;
         let value__shadow_1 = assignmentValue7;
         let previous = assignmentValue8;
-        return value__shadow_1 + previous;
+        return value__shadow_1 + previous | 0;
     }
     return 0;
 }
 export function Accumulate(total: int32, delta: int32): int32 {
-    total += delta;
+    const assignmentValue9 = delta;
+    total = total + assignmentValue9 | 0;
     return total;
 }

@@ -103,6 +103,18 @@ func CarrierRepresentation(
 	profile api.IntegerRepresentation,
 	carrier Carrier,
 ) (api.IntegerCarrier, bool) {
+	abi, ok := scalarABI(profile, carrier)
+	if !ok {
+		return api.IntegerCarrierInvalid, false
+	}
+	representation, err := abi.Carrier(carrier.Alias())
+	return representation, err == nil
+}
+
+func scalarABI(
+	profile api.IntegerRepresentation,
+	carrier Carrier,
+) (api.ScalarABI, bool) {
 	width := api.NativeIntegerWidth64
 	if carrier.Alias() == api.PrimitiveInt ||
 		carrier.Alias() == api.PrimitiveUint ||
@@ -111,13 +123,10 @@ func CarrierRepresentation(
 	}
 	abi, err := api.NewScalarABI(profile, width)
 	if err != nil {
-		return api.IntegerCarrierInvalid, false
+		var invalid api.ScalarABI
+		return invalid, false
 	}
-	representation, err := api.IntegerCarrierRepresentation(
-		carrier.Alias(),
-		abi,
-	)
-	return representation, err == nil
+	return abi, true
 }
 
 func UsesBigInt(
@@ -126,6 +135,25 @@ func UsesBigInt(
 ) bool {
 	representation, ok := CarrierRepresentation(profile, carrier)
 	return ok && representation == api.IntegerCarrierBigInt
+}
+
+func RequiresExactResult(
+	profile api.IntegerRepresentation,
+	carrier Carrier,
+) bool {
+	abi, ok := scalarABI(profile, carrier)
+	return ok && abi.RequiresExactIntegerResult(carrier.Alias())
+}
+
+func RequiresExactNumberMultiplication(
+	profile api.IntegerRepresentation,
+	carrier Carrier,
+) bool {
+	representation, ok := CarrierRepresentation(profile, carrier)
+	return ok &&
+		RequiresExactResult(profile, carrier) &&
+		representation == api.IntegerCarrierNumber &&
+		carrier.Width() == 32
 }
 
 func FormatConstant(

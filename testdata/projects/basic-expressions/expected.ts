@@ -1,22 +1,22 @@
 import type { bool, int32 } from "@gotots/runtime/scalars.js";
 export function Arithmetic(value: int32): int32 {
-    return (value - 3) * 2;
+    return globalThis.Math.imul((value - 3 | 0), 2);
 }
 export function WrapAdd(value: int32): int32 {
-    return value + 1;
+    return value + 1 | 0;
 }
 export function WrapSubtract(value: int32): int32 {
-    return value - 1;
+    return value - 1 | 0;
 }
 export function WrapMultiply(value: int32): int32 {
-    return value * 2;
+    return globalThis.Math.imul(value, 2);
 }
 export function Increment(value: int32): int32 {
-    value++;
+    value = value + 1 | 0;
     return value;
 }
 export function Decrement(value: int32): int32 {
-    value--;
+    value = value - 1 | 0;
     return value;
 }
 export function Compare(left: int32, right: int32): [

@@ -149,11 +149,14 @@ func TestParallelAssignmentBoundaryMutationsFailAtTheirOwners(t *testing.T) {
 	}
 }
 
-func TestCompoundIdentifierAssignmentUsesDirectTargetOperation(t *testing.T) {
+func TestNumberProfileCompoundIdentifierAssignmentUsesDirectTargetOperation(t *testing.T) {
 	loaded := loadProject(t)
-	targetFile := emitProject(
+	options := emit.DefaultOptions()
+	options.IntegerRepresentation = emit.IntegerRepresentationNumber
+	targetFile := emitProjectWithOptions(
 		t,
 		loaded,
+		options,
 	)
 	function := assignmentFunctionByName(t, targetFile, "Accumulate")
 	statement := function.Body().(tsgo.Block).Statements()[0].(tsgo.ExpressionStatement)
@@ -164,6 +167,61 @@ func TestCompoundIdentifierAssignmentUsesDirectTargetOperation(t *testing.T) {
 	}
 	if identifierText(operation.Right()) != "delta" {
 		t.Fatal("compound assignment changed its right operand")
+	}
+}
+
+func TestNumberProfileDefinedIntegerUpdatesKeepTheirRepresentationOwner(t *testing.T) {
+	directory := t.TempDir()
+	writeFile(
+		t,
+		filepath.Join(directory, "go.mod"),
+		"module example.com/definedupdate\n\ngo 1.26.4\n",
+	)
+	writeFile(t, filepath.Join(directory, "source.go"), `package definedupdate
+
+type Count int32
+
+func (Count) Marker() {}
+
+func Update(value Count, delta Count) Count {
+	value += delta
+	value++
+	return value
+}
+`)
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := emit.DefaultOptions()
+	options.IntegerRepresentation = emit.IntegerRepresentationNumber
+	targetFile := emitProjectWithOptions(t, loaded, options)
+	function := assignmentFunctionByName(t, targetFile, "Update")
+	assignments := 0
+	for _, statement := range function.Body().(tsgo.Block).Statements() {
+		expressionStatement, ok := statement.(tsgo.ExpressionStatement)
+		if !ok {
+			continue
+		}
+		if _, direct := expressionStatement.Expression().(tsgo.PostfixUnaryExpression); direct {
+			t.Fatal("defined integer increment bypasses its representation owner")
+		}
+		operation, ok := expressionStatement.Expression().(tsgo.BinaryExpression)
+		if !ok {
+			continue
+		}
+		if operation.OperatorToken().Kind() == tsgo.SyntaxKindPlusEqualsToken {
+			t.Fatal("defined integer compound assignment bypasses its representation owner")
+		}
+		if operation.OperatorToken().Kind() == tsgo.SyntaxKindEqualsToken {
+			assignments++
+		}
+	}
+	if assignments != 2 {
+		t.Fatalf("defined integer owned assignments = %d, want two", assignments)
 	}
 }
 
@@ -301,9 +359,21 @@ func emitProject(
 	t *testing.T,
 	loaded *load.Package,
 ) tsgo.SourceFile {
+	return emitProjectWithOptions(t, loaded, emit.DefaultOptions())
+}
+
+func emitProjectWithOptions(
+	t *testing.T,
+	loaded *load.Package,
+	options emit.Options,
+) tsgo.SourceFile {
 	t.Helper()
 	source := loaded.Files()[0].Syntax()
-	emission, err := emit.CompileFile(loaded, source)
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.CompileWithOptions(loaded.Program(), roots, options)
 	if err != nil {
 		t.Fatal(err)
 	}

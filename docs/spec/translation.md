@@ -389,23 +389,30 @@ A 64-bit integer selected as `number` instead emits an ordinary local alias and
 is certified only under that profile's named precision envelope; it does not
 pretend to carry the exact neutral `int64` contract.
 
-Each BigInt-carrier profile is exact for operations whose selected carrier is
-`bigint`. Their arithmetic, bitwise, shift, unary, compound-assignment, and
-increment results are normalized to the selected Go width before they become
-observable. The demand-generated `goInt64` and `goUint64` runtime operations
-are the only wide-result wrappers; each delegates to the corresponding
-`globalThis.BigInt.asIntN` or `asUintN` operation. For example, `uint64(max) +
-1` emits `goUint64(max + 1n)` and produces zero. Number-carried aliases retain
-direct operations and the declared number-carrier overflow tradeoff; neither
-explicit profile adds wrappers to ordinary `int32` expressions, and
-`fixed64-bigint` does not add them to native `int`. This policy is owned by the
-integer value family and is never selected by package, function, or identifier
-spelling.
+The canonical `bigint` profile is exact for every fixed-width integer result.
+Its arithmetic, bitwise, shift, unary, compound-assignment, and increment
+results are normalized to the selected Go width before they become observable.
+The demand-generated `goInt64` and `goUint64` runtime operations own BigInt
+normalization and delegate to `globalThis.BigInt.asIntN` or `asUintN`. Narrower
+number carriers use direct constant-size width/sign normalization; exact
+32-bit multiplication uses `globalThis.Math.imul` because binary64
+multiplication can irreversibly lose the low product bits. Thus
+`uint64(max) + 1` emits `goUint64(max + 1n)`, while
+`uint32(max) * uint32(max)` emits `globalThis.Math.imul(max, max) >>> 0`; both
+produce the Go result.
 
-A product whose reached behavior depends on exact fixed-width wide-integer
-values, such as a `uint64` hash used as a cache identity, cannot claim runtime
-parity under the `number` profile. It must select at least `fixed64-bigint`
-explicitly. A product whose behavior additionally depends on native 64-bit
+The explicit `number` and `fixed64-bigint` executable profiles retain direct
+number-carried operations and their declared overflow tradeoff.
+`fixed64-bigint` normalizes `int64` and `uint64`, but does not add narrow or
+native-`int` normalization. The scalar ABI owns whether an integer alias
+requires exact results; the integer value family owns the resulting target
+operation and normalization. Neither is selected by package, function, or
+identifier spelling.
+
+A product whose reached behavior depends on exact `int64` or `uint64` values,
+such as a wide hash used as a cache identity, cannot claim runtime parity under
+the `number` profile. It must select at least `fixed64-bigint` explicitly. A
+product whose behavior also depends on narrow fixed-width or native 64-bit
 integer overflow must select `bigint`. GoToTS neither changes a profile
 heuristically nor adds a local override for the reached package.
 

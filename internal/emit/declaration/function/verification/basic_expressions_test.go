@@ -46,17 +46,29 @@ func TestBasicExpressionsCreateExactTargetTrees(t *testing.T) {
 
 	arithmetic := targetFunction(t, targetFile, "Arithmetic")
 	arithmeticReturn := targetReturn(t, arithmetic)
-	product, ok := arithmeticReturn.Expression().(tsgo.BinaryExpression)
-	if !ok || product.OperatorToken().Kind() != tsgo.SyntaxKindAsteriskToken {
-		t.Fatalf("Arithmetic expression = %T, want direct multiplication", arithmeticReturn.Expression())
+	product, ok := arithmeticReturn.Expression().(tsgo.CallExpression)
+	if !ok || len(product.Arguments()) != 2 {
+		t.Fatalf("Arithmetic expression = %T, want exact int32 multiplication", arithmeticReturn.Expression())
 	}
-	group, ok := product.Left().(tsgo.ParenthesizedExpression)
+	member, ok := product.Expression().(tsgo.PropertyAccessExpression)
 	if !ok {
-		t.Fatalf("Arithmetic left = %T, want source parenthesized subtraction", product.Left())
+		t.Fatalf("Arithmetic callee = %T, want Math.imul", product.Expression())
 	}
-	difference, ok := group.Expression().(tsgo.BinaryExpression)
+	memberName, nameOK := member.Name().(tsgo.Identifier)
+	if !nameOK || memberName.Text() != "imul" {
+		t.Fatalf("Arithmetic callee member = %T, want imul", member.Name())
+	}
+	group, ok := product.Arguments()[0].(tsgo.ParenthesizedExpression)
+	if !ok {
+		t.Fatalf("Arithmetic left = %T, want source parenthesized subtraction", product.Arguments()[0])
+	}
+	normalized, ok := group.Expression().(tsgo.BinaryExpression)
+	if !ok || normalized.OperatorToken().Kind() != tsgo.SyntaxKindBarToken {
+		t.Fatalf("Arithmetic grouped expression = %T, want int32 normalization", group.Expression())
+	}
+	difference, ok := normalized.Left().(tsgo.BinaryExpression)
 	if !ok || difference.OperatorToken().Kind() != tsgo.SyntaxKindMinusToken {
-		t.Fatalf("Arithmetic grouped expression = %T, want subtraction", group.Expression())
+		t.Fatalf("Arithmetic normalized operand = %T, want subtraction", normalized.Left())
 	}
 
 	shortCircuit := targetFunction(t, targetFile, "ShortCircuitAnd")

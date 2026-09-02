@@ -197,12 +197,27 @@ func TestWaveFourLabelsUseCheckerIdentityNotSourceSpelling(t *testing.T) {
 	}
 	loop := targetLabel.Statement().(tsgo.ForStatement)
 	loopBody := loop.Statement().(tsgo.Block).Statements()
-	continueStatement := loopBody[2].(tsgo.IfStatement).
-		ThenStatement().(tsgo.Block).
-		Statements()[0].(tsgo.ContinueStatement)
-	breakStatement := loopBody[4].(tsgo.IfStatement).
-		ThenStatement().(tsgo.Block).
-		Statements()[0].(tsgo.BreakStatement)
+	var continueStatement tsgo.ContinueStatement
+	var breakStatement tsgo.BreakStatement
+	for _, statement := range loopBody {
+		conditional, ok := statement.(tsgo.IfStatement)
+		if !ok {
+			continue
+		}
+		branch := conditional.ThenStatement().(tsgo.Block).Statements()
+		if len(branch) != 1 {
+			continue
+		}
+		switch statement := branch[0].(type) {
+		case tsgo.ContinueStatement:
+			continueStatement = statement
+		case tsgo.BreakStatement:
+			breakStatement = statement
+		}
+	}
+	if continueStatement == nil || breakStatement == nil {
+		t.Fatal("target loop lacks its labeled continue or break")
+	}
 	if continueStatement.Label().Text() != "outer" ||
 		breakStatement.Label().Text() != "outer" {
 		t.Fatalf(

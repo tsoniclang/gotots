@@ -24,7 +24,7 @@ func TestDirectSeamsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	for _, expected := range []string{
 		"const low: int32 = 3;",
 		"if (value < low)",
-		"for (current = 0; current < limit; current = current + 1)",
+		"for (current = 0; current < limit; current = current + 1 | 0)",
 		"for (Touch(); value < 2; Touch())",
 		"let firstIteration",
 		"for (;;)",

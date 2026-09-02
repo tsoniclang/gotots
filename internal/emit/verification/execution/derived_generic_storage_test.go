@@ -75,7 +75,7 @@ func TestDerivedGenericStorageUsesCanonicalProjection(t *testing.T) {
 	}
 	if !strings.Contains(
 		artifacts.printed,
-		"return value.Value + DerivedBox.$storageOf(generic).Value;",
+		"return value.Value + DerivedBox.$storageOf(generic).Value | 0;",
 	) {
 		t.Fatalf(
 			"generic derived selection bypasses canonical storage:\n%s",

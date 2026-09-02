@@ -17,15 +17,15 @@ export function Sum(limit: int32): int32 {
     let total = 0;
     let current = 0;
     for (; current < limit;) {
-        total = total + current;
-        current++;
+        total = total + current | 0;
+        current = current + 1 | 0;
     }
     return total;
 }
 export function Once(): int32 {
     let total = 0;
     for (;;) {
-        total = total + 1;
+        total = total + 1 | 0;
         break;
     }
     return total;

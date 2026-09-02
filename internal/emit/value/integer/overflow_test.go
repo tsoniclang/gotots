@@ -4,12 +4,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+var narrowOverflowRoots = []string{
+	"NarrowOverflowBinary",
+	"NarrowOverflowUpdate",
+	"NumberBits8",
+	"NumberBits16",
+	"NumberBits32",
+	"NumberShifts",
+	"NumberUnsignedShift",
+	"NumberVariableShift",
+	"NumberVariableUnsignedShift",
+	"NumberUnary",
+	"NumberUnaryUint",
+}
 
 func assertBigIntDivisionUsesRuntime(
 	t *testing.T,
@@ -108,6 +123,155 @@ func TestIntegerBigIntCarrierProfilesWrapFixedWidthOperationsDifferentially(t *t
 	}
 }
 
+func TestIntegerCanonicalProfileNormalizesNarrowFixedWidthResults(t *testing.T) {
+	loaded := loadIntegerFamily(t)
+	emission := compileIntegerFamily(
+		t,
+		loaded,
+		integerOptions(emit.IntegerRepresentationBigInt),
+		narrowOverflowRoots...,
+	)
+	printed := printIntegerFamily(t, emission)
+	if !strings.Contains(printed, "globalThis.Math.imul(") {
+		t.Fatalf("canonical narrow multiplication is not exact:\n%s", printed)
+	}
+	for _, required := range []string{" | 0", " >>> 0", " << 24", " >> 24"} {
+		if !strings.Contains(printed, required) {
+			t.Fatalf("canonical narrow artifact lacks %q:\n%s", required, printed)
+		}
+	}
+	workingDirectory := t.TempDir()
+	goOutput := executeNarrowOverflowGo(t, workingDirectory)
+	targetOutput := executeNarrowOverflowTS(t, emission, workingDirectory)
+	if targetOutput != goOutput {
+		t.Fatalf("canonical narrow TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+	}
+}
+
+func TestIntegerExecutableProfilesKeepDirectNarrowOperations(t *testing.T) {
+	loaded := loadIntegerFamily(t)
+	for _, representation := range []emit.IntegerRepresentation{
+		emit.IntegerRepresentationNumber,
+		emit.IntegerRepresentationFixed64BigInt,
+	} {
+		t.Run(representation.String(), func(t *testing.T) {
+			emission := compileIntegerFamily(
+				t,
+				loaded,
+				integerOptions(representation),
+				narrowOverflowRoots...,
+			)
+			printed := printIntegerFamily(t, emission)
+			for _, forbidden := range []string{
+				"globalThis.Math.imul(",
+				" << 24 >> 24",
+				" << 16 >> 16",
+			} {
+				if strings.Contains(printed, forbidden) {
+					t.Fatalf("%s narrow artifact contains %q:\n%s", representation, forbidden, printed)
+				}
+			}
+			for _, required := range []string{
+				"maxSigned++",
+				"maxUnsigned += 1",
+			} {
+				if !strings.Contains(printed, required) {
+					t.Fatalf("%s narrow artifact lacks direct %q:\n%s", representation, required, printed)
+				}
+			}
+		})
+	}
+}
+
+func executeNarrowOverflowTS(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	workingDirectory string,
+) string {
+	t.Helper()
+	artifacts := materializeIntegerFamily(t, emission, workingDirectory)
+	return executeNarrowOverflowArtifacts(t, artifacts, workingDirectory)
+}
+
+func executeNarrowOverflowArtifacts(
+	t *testing.T,
+	artifacts materializedProgram,
+	workingDirectory string,
+) string {
+	t.Helper()
+	runnerPath := filepath.Join(workingDirectory, "runner.ts")
+	writeFile(t, runnerPath, `import * as values from "`+
+		artifacts.module(t, "source.ts")+`";
+
+const row = (values: readonly number[]): string => values.map(String).join(" ");
+console.log(row(values.NarrowOverflowBinary(2147483647, -2147483648, 4294967295, 32767, 65535, 127, 255)));
+console.log(row(values.NarrowOverflowUpdate(2147483647, 4294967295, 127, -128)));
+console.log(row(values.NumberBits8(-7, 3)));
+console.log(row(values.NumberBits16(60000, 3855)));
+console.log(row(values.NumberBits32(4042322160, 252645135)));
+console.log(row(values.NumberShifts(-128)));
+console.log(row(values.NumberUnsignedShift(4042322160)));
+console.log(row(values.NumberVariableShift(-9, 32)));
+console.log(row(values.NumberVariableUnsignedShift(15, 40)));
+console.log(row(values.NumberUnary(-123456)));
+console.log(String(values.NumberUnaryUint(4042322160)));
+`)
+	return executeMaterializedTypeScript(
+		t,
+		workingDirectory,
+		artifacts,
+		runnerPath,
+	)
+}
+
+func executeNarrowOverflowGo(t *testing.T, workingDirectory string) string {
+	t.Helper()
+	modulePath, err := filepath.Abs(integerFamilyDirectory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runnerDirectory := filepath.Join(workingDirectory, "narrow-go-runner")
+	if err := os.MkdirAll(runnerDirectory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(runnerDirectory, "go.mod"), fmt.Sprintf(`module example.com/narrowrunner
+
+go 1.26.4
+
+require example.com/integerfamily v0.0.0
+
+replace example.com/integerfamily => %s
+`, filepath.ToSlash(modulePath)))
+	writeFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+	values "example.com/integerfamily"
+)
+
+func main() {
+	fmt.Println(values.NarrowOverflowBinary(2147483647, -2147483648, 4294967295, 32767, 65535, 127, 255))
+	fmt.Println(values.NarrowOverflowUpdate(2147483647, 4294967295, 127, -128))
+	fmt.Println(values.NumberBits8(-7, 3))
+	fmt.Println(values.NumberBits16(60000, 3855))
+	fmt.Println(values.NumberBits32(4042322160, 252645135))
+	fmt.Println(values.NumberShifts(-128))
+	fmt.Println(values.NumberUnsignedShift(4042322160))
+	fmt.Println(values.NumberVariableShift(-9, 32))
+	fmt.Println(values.NumberVariableUnsignedShift(15, 40))
+	fmt.Println(values.NumberUnary(-123456))
+	fmt.Println(values.NumberUnaryUint(4042322160))
+}
+`)
+	return run(
+		t,
+		runnerDirectory,
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"run",
+		".",
+	)
+}
+
 func executeIntegerOverflowTS(
 	t *testing.T,
 	emission emit.ProgramEmission,
@@ -163,7 +327,13 @@ func main() {
 	fmt.Println(values.WideHash("a"), values.WideHash("b"), values.WideHash("cache-key"))
 }
 `)
-	return run(t, runnerDirectory, "go", "run", ".")
+	return run(
+		t,
+		runnerDirectory,
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"run",
+		".",
+	)
 }
 
 func TestIntegerNumberProfileRecordsWideHashBoundary(t *testing.T) {
@@ -232,5 +402,11 @@ func main() {
 	fmt.Println(values.WideHash("a"), values.WideHash("b"), values.WideHash("cache-key"))
 }
 `)
-	return run(t, runnerDirectory, "go", "run", ".")
+	return run(
+		t,
+		runnerDirectory,
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"run",
+		".",
+	)
 }

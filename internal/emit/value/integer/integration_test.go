@@ -252,7 +252,6 @@ func compileIntegerFamily(
 func assertDirectIntegerArtifact(t *testing.T, printed string, bigint bool) {
 	t.Helper()
 	for _, forbidden := range []string{
-		"Math.imul",
 		" as any",
 		": any",
 		"unknown",
@@ -264,7 +263,11 @@ func assertDirectIntegerArtifact(t *testing.T, printed string, bigint bool) {
 			t.Fatalf("integer artifact contains %q:\n%s", forbidden, printed)
 		}
 	}
+	if !bigint && strings.Contains(printed, "Math.imul") {
+		t.Fatalf("number-profile integer artifact contains Math.imul:\n%s", printed)
+	}
 	if bigint && (!strings.Contains(printed, "1n") ||
+		!strings.Contains(printed, "globalThis.Math.imul(") ||
 		!strings.Contains(printed, "export type int32 = TsonicInt32;") ||
 		!strings.Contains(printed, "export type int64 = TsonicInt64;") ||
 		strconv.IntSize == 64 &&
@@ -394,6 +397,20 @@ func materializeIntegerFamily(
 	emission emit.ProgramEmission,
 	workingDirectory string,
 ) materializedProgram {
+	return materializeIntegerFamilyWithTransform(
+		t,
+		emission,
+		workingDirectory,
+		nil,
+	)
+}
+
+func materializeIntegerFamilyWithTransform(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	workingDirectory string,
+	transform func(emit.TargetFile) tsgo.SourceFile,
+) materializedProgram {
 	t.Helper()
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
 	if err != nil {
@@ -406,7 +423,11 @@ func materializeIntegerFamily(
 	})
 	result := materializedProgram{modules: make(map[string]string)}
 	for _, file := range emission.Files() {
-		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		source := file.SourceFile()
+		if transform != nil {
+			source = transform(file)
+		}
+		printed, err := client.PrintNode(source, tsgo.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}

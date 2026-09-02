@@ -81,7 +81,7 @@ export function ReturnSnapshotResult(): int32 {
     let value = NewBox(1);
     let snapshot = Snapshot(addressOf<Box>(value));
     value.Point.X = 2;
-    return snapshot.X * 10 + value.Point.X;
+    return globalThis.Math.imul(snapshot.X, 10) + value.Point.X | 0;
 }
 export function ZeroIsFresh(): bool {
     let left = Box.$zero();
@@ -91,22 +91,22 @@ export function ZeroIsFresh(): bool {
 }
 export function CopyIsolated(value: Box): int32 {
     let copy = Box.$copy(value);
-    copy.Point.X = copy.Point.X + 1;
-    return value.Point.X * 10 + copy.Point.X;
+    copy.Point.X = copy.Point.X + 1 | 0;
+    return globalThis.Math.imul(value.Point.X, 10) + copy.Point.X | 0;
 }
 export function AssignIsolated(value: Box): int32 {
     let target = Box.$zero();
     target = Box.$copy(value);
-    target.Point.X = target.Point.X + 2;
-    return value.Point.X * 10 + target.Point.X;
+    target.Point.X = target.Point.X + 2 | 0;
+    return globalThis.Math.imul(value.Point.X, 10) + target.Point.X | 0;
 }
 export function MutateParameter(value: Box): Box {
-    value.Point.X = value.Point.X + 3;
+    value.Point.X = value.Point.X + 3 | 0;
     return Box.$copy(value);
 }
 export function ParameterIsolated(value: Box): int32 {
     let changed = MutateParameter(Box.$copy(value));
-    return value.Point.X * 10 + changed.Point.X;
+    return globalThis.Math.imul(value.Point.X, 10) + changed.Point.X | 0;
 }
 export function Equal(left: Box, right: Box): bool {
     return Box.$equal(left, right);
@@ -132,7 +132,7 @@ export function EqualDifferentResult(): bool {
 export function MethodResult(): int32 {
     let first = NewBox(4);
     let changed = Invoke(Box.$copy(first), 9);
-    return changed.Point.X * 10 + first.Point.X;
+    return globalThis.Math.imul(changed.Point.X, 10) + first.Point.X | 0;
 }
 export function ReservedValue(): int32 {
     let value = new Reserved(7);
@@ -154,7 +154,7 @@ export function MultipleResultIsolated(): int32 {
     let left = results[0];
     let right = results[1];
     left.Point.X = 8;
-    return left.Point.X * 10 + right.Point.X;
+    return globalThis.Math.imul(left.Point.X, 10) + right.Point.X | 0;
 }
 export function ReadX(value: Box): int32 {
     return value.Point.X;
@@ -167,7 +167,7 @@ export function CompositeArgument(): int32 {
     return ReadX(new Box(fieldValue8, fieldValue7));
 }
 export function ReadXAfter(first: int32, value: Box): int32 {
-    return first * 10 + value.Point.X;
+    return globalThis.Math.imul(first, 10) + value.Point.X | 0;
 }
 export function DirectValue(): int32 {
     return 2;
@@ -212,7 +212,7 @@ export function NotEqual(): bool {
 export function ExplicitVarCopy(value: Box): int32 {
     let copied = Box.$copy(value);
     copied.Point.X = 6;
-    return value.Point.X * 10 + copied.Point.X;
+    return globalThis.Math.imul(value.Point.X, 10) + copied.Point.X | 0;
 }
 export function ExplicitVarCopyResult(): int32 {
     return ExplicitVarCopy(NewBox(4));
@@ -225,11 +225,11 @@ export function ParallelAssignment(): int32 {
     left = assignmentValue;
     right = assignmentValue2;
     left.Point.X = 8;
-    return left.Point.X * 10 + right.Point.X;
+    return globalThis.Math.imul(left.Point.X, 10) + right.Point.X | 0;
 }
 export function GroupedResult(): int32 {
     let value = new Grouped(1, 2);
-    return value.Left * 10 + value.Right;
+    return globalThis.Math.imul(value.Left, 10) + value.Right | 0;
 }
 export function EmptyEqual(): bool {
     let left = Empty.$zero();

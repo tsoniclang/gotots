@@ -87,6 +87,32 @@ func TestFixed64BigIntProfileLeavesNativeIntegersAsNumbers(t *testing.T) {
 	}
 }
 
+func TestScalarABISelectsExactIntegerResultPolicy(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		profile IntegerRepresentation
+		alias   PrimitiveAlias
+		want    bool
+	}{
+		{"number int32", IntegerRepresentationNumber, PrimitiveInt32, false},
+		{"fixed64 int32", IntegerRepresentationFixed64BigInt, PrimitiveInt32, false},
+		{"fixed64 int64", IntegerRepresentationFixed64BigInt, PrimitiveInt64, true},
+		{"canonical int8", IntegerRepresentationBigInt, PrimitiveInt8, true},
+		{"canonical int64", IntegerRepresentationBigInt, PrimitiveInt64, true},
+		{"non-integer", IntegerRepresentationBigInt, PrimitiveBool, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			abi, err := NewScalarABI(test.profile, NativeIntegerWidth64)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if actual := abi.RequiresExactIntegerResult(test.alias); actual != test.want {
+				t.Fatalf("RequiresExactIntegerResult() = %t, want %t", actual, test.want)
+			}
+		})
+	}
+}
+
 func TestPrimitiveAliasIDsAndNamesPreserveSourceIdentity(t *testing.T) {
 	for _, test := range []struct {
 		alias PrimitiveAlias

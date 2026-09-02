@@ -4,11 +4,11 @@ export function Even(value: int32): int32 {
     if (value === 0) {
         return Offset;
     }
-    return Odd(value - 1);
+    return Odd(value - 1 | 0);
 }
 export function Odd(value: int32): int32 {
     if (value === 0) {
         return 0;
     }
-    return Even(value - 1);
+    return Even(value - 1 | 0);
 }
