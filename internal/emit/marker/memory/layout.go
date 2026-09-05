@@ -33,10 +33,22 @@ func DataLayout(context api.Context) (api.ExpressionEmission, error) {
 }
 
 func Layout(context api.Context, children api.ChildEmitter, source ast.Node, pointee types.Type) (api.ExpressionEmission, api.TypeEmission, error) {
-	if pointee == nil || api.ContainsGenericTypeParameter(pointee) {
+	if pointee == nil || api.ContainsGenericTypeParameter(pointee) || !physicalLayoutRepresentable(pointee) {
 		return api.ExpressionEmission{}, api.TypeEmission{}, api.Unsupported(context, api.CategoryExpression, source)
 	}
-	represented, err := children.RepresentedType(context.WithRole(api.RoleResultType), nil, pointee)
+	projected, err := context.Values().RequiresStorageProjection(context, pointee)
+	if err != nil {
+		return api.ExpressionEmission{}, api.TypeEmission{}, err
+	}
+	if _, structure := pointee.Underlying().(*types.Struct); structure && !projected {
+		return api.ExpressionEmission{}, api.TypeEmission{}, api.Unsupported(context, api.CategoryExpression, source)
+	}
+	var represented api.TypeEmission
+	if projected {
+		represented, err = context.Values().StorageType(context.WithRole(api.RoleStorageType), source, pointee)
+	} else {
+		represented, err = children.RepresentedType(context.WithRole(api.RoleResultType), nil, pointee)
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, api.TypeEmission{}, err
 	}
@@ -61,9 +73,6 @@ func Layout(context api.Context, children api.ChildEmitter, source ast.Node, poi
 		}
 		offsets := context.TypesSizes().Offsetsof(fields)
 		for index, field := range fields {
-			if field.Name() == "_" {
-				continue
-			}
 			name, nameErr := context.Names().Member(field)
 			if nameErr != nil {
 				return api.ExpressionEmission{}, api.TypeEmission{}, nameErr

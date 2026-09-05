@@ -813,6 +813,15 @@ and target support, not a fabricated JavaScript address. Unsupported layouts
 and operations fail closed; managed TypeScript memory support is not a claim
 of unrestricted native address emulation.
 
+For a flat struct `type Pair struct { First, Second uint32 }`, the selected
+physical carrier is the existing `Pair$Storage` type. The emitter constructs
+`memoryLayout<Pair$Storage>(abi, 8, 4, 8, ...)` with selectors of `First` at
+offset 0 and `Second` at offset 4. `projectPointer` uses `Pair.$storageOf` and
+`Pair.$fromStorage` to preserve the logical pointer, including nil and writes
+in both directions. Layout metadata must never attach to logical accessors.
+This preserves the source contract; an executable target still needs an exact
+aggregate codec or must reject it. It is not a claim of Node aggregate support.
+
 ### Interfaces
 
 An interface value is nil or a canonical dynamic-type token plus represented

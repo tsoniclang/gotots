@@ -56,9 +56,21 @@ func Convert(
 		if layoutErr != nil {
 			return api.ExpressionEmission{}, true, layoutErr
 		}
+		if !sourceRaw {
+			value, err = memorymarker.ToStoragePointer(context, children, source, pointer.Elem(), value)
+			if err != nil {
+				return api.ExpressionEmission{}, true, err
+			}
+		}
 		target, err = pointermarker.Operation(context, operation, []api.TypeEmission{pointee}, []api.ExpressionEmission{value, layout})
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
+		}
+		if sourceRaw {
+			target, err = context.Values().ProjectStoragePointer(context, source, pointer.Elem(), target)
+			if err != nil {
+				return api.ExpressionEmission{}, true, err
+			}
 		}
 	}
 	if wrapsTarget {

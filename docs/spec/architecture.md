@@ -716,6 +716,18 @@ ABI supplies a registered `DataLayout` token carrying byte order and address
 width; it is not inferred from the machine running the target. The
 GoToTS-owned ABI provider is source configuration, not a target implementation.
 
+A logical wrapper is not a physical layout. Raw conversion demands the
+existing value/storage projection first. For example, `Pointer<Pair>` projects
+to `Pointer<Pair$Storage>` using the existing storage-of/from-storage inverse;
+`memoryField` then selects the storage type's real property declarations, not
+a logical getter or constructor parameter. Reinterpretation applies the same
+inverse projection. There is no second descriptor registry or weakened shared
+field selector. Scalar and pointer leaves and flat structs with those fields
+have this closed source representation. Nested/blank-field aggregates,
+array/slice/string/interface descriptors, complex values, and runtime handles
+without a physical projection remain source boundaries; publishing their
+logical wrapper with only a byte size is not information preservation.
+
 The separately built `abi/` package implements that source-configuration
 boundary. Its production code registers immutable declarations and descriptors
 through the shared provider API; it neither checks source nor imports a target
