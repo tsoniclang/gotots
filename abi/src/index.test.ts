@@ -8,9 +8,7 @@ import { goAbiCompilerContributions } from "./index.js";
 
 test("selected Go ABI tokens produce exact shared layout and raw-memory facts", () => {
   const contributions = goAbiCompilerContributions();
-  const checked = createCompilerSessionFromFiles({
-    currentDirectory: "/src",
-    files: { "/src/index.ts": `
+  const checked = checkABI(`
       import { little32, little64, big32, big64 } from "@gotots/abi/layout.js";
       import type { uint32 } from "@tsonic/core/types.js";
       import { memoryLayout, addressOf, toRawPointer, reinterpretRawPointer, storePointer } from "@tsonic/core/lang.js";
@@ -22,14 +20,7 @@ test("selected Go ABI tokens produce exact shared layout and raw-memory facts", 
       const raw = toRawPointer(addressOf(count), second);
       const view = reinterpretRawPointer(raw, second);
       if (view !== undefined) storePointer(view, 7);
-    ` },
-    compilerOptions: { strict: true, target: "es2022", module: "esnext", moduleResolution: "bundler" },
-    extensionHostOptions: { extensions: [
-      createSourceSemanticsExtension({ modules: tsonicCoreSourceSemanticsModules() }),
-      createTsonicCoreSourceExtension({ dataLayouts: contributions.dataLayouts ?? [] }),
-      ...contributions.extensions ?? [],
-    ] },
-  }).checkSource();
+    `);
   const diagnostics = checked.diagnostics.filter((diagnostic) => diagnostic !== undefined);
   assert.equal(diagnostics.length, 0, formatDiagnostics(diagnostics, "/src"));
   assert.equal(checked.extensionDiagnostics.length, 0,
@@ -52,3 +43,41 @@ test("selected Go ABI tokens produce exact shared layout and raw-memory facts", 
   assert.deepEqual(operations, ["to-raw", "reinterpret"]);
   assert.deepEqual(goAbiCompilerContributions().dataLayouts, contributions.dataLayouts);
 });
+
+test("same-spelled authored ABI objects do not acquire provider evidence", () => {
+  const checked = checkABI(`
+    import type { DataLayout, uint32 } from "@tsonic/core/types.js";
+    import { memoryLayout } from "@tsonic/core/lang.js";
+    const little64: DataLayout = { __tsonicDataLayout: "DataLayout" };
+    export const word = memoryLayout<uint32>(little64, 4, 4, 4);
+  `);
+  assert.equal(checked.diagnostics.length, 0);
+  assert.equal(checked.extensionDiagnostics.length, 1);
+  assert.equal(checked.extensionDiagnostics[0]?.extensionCode, "SOURCE_CORE_MEMORY_LAYOUT_NOT_PROVEN");
+});
+
+test("an imported ABI without its registration fails at the shared owner", () => {
+  const checked = checkABI(`
+    import { little64 } from "@gotots/abi/layout.js";
+    import type { uint32 } from "@tsonic/core/types.js";
+    import { memoryLayout } from "@tsonic/core/lang.js";
+    export const word = memoryLayout<uint32>(little64, 4, 4, 4);
+  `, false);
+  assert.equal(checked.diagnostics.length, 0);
+  assert.equal(checked.extensionDiagnostics.length, 1);
+  assert.equal(checked.extensionDiagnostics[0]?.extensionCode, "SOURCE_CORE_MEMORY_LAYOUT_NOT_PROVEN");
+});
+
+function checkABI(text: string, registerLayouts = true) {
+  const contributions = goAbiCompilerContributions();
+  return createCompilerSessionFromFiles({
+    currentDirectory: "/src",
+    files: { "/src/index.ts": text },
+    compilerOptions: { strict: true, target: "es2022", module: "esnext", moduleResolution: "bundler" },
+    extensionHostOptions: { extensions: [
+      createSourceSemanticsExtension({ modules: tsonicCoreSourceSemanticsModules() }),
+      createTsonicCoreSourceExtension({ dataLayouts: registerLayouts ? contributions.dataLayouts ?? [] : [] }),
+      ...contributions.extensions ?? [],
+    ] },
+  }).checkSource();
+}

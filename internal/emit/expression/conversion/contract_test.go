@@ -166,8 +166,14 @@ func TestRawPointerStorageEmitsCanonicalLayouts(t *testing.T) {
 
 import "unsafe"
 
+type ScalarPointer *int32
+type Raw unsafe.Pointer
+
 func Bind(value *int32) unsafe.Pointer { return unsafe.Pointer(value) }
 func RoundTrip(value *int32) *int32 { return (*int32)(unsafe.Pointer(value)) }
+func NamedRoundTrip(value ScalarPointer) ScalarPointer { return ScalarPointer(Raw(value)) }
+func NamedRaw(value unsafe.Pointer) Raw { return Raw(value) }
+func UnnamedRaw(value Raw) unsafe.Pointer { return unsafe.Pointer(value) }
 func Advance(value unsafe.Pointer, amount int32) unsafe.Pointer { return unsafe.Add(value, amount) }
 func Nil() unsafe.Pointer { return nil }
 func Same(left, right unsafe.Pointer) bool { return left == right }
@@ -188,7 +194,7 @@ func Lookup(pointer unsafe.Pointer) bool {
 		t.Fatal(err)
 	}
 	var roots []emit.Root
-	for _, name := range []string{"Bind", "RoundTrip", "Advance", "Nil", "Same", "Lookup"} {
+	for _, name := range []string{"Bind", "RoundTrip", "NamedRoundTrip", "NamedRaw", "UnnamedRaw", "Advance", "Nil", "Same", "Lookup"} {
 		root, rootErr := emit.NewRoot(loaded.Types().Scope().Lookup(name))
 		if rootErr != nil {
 			t.Fatal(rootErr)

@@ -193,6 +193,14 @@ Broad walls reject:
 
 ## Marker And Target Boundary Proof
 
+The source ABI adapter is tested as a separate integration package. Its
+production shared imports are limited to provider construction and type-only
+contracts. Mutation controls reject a live checker import there, a target or
+target-runtime dependency there, and those same adapter dependencies in the
+standalone compiler. Its test-only checker dependency cannot enter production
+through package metadata. The compiler dependency wall remains active for all
+other repository source.
+
 Every canonical marker occurrence owns one finalized TSTS fact selected by
 provider declaration identity and keyed to the exact node in the checked
 TS-Go-contract AST. The selected target transforms that same AST; it never

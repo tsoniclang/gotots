@@ -12,12 +12,16 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+type sourceLayoutNames interface {
+	SourceDataLayout(goabi.Layout) (api.NameReference, error)
+}
+
 func DataLayout(context api.Context) (api.ExpressionEmission, error) {
 	layout, err := goabi.Select(context.MemoryByteOrder(), context.TypesSizes().Sizeof(types.Typ[types.UnsafePointer]))
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	names, ok := context.Names().(api.SourceLayoutNames)
+	names, ok := context.Names().(sourceLayoutNames)
 	if !ok {
 		return api.ExpressionEmission{}, &api.InvariantError{Role: context.Role(), Reason: "source ABI has no canonical name owner"}
 	}

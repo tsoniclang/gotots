@@ -716,6 +716,15 @@ ABI supplies a registered `DataLayout` token carrying byte order and address
 width; it is not inferred from the machine running the target. The
 GoToTS-owned ABI provider is source configuration, not a target implementation.
 
+The separately built `abi/` package implements that source-configuration
+boundary. Its production code registers immutable declarations and descriptors
+through the shared provider API; it neither checks source nor imports a target
+or target runtime. Checker execution is confined to its integration tests.
+The Go compiler does not import, build, load, or invoke this package. Its
+ordinary build and translation path remains independent of Tsonic installation.
+Architecture walls check these two dependency surfaces separately; the ABI
+package is not an unchecked repository-wide dependency exception.
+
 Canonical output retains raw/typed conversion, byte offsets, nil, and layout
 operands before targets choose representations. A target must consume the
 shared finalized facts or reject the operation before publication. The
