@@ -784,27 +784,34 @@ GoToTS, and must exact-join the finalized TSTS facts for every transformed
 occurrence. The unoptimized/native-target build consumes the pointer facts
 directly.
 
-Opaque `unsafe.Pointer` identity uses the accepted target-neutral contract:
+`unsafe.Pointer` conversion retains writable storage and its selected layout:
 
 ```go
+var value uint32 = 1
 pointer := unsafe.Pointer(&value)
 same := pointer == unsafe.Pointer(&value)
-lookup[pointer] = true
+*(*uint32)(pointer) = 7
 ```
 
 ```ts
-const pointer: RawPointer | undefined = bindRawPointer(addressOf(value));
-const same = equalRawPointer(pointer, bindRawPointer(addressOf(value)));
-lookup.store(pointer, true); // the map key facet uses hashRawPointer
+const layout = memoryLayout<uint32>(little64, 4, 4, 4);
+const pointer = toRawPointer(addressOf(value), layout);
+const same = equalRawPointer(pointer, toRawPointer(addressOf(value), layout));
+const view = reinterpretRawPointer(pointer, layout);
+if (view === undefined) throw goNilPointerPanic();
+storePointer(view, 7);
 ```
 
-Nil remains `undefined`. A certified provider raw-pointer result is bound by
-its opaque object identity before entering generated code. Raw-address
-arithmetic, reinterpretation, raw-pointer-to-typed-pointer conversion,
-pointer/integer conversion, and provider raw-pointer inputs remain exact typed
-boundaries. Canonical output never exposes or fabricates an address, and safe
-typed pointers are not lowered through a legacy JavaScript virtual-address
-representation.
+The example selects the explicit little-endian 64-bit Go ABI. Layouts may be
+inlined at their demand site; the ABI import is deduplicated by the normal name
+owner. Nil remains `undefined`; the write changes `value`, not a copy.
+`unsafe.Add(pointer, offset)` emits `offsetRawPointer(pointer, offset, ABI)`;
+the integer operand keeps its exact selected width and signedness. A raw
+provider result without a certified address-bearing transport is rejected.
+Physical pointer/integer conversion requires an exact shared integer carrier
+and target support, not a fabricated JavaScript address. Unsupported layouts
+and operations fail closed; managed TypeScript memory support is not a claim
+of unrestricted native address emulation.
 
 ### Interfaces
 

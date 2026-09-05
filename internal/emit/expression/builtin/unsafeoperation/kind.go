@@ -13,6 +13,7 @@ const (
 	Sizeof
 	Alignof
 	Offsetof
+	Add
 )
 
 var objectKinds = map[types.Object]Kind{
@@ -23,6 +24,7 @@ var objectKinds = map[types.Object]Kind{
 	types.Unsafe.Scope().Lookup("Sizeof"):     Sizeof,
 	types.Unsafe.Scope().Lookup("Alignof"):    Alignof,
 	types.Unsafe.Scope().Lookup("Offsetof"):   Offsetof,
+	types.Unsafe.Scope().Lookup("Add"):        Add,
 }
 
 func Classify(builtin *types.Builtin) Kind {
@@ -33,7 +35,7 @@ func Classify(builtin *types.Builtin) Kind {
 }
 
 func (k Kind) Runtime() bool {
-	return k >= String && k <= SliceData
+	return k >= String && k <= SliceData || k == Add
 }
 
 func (k Kind) Constant() bool {

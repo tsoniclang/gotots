@@ -510,22 +510,23 @@ subsequent control flow. Adding a runtime wrapper or coercion, restoring the
 former empty-method-set restriction, or restoring a class-member method route
 fails the same family gate.
 
-Unsafe-pointer proof separates opaque identity from raw memory. Differential
-fixtures convert the same and different typed locations to `unsafe.Pointer`,
-cover nil, copies, interface boxing, equality, hashing, and map keys, and exact-
-join the emitted canonical raw-pointer marker facts. Provider fixtures prove
-that repeated certified provider identities bind to the same raw identity and
-that nil remains nil. Target fixtures lower nested safe/raw marker calls in one
-AST pass and prove that a local same-spelled function is untouched.
+Unsafe-pointer proof separates identity, writable storage, and physical native
+addresses. Fixtures convert typed locations to raw pointers and back, perform
+byte-offset accesses, cover nil, copies, equality, hashing, and map keys, and
+exact-join emitted shared raw-memory/layout facts. Runtime tests prove writes
+through reinterpreted views update the original storage in both byte orders;
+misalignment, out-of-bounds access, and inexact offsets fail. ABI-provider tests
+cover all four endian/address-width selections and stable fingerprints.
 
-Separate negative fixtures cover offset arithmetic, reinterpretation,
-raw-pointer-to-typed-pointer conversion, pointer/integer conversion, and raw
-pointer input to a provider. They require a diagnostic carrying the exact Go
-occurrence and selected source/target types. Mutations that restore the former
-virtual-address runtime, use JavaScript equality or object hashing directly,
-expose the provider identity, emit a cast, select by spelling, or fabricate a
-target-neutral fact must fail. Broad searches prove that no legacy raw-memory
-carrier or alternate raw-pointer route remains.
+Provider fixtures reject arbitrary object results without an exact address
+contract. Pointer/integer conversions with an unrepresentable neutral carrier
+and physical-address operations unsupported by the target remain explicit
+negative cases. Canonical emission, shared fact production, and target runtime
+support are distinct claims, each with its own proof. Nested safe/raw calls
+lower in one AST pass; a same-spelled local function remains ordinary code.
+Mutations that restore object-only binding, fabricate native addresses, drop
+layout operands, select markers by spelling, or fabricate facts must fail.
+Declaration-only resolution fixtures never count as semantic certification.
 
 ## Struct, Receiver, And Embedding Proof
 

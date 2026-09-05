@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/goabi"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -30,6 +31,7 @@ type File struct {
 	projections             map[constantProjectionImport]string
 	primitives              map[api.PrimitiveAlias]string
 	tsonicCore              map[tsoniccore.Symbol]string
+	sourceLayouts           map[goabi.Layout]string
 	runtime                 map[api.RuntimeSymbol]string
 	providerImports         map[string]providerImport
 	callableImplementations map[string]string

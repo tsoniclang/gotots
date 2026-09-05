@@ -166,6 +166,7 @@ func Apply(
 	}
 	if target, handled, rawPointerErr := rawpointerconversion.Convert(
 		context,
+		children,
 		source,
 		sourceType,
 		targetType,

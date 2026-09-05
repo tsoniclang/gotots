@@ -151,7 +151,7 @@ func TestConversionTargetSpellingDoesNotSelectSemantics(t *testing.T) {
 	}
 }
 
-func TestOpaqueRawPointerIdentityEmitsCanonicalMarkers(t *testing.T) {
+func TestRawPointerStorageEmitsCanonicalLayouts(t *testing.T) {
 	directory := t.TempDir()
 	if err := os.WriteFile(
 		filepath.Join(directory, "go.mod"),
@@ -167,6 +167,8 @@ func TestOpaqueRawPointerIdentityEmitsCanonicalMarkers(t *testing.T) {
 import "unsafe"
 
 func Bind(value *int32) unsafe.Pointer { return unsafe.Pointer(value) }
+func RoundTrip(value *int32) *int32 { return (*int32)(unsafe.Pointer(value)) }
+func Advance(value unsafe.Pointer, amount int32) unsafe.Pointer { return unsafe.Add(value, amount) }
 func Nil() unsafe.Pointer { return nil }
 func Same(left, right unsafe.Pointer) bool { return left == right }
 func Lookup(pointer unsafe.Pointer) bool {
@@ -186,7 +188,7 @@ func Lookup(pointer unsafe.Pointer) bool {
 		t.Fatal(err)
 	}
 	var roots []emit.Root
-	for _, name := range []string{"Bind", "Nil", "Same", "Lookup"} {
+	for _, name := range []string{"Bind", "RoundTrip", "Advance", "Nil", "Same", "Lookup"} {
 		root, rootErr := emit.NewRoot(loaded.Types().Scope().Lookup(name))
 		if rootErr != nil {
 			t.Fatal(rootErr)
@@ -201,7 +203,11 @@ func Lookup(pointer unsafe.Pointer) bool {
 	_, _, printed := printConversions(t, t.TempDir(), emission)
 	for _, required := range []string{
 		`import type { RawPointer } from "@tsonic/core/types.js"`,
-		`bindRawPointer`,
+		`toRawPointer`,
+		`reinterpretRawPointer`,
+		`offsetRawPointer`,
+		`memoryLayout`,
+		`@gotots/abi/layout.js`,
 		`equalRawPointer`,
 		`hashRawPointer`,
 		`RawPointer | undefined`,
@@ -210,7 +216,7 @@ func Lookup(pointer unsafe.Pointer) bool {
 			t.Fatalf("raw-pointer identity output lacks %q:\n%s", required, printed)
 		}
 	}
-	for _, forbidden := range []string{"GoUnsafePointer", "GoPointer", " as unknown", " as any"} {
+	for _, forbidden := range []string{"bindRawPointer", "GoUnsafePointer", "GoPointer", " as unknown", " as any"} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("raw-pointer identity output retains %q:\n%s", forbidden, printed)
 		}
@@ -223,18 +229,6 @@ func TestRawPointerMemoryConversionsFailAtTheTypedBoundary(t *testing.T) {
 		source   string
 		category api.Category
 	}{
-		{
-			name: "typed pointer round trip",
-			source: `package boundary
-
-import "unsafe"
-
-func Convert(value *int32) *int32 {
-	return (*int32)(unsafe.Pointer(value))
-}
-`,
-			category: api.CategoryExpression,
-		},
 		{
 			name: "pointer to integer",
 			source: `package boundary

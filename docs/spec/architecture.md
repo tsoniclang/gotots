@@ -703,20 +703,32 @@ planning rather than being adapted by a compatibility route.
 
 ### Unsafe Pointer Memory
 
-Raw addresses are a different semantic class from typed locations. The shared
-contract owns only opaque raw-pointer identity: `RawPointer`,
-`bindRawPointer`, `equalRawPointer`, and `hashRawPointer`. GoToTS may convert a
-safe typed pointer or a certified provider raw-pointer result to that identity,
-preserve `undefined` as nil, copy or box it, and use the canonical equality and
-hash operations. The marker and its target runtime expose no address or
-pointee.
+Raw addresses are a different semantic class from typed locations. Shared
+Tsonic owns `RawPointer`, `toRawPointer`, `reinterpretRawPointer`,
+`offsetRawPointer`, address-integer operations, layout queries, and `keepAlive`.
+Equality and hashing remain shared operations. The retired object-only
+`bindRawPointer` operation is not an admissible producer or consumer path.
 
-Offsets, reinterpretation, raw-pointer-to-typed-pointer conversion,
-pointer/integer conversion, and raw pointer input to a provider remain typed
-boundaries until separately accepted contracts own those operations. GoToTS
-emits no substitute virtual address, JavaScript cast, identity extraction, or
-target-specific codec in canonical source. Safe pointer semantics are never
-routed through a legacy raw-memory implementation to keep a corpus compiling.
+GoToTS obtains byte size, alignment, array stride, and field offsets from its
+one selected `go/types.Sizes` graph. It emits `memoryLayout<T>` and
+`memoryField` on exact represented types and field declarations. The source
+ABI supplies a registered `DataLayout` token carrying byte order and address
+width; it is not inferred from the machine running the target. The
+GoToTS-owned ABI provider is source configuration, not a target implementation.
+
+Canonical output retains raw/typed conversion, byte offsets, nil, and layout
+operands before targets choose representations. A target must consume the
+shared finalized facts or reject the operation before publication. The
+TypeScript target may implement managed writable storage; that does not
+authorize physical native addresses, aggregate padding emulation, or recovery
+of pointers from arbitrary integers. Provider objects without an exact
+address-bearing contract remain a typed boundary, never an opaque-object cast.
+
+Each source handler must reject a layout or address-integer carrier it cannot
+represent exactly under the selected profile. An unsupported operation is not
+silently replaced by object identity or an invented address. There is no
+Go-specific fact schema, second semantic graph, or target codec in canonical
+source.
 
 Maps have one representation owner and three storage modes. A key with an
 identity boolean, integer, or string primitive representation and a

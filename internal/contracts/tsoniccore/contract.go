@@ -16,7 +16,7 @@ const (
 	SymbolProjectPointer
 	SymbolBindPointer
 	SymbolRawPointer
-	SymbolBindRawPointer
+	SymbolToRawPointer
 	SymbolEqualRawPointer
 	SymbolHashRawPointer
 	SymbolBool
@@ -30,6 +30,19 @@ const (
 	SymbolUint64
 	SymbolFloat32
 	SymbolFloat64
+	SymbolReinterpretRawPointer
+	SymbolOffsetRawPointer
+	SymbolRawPointerToAddressInteger
+	SymbolAddressIntegerToRawPointer
+	SymbolMemoryLayout
+	SymbolMemoryField
+	SymbolDataLayout
+	SymbolMemoryLayoutType
+	SymbolSizeOf
+	SymbolAlignOf
+	SymbolFieldOffsetOf
+	SymbolKeepAlive
+	SymbolNativeUint
 )
 
 type Phase uint8
@@ -88,8 +101,8 @@ func Resolve(symbol Symbol) (Declaration, error) {
 			export: "RawPointer",
 			phase:  PhaseType,
 		}, nil
-	case SymbolBindRawPointer:
-		return value("bindRawPointer"), nil
+	case SymbolToRawPointer:
+		return value("toRawPointer"), nil
 	case SymbolEqualRawPointer:
 		return value("equalRawPointer"), nil
 	case SymbolHashRawPointer:
@@ -116,6 +129,32 @@ func Resolve(symbol Symbol) (Declaration, error) {
 		return typeDeclaration("float32"), nil
 	case SymbolFloat64:
 		return typeDeclaration("float64"), nil
+	case SymbolReinterpretRawPointer:
+		return value("reinterpretRawPointer"), nil
+	case SymbolOffsetRawPointer:
+		return value("offsetRawPointer"), nil
+	case SymbolRawPointerToAddressInteger:
+		return value("rawPointerToAddressInteger"), nil
+	case SymbolAddressIntegerToRawPointer:
+		return value("addressIntegerToRawPointer"), nil
+	case SymbolMemoryLayout:
+		return value("memoryLayout"), nil
+	case SymbolMemoryField:
+		return value("memoryField"), nil
+	case SymbolDataLayout:
+		return typeDeclaration("DataLayout"), nil
+	case SymbolMemoryLayoutType:
+		return typeDeclaration("MemoryLayout"), nil
+	case SymbolSizeOf:
+		return value("sizeOf"), nil
+	case SymbolAlignOf:
+		return value("alignOf"), nil
+	case SymbolFieldOffsetOf:
+		return value("fieldOffsetOf"), nil
+	case SymbolKeepAlive:
+		return value("keepAlive"), nil
+	case SymbolNativeUint:
+		return typeDeclaration("nativeUint"), nil
 	default:
 		return Declaration{}, fmt.Errorf(
 			"resolve Tsonic core symbol: invalid symbol %d",
