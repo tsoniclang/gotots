@@ -14,6 +14,10 @@ target-neutral `goAbiCompilerContributions()` without changing this provider.
 Do not register a second core extension: the host incorporates `dataLayouts`
 into its one core extension.
 
+`goAbiProviderDeclarations()` exposes the same immutable declarations consumed
+by provider registration. Product replacement-certification tools may project
+those declarations; they must not maintain an independent ABI signature copy.
+
 ```ts
 import { little64 } from "@gotots/abi/layout.js";
 import type { uint32 } from "@tsonic/core/types.js";

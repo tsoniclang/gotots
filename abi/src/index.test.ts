@@ -4,7 +4,24 @@ import { createCompilerSessionFromFiles, createSourceSemanticsExtension, formatD
 import type { Node } from "@tsonic/tsts";
 import { createTsonicCoreSourceExtension, tsonicCoreSourceSemanticsModules } from "@tsonic/source-core";
 import { readTsonicMemoryLayout, readTsonicRawMemoryOperation, selectTsonicRawLocationOperation } from "@tsonic/source-core/facts";
-import { goAbiCompilerContributions } from "./index.js";
+import { goAbiCompilerContributions, goAbiProviderDeclarations } from "./index.js";
+
+test("ABI certification consumes the same immutable declaration model", () => {
+  const declarations = goAbiProviderDeclarations();
+  assert.equal(declarations, goAbiProviderDeclarations());
+  assert.equal(Object.isFrozen(declarations), true);
+  assert.deepEqual(declarations.map(declaration => declaration.name), ["little32", "little64", "big32", "big64"]);
+  for (const declaration of declarations) {
+    assert.equal(Object.isFrozen(declaration), true);
+    assert.equal(Object.isFrozen(declaration.type), true);
+    assert.equal(declaration.kind, "value");
+    assert.deepEqual(declaration.type, {
+      kind: "provider-ref", moduleSpecifier: "@tsonic/core/types.js", exportName: "DataLayout",
+    });
+  }
+  assert.equal(Reflect.set(declarations, "0", declarations[1]), false);
+  assert.equal(goAbiProviderDeclarations()[0]?.name, "little32");
+});
 
 test("selected Go ABI tokens produce exact shared layout and raw-memory facts", () => {
   const contributions = goAbiCompilerContributions();

@@ -15,13 +15,18 @@ const layouts = Object.freeze([
   Object.freeze({ name: "big64", byteOrder: "big", addressWidth: 64 } as const),
 ]);
 
-export function goAbiCompilerContributions(): TargetSourceCompilerContributions {
-  const declarations: readonly ProviderExportDeclaration[] = layouts.map((layout) => ({
+const declarations: readonly ProviderExportDeclaration[] = Object.freeze(layouts.map((layout) => Object.freeze({
     id: layout.name,
     name: layout.name,
-    kind: "value",
-    type: { kind: "provider-ref", moduleSpecifier: "@tsonic/core/types.js", exportName: "DataLayout" },
-  }));
+    kind: "value" as const,
+    type: Object.freeze({ kind: "provider-ref" as const, moduleSpecifier: "@tsonic/core/types.js", exportName: "DataLayout" }),
+})));
+
+export function goAbiProviderDeclarations(): readonly ProviderExportDeclaration[] {
+  return declarations;
+}
+
+export function goAbiCompilerContributions(): TargetSourceCompilerContributions {
   const provider = createSourceSemanticsVirtualModuleProvider({
     id: providerId,
     version: providerVersion,
@@ -34,7 +39,7 @@ export function goAbiCompilerContributions(): TargetSourceCompilerContributions 
       namedImports: [{ exportedName: "DataLayout", kind: "type" }],
       typeOnly: true,
     }],
-    exportsForModule: () => declarations,
+    exportsForModule: () => [...goAbiProviderDeclarations()],
   });
   const extension: CompilerExtension = {
     identity: { id: providerId, version: providerVersion },

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "files": ["dist", "README.md"],
+  "files": ["dist", "!dist/**/*.test.*", "README.md"],
   "exports": {
     ".": "./dist/index.js",
     "./typescript": "./dist/typescript.js"
@@ -19,6 +19,9 @@
     "@tsonic/tsts": "0.1.1"
   },
   "devDependencies": {
+    "@tsonic/source-core": "file:../../tsonic/packages/source-core",
+    "@tsonic/target-api": "file:../../tsonic/packages/target-api",
+    "@tsonic/tsts": "file:../../tsonic/packages/tsts",
     "@types/node": "25.9.1",
     "typescript": "5.9.3"
   }
