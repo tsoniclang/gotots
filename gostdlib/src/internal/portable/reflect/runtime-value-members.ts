@@ -1,4 +1,5 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
+import type { RawPointer } from "@tsonic/core/types.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 
 import type { Type } from "../../../reflect.js";
@@ -101,6 +102,7 @@ export interface RuntimePointerElementBuilder<P> {
 }
 
 export interface RuntimePointerValueOperations<P> {
+  readonly unsafePointer?: (pointer: P | undefined) => RawPointer | undefined;
   readonly element: RuntimePointerElementOperations<P>;
   readonly newPointer?: () => P;
 }

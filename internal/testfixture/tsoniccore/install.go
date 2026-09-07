@@ -26,7 +26,7 @@ func InstallResolutionOnly(root string) error {
 			return fmt.Errorf("install Tsonic core resolution fixture %s: %w", name, err)
 		}
 	}
-	return nil
+	return installABIResolution(root)
 }
 
 func fixtureFiles() (map[string]string, error) {
@@ -62,7 +62,7 @@ func fixtureFiles() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	bindRawPointer, err := exportName(corecontract.SymbolBindRawPointer)
+	toRawPointer, err := exportName(corecontract.SymbolToRawPointer)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ declare const rawPointerBrand: unique symbol;
 export interface RawPointer {
   readonly [rawPointerBrand]: void;
 }
-` + primitiveTypes,
+` + primitiveTypes + memoryTypeDeclarations,
 		"types.js": "export {};\n",
 		"lang.d.ts": fmt.Sprintf(`import type { Pointer } from "./types.js";
 export declare function %[1]s<T>(storage: T | undefined): Pointer<T>;
@@ -107,10 +107,10 @@ export declare function %[6]s<T>(pointer: Pointer<T> | undefined): number;
 export declare function %[7]s<F, T>(pointer: Pointer<F>, fromSource: (value: F) => T, toSource: (value: T) => F): Pointer<T>;
 export declare function %[7]s<F, T>(pointer: Pointer<F> | undefined, fromSource: (value: F) => T, toSource: (value: T) => F): Pointer<T> | undefined;
 export declare function %[8]s<T>(identity: object, read: () => T, write: (value: T) => void): Pointer<T>;
-export declare function %[9]s(identity: object): import("./types.js").RawPointer;
+export declare function %[9]s<T>(pointer: Pointer<T> | undefined, layout: import("./types.js").MemoryLayout<T>): import("./types.js").RawPointer | undefined;
 export declare function %[10]s(left: import("./types.js").RawPointer | undefined, right: import("./types.js").RawPointer | undefined): boolean;
 export declare function %[11]s(pointer: import("./types.js").RawPointer | undefined): number;
-`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer),
+`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, toRawPointer, equalRawPointer, hashRawPointer) + memoryOperationDeclarations,
 		"lang.js": fmt.Sprintf(`const unsupported = (name) => {
   throw new Error("resolution-only Tsonic core fixture executed " + name);
 };
@@ -125,7 +125,7 @@ export const %[8]s = () => unsupported("%[8]s");
 export const %[9]s = () => unsupported("%[9]s");
 export const %[10]s = () => unsupported("%[10]s");
 export const %[11]s = () => unsupported("%[11]s");
-`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer),
+`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, toRawPointer, equalRawPointer, hashRawPointer) + memoryOperationRuntime(),
 	}, nil
 }
 

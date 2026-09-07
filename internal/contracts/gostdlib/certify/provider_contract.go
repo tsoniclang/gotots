@@ -344,6 +344,7 @@ func providerSubpath(specifier string) (string, bool) {
 
 func providerDigest(config resolvedConfig) (string, error) {
 	paths := []string{
+		coreResolutionPath,
 		"package.json",
 		"tsconfig.json",
 		filepath.ToSlash(relativeProviderPath(config, config.moduleMapPath)),

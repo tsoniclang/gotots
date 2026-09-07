@@ -10,6 +10,7 @@ import (
 
 func pointerValueOperationsStatement(
 	context api.Context,
+	children api.ChildEmitter,
 	names api.ReflectionNames,
 	operations api.NameReference,
 	reflectionType *types.TypeName,
@@ -56,6 +57,14 @@ func pointerValueOperationsStatement(
 		properties,
 		expressionProperty(factory, "element", element),
 	)
+	raw, rawRequests, rawErr := pointerRawOperation(context, children, pointee)
+	if rawErr != nil {
+		return nil, nil, false, rawErr
+	}
+	if raw != nil {
+		properties = append(properties, expressionProperty(factory, "unsafePointer", raw))
+		scaffold.requests = append(scaffold.requests, rawRequests...)
+	}
 	if _, basic := types.Unalias(pointee).Underlying().(*types.Basic); basic {
 		newPointer, newRequests, supported, newErr :=
 			pointerNewOperation(context, pointee, scaffold)

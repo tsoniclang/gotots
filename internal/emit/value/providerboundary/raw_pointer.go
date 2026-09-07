@@ -4,8 +4,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	rawpointermarker "github.com/tsoniclang/gotots/internal/emit/marker/rawpointer"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 )
 
 func fromProviderRawPointer(
@@ -16,20 +16,24 @@ func fromProviderRawPointer(
 	if !basictype.SupportsUnsafePointer(sourceType) {
 		return api.ExpressionEmission{}, false, false, nil
 	}
-	target, err := rawpointermarker.BindNullable(context, value)
-	return target, true, true, err
+	if model, defined := definedtype.ResolveBasic(sourceType); defined {
+		wrapped, err := model.Wrap(context, value)
+		return wrapped, true, err == nil, err
+	}
+	return value, true, false, nil
 }
 
 func toProviderRawPointer(
 	context api.Context,
 	sourceType types.Type,
-	_ api.ExpressionEmission,
+	value api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, bool, error) {
 	if !basictype.SupportsUnsafePointer(sourceType) {
 		return api.ExpressionEmission{}, false, false, nil
 	}
-	return api.ExpressionEmission{}, true, false, boundaryInvariant(
-		context,
-		"provider raw-pointer input requires an exact raw-pointer identity extraction contract",
-	)
+	if model, defined := definedtype.ResolveBasic(sourceType); defined {
+		projected, err := model.Project(context, value)
+		return projected, true, err == nil, err
+	}
+	return value, true, false, nil
 }

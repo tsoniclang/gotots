@@ -478,12 +478,17 @@ func verifyCompilerDependencyBoundary(root string) error {
 }
 
 func verifyCompilerDependencyText(relative string, source []byte) error {
-	sourceText := string(source)
+	sourceText, err := abiDependencySurface(relative, source)
+	if err != nil {
+		return err
+	}
 	for _, forbidden := range []string{
 		"github.com/tsoniclang/" + "tso" + "nic",
 		"@" + "tso" + "nic/target-",
 		"@" + "tso" + "nic/typescript-runtime",
 		"@" + "tso" + "nic/tsts",
+		"@" + "tso" + "nic/source-core",
+		"@" + "tso" + "nic/host",
 	} {
 		if strings.Contains(sourceText, forbidden) {
 			return &wallError{

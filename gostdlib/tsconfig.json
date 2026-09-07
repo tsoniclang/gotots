@@ -4,6 +4,9 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "paths": {
+      "@tsonic/core/types.js": [
+        "./test/core-resolution/types.d.ts"
+      ],
       "@gotots/runtime/*.js": [
         "./test/runtime-package/*.ts"
       ]

@@ -95,6 +95,12 @@ func basicValueProperties(
 			)),
 		)),
 	}
+	if basic.Kind() == types.UnsafePointer {
+		properties = append(properties, expressionProperty(factory, "unsafePointer", factory.ArrowFunction(
+			nil, nil, []tsgo.ParameterDeclaration{boxParameter(scaffold)}, nil, factory.EqualsGreaterThanToken(),
+			factory.ParenthesizedExpression(guardedProjection(scaffold, "Value.UnsafePointer", payload)),
+		)))
+	}
 	boxing, err := scalarBoxingProperty(
 		operationContext,
 		scaffold,
@@ -173,6 +179,8 @@ func scalarZeroExpression(
 ) (tsgo.Expression, error) {
 	info := basic.Info()
 	switch {
+	case basic.Kind() == types.UnsafePointer:
+		return factory.Identifier("undefined"), nil
 	case info&types.IsBoolean != 0:
 		return factory.FalseLiteral(), nil
 	case info&types.IsString != 0:

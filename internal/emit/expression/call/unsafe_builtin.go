@@ -37,6 +37,10 @@ func emitUnsafeBuiltin(
 		)
 		return target, true, err
 	case kind.Runtime():
+		if kind == unsafeoperation.Add {
+			target, err := emitUnsafeAdd(context, children, source)
+			return target, true, err
+		}
 		if kind == unsafeoperation.String {
 			target, err := emitUnsafeString(
 				context,

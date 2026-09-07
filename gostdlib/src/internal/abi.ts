@@ -6,7 +6,7 @@ import type {
   uint8,
   uintptr,
 } from "@gotots/gostdlib/internal/scalars.js";
-import type { ProviderRawPointer } from "./runtime/raw-pointer.js";
+import type { RawPointer } from "@tsonic/core/types.js";
 import type { ProviderPointer } from "./runtime/pointer.js";
 
 export class Kind {
@@ -27,8 +27,8 @@ export class TypeOff {
 
 type EqualFunction =
   | ((
-      argument0: ProviderRawPointer | undefined,
-      argument1: ProviderRawPointer | undefined,
+      argument0: RawPointer | undefined,
+      argument1: RawPointer | undefined,
     ) => bool)
   | undefined;
 

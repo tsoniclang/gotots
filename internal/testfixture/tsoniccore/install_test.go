@@ -30,7 +30,11 @@ func TestResolutionFixtureIsComplete(t *testing.T) {
 		"hashPointer",
 		"projectPointer",
 		"bindPointer",
-		"bindRawPointer",
+		"toRawPointer",
+		"reinterpretRawPointer",
+		"offsetRawPointer",
+		"memoryLayout",
+		"memoryField",
 		"equalRawPointer",
 		"hashRawPointer",
 	} {

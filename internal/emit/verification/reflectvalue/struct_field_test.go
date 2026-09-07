@@ -118,7 +118,7 @@ func main() {
 	)
 }
 
-func TestReflectStructPropertyFactsPreserveValueCopies(t *testing.T) {
+func TestReflectStructProjectedFieldsPreserveValueCopies(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -169,20 +169,13 @@ func main() {
 		typescriptRunner,
 		goRunner,
 		func(artifacts renderedArtifacts) {
-			if !strings.Contains(
-				artifacts.printed,
-				"fields.copyingValueProperty(",
-			) {
-				t.Fatalf(
-					"copying reflected property fact is absent:\n%s",
-					artifacts.printed,
-				)
+			setter := regexp.MustCompile(`\(instance, value\) => \{\s*Outer__from_reflectvalue\.\$storageOf\(instance\)\.Child = Child__from_reflectvalue\.\$storageOf\(Child__from_reflectvalue\.\$copy\(value\)\);\s*\}`)
+			if !setter.MatchString(artifacts.printed) {
+				t.Fatal("projected reflected Child setter does not copy before storing")
 			}
-			if !strings.Contains(
-				artifacts.printed,
-				`"Child", value =>`,
-			) {
-				t.Fatal("copying reflected property does not retain its exact key")
+			withoutCopy := strings.ReplaceAll(artifacts.printed, "Child__from_reflectvalue.$copy(value)", "value")
+			if setter.MatchString(withoutCopy) {
+				t.Fatal("copy proof does not distinguish an aliasing reflected setter")
 			}
 		},
 	)

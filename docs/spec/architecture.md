@@ -703,20 +703,62 @@ planning rather than being adapted by a compatibility route.
 
 ### Unsafe Pointer Memory
 
-Raw addresses are a different semantic class from typed locations. The shared
-contract owns only opaque raw-pointer identity: `RawPointer`,
-`bindRawPointer`, `equalRawPointer`, and `hashRawPointer`. GoToTS may convert a
-safe typed pointer or a certified provider raw-pointer result to that identity,
-preserve `undefined` as nil, copy or box it, and use the canonical equality and
-hash operations. The marker and its target runtime expose no address or
-pointee.
+Raw addresses are a different semantic class from typed locations. Shared
+Tsonic owns `RawPointer`, `toRawPointer`, `reinterpretRawPointer`,
+`offsetRawPointer`, address-integer operations, layout queries, and `keepAlive`.
+Equality and hashing remain shared operations. The retired object-only
+`bindRawPointer` operation is not an admissible producer or consumer path.
 
-Offsets, reinterpretation, raw-pointer-to-typed-pointer conversion,
-pointer/integer conversion, and raw pointer input to a provider remain typed
-boundaries until separately accepted contracts own those operations. GoToTS
-emits no substitute virtual address, JavaScript cast, identity extraction, or
-target-specific codec in canonical source. Safe pointer semantics are never
-routed through a legacy raw-memory implementation to keep a corpus compiling.
+GoToTS obtains byte size, alignment, array stride, and field offsets from its
+one selected `go/types.Sizes` graph. It emits `memoryLayout<T>` and
+`memoryField` on exact represented types and field declarations. Each field
+supplies its exact child layout as the required fourth argument; an offset
+alone does not preserve nested storage. The source
+ABI supplies a registered `DataLayout` token carrying byte order and address
+width; it is not inferred from the machine running the target. The
+GoToTS-owned ABI provider is source configuration, not a target implementation.
+
+A logical wrapper is not a physical layout. Raw conversion demands the
+existing value/storage projection first. For example, `Pointer<Pair>` projects
+to `Pointer<Pair$Storage>` using the existing storage-of/from-storage inverse;
+`memoryField` then selects the storage type's real property declarations, not
+a logical getter or constructor parameter. Reinterpretation applies the same
+inverse projection. There is no second descriptor registry or weakened shared
+field selector. Scalar and pointer leaves and finite nested structs with those
+fields have this closed source representation. Blank-field aggregates,
+array/slice/string/interface descriptors, complex values, and runtime handles
+without a physical projection remain source boundaries; publishing their
+logical wrapper with only a byte size is not information preservation.
+
+The separately built `abi/` package implements that source-configuration
+boundary. Its production code registers immutable declarations and descriptors
+through the shared provider API; it neither checks source nor imports a target
+or target runtime. Checker execution is confined to its integration tests.
+The Go compiler does not import, build, load, or invoke this package. Its
+ordinary build and translation path remains independent of Tsonic installation.
+Architecture walls check these two dependency surfaces separately; the ABI
+package is not an unchecked repository-wide dependency exception.
+
+Canonical output retains raw/typed conversion, byte offsets, nil, and layout
+operands before targets choose representations. A target must consume the
+shared finalized facts or reject the operation before publication. The
+TypeScript target may implement managed writable storage; that does not
+authorize physical native addresses, aggregate padding emulation, or recovery
+of pointers from arbitrary integers. Provider objects without an exact
+address-bearing contract remain a typed boundary, never an opaque-object cast.
+
+Address/integer conversion selects the exact shared unsigned domain: uint32
+on a 32-bit source ABI and uint64 on a 64-bit source ABI. Raw-to-integer carries
+that explicit type argument; inverse conversions retain the same exact domain.
+A number-backed 64-bit uintptr profile rejects this operation rather than
+coercing through number, inventing addresses, or asserting an erased type.
+Address integers do not retain allocation owners or prove safe dereference.
+
+Each source handler must reject a layout or address-integer carrier it cannot
+represent exactly under the selected profile. An unsupported operation is not
+silently replaced by object identity or an invented address. There is no
+Go-specific fact schema, second semantic graph, or target codec in canonical
+source.
 
 Maps have one representation owner and three storage modes. A key with an
 identity boolean, integer, or string primitive representation and a

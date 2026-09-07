@@ -193,6 +193,14 @@ Broad walls reject:
 
 ## Marker And Target Boundary Proof
 
+The source ABI adapter is tested as a separate integration package. Its
+production shared imports are limited to provider construction and type-only
+contracts. Mutation controls reject a live checker import there, a target or
+target-runtime dependency there, and those same adapter dependencies in the
+standalone compiler. Its test-only checker dependency cannot enter production
+through package metadata. The compiler dependency wall remains active for all
+other repository source.
+
 Every canonical marker occurrence owns one finalized TSTS fact selected by
 provider declaration identity and keyed to the exact node in the checked
 TS-Go-contract AST. The selected target transforms that same AST; it never
@@ -510,22 +518,23 @@ subsequent control flow. Adding a runtime wrapper or coercion, restoring the
 former empty-method-set restriction, or restoring a class-member method route
 fails the same family gate.
 
-Unsafe-pointer proof separates opaque identity from raw memory. Differential
-fixtures convert the same and different typed locations to `unsafe.Pointer`,
-cover nil, copies, interface boxing, equality, hashing, and map keys, and exact-
-join the emitted canonical raw-pointer marker facts. Provider fixtures prove
-that repeated certified provider identities bind to the same raw identity and
-that nil remains nil. Target fixtures lower nested safe/raw marker calls in one
-AST pass and prove that a local same-spelled function is untouched.
+Unsafe-pointer proof separates identity, writable storage, and physical native
+addresses. Fixtures convert typed locations to raw pointers and back, perform
+byte-offset accesses, cover nil, copies, equality, hashing, and map keys, and
+exact-join emitted shared raw-memory/layout facts. Runtime tests prove writes
+through reinterpreted views update the original storage in both byte orders;
+misalignment, out-of-bounds access, and inexact offsets fail. ABI-provider tests
+cover all four endian/address-width selections and stable fingerprints.
 
-Separate negative fixtures cover offset arithmetic, reinterpretation,
-raw-pointer-to-typed-pointer conversion, pointer/integer conversion, and raw
-pointer input to a provider. They require a diagnostic carrying the exact Go
-occurrence and selected source/target types. Mutations that restore the former
-virtual-address runtime, use JavaScript equality or object hashing directly,
-expose the provider identity, emit a cast, select by spelling, or fabricate a
-target-neutral fact must fail. Broad searches prove that no legacy raw-memory
-carrier or alternate raw-pointer route remains.
+Provider fixtures reject arbitrary object results without an exact address
+contract. Pointer/integer conversions with an unrepresentable neutral carrier
+and physical-address operations unsupported by the target remain explicit
+negative cases. Canonical emission, shared fact production, and target runtime
+support are distinct claims, each with its own proof. Nested safe/raw calls
+lower in one AST pass; a same-spelled local function remains ordinary code.
+Mutations that restore object-only binding, fabricate native addresses, drop
+layout operands, select markers by spelling, or fabricate facts must fail.
+Declaration-only resolution fixtures never count as semantic certification.
 
 ## Struct, Receiver, And Embedding Proof
 
@@ -1466,9 +1475,16 @@ named-struct and scalar results and must contain `bindPointer` with one captured
 provider identity and exact getter/setter closures. Mutations return a raw
 provider object, replace stable assignment with rebinding, drop the setter, or
 use a detached scalar cell; strict canonical checking or the selected target's
-differential must fail. Broad searches prove provider source imports no
-canonical marker module and GoToTS provider verification executes no
-resolution-only marker JavaScript.
+differential must fail. Provider source may import the public canonical
+`RawPointer` type for its exact raw-pointer transport; it must not construct raw
+addresses using a private brand or execute resolution-only marker JavaScript.
+Raw callable parameter and result identities, including tuple positions,
+exact-join the canonical import. A structurally assignable private interface
+with a different declaration identity must fail certification. Generated
+reflection callbacks must use selected source storage/layout operations and
+preserve nil, mutation and equality; opaque nested provider fields must not
+acquire fabricated physical layouts. Full target execution is a separate gate
+from this canonical source/provider proof.
 
 Pointer-target mutation tests require complete-flow lowering: changing one
 definition without every reference, scalarizing one of two aliases, dropping a

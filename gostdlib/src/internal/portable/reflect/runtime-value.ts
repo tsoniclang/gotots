@@ -11,7 +11,7 @@ import type {
 } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { Type } from "../../../reflect.js";
-import type { ProviderRawPointer } from "../../runtime/raw-pointer.js";
+import type { RawPointer } from "@tsonic/core/types.js";
 import {
   createRuntimePointerElementBuilder,
   createRuntimeStructFieldBuilder,
@@ -114,7 +114,7 @@ export interface RuntimeValueOperations {
   readonly cloned?: (box: GoInterfaceValue) => GoInterfaceValue;
   readonly unsafePointer?: (
     box: GoInterfaceValue,
-  ) => ProviderRawPointer | undefined;
+  ) => RawPointer | undefined;
 }
 
 const pointerDescriptors: Array<[Type, () => Type]> = [];
@@ -275,6 +275,15 @@ export function registerRuntimePointerValueOperations<P>(
     const descriptor = createDescriptor(createRuntimePointerElementBuilder<P>());
     const element = descriptor.element;
     const newPointer = descriptor.newPointer;
+    const unsafePointer = descriptor.unsafePointer;
+    const unsafePointerOperation = unsafePointer === undefined ? {} : {
+      unsafePointer: (box: GoInterfaceValue): RawPointer | undefined => {
+        if (!adapter.$is(box)) {
+          return GoPanic.raiseRuntime("reflect: Value.UnsafePointer received a foreign interface box");
+        }
+        return unsafePointer(box.$go$value);
+      },
+    };
     const newPointerOperation = newPointer === undefined
       ? {}
       : { newPointer: (): GoInterfaceValue => new adapter(newPointer()) };
@@ -311,6 +320,7 @@ export function registerRuntimePointerValueOperations<P>(
       },
       zero: (): GoInterfaceValue => new adapter(undefined),
       ...newPointerOperation,
+      ...unsafePointerOperation,
     };
   });
 }

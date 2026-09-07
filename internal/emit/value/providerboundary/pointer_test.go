@@ -7,41 +7,26 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestProviderRawPointerResultBindsOpaqueIdentity(t *testing.T) {
+func TestProviderRawPointerResultPreservesCanonicalCarrier(t *testing.T) {
 	context := scalarBoundaryContext(
 		t,
 		"amd64",
 		api.IntegerRepresentationNumber,
 		api.IntegerRepresentationBigInt,
 	)
-	target, changed, err := FromProviderValue(
+	input := api.DirectExpression(context.Factory().Identifier("providerPointer"))
+	output, changed, err := FromProviderValue(
 		context,
 		nil,
 		nil,
 		"",
 		types.Typ[types.UnsafePointer],
-		api.DirectExpression(context.Factory().Identifier("providerPointer")),
+		input,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !changed {
-		t.Fatal("provider raw-pointer result bypassed canonical identity binding")
-	}
-	conditional, ok := target.Value().(tsgo.ConditionalExpression)
-	if !ok {
-		t.Fatalf("provider raw-pointer bridge = %T, want nil-preserving conditional", target.Value())
-	}
-	call, ok := conditional.WhenFalse().(tsgo.CallExpression)
-	if !ok {
-		t.Fatalf("provider raw-pointer non-nil branch = %T, want marker call", conditional.WhenFalse())
-	}
-	callee, ok := call.Expression().(tsgo.Identifier)
-	if !ok || callee.Text() != "bindRawPointer" {
-		t.Fatalf("provider raw-pointer callee = %T %v", call.Expression(), call.Expression())
+	if err != nil || changed || output.Value() != input.Value() || len(output.Before()) != 0 {
+		t.Fatalf("canonical raw provider carrier was changed: %v", err)
 	}
 }
 
@@ -68,23 +53,24 @@ func TestProviderScalarPointerInputFailsWithoutExactInverseTransport(t *testing.
 	}
 }
 
-func TestProviderRawPointerInputFailsWithoutIdentityExtraction(t *testing.T) {
+func TestProviderRawPointerInputPreservesCanonicalCarrier(t *testing.T) {
 	context := scalarBoundaryContext(
 		t,
 		"amd64",
 		api.IntegerRepresentationNumber,
 		api.IntegerRepresentationBigInt,
 	)
-	_, _, err := ToProviderValue(
+	input := api.DirectExpression(context.Factory().Identifier("pointer"))
+	output, changed, err := ToProviderValue(
 		context,
 		nil,
 		nil,
 		"",
 		types.Typ[types.UnsafePointer],
-		api.DirectExpression(context.Factory().Identifier("pointer")),
+		input,
 	)
-	if err == nil || !strings.Contains(err.Error(), "raw-pointer identity extraction") {
-		t.Fatalf("provider raw-pointer input error = %v", err)
+	if err != nil || changed || output.Value() != input.Value() || len(output.Before()) != 0 {
+		t.Fatalf("canonical raw provider input was changed: %v", err)
 	}
 }
 

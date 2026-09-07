@@ -784,27 +784,59 @@ GoToTS, and must exact-join the finalized TSTS facts for every transformed
 occurrence. The unoptimized/native-target build consumes the pointer facts
 directly.
 
-Opaque `unsafe.Pointer` identity uses the accepted target-neutral contract:
+`unsafe.Pointer` conversion retains writable storage and its selected layout:
 
 ```go
+var value uint32 = 1
 pointer := unsafe.Pointer(&value)
 same := pointer == unsafe.Pointer(&value)
-lookup[pointer] = true
+*(*uint32)(pointer) = 7
 ```
 
 ```ts
-const pointer: RawPointer | undefined = bindRawPointer(addressOf(value));
-const same = equalRawPointer(pointer, bindRawPointer(addressOf(value)));
-lookup.store(pointer, true); // the map key facet uses hashRawPointer
+const layout = memoryLayout<uint32>(little64, 4, 4, 4);
+const pointer = toRawPointer(addressOf(value), layout);
+const same = equalRawPointer(pointer, toRawPointer(addressOf(value), layout));
+const view = reinterpretRawPointer(pointer, layout);
+if (view === undefined) throw goNilPointerPanic();
+storePointer(view, 7);
 ```
 
-Nil remains `undefined`. A certified provider raw-pointer result is bound by
-its opaque object identity before entering generated code. Raw-address
-arithmetic, reinterpretation, raw-pointer-to-typed-pointer conversion,
-pointer/integer conversion, and provider raw-pointer inputs remain exact typed
-boundaries. Canonical output never exposes or fabricates an address, and safe
-typed pointers are not lowered through a legacy JavaScript virtual-address
-representation.
+The example selects the explicit little-endian 64-bit Go ABI. Layouts may be
+inlined at their demand site; the ABI import is deduplicated by the normal name
+owner. Nil remains `undefined`; the write changes `value`, not a copy.
+`unsafe.Add(pointer, offset)` emits `offsetRawPointer(pointer, offset, ABI)`;
+the integer operand keeps its exact selected width and signedness. A raw
+provider result without a certified address-bearing transport is rejected.
+The gostdlib raw-pointer boundary uses the public `RawPointer | undefined`
+contract directly in both directions. Certification exact-joins each selected
+unsafe-pointer parameter/result to that declaration, including result tuples;
+a private same-shaped brand fails. A reflected supported typed pointer uses a
+generated `toRawPointer(pointer, exactLayout)` callback; reflection forwards
+that value after the exact box guard. Reflecting an already-raw value preserves
+it. Nil remains nil. No address is synthesized by casting a provider object.
+Named Go raw-pointer wrappers still use their ordinary wrap/project owner.
+The selected target must lower the provider's marker-bearing declaration
+surface consistently with generated callers before publishing its executable
+project. Installing pre-target declarations unchanged is not completed
+transport; a missing marker package must not be replaced by a dummy declaration
+or an unchecked assertion. Provider implementation and declaration artifacts
+must remain one certified package selection.
+Reflection kinds without a complete storage layout remain explicit boundaries;
+this transport does not certify map, slice, string or aggregate execution.
+Physical pointer/integer conversion requires an exact shared integer carrier
+and target support, not a fabricated JavaScript address. Unsupported layouts
+and operations fail closed; managed TypeScript memory support is not a claim
+of unrestricted native address emulation.
+
+For a flat struct `type Pair struct { First, Second uint32 }`, the selected
+physical carrier is the existing `Pair$Storage` type. The emitter constructs
+`memoryLayout<Pair$Storage>(abi, 8, 4, 8, ...)` with selectors of `First` at
+offset 0 and `Second` at offset 4. `projectPointer` uses `Pair.$storageOf` and
+`Pair.$fromStorage` to preserve the logical pointer, including nil and writes
+in both directions. Layout metadata must never attach to logical accessors.
+This preserves the source contract; an executable target still needs an exact
+aggregate codec or must reject it. It is not a claim of Node aggregate support.
 
 ### Interfaces
 
