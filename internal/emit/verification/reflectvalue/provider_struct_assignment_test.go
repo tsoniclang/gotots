@@ -228,3 +228,20 @@ func main() {
 		},
 	)
 }
+
+func TestReflectOpaqueNestedStorageDoesNotFabricateRawLayout(test *testing.T) {
+	source := `package reflectvalue
+import ("reflect"; "time")
+type Entry struct { Number uint32; Updated time.Time }
+func Check() bool { return reflect.ValueOf(&Entry{}).Kind() == reflect.Pointer }
+`
+	verifyReflectCanonicalInspect(test, source, "Check", "reflectvalue", `console.log(Check());`,
+		`package main
+import ("fmt"; fixture "example.com/reflectvalue")
+func main() { fmt.Println(fixture.Check()) }
+`, func(artifacts renderedArtifacts) {
+			if strings.Contains(artifacts.printed, "memoryLayout<Entry") {
+				test.Fatal("opaque nested provider storage acquired a fabricated physical layout")
+			}
+		})
+}

@@ -26,6 +26,7 @@ type valueOperationCallback struct {
 // projects the represented payload; message strings never select behavior.
 func valueOperationsStatement(
 	context api.Context,
+	children api.ChildEmitter,
 	names api.ReflectionNames,
 	operations api.NameReference,
 	reflectionType *types.TypeName,
@@ -48,6 +49,7 @@ func valueOperationsStatement(
 	if pointerType, ok := types.Unalias(sourceType).Underlying().(*types.Pointer); ok {
 		return pointerValueOperationsStatement(
 			context,
+			children,
 			names,
 			operations,
 			reflectionType,

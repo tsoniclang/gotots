@@ -358,6 +358,9 @@ func buildModule(
 			binding.Disposition = behavior.disposition
 		}
 		if binding.Kind == gostdlib.BindingFunction {
+			if err := verifyExportSourceRawPointers(config, project, evidence, target); err != nil {
+				return gostdlib.ModuleDocument{}, err
+			}
 			if err := verifyExportSourceCallableShape(
 				project,
 				evidence,
@@ -538,6 +541,9 @@ func buildMethodBindings(
 			selected,
 			access,
 		); err != nil {
+			return nil, err
+		}
+		if err := verifyMethodSourceRawPointers(config, project, method, selected, access); err != nil {
 			return nil, err
 		}
 		if err := verifyMethodSourceCallableScalars(

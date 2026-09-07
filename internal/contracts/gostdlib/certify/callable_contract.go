@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"go/types"
 	"path/filepath"
@@ -370,4 +371,88 @@ func typeContainsCallableValue(
 		}
 	}
 	return false
+}
+
+const coreResolutionPath = "test/core-resolution/types.d.ts"
+
+func verifyExportSourceRawPointers(config resolvedConfig, project *tsgo.ProjectInspection, evidence goObject, target tsgo.ProjectExport) error {
+	signature, ok := evidence.object.Type().(*types.Signature)
+	if !ok {
+		return certifyError("verify source raw pointers", evidence.contract.Identity(), "source signature is absent")
+	}
+	return verifySourceRawPointers(config, project, evidence.contract.Identity(), signature, gostdlib.AccessExport,
+		func(index int) (tsgo.ProjectTypeIdentity, error) {
+			return project.CallableParameterTypeIdentity(target, index)
+		},
+		func(index int) (tsgo.ProjectTypeIdentity, error) {
+			return project.CallableResultTypeIdentity(target, index, signature.Results().Len())
+		})
+}
+
+func verifyMethodSourceRawPointers(config resolvedConfig, project *tsgo.ProjectInspection, evidence goObject, target tsgo.ProjectMember, access gostdlib.AccessKind) error {
+	signature, ok := evidence.object.Type().(*types.Signature)
+	if !ok {
+		return certifyError("verify source raw pointers", evidence.contract.Identity(), "source signature is absent")
+	}
+	return verifySourceRawPointers(config, project, evidence.contract.Identity(), signature, access,
+		func(index int) (tsgo.ProjectTypeIdentity, error) {
+			return project.CallableParameterTypeIdentity(target, index)
+		},
+		func(index int) (tsgo.ProjectTypeIdentity, error) {
+			return project.CallableResultTypeIdentity(target, index, signature.Results().Len())
+		})
+}
+
+func verifySourceRawPointers(
+	config resolvedConfig, project *tsgo.ProjectInspection, identity string, signature *types.Signature, access gostdlib.AccessKind,
+	parameterIdentity func(int) (tsgo.ProjectTypeIdentity, error), resultIdentity func(int) (tsgo.ProjectTypeIdentity, error),
+) error {
+	offset := 0
+	if access == gostdlib.AccessStaticMethod {
+		offset = 1
+	}
+	var canonical tsgo.ProjectExport
+	verify := func(kind string, index int, read func(int) (tsgo.ProjectTypeIdentity, error)) error {
+		if canonical.Name() == "" {
+			declaration, err := tsoniccore.Resolve(tsoniccore.SymbolRawPointer)
+			if err != nil {
+				return err
+			}
+			exports, err := project.Exports(filepath.Join(config.providerRoot, coreResolutionPath))
+			if err != nil {
+				return err
+			}
+			for _, exported := range exports {
+				if exported.Name() == declaration.Export() {
+					canonical = exported
+				}
+			}
+			if canonical.Name() == "" {
+				return certifyError("verify source raw pointers", identity, "canonical raw-pointer import is absent")
+			}
+		}
+		selected, err := read(index)
+		if err != nil {
+			return certifyError("verify source raw pointers", identity, fmt.Sprintf("%s %d: %v", kind, index, err))
+		}
+		if !selected.Matches(canonical) {
+			return certifyError("verify source raw pointers", identity, fmt.Sprintf("%s %d is not the canonical RawPointer declaration", kind, index))
+		}
+		return nil
+	}
+	for index := range signature.Params().Len() {
+		if basic, ok := signature.Params().At(index).Type().Underlying().(*types.Basic); ok && basic.Kind() == types.UnsafePointer {
+			if err := verify("parameter", index+offset, parameterIdentity); err != nil {
+				return err
+			}
+		}
+	}
+	for index := range signature.Results().Len() {
+		if basic, ok := signature.Results().At(index).Type().Underlying().(*types.Basic); ok && basic.Kind() == types.UnsafePointer {
+			if err := verify("result", index, resultIdentity); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

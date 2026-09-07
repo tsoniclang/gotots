@@ -401,7 +401,7 @@ func buildRepresentationArtifact(
 			},
 		)
 	case api.GeneratedArtifactReflectionType:
-		return reflectiontypedeclaration.Build(context, artifact)
+		return reflectiontypedeclaration.Build(context, builder.emitter, artifact)
 	default:
 		return nil, nil, &ScheduleError{
 			Object: artifact.TargetName(),

@@ -1475,9 +1475,16 @@ named-struct and scalar results and must contain `bindPointer` with one captured
 provider identity and exact getter/setter closures. Mutations return a raw
 provider object, replace stable assignment with rebinding, drop the setter, or
 use a detached scalar cell; strict canonical checking or the selected target's
-differential must fail. Broad searches prove provider source imports no
-canonical marker module and GoToTS provider verification executes no
-resolution-only marker JavaScript.
+differential must fail. Provider source may import the public canonical
+`RawPointer` type for its exact raw-pointer transport; it must not construct raw
+addresses using a private brand or execute resolution-only marker JavaScript.
+Raw callable parameter and result identities, including tuple positions,
+exact-join the canonical import. A structurally assignable private interface
+with a different declaration identity must fail certification. Generated
+reflection callbacks must use selected source storage/layout operations and
+preserve nil, mutation and equality; opaque nested provider fields must not
+acquire fabricated physical layouts. Full target execution is a separate gate
+from this canonical source/provider proof.
 
 Pointer-target mutation tests require complete-flow lowering: changing one
 definition without every reference, scalarizing one of two aliases, dropping a

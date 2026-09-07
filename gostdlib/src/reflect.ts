@@ -22,7 +22,7 @@ import {
 } from "./internal/portable/reflect/struct-tag.js";
 import { ProviderError } from "./internal/runtime/error.js";
 import { providerPlaceholder } from "./internal/runtime/placeholder.js";
-import type { ProviderRawPointer } from "./internal/runtime/raw-pointer.js";
+import type { RawPointer } from "@tsonic/core/types.js";
 import {
   pointerDescriptorFor,
   recordRuntimeType,
@@ -699,7 +699,7 @@ export abstract class Value {
     }
     return operation(this.source);
   }
-  UnsafePointer(): ProviderRawPointer | undefined {
+  UnsafePointer(): RawPointer | undefined {
     const operation = this.operations()?.unsafePointer;
     if (operation === undefined || this.source === undefined) {
       return this.operationPanic("UnsafePointer");

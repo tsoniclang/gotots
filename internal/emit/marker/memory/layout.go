@@ -33,15 +33,16 @@ func DataLayout(context api.Context) (api.ExpressionEmission, error) {
 }
 
 func Layout(context api.Context, children api.ChildEmitter, source ast.Node, pointee types.Type) (api.ExpressionEmission, api.TypeEmission, error) {
-	if pointee == nil || api.ContainsGenericTypeParameter(pointee) || !physicalLayoutRepresentable(pointee) {
+	supported, err := SupportsLayout(context, pointee)
+	if err != nil {
+		return api.ExpressionEmission{}, api.TypeEmission{}, err
+	}
+	if !supported {
 		return api.ExpressionEmission{}, api.TypeEmission{}, api.Unsupported(context, api.CategoryExpression, source)
 	}
 	projected, err := context.Values().RequiresStorageProjection(context, pointee)
 	if err != nil {
 		return api.ExpressionEmission{}, api.TypeEmission{}, err
-	}
-	if _, structure := pointee.Underlying().(*types.Struct); structure && !projected {
-		return api.ExpressionEmission{}, api.TypeEmission{}, api.Unsupported(context, api.CategoryExpression, source)
 	}
 	var represented api.TypeEmission
 	if projected {

@@ -808,6 +808,22 @@ owner. Nil remains `undefined`; the write changes `value`, not a copy.
 `unsafe.Add(pointer, offset)` emits `offsetRawPointer(pointer, offset, ABI)`;
 the integer operand keeps its exact selected width and signedness. A raw
 provider result without a certified address-bearing transport is rejected.
+The gostdlib raw-pointer boundary uses the public `RawPointer | undefined`
+contract directly in both directions. Certification exact-joins each selected
+unsafe-pointer parameter/result to that declaration, including result tuples;
+a private same-shaped brand fails. A reflected supported typed pointer uses a
+generated `toRawPointer(pointer, exactLayout)` callback; reflection forwards
+that value after the exact box guard. Reflecting an already-raw value preserves
+it. Nil remains nil. No address is synthesized by casting a provider object.
+Named Go raw-pointer wrappers still use their ordinary wrap/project owner.
+The selected target must lower the provider's marker-bearing declaration
+surface consistently with generated callers before publishing its executable
+project. Installing pre-target declarations unchanged is not completed
+transport; a missing marker package must not be replaced by a dummy declaration
+or an unchecked assertion. Provider implementation and declaration artifacts
+must remain one certified package selection.
+Reflection kinds without a complete storage layout remain explicit boundaries;
+this transport does not certify map, slice, string or aggregate execution.
 Physical pointer/integer conversion requires an exact shared integer carrier
 and target support, not a fabricated JavaScript address. Unsupported layouts
 and operations fail closed; managed TypeScript memory support is not a claim

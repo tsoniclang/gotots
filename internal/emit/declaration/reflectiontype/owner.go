@@ -11,6 +11,7 @@ import (
 
 func Build(
 	context api.Context,
+	children api.ChildEmitter,
 	artifact *api.GeneratedArtifact,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	sourceType, reflectionType, ok := artifact.ReflectionType()
@@ -110,6 +111,7 @@ func Build(
 		registration, registrationRequests, handled, valueErr :=
 			valueOperationsStatement(
 				context,
+				children,
 				names,
 				operations,
 				reflectionType,

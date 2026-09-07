@@ -1,6 +1,9 @@
 package reflectvalue_test
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // TestReflectValueScalarReadsMatchGo proves the canonical reflection value
 // model over scalar kinds: ValueOf, Kind, Type identity, scalar reads,
@@ -61,4 +64,46 @@ func main() {
 		typescriptRunner,
 		goRunner,
 	)
+}
+
+func TestReflectRawPointerCanonicalizesStorageAndNamedValues(test *testing.T) {
+	source := `package reflectvalue
+
+import (
+  "reflect"
+  "unsafe"
+)
+
+type Raw unsafe.Pointer
+
+func Check() bool {
+  var value uint32 = 7
+  pointer := &value
+  reflected := reflect.ValueOf(pointer).UnsafePointer()
+  *(*uint32)(reflected) = 42
+  direct := unsafe.Pointer(pointer)
+  var missing *uint32
+  var rawMissing unsafe.Pointer
+  named := Raw(direct)
+  return reflected == direct && value == 42 &&
+    reflect.ValueOf(named).UnsafePointer() == direct &&
+    reflect.ValueOf(direct).UnsafePointer() == direct &&
+    reflect.ValueOf(missing).UnsafePointer() == nil &&
+    reflect.ValueOf(rawMissing).UnsafePointer() == nil
+}
+
+`
+	verifyReflectCanonicalInspect(test, source, "Check", "reflectvalue",
+		`console.log(Check());`,
+		`package main
+import ("fmt"; fixture "example.com/reflectvalue")
+func main() { fmt.Println(fixture.Check()) }
+`, func(artifacts renderedArtifacts) {
+			if !strings.Contains(artifacts.printed, "toRawPointer<uint32>") || !strings.Contains(artifacts.printed, "unsafePointer:") {
+				test.Fatal("reflection did not emit its canonical storage callback")
+			}
+			if strings.Contains(artifacts.printed, "ProviderRawPointer") {
+				test.Fatal("retired private raw-pointer carrier survived")
+			}
+		})
 }

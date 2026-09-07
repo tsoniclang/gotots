@@ -1,22 +1,37 @@
 package memory
 
-import "go/types"
+import (
+	"go/types"
 
-func physicalLayoutRepresentable(source types.Type) bool {
+	"github.com/tsoniclang/gotots/internal/emit/api"
+)
+
+func SupportsLayout(context api.Context, source types.Type) (bool, error) {
+	if source == nil || api.ContainsGenericTypeParameter(source) {
+		return false, nil
+	}
 	if physicalLeaf(source) {
-		return true
+		return true, nil
 	}
 	structure, ok := source.Underlying().(*types.Struct)
 	if !ok {
-		return false
+		return false, nil
+	}
+	projected, err := context.Values().RequiresStorageProjection(context, source)
+	if err != nil || !projected {
+		return false, err
 	}
 	for index := range structure.NumFields() {
 		field := structure.Field(index)
-		if field.Name() == "_" || !physicalLayoutRepresentable(field.Type()) {
-			return false
+		if field.Name() == "_" {
+			return false, nil
+		}
+		supported, err := SupportsLayout(context, field.Type())
+		if err != nil || !supported {
+			return false, err
 		}
 	}
-	return true
+	return true, nil
 }
 
 func physicalLeaf(source types.Type) bool {

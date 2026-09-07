@@ -522,3 +522,35 @@ type signatureResponse struct {
 	TypeParameters []uint32 `json:"typeParameters,omitempty"`
 	Parameters     []uint64 `json:"parameters,omitempty"`
 }
+
+func (p *ProjectInspection) CallableResultTypeIdentity(target projectCallable, index, count int) (ProjectTypeIdentity, error) {
+	if p == nil || target == nil || index < 0 || index >= count {
+		return ProjectTypeIdentity{}, &ProjectInspectionError{Operation: "callable result identity", Reason: "invalid result selection"}
+	}
+	if count == 1 {
+		return p.CallableReturnTypeIdentity(target)
+	}
+	signature, err := p.singleCallSignature(target, target.callableSubject())
+	if err != nil {
+		return ProjectTypeIdentity{}, err
+	}
+	result, err := p.signatureReturn(signature.ID, target.callableSubject())
+	if err != nil {
+		return ProjectTypeIdentity{}, err
+	}
+	tuple, err := p.dynamicTypeProperty("getTargetOfType", result.ID)
+	if err != nil {
+		return ProjectTypeIdentity{}, err
+	}
+	if tuple == nil || tuple.ObjectFlags&(1<<3) == 0 {
+		return ProjectTypeIdentity{}, &ProjectInspectionError{Operation: "callable result identity", Reason: "multiple results require an exact tuple"}
+	}
+	arguments, err := p.typeArguments(result.ID)
+	if err != nil {
+		return ProjectTypeIdentity{}, err
+	}
+	if len(arguments) != count {
+		return ProjectTypeIdentity{}, &ProjectInspectionError{Operation: "callable result identity", Reason: "tuple arity differs from the selected source results"}
+	}
+	return p.projectTypeIdentity(arguments[index].ID)
+}
