@@ -12,7 +12,7 @@ func physicalLayoutRepresentable(source types.Type) bool {
 	}
 	for index := range structure.NumFields() {
 		field := structure.Field(index)
-		if field.Name() == "_" || !physicalLeaf(field.Type()) {
+		if field.Name() == "_" || !physicalLayoutRepresentable(field.Type()) {
 			return false
 		}
 	}

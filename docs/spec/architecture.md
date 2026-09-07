@@ -711,7 +711,9 @@ Equality and hashing remain shared operations. The retired object-only
 
 GoToTS obtains byte size, alignment, array stride, and field offsets from its
 one selected `go/types.Sizes` graph. It emits `memoryLayout<T>` and
-`memoryField` on exact represented types and field declarations. The source
+`memoryField` on exact represented types and field declarations. Each field
+supplies its exact child layout as the required fourth argument; an offset
+alone does not preserve nested storage. The source
 ABI supplies a registered `DataLayout` token carrying byte order and address
 width; it is not inferred from the machine running the target. The
 GoToTS-owned ABI provider is source configuration, not a target implementation.
@@ -722,8 +724,8 @@ to `Pointer<Pair$Storage>` using the existing storage-of/from-storage inverse;
 `memoryField` then selects the storage type's real property declarations, not
 a logical getter or constructor parameter. Reinterpretation applies the same
 inverse projection. There is no second descriptor registry or weakened shared
-field selector. Scalar and pointer leaves and flat structs with those fields
-have this closed source representation. Nested/blank-field aggregates,
+field selector. Scalar and pointer leaves and finite nested structs with those
+fields have this closed source representation. Blank-field aggregates,
 array/slice/string/interface descriptors, complex values, and runtime handles
 without a physical projection remain source boundaries; publishing their
 logical wrapper with only a byte size is not information preservation.
@@ -744,6 +746,13 @@ TypeScript target may implement managed writable storage; that does not
 authorize physical native addresses, aggregate padding emulation, or recovery
 of pointers from arbitrary integers. Provider objects without an exact
 address-bearing contract remain a typed boundary, never an opaque-object cast.
+
+Address/integer conversion selects the exact shared unsigned domain: uint32
+on a 32-bit source ABI and uint64 on a 64-bit source ABI. Raw-to-integer carries
+that explicit type argument; inverse conversions retain the same exact domain.
+A number-backed 64-bit uintptr profile rejects this operation rather than
+coercing through number, inventing addresses, or asserting an erased type.
+Address integers do not retain allocation owners or prove safe dereference.
 
 Each source handler must reject a layout or address-integer carrier it cannot
 represent exactly under the selected profile. An unsupported operation is not

@@ -27,7 +27,7 @@ func Convert(value *Pair) *Pair { return (*Pair)(unsafe.Pointer(value)) }
 	}
 	strictTypecheckEmission(t, emission)
 	_, _, printed := printConversions(t, t.TempDir(), emission)
-	for _, required := range []string{"memoryLayout<Pair$Storage>", "projectPointer<Pair, Pair$Storage>", "projectPointer<Pair$Storage, Pair>", "Pair.$storageOf", "Pair.$fromStorage", ".Second, 4, 4)"} {
+	for _, required := range []string{"memoryLayout<Pair$Storage>", "projectPointer<Pair, Pair$Storage>", "projectPointer<Pair$Storage, Pair>", "Pair.$storageOf", "Pair.$fromStorage", ".Second, 4, 4, memoryLayout<uint32>"} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("physical memory output lacks %q", required)
 		}
@@ -38,7 +38,7 @@ func Convert(value *Pair) *Pair { return (*Pair)(unsafe.Pointer(value)) }
 }
 
 func TestRawMemoryRejectsUnrepresentedDescriptorFamilies(t *testing.T) {
-	for _, spelling := range []string{"[2]uint32", "[]uint32", "string", "complex128", "interface{}", "map[int]int", "chan int", "func()", "struct{ Nested struct{ Value uint32 } }", "struct{ _ uint32; Value uint32 }"} {
+	for _, spelling := range []string{"[2]uint32", "[]uint32", "string", "complex128", "interface{}", "map[int]int", "chan int", "func()", "struct{ _ uint32; Value uint32 }"} {
 		t.Run(spelling, func(t *testing.T) {
 			loaded := loadMemoryStorageCase(t, "func Convert(value *"+spelling+") unsafe.Pointer { return unsafe.Pointer(value) }")
 			root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Convert"))
@@ -51,6 +51,29 @@ func TestRawMemoryRejectsUnrepresentedDescriptorFamilies(t *testing.T) {
 				t.Fatalf("unrepresented physical descriptor = %v, want source expression boundary", err)
 			}
 		})
+	}
+}
+
+func TestRawNestedLayoutRetainsPhysicalChildren(test *testing.T) {
+	loaded := loadMemoryStorageCase(test, `
+type Pair struct { First uint32; Second uint32 }
+type Outer struct { Tag uint32; Inner Pair }
+func Convert(value *Outer) *Outer { return (*Outer)(unsafe.Pointer(value)) }
+`)
+	root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Convert"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), []emit.Root{root})
+	if err != nil {
+		test.Fatal(err)
+	}
+	strictTypecheckEmission(test, emission)
+	_, _, printed := printConversions(test, test.TempDir(), emission)
+	for _, required := range []string{"memoryLayout<Outer$Storage>", ".Inner, 4, 4, memoryLayout<Pair$Storage>", ".Second, 4, 4, memoryLayout<uint32>"} {
+		if !strings.Contains(printed, required) {
+			test.Fatalf("nested physical memory output lacks %q", required)
+		}
 	}
 }
 

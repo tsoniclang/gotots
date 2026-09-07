@@ -18,10 +18,10 @@ const memoryOperationDeclarations = `
 import type { DataLayout, MemoryLayout, MemoryFieldLayout, RawPointer, nativeUint } from "./types.js";
 export declare function reinterpretRawPointer<T>(pointer: RawPointer | undefined, layout: MemoryLayout<T>): Pointer<T> | undefined;
 export declare function offsetRawPointer<TOffset extends number | bigint>(pointer: RawPointer | undefined, byteOffset: TOffset, dataLayout: DataLayout): RawPointer | undefined;
-export declare function rawPointerToAddressInteger(pointer: RawPointer | undefined, dataLayout: DataLayout): nativeUint;
-export declare function addressIntegerToRawPointer(address: nativeUint, dataLayout: DataLayout): RawPointer | undefined;
+export declare function rawPointerToAddressInteger<TAddress extends number | bigint>(pointer: RawPointer | undefined, dataLayout: DataLayout): TAddress;
+export declare function addressIntegerToRawPointer<TAddress extends number | bigint>(address: TAddress, dataLayout: DataLayout): RawPointer | undefined;
 export declare function memoryLayout<T>(dataLayout: DataLayout, byteSize: nativeUint, byteAlignment: nativeUint, stride: nativeUint, ...fields: MemoryFieldLayout<T>[]): MemoryLayout<T>;
-export declare function memoryField<T, TField>(select: (value: T) => TField, byteOffset: nativeUint, byteAlignment: nativeUint): MemoryFieldLayout<T>;
+export declare function memoryField<T, TField>(select: (value: T) => TField, byteOffset: nativeUint, byteAlignment: nativeUint, fieldLayout: MemoryLayout<TField>): MemoryFieldLayout<T>;
 export declare function sizeOf<T>(layout: MemoryLayout<T>): nativeUint;
 export declare function alignOf<T>(layout: MemoryLayout<T>): nativeUint;
 export declare function strideOf<T>(layout: MemoryLayout<T>): nativeUint;

@@ -229,7 +229,7 @@ func Lookup(pointer unsafe.Pointer) bool {
 	}
 }
 
-func TestRawPointerMemoryConversionsFailAtTheTypedBoundary(t *testing.T) {
+func TestLossyAddressProfileFailsAtTheTypedBoundary(t *testing.T) {
 	for _, testCase := range []struct {
 		name     string
 		source   string
@@ -276,9 +276,14 @@ func Convert(value uintptr) unsafe.Pointer {
 			); err != nil {
 				t.Fatal(err)
 			}
+			profile, err := load.NewBuildProfile("linux", "amd64", false, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 			loaded, err := load.One(context.Background(), load.Request{
-				Directory: directory,
-				Pattern:   ".",
+				Directory:    directory,
+				Pattern:      ".",
+				BuildProfile: profile,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -287,7 +292,9 @@ func Convert(value uintptr) unsafe.Pointer {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = emit.Compile(loaded.Program(), []emit.Root{root})
+			options := emit.DefaultOptions()
+			options.IntegerRepresentation = emit.IntegerRepresentationNumber
+			_, err = emit.CompileWithOptions(loaded.Program(), []emit.Root{root}, options)
 			var unsupported *api.UnsupportedError
 			if !errors.As(err, &unsupported) ||
 				unsupported.Category != testCase.category {

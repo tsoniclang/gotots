@@ -85,8 +85,12 @@ func Layout(context api.Context, children api.ChildEmitter, source ast.Node, poi
 				context.Factory().ParameterDeclaration(nil, nil, context.Factory().Identifier(parameter), nil, represented.Value(), nil),
 			}, nil, context.Factory().EqualsGreaterThanToken(), context.Factory().PropertyAccessExpression(
 				context.Factory().Identifier(parameter), nil, context.Factory().Identifier(name), tsgo.NodeFlagsNone))
+			childLayout, _, fieldErr := Layout(context, children, source, field.Type())
+			if fieldErr != nil {
+				return api.ExpressionEmission{}, api.TypeEmission{}, fieldErr
+			}
 			selected, fieldErr := pointermarker.Operation(context, tsoniccore.SymbolMemoryField, nil, []api.ExpressionEmission{
-				api.DirectExpression(selector, represented.Requests()...), number(offsets[index]), number(context.TypesSizes().Alignof(field.Type())),
+				api.DirectExpression(selector, represented.Requests()...), number(offsets[index]), number(context.TypesSizes().Alignof(field.Type())), childLayout,
 			})
 			if fieldErr != nil {
 				return api.ExpressionEmission{}, api.TypeEmission{}, fieldErr

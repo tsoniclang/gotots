@@ -41,7 +41,16 @@ func Convert(
 		targetType = targetDefined.Underlying()
 	}
 	target := value
-	if !sourceRaw || !targetRaw {
+	addressType := sourceType
+	if sourceRaw {
+		addressType = targetType
+	}
+	if basic, ok := types.Unalias(addressType).(*types.Basic); ok && basic.Kind() == types.Uintptr {
+		target, err = convertAddress(context, source, value, sourceRaw)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+	} else if !sourceRaw || !targetRaw {
 		pointerType := sourceType
 		operation := tsoniccore.SymbolToRawPointer
 		if sourceRaw {
