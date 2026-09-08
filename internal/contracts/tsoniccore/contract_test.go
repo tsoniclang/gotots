@@ -24,6 +24,8 @@ func TestContractIsPinned(t *testing.T) {
 		{SymbolOffsetRawPointer, "@tsonic/core/lang.js", "offsetRawPointer", PhaseValue},
 		{SymbolMemoryLayout, "@tsonic/core/lang.js", "memoryLayout", PhaseValue},
 		{SymbolMemoryField, "@tsonic/core/lang.js", "memoryField", PhaseValue},
+		{SymbolStruct, "@tsonic/core/lang.js", "struct", PhaseValue},
+		{SymbolField, "@tsonic/core/lang.js", "field", PhaseValue},
 		{SymbolEqualRawPointer, "@tsonic/core/lang.js", "equalRawPointer", PhaseValue},
 		{SymbolHashRawPointer, "@tsonic/core/lang.js", "hashRawPointer", PhaseValue},
 		{SymbolBool, "@tsonic/core/types.js", "bool", PhaseType},

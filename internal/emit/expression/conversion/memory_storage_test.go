@@ -27,7 +27,7 @@ func Convert(value *Pair) *Pair { return (*Pair)(unsafe.Pointer(value)) }
 	}
 	strictTypecheckEmission(t, emission)
 	_, _, printed := printConversions(t, t.TempDir(), emission)
-	for _, required := range []string{"memoryLayout<Pair$Storage>", "projectPointer<Pair, Pair$Storage>", "projectPointer<Pair$Storage, Pair>", "Pair.$storageOf", "Pair.$fromStorage", ".Second, 4, 4, memoryLayout<uint32>"} {
+	for _, required := range []string{"const Pair$Storage:", "= struct({", "First: field<uint32>()", "Second: field<uint32>()", "type Pair$Storage = typeof Pair$Storage;", "memoryLayout<Pair$Storage>", "projectPointer<Pair, Pair$Storage>", "projectPointer<Pair$Storage, Pair>", "Pair.$storageOf", "Pair.$fromStorage", ".Second, 4, 4, memoryLayout<uint32>"} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("physical memory output lacks %q", required)
 		}
@@ -85,7 +85,8 @@ func TestRawScalarLayoutRetainsSelected386Alignment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	loaded, err := load.One(context.Background(), load.Request{Directory: directory, Pattern: ".", BuildProfile: profile})
+	loaded, err := load.One(context.Background(), load.Request{Directory: directory, Pattern: ".", BuildProfile: profile,
+		ToolCacheRoot: filepath.Join(repositoryRoot(), ".temp", "cache", "toolchain")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +112,8 @@ func loadMemoryStorageCase(t *testing.T, declarations string) *load.Package {
 	directory := t.TempDir()
 	writeFile(t, filepath.Join(directory, "go.mod"), "module example.com/memorystorage\n\ngo 1.26.4\n")
 	writeFile(t, filepath.Join(directory, "source.go"), "package conversion\nimport \"unsafe\"\n"+declarations)
-	loaded, err := load.One(context.Background(), load.Request{Directory: directory, Pattern: "."})
+	loaded, err := load.One(context.Background(), load.Request{Directory: directory, Pattern: ".",
+		ToolCacheRoot: filepath.Join(repositoryRoot(), ".temp", "cache", "toolchain")})
 	if err != nil {
 		t.Fatal(err)
 	}

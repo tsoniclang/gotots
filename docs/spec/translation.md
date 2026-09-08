@@ -830,7 +830,24 @@ and operations fail closed; managed TypeScript memory support is not a claim
 of unrestricted native address emulation.
 
 For a flat struct `type Pair struct { First, Second uint32 }`, the selected
-physical carrier is the existing `Pair$Storage` type. The emitter constructs
+physical carrier is the existing `Pair$Storage` type. Non-generic physical
+records carry the shared value-record contract explicitly:
+
+```ts
+export const Pair$Storage: { First: uint32; Second: uint32 } = struct({
+    First: field<uint32>(),
+    Second: field<uint32>(),
+});
+export type Pair$Storage = typeof Pair$Storage;
+```
+
+The marker imports resolve to the canonical `@tsonic/core/lang.js`
+declarations. A target consumes the finalized schema; neither the `$Storage`
+name nor an object-shaped type alias establishes value semantics. The schema
+is compile-time representation evidence, not a second runtime instance.
+Generic physical memory remains an explicit unsupported boundary; generic
+logical storage aliases do not claim an executable memory layout.
+The emitter constructs
 `memoryLayout<Pair$Storage>(abi, 8, 4, 8, ...)` with selectors of `First` at
 offset 0 and `Second` at offset 4. `projectPointer` uses `Pair.$storageOf` and
 `Pair.$fromStorage` to preserve the logical pointer, including nil and writes
