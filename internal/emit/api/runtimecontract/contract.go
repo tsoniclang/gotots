@@ -13,6 +13,8 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 		return contract, nil
 	}
 	switch symbol {
+	case RuntimeKeepAlive:
+		return runtimeContract(RuntimeModuleLifetime, "runtime/lifetime.ts", "goKeepAlive", false, RuntimeInterfaceValue), nil
 	case RuntimeStringIndex:
 		return runtimeContract(
 			RuntimeModuleString,

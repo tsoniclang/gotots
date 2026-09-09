@@ -12,6 +12,7 @@ import (
 	floatruntime "github.com/tsoniclang/gotots/internal/emit/runtime/float"
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
 	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
+	lifetimeruntime "github.com/tsoniclang/gotots/internal/emit/runtime/lifetime"
 	storagefacetruntime "github.com/tsoniclang/gotots/internal/emit/runtime/storagefacet"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
 	unsaferuntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafeoperation"
@@ -347,6 +348,20 @@ func Build(
 	}
 	if module == api.RuntimeModuleChannel {
 		return buildChannel(factory, symbols)
+	}
+	if module == api.RuntimeModuleLifetime {
+		if len(symbols) != 1 || symbols[0] != api.RuntimeKeepAlive {
+			return nil, &AssemblyError{Module: module, Reason: "lifetime module requires its one exact callable"}
+		}
+		statement, err := lifetimeruntime.Build(factory)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(api.RuntimeKeepAlive, statement)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
 	}
 	if module == api.RuntimeModuleUnsafe {
 		definitions := make([]Definition, 0, len(symbols))

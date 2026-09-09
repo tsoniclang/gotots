@@ -99,6 +99,7 @@ const (
 	RuntimeSelectReady                = runtimecontract.RuntimeSelectReady
 	RuntimeSelectAttempt              = runtimecontract.RuntimeSelectAttempt
 	RuntimeUnsafeString               = runtimecontract.RuntimeUnsafeString
+	RuntimeKeepAlive                  = runtimecontract.RuntimeKeepAlive
 )
 
 type RuntimeModule = runtimecontract.RuntimeModule
@@ -123,6 +124,7 @@ const (
 	RuntimeModuleStorage          = runtimecontract.RuntimeModuleStorage
 	RuntimeModuleDeferredRegistry = runtimecontract.RuntimeModuleDeferredRegistry
 	RuntimeModuleScalar           = runtimecontract.RuntimeModuleScalar
+	RuntimeModuleLifetime         = runtimecontract.RuntimeModuleLifetime
 )
 
 type RuntimeSymbolContract = runtimecontract.RuntimeSymbolContract

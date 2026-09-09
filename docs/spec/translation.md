@@ -56,6 +56,16 @@ ancestor. Imports and preferred-static declarations request file scope.
 
 ## Declarations And Names
 
+The exact selected `runtime.KeepAlive` declaration maps to one generated
+one-argument, void-returning callable. Its body invokes the public neutral
+`keepAlive` marker on the ordinary Go interface carrier. Name resolution owns
+this selection, so direct calls, aliases, callbacks and deferred calls all
+retain the same lifetime operation. A same-spelled user function remains
+ordinary source. Environment evidence records the generated implementation
+route; no provider stub or discarded-read substitute survives. Target runtime
+reachability and native pinning remain distinct obligations. This mapping
+does not implement `runtime.Pinner` or certify a native pin lease.
+
 Names are reserved by exact `types.Object` identity in deterministic package
 and source order. Target-only collision suffixes are stable and readable.
 Source spelling never acts as semantic identity.

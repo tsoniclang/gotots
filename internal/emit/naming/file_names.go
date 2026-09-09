@@ -266,6 +266,9 @@ func (n *File) reference(
 			Reason: "object has no emitted declaration",
 		}
 	}
+	if reference, handled, err := n.lifetimeReference(object, binding.kind, phase); handled {
+		return reference, err
+	}
 	if binding.kind == targetBindingMissingProvider {
 		contract, err := environmentcontract.Describe(object)
 		if err != nil {

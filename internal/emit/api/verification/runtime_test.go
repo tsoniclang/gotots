@@ -96,6 +96,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeSelectReady, 1106, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectReady", false, []api.RuntimeSymbol{api.RuntimeSelectAttempt}},
 		{api.RuntimeSelectAttempt, 1107, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectAttempt", false, []api.RuntimeSymbol{api.RuntimeSelectCase}},
 		{api.RuntimeUnsafeString, 1210, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeString", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimePanic}},
+		{api.RuntimeKeepAlive, 1300, api.RuntimeModuleLifetime, "runtime/lifetime.ts", "goKeepAlive", false, []api.RuntimeSymbol{api.RuntimeInterfaceValue}},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {
