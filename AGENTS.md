@@ -1,5 +1,8 @@
 # Agent Notes (GoToTS)
 
+Read and follow `../tsonic/docs/architecture/workspace-agent-policy.md` before
+any work.
+
 `AGENTS.md` and `CLAUDE.md` must remain byte-identical. Apply every change to
 both and verify with `cmp`.
 
@@ -288,3 +291,12 @@ revision and governing spec, distinguish facts from proposed work, preserve one
 active endpoint, and perform a separate pre-send review. If a note to the user
 is needed, put it before a `Message to Team` heading; otherwise print only the
 complete copy/paste-ready team message.
+
+## Pull Request Workflow
+
+Never use the GitHub CLI (`gh`), install it, or request its authentication.
+Do not create pull requests through APIs or other automation. When a PR is
+requested, provide the GitHub creation URL for the pushed feature branch:
+`https://github.com/<owner>/<repo>/compare/<base>...<branch>?quick_pull=1`.
+The user creates and merges the PR. Clearly distinguish a creation link from
+an existing PR; a pushed branch does not mean a PR has been opened.
