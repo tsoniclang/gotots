@@ -9,6 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
+	"github.com/tsoniclang/gotots/internal/emit/value/structconstruction"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -74,7 +75,7 @@ func Layout(context api.Context, children api.ChildEmitter, source ast.Node, poi
 		}
 		offsets := context.TypesSizes().Offsetsof(fields)
 		for index, field := range fields {
-			name, nameErr := context.Names().Member(field)
+			name, nameErr := structconstruction.FieldName(context.Names(), field, index)
 			if nameErr != nil {
 				return api.ExpressionEmission{}, api.TypeEmission{}, nameErr
 			}

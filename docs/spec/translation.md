@@ -864,8 +864,14 @@ The marker imports resolve to the canonical `@tsonic/core/lang.js`
 declarations. A target consumes the finalized schema; neither the `$Storage`
 name nor an object-shaped type alias establishes value semantics. The schema
 is compile-time representation evidence, not a second runtime instance.
-Generic physical memory remains an explicit unsupported boundary; generic
-logical storage aliases do not claim an executable memory layout.
+Closed generic physical records use their concretely substituted storage
+schemas. Open generic physical memory remains unsupported; a generic logical
+storage alias alone does not establish an executable memory layout.
+Blank Go fields retain their exact selected-ABI slots under the same closed
+physical-field name owner used by storage construction. They do not become
+source-visible properties. Pointer-bearing blank slots are not erased into
+untyped padding, and trailing zero-sized fields retain the Go-selected record
+size and stride rather than a sum of child sizes.
 The emitter constructs
 `memoryLayout<Pair$Storage>(abi, 8, 4, 8, ...)` with selectors of `First` at
 offset 0 and `Second` at offset 4. `projectPointer` uses `Pair.$storageOf` and

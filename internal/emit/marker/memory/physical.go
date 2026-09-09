@@ -23,9 +23,6 @@ func SupportsLayout(context api.Context, source types.Type) (bool, error) {
 	}
 	for index := range structure.NumFields() {
 		field := structure.Field(index)
-		if field.Name() == "_" {
-			return false, nil
-		}
 		supported, err := SupportsLayout(context, field.Type())
 		if err != nil || !supported {
 			return false, err
