@@ -19,6 +19,10 @@ func pointerRawOperation(context api.Context, children api.ChildEmitter, pointee
 	if err != nil {
 		return nil, nil, err
 	}
+	parameterType, err := children.RepresentedType(context.WithRole(api.RoleParameterType), nil, types.NewPointer(pointee))
+	if err != nil {
+		return nil, nil, err
+	}
 	parameter, err := context.Names().Temporary(api.TemporaryConversionOperand)
 	if err != nil {
 		return nil, nil, err
@@ -32,6 +36,8 @@ func pointerRawOperation(context api.Context, children api.ChildEmitter, pointee
 	if err != nil {
 		return nil, nil, err
 	}
-	return factory.ArrowFunction(nil, nil, []tsgo.ParameterDeclaration{untypedParameter(factory, parameter)}, nil,
-		factory.EqualsGreaterThanToken(), factory.Block(append(raw.Before(), factory.ReturnStatement(raw.Value())), true)), raw.Requests(), nil
+	return factory.ArrowFunction(nil, nil, []tsgo.ParameterDeclaration{
+			factory.ParameterDeclaration(nil, nil, factory.Identifier(parameter), nil, parameterType.Value(), nil),
+		}, nil, factory.EqualsGreaterThanToken(), factory.Block(append(raw.Before(), factory.ReturnStatement(raw.Value())), true)),
+		api.CombineRequests(parameterType.Requests(), raw.Requests()), nil
 }

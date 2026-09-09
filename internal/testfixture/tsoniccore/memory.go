@@ -27,10 +27,13 @@ export declare function alignOf<T>(layout: MemoryLayout<T>): nativeUint;
 export declare function strideOf<T>(layout: MemoryLayout<T>): nativeUint;
 export declare function fieldOffsetOf<T, TField>(layout: MemoryLayout<T>, select: (value: T) => TField): nativeUint;
 export declare function keepAlive<T>(value: T): void;
+export declare function struct<T>(shape: T): T;
+export declare function field<T>(): T;
 `
 
 func memoryOperationRuntime() string {
 	var output strings.Builder
+	output.WriteString("export function struct(shape) { return shape; }\nexport function field() { return undefined; }\n")
 	for _, name := range []string{
 		"reinterpretRawPointer", "offsetRawPointer", "rawPointerToAddressInteger", "addressIntegerToRawPointer",
 		"memoryLayout", "memoryField", "sizeOf", "alignOf", "strideOf", "fieldOffsetOf", "keepAlive",

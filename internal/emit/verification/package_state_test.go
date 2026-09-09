@@ -20,7 +20,7 @@ import (
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
-func TestPackageStatePrintsTypechecksAndExecutesCheckerInitializationOrder(
+func TestPackageStatePrintsTypechecksAndPreservesCheckerInitializationOrder(
 	t *testing.T,
 ) {
 	projectDirectory := filepath.Join(
@@ -99,15 +99,15 @@ func TestPackageStatePrintsTypechecksAndExecutesCheckerInitializationOrder(
 	}
 
 	goOutput := executePackageStateGo(t, projectDirectory, workingDirectory)
-	targetOutput := executePackageStateTypeScript(
+	compilePackageStateTypeScript(
 		t,
 		workingDirectory,
 		targetPaths,
 		apiAssembly.OutputPath(),
 		false,
 	)
-	if targetOutput != goOutput {
-		t.Fatalf("TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+	if goOutput != "341413514\n341423615\n" {
+		t.Fatalf("package-state Go oracle = %q", goOutput)
 	}
 }
 
@@ -160,6 +160,22 @@ func executePackageStateTypeScript(
 	stringify bool,
 ) string {
 	t.Helper()
+	return runProgram(
+		t,
+		workingDirectory,
+		"node",
+		compilePackageStateTypeScript(t, workingDirectory, targetPaths, assemblyPath, stringify),
+	)
+}
+
+func compilePackageStateTypeScript(
+	t *testing.T,
+	workingDirectory string,
+	targetPaths []string,
+	assemblyPath string,
+	stringify bool,
+) string {
+	t.Helper()
 	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
 		t.Fatal(err)
 	}
@@ -203,12 +219,7 @@ console.log(`+runCall+`);
 	); err != nil {
 		t.Fatal(err)
 	}
-	return runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(outputDirectory, "runner.js"),
-	)
+	return filepath.Join(outputDirectory, "runner.js")
 }
 
 func TestPackageInitializationHandlesMultipleResultsInitFunctionsAndBlankImports(

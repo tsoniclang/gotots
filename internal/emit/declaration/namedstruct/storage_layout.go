@@ -73,18 +73,22 @@ func emitLayout(
 	if err != nil {
 		return layoutEmission{}, err
 	}
+	var declarations []tsgo.Statement
+	var schemaRequests []api.RootRequest
+	if len(typeParameters) == 0 {
+		declarations, schemaRequests, err = storageSchema(context, storageName, selected, moduleExport)
+		if err != nil {
+			return layoutEmission{}, err
+		}
+	} else {
+		declarations = []tsgo.Statement{storageAlias(context, storageName, selected, moduleExport, typeParameters)}
+	}
 	return layoutEmission{
-		declarations: []tsgo.Statement{storageAlias(
-			context,
-			storageName,
-			selected,
-			moduleExport,
-			typeParameters,
-		)},
-		members:     members,
-		fields:      selected,
-		storageType: storageType,
-		requests:    api.CombineRequests(requests, memberRequests),
+		declarations: declarations,
+		members:      members,
+		fields:       selected,
+		storageType:  storageType,
+		requests:     api.CombineRequests(requests, memberRequests, schemaRequests),
 	}, nil
 }
 
@@ -168,6 +172,19 @@ func storageAlias(
 	moduleExport bool,
 	typeParameters []tsgo.TypeParameterDeclaration,
 ) tsgo.TypeAliasDeclaration {
+	var modifiers []tsgo.ModifierLike
+	if moduleExport {
+		modifiers = []tsgo.ModifierLike{context.Factory().ExportKeyword()}
+	}
+	return context.Factory().TypeAliasDeclaration(
+		modifiers,
+		context.Factory().Identifier(name),
+		typeParameters,
+		storageShape(context, fields),
+	)
+}
+
+func storageShape(context api.Context, fields []layoutField) tsgo.TypeLiteralNode {
 	members := make([]tsgo.TypeElement, 0, len(fields))
 	for _, selected := range fields {
 		members = append(members,
@@ -180,16 +197,7 @@ func storageAlias(
 			),
 		)
 	}
-	var modifiers []tsgo.ModifierLike
-	if moduleExport {
-		modifiers = []tsgo.ModifierLike{context.Factory().ExportKeyword()}
-	}
-	return context.Factory().TypeAliasDeclaration(
-		modifiers,
-		context.Factory().Identifier(name),
-		typeParameters,
-		context.Factory().TypeLiteralNode(members),
-	)
+	return context.Factory().TypeLiteralNode(members)
 }
 
 func storageMembers(

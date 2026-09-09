@@ -130,12 +130,6 @@ func (owner Owner) StorageType(
 				sourceType,
 			)
 		}
-		reference, err := context.Names().NamedStructStorage(typeName)
-		if err != nil {
-			return api.TypeEmission{}, err
-		}
-		var typeArguments []tsgo.TypeNode
-		var argumentRequests []api.RootRequest
 		named, namedOK := types.Unalias(sourceType).(*types.Named)
 		if !namedOK {
 			return api.TypeEmission{}, &api.InvariantError{
@@ -143,6 +137,15 @@ func (owner Owner) StorageType(
 				Reason: "named-struct storage source type is invalid",
 			}
 		}
+		if named.TypeArgs().Len() != 0 && !api.ContainsGenericTypeParameter(named) {
+			return owner.StorageType(context, source, named.Underlying())
+		}
+		reference, err := context.Names().NamedStructStorage(typeName)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		var typeArguments []tsgo.TypeNode
+		var argumentRequests []api.RootRequest
 		if named.TypeArgs().Len() != 0 {
 			typeArguments, argumentRequests, err =
 				genericinstance.EmitTypeArguments(

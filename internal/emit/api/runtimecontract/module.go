@@ -27,6 +27,7 @@ const (
 	RuntimeModuleStorage          RuntimeModule = 19
 	RuntimeModuleDeferredRegistry RuntimeModule = 20
 	RuntimeModuleScalar           RuntimeModule = 21
+	RuntimeModuleLifetime         RuntimeModule = 22
 )
 
 func runtimeContract(

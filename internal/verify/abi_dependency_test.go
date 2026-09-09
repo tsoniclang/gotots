@@ -1,7 +1,6 @@
 package verify
 
 import (
-	"encoding/json"
 	"regexp"
 	"strings"
 	"testing"
@@ -10,23 +9,8 @@ import (
 func abiDependencySurface(relative string, source []byte) (string, error) {
 	text := string(source)
 	shared := "@" + "tso" + "nic/"
-	if relative == "abi/package.json" {
-		var document map[string]json.RawMessage
-		if err := json.Unmarshal(source, &document); err != nil {
-			return "", err
-		}
-		var peers map[string]string
-		if err := json.Unmarshal(document["peerDependencies"], &peers); err != nil {
-			return "", err
-		}
-		for name := range peers {
-			if name != shared+"source-core" && name != shared+"target-api" && name != shared+"tsts" {
-				return "", &wallError{source: relative, reason: "ABI adapter has an unapproved shared peer"}
-			}
-		}
-		delete(document, "peerDependencies")
-		remaining, err := json.Marshal(document)
-		return string(remaining), err
+	if relative == "abi/package.json" || relative == "abi/package-lock.json" {
+		return abiPackageDependencySurface(relative, source)
 	}
 	if !strings.HasPrefix(relative, "abi/src/") || !strings.HasSuffix(relative, ".ts") {
 		return text, nil

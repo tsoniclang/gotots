@@ -730,6 +730,21 @@ array/slice/string/interface descriptors, complex values, and runtime handles
 without a physical projection remain source boundaries; publishing their
 logical wrapper with only a byte size is not information preservation.
 
+Fixed-array extent/type evidence is not an element-layout descriptor. A raw
+array representation must retain the exact element child layout and element
+stride as well as the array's total size, alignment and stride. An indexed
+element is not a declared record field: it must not be passed to `memoryField`
+as though it were one. Until the shared contract can carry that relationship,
+the source boundary remains; expanding every array element into a synthetic
+record property is not a replacement for the missing array contract.
+
+Slice and string headers are Go-owned descriptors. Existing neutral record
+fields can express the data address and signed source-width length/capacity.
+That metadata alone does not implement a raw-backed view: the Go-owned inverse
+projections must also preserve backing ownership, copied-header aliasing and
+header replacement. No JavaScript byte-memory emulator is implied by those
+canonical requirements.
+
 The separately built `abi/` package implements that source-configuration
 boundary. Its production code registers immutable declarations and descriptors
 through the shared provider API; it neither checks source nor imports a target
@@ -759,6 +774,16 @@ represent exactly under the selected profile. An unsupported operation is not
 silently replaced by object identity or an invented address. There is no
 Go-specific fact schema, second semantic graph, or target codec in canonical
 source.
+
+`runtime.Pinner.Pin` and `Unpin` retain their exact source-facing runtime
+contracts, including the explicit pointer receiver and the one empty-interface
+Pin argument. Direct calls, bound method values, method expressions and
+deferred calls must not become `keepAlive`, disappear, or acquire a fabricated
+shared pin marker. Go's runtime/provider owns the mutable pin set and its
+zero-value, validation, duplicate-pin, unpin and reuse behavior. An unselected
+or unimplemented provider remains an explicit environment obligation; its
+ambient declarations are not executable pinning and do not establish native
+address stability. The selected native runtime must implement that contract.
 
 Maps have one representation owner and three storage modes. A key with an
 identity boolean, integer, or string primitive representation and a

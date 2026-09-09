@@ -27,7 +27,7 @@ func Convert(value *Pair) *Pair { return (*Pair)(unsafe.Pointer(value)) }
 	}
 	strictTypecheckEmission(t, emission)
 	_, _, printed := printConversions(t, t.TempDir(), emission)
-	for _, required := range []string{"memoryLayout<Pair$Storage>", "projectPointer<Pair, Pair$Storage>", "projectPointer<Pair$Storage, Pair>", "Pair.$storageOf", "Pair.$fromStorage", ".Second, 4, 4, memoryLayout<uint32>"} {
+	for _, required := range []string{"const Pair$Storage:", "= struct({", "First: field<uint32>()", "Second: field<uint32>()", "type Pair$Storage = typeof Pair$Storage;", "memoryLayout<Pair$Storage>", "projectPointer<Pair, Pair$Storage>", "projectPointer<Pair$Storage, Pair>", "Pair.$storageOf", "Pair.$fromStorage", ".Second, 4, 4, memoryLayout<uint32>"} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("physical memory output lacks %q", required)
 		}
@@ -77,6 +77,89 @@ func Convert(value *Outer) *Outer { return (*Outer)(unsafe.Pointer(value)) }
 	}
 }
 
+func TestRawClosedGenericLayoutRetainsConcreteFieldContracts(test *testing.T) {
+	loaded := loadMemoryStorageCase(test, `
+type Box[Element any] struct { Value Element }
+func Convert(value *Box[uint32]) *Box[uint32] { return (*Box[uint32])(unsafe.Pointer(value)) }
+`)
+	root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Convert"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), []emit.Root{root})
+	if err != nil {
+		test.Fatal(err)
+	}
+	strictTypecheckEmission(test, emission)
+	_, _, printed := printConversions(test, test.TempDir(), emission)
+	if !strings.Contains(printed, "Value: field<uint32>()") ||
+		!strings.Contains(printed, ".Value, 0, 4, memoryLayout<uint32>") {
+		test.Fatal("closed generic memory lacks its concrete neutral value-record and child-layout contracts")
+	}
+	if strings.Contains(printed, "memoryLayout<Box$Storage<uint32>>") {
+		test.Fatal("physical memory depends on an unproven generic storage alias")
+	}
+}
+
+func TestRawNestedGenericLayoutRetainsConcreteFieldContracts(test *testing.T) {
+	loaded := loadMemoryStorageCase(test, `
+type Box[Element any] struct { Value Element }
+type Outer[Element any] struct { Inner Box[Element]; Next *Outer[Element] }
+func Convert(value *Outer[uint32]) *Outer[uint32] { return (*Outer[uint32])(unsafe.Pointer(value)) }
+`)
+	root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Convert"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), []emit.Root{root})
+	if err != nil {
+		test.Fatal(err)
+	}
+	strictTypecheckEmission(test, emission)
+	_, _, printed := printConversions(test, test.TempDir(), emission)
+	for _, required := range []string{"Value: field<uint32>()", "Inner: field<", "Next: field<Pointer<Outer__from_conversion<uint32>> | undefined>()", ".Value, 0, 4, memoryLayout<uint32>"} {
+		if !strings.Contains(printed, required) {
+			for _, line := range strings.Split(printed, "\n") {
+				if strings.Contains(line, "Next:") {
+					test.Log(line)
+				}
+			}
+			test.Fatalf("nested generic storage lost %q", required)
+		}
+	}
+	for _, forbidden := range []string{"memoryLayout<Box$Storage<uint32>>", "memoryLayout<Outer$Storage<uint32>>"} {
+		if strings.Contains(printed, forbidden) {
+			test.Fatalf("closed generic memory retains unproven alias %q", forbidden)
+		}
+	}
+}
+
+func TestOrdinaryGenericFieldUpdateDoesNotRequestRawMemory(test *testing.T) {
+	loaded := loadMemoryStorageCase(test, `
+type Box[Element any] struct { Value Element }
+func Update(value *Box[uint32]) uint32 { value.Value = 9; return value.Value }
+func Unselected(value *Box[uint32]) unsafe.Pointer { return unsafe.Pointer(value) }
+`)
+	root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Update"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), []emit.Root{root})
+	if err != nil {
+		test.Fatal(err)
+	}
+	strictTypecheckEmission(test, emission)
+	_, _, printed := printConversions(test, test.TempDir(), emission)
+	if !strings.Contains(printed, ".Value = 9") {
+		test.Fatal("ordinary generic field update lost its direct property assignment")
+	}
+	for _, forbidden := range []string{"memoryLayout", "toRawPointer", "fromRawPointer", "memoryField"} {
+		if strings.Contains(printed, forbidden) {
+			test.Fatalf("ordinary field update requests %q", forbidden)
+		}
+	}
+}
+
 func TestRawScalarLayoutRetainsSelected386Alignment(t *testing.T) {
 	directory := t.TempDir()
 	writeFile(t, filepath.Join(directory, "go.mod"), "module example.com/memory386\n\ngo 1.26.4\n")
@@ -85,7 +168,8 @@ func TestRawScalarLayoutRetainsSelected386Alignment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	loaded, err := load.One(context.Background(), load.Request{Directory: directory, Pattern: ".", BuildProfile: profile})
+	loaded, err := load.One(context.Background(), load.Request{Directory: directory, Pattern: ".", BuildProfile: profile,
+		ToolCacheRoot: filepath.Join(repositoryRoot(), ".temp", "cache", "toolchain")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +195,8 @@ func loadMemoryStorageCase(t *testing.T, declarations string) *load.Package {
 	directory := t.TempDir()
 	writeFile(t, filepath.Join(directory, "go.mod"), "module example.com/memorystorage\n\ngo 1.26.4\n")
 	writeFile(t, filepath.Join(directory, "source.go"), "package conversion\nimport \"unsafe\"\n"+declarations)
-	loaded, err := load.One(context.Background(), load.Request{Directory: directory, Pattern: "."})
+	loaded, err := load.One(context.Background(), load.Request{Directory: directory, Pattern: ".",
+		ToolCacheRoot: filepath.Join(repositoryRoot(), ".temp", "cache", "toolchain")})
 	if err != nil {
 		t.Fatal(err)
 	}

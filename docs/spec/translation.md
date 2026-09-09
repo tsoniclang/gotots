@@ -56,6 +56,16 @@ ancestor. Imports and preferred-static declarations request file scope.
 
 ## Declarations And Names
 
+The exact selected `runtime.KeepAlive` declaration maps to one generated
+one-argument, void-returning callable. Its body invokes the public neutral
+`keepAlive` marker on the ordinary Go interface carrier. Name resolution owns
+this selection, so direct calls, aliases, callbacks and deferred calls all
+retain the same lifetime operation. A same-spelled user function remains
+ordinary source. Environment evidence records the generated implementation
+route; no provider stub or discarded-read substitute survives. Target runtime
+reachability and native pinning remain distinct obligations. This mapping
+does not implement `runtime.Pinner` or certify a native pin lease.
+
 Names are reserved by exact `types.Object` identity in deterministic package
 and source order. Target-only collision suffixes are stable and readable.
 Source spelling never acts as semantic identity.
@@ -815,6 +825,15 @@ a private same-shaped brand fails. A reflected supported typed pointer uses a
 generated `toRawPointer(pointer, exactLayout)` callback; reflection forwards
 that value after the exact box guard. Reflecting an already-raw value preserves
 it. Nil remains nil. No address is synthesized by casting a provider object.
+The callback parameter retains its explicit logical `Pointer<T> | undefined`
+annotation from the normal Go type owner. Contextual callable inference alone
+is not evidence for a neutral pointee marker domain. Storage projections keep
+their existing exact `projectPointer` conversion and do not alter that input.
+Closed generic record storage uses the existing concrete underlying-record
+schema, including its substituted field types. The logical generic class and
+open generic storage template remain unchanged. A schema is neutral type
+evidence, not a request for byte-backed storage: ordinary field operations do
+not acquire raw layouts or codecs merely because their record has a schema.
 Named Go raw-pointer wrappers still use their ordinary wrap/project owner.
 The selected target must lower the provider's marker-bearing declaration
 surface consistently with generated callers before publishing its executable
@@ -830,7 +849,24 @@ and operations fail closed; managed TypeScript memory support is not a claim
 of unrestricted native address emulation.
 
 For a flat struct `type Pair struct { First, Second uint32 }`, the selected
-physical carrier is the existing `Pair$Storage` type. The emitter constructs
+physical carrier is the existing `Pair$Storage` type. Non-generic physical
+records carry the shared value-record contract explicitly:
+
+```ts
+export const Pair$Storage: { First: uint32; Second: uint32 } = struct({
+    First: field<uint32>(),
+    Second: field<uint32>(),
+});
+export type Pair$Storage = typeof Pair$Storage;
+```
+
+The marker imports resolve to the canonical `@tsonic/core/lang.js`
+declarations. A target consumes the finalized schema; neither the `$Storage`
+name nor an object-shaped type alias establishes value semantics. The schema
+is compile-time representation evidence, not a second runtime instance.
+Generic physical memory remains an explicit unsupported boundary; generic
+logical storage aliases do not claim an executable memory layout.
+The emitter constructs
 `memoryLayout<Pair$Storage>(abi, 8, 4, 8, ...)` with selectors of `First` at
 offset 0 and `Second` at offset 4. `projectPointer` uses `Pair.$storageOf` and
 `Pair.$fromStorage` to preserve the logical pointer, including nil and writes

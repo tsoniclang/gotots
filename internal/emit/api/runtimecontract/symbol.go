@@ -91,4 +91,5 @@ const (
 	RuntimeSelectReady                RuntimeSymbol = 1106
 	RuntimeSelectAttempt              RuntimeSymbol = 1107
 	RuntimeUnsafeString               RuntimeSymbol = 1210
+	RuntimeKeepAlive                  RuntimeSymbol = 1300
 )

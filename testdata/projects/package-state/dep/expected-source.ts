@@ -1,8 +1,12 @@
 import type { int32 } from "@gotots/runtime/scalars.js";
 import { $state } from "../../../../packages/example.com/package-state/dep/state.js";
-export type Cell$Storage = {
+import { field, struct } from "@tsonic/core/lang.js";
+export const Cell$Storage: {
     Value: int32;
-};
+} = struct({
+    Value: field<int32>()
+});
+export type Cell$Storage = typeof Cell$Storage;
 export class Cell {
     declare private readonly $goType: void;
     public constructor(private readonly $storage: Cell$Storage) {

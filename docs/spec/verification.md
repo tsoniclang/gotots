@@ -220,6 +220,12 @@ runtime differential is the sole executable proof. A test that executes a
 resolution-only marker body, treats a no-op marker implementation as behavior,
 or reports canonical-only evidence as a runtime differential must fail review.
 
+The package-state record fixture now carries `struct`/`field` markers. GoToTS
+pins its exact canonical output, strict typecheck and native Go oracle; TSTS's
+generated package-state proof owns execution after real target lowering. The
+marker-free initialization fixture retains its direct Go-versus-Node proof.
+Never execute the resolution-only `struct` fixture to simulate target lowering.
+
 For typed pointers, focused proof covers `addressOf`, `allocatePointer`,
 `loadPointer`, `storePointer`, and `equalPointer`; nil, alias identity, mutation
 through two aliases, argument/return transport, fresh allocation, and pointer equality;

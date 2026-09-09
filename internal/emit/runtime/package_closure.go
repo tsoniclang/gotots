@@ -211,5 +211,18 @@ func moduleImports(
 			}
 		}
 	}
+	if module == api.RuntimeModuleLifetime {
+		declaration, err := tsoniccore.Resolve(tsoniccore.SymbolKeepAlive)
+		if err != nil {
+			return nil, err
+		}
+		request, err := api.NewImportRequest(factory, api.ImportPhaseValue, declaration.Module(), declaration.Export(), declaration.Export())
+		if err != nil {
+			return nil, err
+		}
+		if err := placement.Apply([]api.RootRequest{request}); err != nil {
+			return nil, err
+		}
+	}
 	return placement.Statements(factory), nil
 }
