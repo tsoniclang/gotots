@@ -212,8 +212,8 @@ func CarrierMap(value int32) (int32, bool) {
 	for _, required := range []string{
 		"Pointer<Box<int32>> | undefined",
 		"function DirectInt(value: int32): Pointer<Box<int32>> | undefined",
-		"RuntimeSlice.literal<Box$Storage<int32>>",
-		"goSliceAddress<Box$Storage<int32>>",
+		"RuntimeSlice.literal<$goStruct$Struct_Field_Value_int32_Tag__empty_$Storage>",
+		"goSliceAddress<$goStruct$Struct_Field_Value_int32_Tag__empty_$Storage>",
 		"projectPointer<Left, Right>",
 		"hashPointer<Box",
 		"function StringPointer(value: gostring): Pointer<Box<gostring>> | undefined",
@@ -224,6 +224,8 @@ func CarrierMap(value int32) (int32, bool) {
 	}
 	for _, forbidden := range []string{
 		"GoPointer.view<Left, Right",
+		"RuntimeSlice.literal<Box$Storage<int32>>",
+		"goSliceAddress<Box$Storage<int32>>",
 		"GoPointer.optionalStorage",
 		"indexView",
 		"AddressView",

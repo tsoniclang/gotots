@@ -287,10 +287,20 @@ func Result() int32 { return Global.Value }
 			api.StructStorageTypeSuffix,
 		)
 	}
-	if got := len(reference.TypeArguments()); got != 1 ||
-		got != boxTypeParameters {
+	if boxTypeParameters != 1 {
+		t.Fatalf("generic Box source parameters = %d, want one", boxTypeParameters)
+	}
+	concrete := onlyAnonymousStructArtifact(t, session)
+	structure, ok := concrete.StructType()
+	if !ok || !types.Identical(structure, global.Type().Underlying()) {
+		t.Fatal("package storage does not select the exact substituted record")
+	}
+	if name.Text() != concrete.TargetName()+api.StructStorageTypeSuffix {
+		t.Fatalf("package storage reference %q does not select its concrete schema", name.Text())
+	}
+	if got := len(reference.TypeArguments()); got != 0 {
 		t.Fatalf(
-			"generic package storage source arguments = %d with %d reconstructions; provider parameters = %d at static revision %d, want exact source arity",
+			"closed package storage arguments = %d with %d reconstructions; provider parameters = %d at static revision %d, want zero on the substituted schema",
 			got,
 			storage.reconstructions,
 			boxTypeParameters,

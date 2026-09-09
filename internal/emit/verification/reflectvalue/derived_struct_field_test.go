@@ -64,7 +64,9 @@ func Make(value int64) Record {
 		},
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
-				"export type Derived$Storage = {",
+				"export const Derived$Storage: {",
+				"export type Derived$Storage = typeof Derived$Storage;",
+				"value: field<int64>()",
 				"value: int64;",
 				"Derived.$fromStorage(",
 				".$storageOf(instance)), fields =>",
