@@ -825,6 +825,15 @@ a private same-shaped brand fails. A reflected supported typed pointer uses a
 generated `toRawPointer(pointer, exactLayout)` callback; reflection forwards
 that value after the exact box guard. Reflecting an already-raw value preserves
 it. Nil remains nil. No address is synthesized by casting a provider object.
+The callback parameter retains its explicit logical `Pointer<T> | undefined`
+annotation from the normal Go type owner. Contextual callable inference alone
+is not evidence for a neutral pointee marker domain. Storage projections keep
+their existing exact `projectPointer` conversion and do not alter that input.
+Closed generic record storage uses the existing concrete underlying-record
+schema, including its substituted field types. The logical generic class and
+open generic storage template remain unchanged. A schema is neutral type
+evidence, not a request for byte-backed storage: ordinary field operations do
+not acquire raw layouts or codecs merely because their record has a schema.
 Named Go raw-pointer wrappers still use their ordinary wrap/project owner.
 The selected target must lower the provider's marker-bearing declaration
 surface consistently with generated callers before publishing its executable
