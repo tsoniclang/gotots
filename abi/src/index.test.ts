@@ -121,8 +121,11 @@ test("Go ABI selections retain exact address domains and nested child layouts", 
       assert.equal(selected.kind, "resolved");
       if (selected.kind === "resolved") {
         assert.equal(selected.layout.byteSize, 12);
-        assert.equal(selected.layout.fields[1]?.fieldLayout.byteSize, 8);
-        assert.equal(selected.layout.fields[1]?.fieldLayout.fields[1]?.byteOffset, 4);
+        assert.ok(selected.layout.kind === "value");
+        const inner = selected.layout.fields[1]?.fieldLayout;
+        assert.ok(inner?.kind === "value");
+        assert.equal(inner.byteSize, 8);
+        assert.equal(inner.fields[1]?.byteOffset, 4);
       }
       selectedRecords++;
     }
@@ -162,6 +165,7 @@ test("a slice-shaped descriptor retains its address and both integer child layou
       assert.equal(selected.kind, "resolved");
       if (selected.kind === "resolved") {
         selectedHeaders++;
+        assert.ok(selected.layout.kind === "value");
         assert.deepEqual(selected.layout.fields.map(field => [field.byteOffset, field.fieldLayout.byteSize]),
           [[0, 8], [8, 8], [16, 8]]);
         for (const field of selected.layout.fields) {
@@ -189,9 +193,9 @@ test("a fixed-array index cannot masquerade as a declared physical record field"
   `);
   assert.equal(checked.diagnostics.length, 0, formatDiagnostics(checked.diagnostics.filter(diagnostic => diagnostic !== undefined), "/src"));
   assert.deepEqual(checked.extensionDiagnostics.map(diagnostic => diagnostic.extensionCode), [
-    "SOURCE_CORE_MEMORY_FIELD_NOT_PROVEN", "SOURCE_CORE_MEMORY_LAYOUT_FIELD_NOT_PROVEN",
+    "SOURCE_CORE_MEMORY_FIELD_NOT_PROVEN", "SOURCE_CORE_MEMORY_ARRAY_ELEMENT_REQUIRED",
   ]);
-  const extents = new Set<number>();
+  const extents = new Set<bigint>();
   const visit = (node: Node): void => {
     const array = checked.sourceFacts.getFact(node, tsonicFixedArrayFactKey);
     if (array !== undefined) extents.add(array.length);
@@ -202,7 +206,39 @@ test("a fixed-array index cannot masquerade as a declared physical record field"
   const source = checked.getSourceFile("/src/index.ts");
   assert.ok(source);
   visit(source);
-  assert.deepEqual([...extents], [2]);
+  assert.deepEqual([...extents], [2n]);
+});
+
+test("Go ABI arrays retain exact children and large zero-sized extents", () => {
+  const checked = checkABI(`
+    import { little64 } from "@gotots/abi/layout.js";
+    import type { uint32 } from "@tsonic/core/types.js";
+    import { memoryLayout, memoryArrayLayout } from "@tsonic/core/lang.js";
+    const word = memoryLayout<uint32>(little64, 4, 4, 4);
+    const pair = memoryArrayLayout(little64, 8, 4, 8, word, 2);
+    const zero = memoryLayout<{}>(little64, 0, 1, 0);
+    const huge = memoryArrayLayout(little64, 0, 1, 0, zero, 9007199254740993n);
+  `);
+  assert.equal(checked.diagnostics.length, 0, formatDiagnostics(checked.diagnostics.filter(diagnostic => diagnostic !== undefined), "/src"));
+  assert.deepEqual(checked.extensionDiagnostics, []);
+  const arrays: { length: bigint; runtimeBase: string; byteSize: number; elementSize: number }[] = [];
+  const visit = (node: Node): void => {
+    const layout = readTsonicMemoryLayout(checked.sourceFacts, node);
+    if (layout?.kind === "array" && layout.call === node) {
+      assert.equal(layout.elementLayout.dataLayout.fingerprint, layout.dataLayout.fingerprint);
+      assert.equal(readTsonicMemoryLayout(checked.sourceFacts, layout.elementLayoutExpression)?.call, layout.elementLayout.call);
+      arrays.push({ length: layout.fixedArray.length, runtimeBase: layout.fixedArray.lengthRuntimeBase,
+        byteSize: layout.byteSize, elementSize: layout.elementLayout.byteSize });
+    }
+    for (const child of checked.ast.children(node)) if (child !== undefined) visit(child);
+  };
+  const source = checked.getSourceFile("/src/index.ts");
+  assert.ok(source);
+  visit(source);
+  assert.deepEqual(arrays, [
+    { length: 2n, runtimeBase: "number", byteSize: 8, elementSize: 4 },
+    { length: 9007199254740993n, runtimeBase: "bigint", byteSize: 0, elementSize: 0 },
+  ]);
 });
 
 function checkABI(text: string, registerLayouts = true) {
