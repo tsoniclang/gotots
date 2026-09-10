@@ -60,7 +60,9 @@ func Boolean(value bool) (bool, bool) {
 	for _, required := range []string{
 		"function NewBox(value: int32): Pointer<Box> | undefined",
 		"allocatePointer<Box>(new Box(value))",
-		"storePointer((pointer ?? GoPanic.raiseRuntime",
+		"Box.$assign(loadPointer((pointer ?? GoPanic.raiseRuntime",
+		"const storeTarget = (pointer ?? GoPanic.raiseRuntime",
+		"storePointer(storeTarget, $go$assign$T0_T0_to_T0(loadPointer(storeTarget),",
 		"pointer: Pointer<T> | undefined",
 		"export class Box",
 	} {
