@@ -74,6 +74,12 @@ const (
 	RuntimeComplex128Div              = runtimecontract.RuntimeComplex128Div
 	RuntimeComplex128Neg              = runtimecontract.RuntimeComplex128Neg
 	RuntimeComplex128Equal            = runtimecontract.RuntimeComplex128Equal
+	RuntimeComplex64Storage           = runtimecontract.RuntimeComplex64Storage
+	RuntimeComplex128Storage          = runtimecontract.RuntimeComplex128Storage
+	RuntimeComplex64ToStorage         = runtimecontract.RuntimeComplex64ToStorage
+	RuntimeComplex128ToStorage        = runtimecontract.RuntimeComplex128ToStorage
+	RuntimeComplex64FromStorage       = runtimecontract.RuntimeComplex64FromStorage
+	RuntimeComplex128FromStorage      = runtimecontract.RuntimeComplex128FromStorage
 	RuntimeNumberToBigInt             = runtimecontract.RuntimeNumberToBigInt
 	RuntimeInterfaceValue             = runtimecontract.RuntimeInterfaceValue
 	RuntimeInterfaceNonNil            = runtimecontract.RuntimeInterfaceNonNil

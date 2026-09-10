@@ -8,6 +8,7 @@ import (
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -43,6 +44,9 @@ func (owner Owner) RequiresStorageProjection(
 				Reason: "defined storage projection representation is invalid",
 			}
 		}
+	}
+	if _, ok := complexvalue.Describe(sourceType); ok {
+		return true, nil
 	}
 	if _, ok := isAnonymousStruct(sourceType); ok {
 		return true, nil
@@ -104,6 +108,9 @@ func (owner Owner) StorageType(
 			source,
 			defined.Underlying(),
 		)
+	}
+	if carrier, ok := complexvalue.Describe(sourceType); ok {
+		return carrier.StorageType(context)
 	}
 	if structType, ok := isAnonymousStruct(sourceType); ok {
 		reference, err := context.Names().AnonymousStructStorage(structType)
@@ -262,6 +269,9 @@ func (owner Owner) ToStorage(
 			projected,
 		)
 	}
+	if carrier, ok := complexvalue.Describe(sourceType); ok {
+		return carrier.ProjectStorage(context, value, true)
+	}
 	if structType, ok := isAnonymousStruct(sourceType); ok {
 		reference, err := context.Names().AnonymousStruct(
 			structType,
@@ -344,6 +354,9 @@ func (owner Owner) FromStorage(
 			return api.ExpressionEmission{}, err
 		}
 		return defined.Wrap(context, restored)
+	}
+	if carrier, ok := complexvalue.Describe(sourceType); ok {
+		return carrier.ProjectStorage(context, value, false)
 	}
 	if structType, ok := isAnonymousStruct(sourceType); ok {
 		reference, err := context.Names().AnonymousStruct(

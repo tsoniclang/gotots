@@ -6,6 +6,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	complexruntime "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -148,6 +149,27 @@ func moduleImports(
 			}
 			if err := placement.Apply([]api.RootRequest{request}); err != nil {
 				return nil, err
+			}
+		}
+	}
+	if module == api.RuntimeModuleComplex {
+		for _, requested := range symbols {
+			for _, symbol := range complexruntime.StorageMarkers(requested) {
+				declaration, err := tsoniccore.Resolve(symbol)
+				if err != nil {
+					return nil, err
+				}
+				phase := api.ImportPhaseValue
+				if declaration.Phase() == tsoniccore.PhaseType {
+					phase = api.ImportPhaseType
+				}
+				request, err := api.NewImportRequest(factory, phase, declaration.Module(), declaration.Export(), declaration.Export())
+				if err != nil {
+					return nil, err
+				}
+				if err := placement.Apply([]api.RootRequest{request}); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}

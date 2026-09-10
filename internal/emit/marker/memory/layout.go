@@ -9,6 +9,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
+	runtimecomplex "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
+	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	"github.com/tsoniclang/gotots/internal/emit/value/structconstruction"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -79,21 +81,17 @@ func Layout(context api.Context, children api.ChildEmitter, source ast.Node, poi
 			if nameErr != nil {
 				return api.ExpressionEmission{}, api.TypeEmission{}, nameErr
 			}
-			parameter, nameErr := context.Names().Temporary(api.TemporaryConversionOperand)
-			if nameErr != nil {
-				return api.ExpressionEmission{}, api.TypeEmission{}, nameErr
-			}
-			selector := context.Factory().ArrowFunction(nil, nil, []tsgo.ParameterDeclaration{
-				context.Factory().ParameterDeclaration(nil, nil, context.Factory().Identifier(parameter), nil, represented.Value(), nil),
-			}, nil, context.Factory().EqualsGreaterThanToken(), context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(parameter), nil, context.Factory().Identifier(name), tsgo.NodeFlagsNone))
-			childLayout, _, fieldErr := Layout(context, children, source, field.Type())
+			selected, fieldErr := fieldLayout(context, children, source, represented, name, field.Type(), offsets[index])
 			if fieldErr != nil {
 				return api.ExpressionEmission{}, api.TypeEmission{}, fieldErr
 			}
-			selected, fieldErr := pointermarker.Operation(context, tsoniccore.SymbolMemoryField, nil, []api.ExpressionEmission{
-				api.DirectExpression(selector, represented.Requests()...), number(offsets[index]), number(context.TypesSizes().Alignof(field.Type())), childLayout,
-			})
+			arguments = append(arguments, selected)
+		}
+	}
+	if carrier, ok := complexvalue.Describe(pointee.Underlying()); ok {
+		component := carrier.ComponentType()
+		for index, name := range []string{runtimecomplex.RealMember, runtimecomplex.ImagMember} {
+			selected, fieldErr := fieldLayout(context, children, source, represented, name, component, int64(index)*context.TypesSizes().Sizeof(component))
 			if fieldErr != nil {
 				return api.ExpressionEmission{}, api.TypeEmission{}, fieldErr
 			}

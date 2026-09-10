@@ -261,6 +261,11 @@ console.log(show(values.Divide128(a128, inf128)));
 const nan128 = values.Construct128(NaN, 1);
 console.log(show(values.Divide128(nan128, b128)));
 `
+	return runComplexScript(t, workingDirectory, targetPaths, runner)
+}
+
+func runComplexScript(t *testing.T, workingDirectory string, targetPaths []string, runner string) string {
+	t.Helper()
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, runner)
 	writeFile(

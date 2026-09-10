@@ -397,6 +397,18 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			true,
 			RuntimeFloat32Round,
 		), nil
+	case RuntimeComplex64Storage:
+		return runtimeContract(RuntimeModuleComplex, "runtime/complex.ts", "GoComplex64Storage", true), nil
+	case RuntimeComplex128Storage:
+		return runtimeContract(RuntimeModuleComplex, "runtime/complex.ts", "GoComplex128Storage", true), nil
+	case RuntimeComplex64ToStorage:
+		return runtimeContract(RuntimeModuleComplex, "runtime/complex.ts", "goComplex64ToStorage", false, RuntimeComplex64, RuntimeComplex64Storage), nil
+	case RuntimeComplex128ToStorage:
+		return runtimeContract(RuntimeModuleComplex, "runtime/complex.ts", "goComplex128ToStorage", false, RuntimeComplex128, RuntimeComplex128Storage), nil
+	case RuntimeComplex64FromStorage:
+		return runtimeContract(RuntimeModuleComplex, "runtime/complex.ts", "goComplex64FromStorage", false, RuntimeComplex64, RuntimeComplex64Storage), nil
+	case RuntimeComplex128FromStorage:
+		return runtimeContract(RuntimeModuleComplex, "runtime/complex.ts", "goComplex128FromStorage", false, RuntimeComplex128, RuntimeComplex128Storage), nil
 	case RuntimeComplex128:
 		return runtimeContract(
 			RuntimeModuleComplex,

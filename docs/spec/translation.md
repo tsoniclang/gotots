@@ -880,6 +880,18 @@ in both directions. Layout metadata must never attach to logical accessors.
 This preserves the source contract; an executable target still needs an exact
 aggregate codec or must reject it. It is not a claim of Node aggregate support.
 
+Complex storage uses the same value-record contract, not the logical arithmetic
+class. A `complex64` storage schema has `real: float32` and `imag: float32`
+fields at offsets 0 and 4; `complex128` uses `float64` at offsets 0 and 8.
+Each child has its selected-source scalar layout. Whole size, alignment and
+stride come from the selected Go ABI, including architectures where component
+alignment differs from its width. The value-representation owner supplies both
+inverse conversions; named complex types reuse their existing nominal owner.
+Record fields and container elements use that same storage selection, while
+ordinary complex arithmetic keeps its existing immutable logical carrier.
+Schemas and conversions are emitted once per requested complex width. Merely
+performing arithmetic does not request raw-memory descriptors or codecs.
+
 ### Interfaces
 
 An interface value is nil or a canonical dynamic-type token plus represented

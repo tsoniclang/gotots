@@ -38,7 +38,7 @@ func Convert(value *Pair) *Pair { return (*Pair)(unsafe.Pointer(value)) }
 }
 
 func TestRawMemoryRejectsUnrepresentedDescriptorFamilies(t *testing.T) {
-	for _, spelling := range []string{"[2]uint32", "[]uint32", "string", "complex128", "interface{}", "map[int]int", "chan int", "func()"} {
+	for _, spelling := range []string{"[2]uint32", "[]uint32", "string", "interface{}", "map[int]int", "chan int", "func()"} {
 		t.Run(spelling, func(t *testing.T) {
 			loaded := loadMemoryStorageCase(t, "func Convert(value *"+spelling+") unsafe.Pointer { return unsafe.Pointer(value) }")
 			root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Convert"))
@@ -191,11 +191,16 @@ func TestRawScalarLayoutRetainsSelected386Alignment(t *testing.T) {
 }
 
 func loadMemoryStorageCase(t *testing.T, declarations string) *load.Package {
+	return loadMemoryStorageProfile(t, declarations, load.BuildProfile{})
+}
+
+func loadMemoryStorageProfile(t *testing.T, declarations string, profile load.BuildProfile) *load.Package {
 	t.Helper()
 	directory := t.TempDir()
 	writeFile(t, filepath.Join(directory, "go.mod"), "module example.com/memorystorage\n\ngo 1.26.4\n")
 	writeFile(t, filepath.Join(directory, "source.go"), "package conversion\nimport \"unsafe\"\n"+declarations)
 	loaded, err := load.One(context.Background(), load.Request{Directory: directory, Pattern: ".",
+		BuildProfile:  profile,
 		ToolCacheRoot: filepath.Join(repositoryRoot(), ".temp", "cache", "toolchain")})
 	if err != nil {
 		t.Fatal(err)

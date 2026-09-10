@@ -29,6 +29,12 @@ func TestComplexRuntimeOwnsOneDefinitionPerClosedSymbol(t *testing.T) {
 		api.RuntimeComplex128Div,
 		api.RuntimeComplex128Neg,
 		api.RuntimeComplex128Equal,
+		api.RuntimeComplex64Storage,
+		api.RuntimeComplex128Storage,
+		api.RuntimeComplex64ToStorage,
+		api.RuntimeComplex128ToStorage,
+		api.RuntimeComplex64FromStorage,
+		api.RuntimeComplex128FromStorage,
 	}
 	definitions, err := runtimeemission.Build(
 		tsgo.NewFactory(),

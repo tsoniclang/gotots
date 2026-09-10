@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 )
 
 func SupportsLayout(context api.Context, source types.Type) (bool, error) {
@@ -11,6 +12,9 @@ func SupportsLayout(context api.Context, source types.Type) (bool, error) {
 		return false, nil
 	}
 	if physicalLeaf(source) {
+		return true, nil
+	}
+	if _, ok := complexvalue.Describe(source.Underlying()); ok {
 		return true, nil
 	}
 	structure, ok := source.Underlying().(*types.Struct)

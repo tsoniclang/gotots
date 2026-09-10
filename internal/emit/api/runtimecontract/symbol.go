@@ -66,6 +66,12 @@ const (
 	RuntimeComplex128Div              RuntimeSymbol = 823
 	RuntimeComplex128Neg              RuntimeSymbol = 824
 	RuntimeComplex128Equal            RuntimeSymbol = 825
+	RuntimeComplex64Storage           RuntimeSymbol = 830
+	RuntimeComplex128Storage          RuntimeSymbol = 831
+	RuntimeComplex64ToStorage         RuntimeSymbol = 832
+	RuntimeComplex128ToStorage        RuntimeSymbol = 833
+	RuntimeComplex64FromStorage       RuntimeSymbol = 834
+	RuntimeComplex128FromStorage      RuntimeSymbol = 835
 	RuntimeNumberToBigInt             RuntimeSymbol = 900
 	RuntimeInterfaceValue             RuntimeSymbol = 1000
 	RuntimeInterfaceNonNil            RuntimeSymbol = 1001
