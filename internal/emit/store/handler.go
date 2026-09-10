@@ -350,6 +350,10 @@ func identifier(
 		object.Parent() == object.Pkg().Scope() {
 		return packageVariable(context, object)
 	}
+	exposure, err := context.CapturedStoreRequests(source)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
 	if receiver, ok := context.ValueReceiver(object); ok {
 		request, err := receiver.CopyRequest()
 		if err != nil {
@@ -358,7 +362,7 @@ func identifier(
 		return api.NewStoreTargetEmission(
 			context.Factory().Identifier(receiver.CopyName()),
 			sourceType,
-			[]api.RootRequest{request},
+			api.CombineRequests([]api.RootRequest{request}, exposure),
 		)
 	}
 	reference, err := context.Names().Reference(object)
@@ -368,7 +372,7 @@ func identifier(
 	return api.NewStoreTargetEmission(
 		reference.Expression(context.Factory()),
 		sourceType,
-		reference.Requests(),
+		api.CombineRequests(reference.Requests(), exposure),
 	)
 }
 

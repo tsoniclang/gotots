@@ -95,7 +95,8 @@ export function ZeroIsFresh(): bool {
     let left = Box.$zero();
     let right = Box.$zero();
     left.Point.X = 7;
-    return right.Point.X === 0;
+    let logicalResult: boolean = right.Point.X === 0;
+    return logicalResult;
 }
 export function CopyIsolated(value: Box): int32 {
     let copy = Box.$copy(value);
@@ -212,7 +213,13 @@ export function PositionalComposite(): int32 {
 }
 export function OmittedComposite(): bool {
     let value = new Point(5, false);
-    return value.X === 5 && !value.Visible;
+    let logicalResult2: boolean = value.X === 5;
+    let logicalResult4: boolean = logicalResult2;
+    if (logicalResult4) {
+        let logicalResult3: boolean = !value.Visible;
+        logicalResult4 = logicalResult3;
+    }
+    return logicalResult4;
 }
 export function NotEqual(): bool {
     return !Box.$equal(NewBox(4), NewBox(5));

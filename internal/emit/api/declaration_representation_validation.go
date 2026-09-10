@@ -2,10 +2,15 @@ package api
 
 import (
 	"go/types"
+
+	controlcontract "github.com/tsoniclang/gotots/internal/emit/api/control"
 )
 
 func (r DeclarationRequirement) Valid() bool {
 	if !r.kind.Valid() {
+		return false
+	}
+	if (r.control == CallableControlIndirectMutation) != (r.controlVariable != nil) {
 		return false
 	}
 	if r.kind != DeclarationRequirementCallableControl &&
@@ -15,7 +20,7 @@ func (r DeclarationRequirement) Valid() bool {
 			r.controlLabel != nil ||
 			r.controlPosition.IsValid() ||
 			r.controlRange != nil ||
-			r.controlDefer != nil) {
+			r.controlDefer != nil || r.controlVariable != nil) {
 		return false
 	}
 	if r.kind != DeclarationRequirementGenericOperation &&
@@ -259,9 +264,14 @@ func (r DeclarationRequirement) Valid() bool {
 			r.anonymousDemand != AnonymousStructDemandInvalid ||
 			r.mapDemand != MapSpecializationDemandInvalid ||
 			r.genericOperation != nil ||
-			!validCallableControlOwner(r.owner, r.enclosing, r.callable) ||
+			!controlcontract.ValidOwner(r.owner, r.enclosing, r.callable) ||
 			!r.control.Valid() {
 			return false
+		}
+		if r.control == CallableControlIndirectMutation {
+			return controlcontract.ValidIndirectVariable(r.owner, r.enclosing, r.controlVariable) &&
+				r.callable != nil && r.controlLabel == nil && !r.controlPosition.IsValid() &&
+				r.controlRange == nil && r.controlDefer == nil
 		}
 		if r.control == CallableControlGoto {
 			return r.controlLabel != nil &&
@@ -276,14 +286,14 @@ func (r DeclarationRequirement) Valid() bool {
 			return r.controlLabel == nil &&
 				!r.controlPosition.IsValid() &&
 				r.controlDefer == nil &&
-				validIteratorReturnRange(r.callable, r.controlRange)
+				controlcontract.ValidIteratorRange(r.callable, r.controlRange)
 		}
 		if r.control == CallableControlDefer {
 			return r.controlLabel == nil &&
 				!r.controlPosition.IsValid() &&
 				r.controlRange == nil &&
 				(r.controlDefer == nil ||
-					validDeferControl(r.callable, r.controlDefer))
+					controlcontract.ValidDefer(r.callable, r.controlDefer))
 		}
 		return r.controlLabel == nil &&
 			!r.controlPosition.IsValid() &&

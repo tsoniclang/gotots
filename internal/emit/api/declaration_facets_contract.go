@@ -165,11 +165,12 @@ func (k DeclarationRequirementKind) Valid() bool {
 type CallableControlFacet = controlcontract.CallableFacet
 
 const (
-	CallableControlInvalid        = controlcontract.CallableInvalid
-	CallableControlDefer          = controlcontract.CallableDefer
-	CallableControlRecovery       = controlcontract.CallableRecovery
-	CallableControlGoto           = controlcontract.CallableGoto
-	CallableControlIteratorReturn = controlcontract.CallableIteratorReturn
+	CallableControlInvalid          = controlcontract.CallableInvalid
+	CallableControlDefer            = controlcontract.CallableDefer
+	CallableControlRecovery         = controlcontract.CallableRecovery
+	CallableControlGoto             = controlcontract.CallableGoto
+	CallableControlIteratorReturn   = controlcontract.CallableIteratorReturn
+	CallableControlIndirectMutation = controlcontract.CallableIndirectMutation
 )
 
 func NewGenericCapabilityRequirement(
@@ -404,36 +405,17 @@ func validConstantProjection(projection types.BasicKind) bool {
 	return ok
 }
 
-func NewDirectCallableControlRequirement(
-	owner *types.Func,
-	control CallableControlFacet,
-) (DeclarationRequirement, error) {
-	if owner == nil ||
-		owner.Origin() != owner ||
-		!control.Valid() ||
-		control == CallableControlGoto ||
-		control == CallableControlIteratorReturn {
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "direct callable-control requirement is invalid",
-		}
-	}
-	return DeclarationRequirement{
-		owner:   MustSourceArtifactOwner(owner),
-		kind:    DeclarationRequirementCallableControl,
-		control: control,
-	}, nil
-}
-
 func NewCallableControlRequirement(
 	owner ArtifactOwner,
 	enclosing ast.Node,
 	callable ast.Node,
 	control CallableControlFacet,
 ) (DeclarationRequirement, error) {
-	if !validCallableControlAnchor(owner, enclosing, callable) ||
+	if !controlcontract.ValidAnchor(owner, enclosing, callable) ||
 		!control.Valid() ||
 		control == CallableControlGoto ||
-		control == CallableControlIteratorReturn {
+		control == CallableControlIteratorReturn ||
+		control == CallableControlIndirectMutation {
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "callable-control requirement is invalid",
 		}
@@ -453,8 +435,8 @@ func NewDeferControlRequirement(
 	callable ast.Node,
 	source *ast.DeferStmt,
 ) (DeclarationRequirement, error) {
-	if !validCallableControlAnchor(owner, enclosing, callable) ||
-		!validDeferControl(callable, source) {
+	if !controlcontract.ValidAnchor(owner, enclosing, callable) ||
+		!controlcontract.ValidDefer(callable, source) {
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "defer control requirement is invalid",
 		}
@@ -475,8 +457,8 @@ func NewIteratorReturnControlRequirement(
 	callable ast.Node,
 	source *ast.RangeStmt,
 ) (DeclarationRequirement, error) {
-	if !validCallableControlAnchor(owner, enclosing, callable) ||
-		!validIteratorReturnRange(callable, source) {
+	if !controlcontract.ValidAnchor(owner, enclosing, callable) ||
+		!controlcontract.ValidIteratorRange(callable, source) {
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "iterator-return control requirement is invalid",
 		}
@@ -498,7 +480,7 @@ func NewGotoControlRequirement(
 	label *types.Label,
 	position token.Pos,
 ) (DeclarationRequirement, error) {
-	if !validCallableControlAnchor(owner, enclosing, callable) ||
+	if !controlcontract.ValidAnchor(owner, enclosing, callable) ||
 		label == nil ||
 		!position.IsValid() ||
 		position < callable.Pos() ||
@@ -518,82 +500,69 @@ func NewGotoControlRequirement(
 	}, nil
 }
 
-func validIteratorReturnRange(
+func NewCallableControlRequest(
+	owner ArtifactOwner,
+	enclosing ast.Node,
 	callable ast.Node,
-	source *ast.RangeStmt,
-) bool {
-	return callable != nil &&
-		source != nil &&
-		source.X != nil &&
-		source.Body != nil &&
-		source.Pos() >= callable.Pos() &&
-		source.End() <= callable.End()
+	control CallableControlFacet,
+) (RootRequest, error) {
+	requirement, err := NewCallableControlRequirement(
+		owner,
+		enclosing,
+		callable,
+		control,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
-func validDeferControl(
+func NewDeferControlRequest(
+	owner ArtifactOwner,
+	enclosing ast.Node,
 	callable ast.Node,
 	source *ast.DeferStmt,
-) bool {
-	return callable != nil &&
-		source != nil &&
-		source.Call != nil &&
-		source.Pos().IsValid() &&
-		source.End() >= source.Pos() &&
-		source.Pos() >= callable.Pos() &&
-		source.End() <= callable.End()
+) (RootRequest, error) {
+	requirement, err := NewDeferControlRequirement(
+		owner,
+		enclosing,
+		callable,
+		source,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
-func validCallableControlAnchor(
+func NewGotoControlRequest(
 	owner ArtifactOwner,
 	enclosing ast.Node,
 	callable ast.Node,
-) bool {
-	if !owner.Valid() ||
-		enclosing == nil ||
-		callable == nil ||
-		callable.Pos() < enclosing.Pos() ||
-		callable.End() > enclosing.End() {
-		return false
+	label *types.Label,
+	position token.Pos,
+) (RootRequest, error) {
+	requirement, err := NewGotoControlRequirement(
+		owner,
+		enclosing,
+		callable,
+		label,
+		position,
+	)
+	if err != nil {
+		return RootRequest{}, err
 	}
-	switch callable := callable.(type) {
-	case *ast.FuncDecl:
-		source, ok := owner.Source()
-		function, functionOK := source.(*types.Func)
-		return ok &&
-			functionOK &&
-			enclosing == callable &&
-			callable.Type != nil &&
-			callable.Body != nil &&
-			function.Pos() >= callable.Pos() &&
-			function.Pos() <= callable.End()
-	case *ast.FuncLit:
-		if callable.Type == nil || callable.Body == nil {
-			return false
-		}
-		if source, ok := owner.Source(); ok {
-			function, functionOK := source.(*types.Func)
-			return functionOK &&
-				function.Pos() >= enclosing.Pos() &&
-				function.Pos() <= enclosing.End()
-		}
-		_, initializer, ok := owner.PackageInitializer()
-		return ok &&
-			initializer.Rhs != nil &&
-			enclosing == initializer.Rhs
-	default:
-		return false
-	}
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
-func validCallableControlOwner(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-) bool {
-	if enclosing != nil || callable != nil {
-		return validCallableControlAnchor(owner, enclosing, callable)
+func NewDirectCallableControlRequest(
+	owner *types.Func,
+	control CallableControlFacet,
+) (RootRequest, error) {
+	requirement, err := NewDirectCallableControlRequirement(owner, control)
+	if err != nil {
+		return RootRequest{}, err
 	}
-	source, ok := owner.Source()
-	function, functionOK := source.(*types.Func)
-	return ok && functionOK && function.Origin() == function
+	return newDeclarationRequirementRequest(requirement), nil
 }

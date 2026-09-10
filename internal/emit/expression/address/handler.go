@@ -44,6 +44,14 @@ func emitAddressedOperand(context api.Context, children api.ChildEmitter, source
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	requests, err := context.AddressExposureRequests(source)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	pointer, err = api.NewExpressionEmission(pointer.Before(), pointer.Value(), api.CombineRequests(pointer.Requests(), requests))
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	array, arrayOK := arrayvalue.Resolve(context, element)
 	if !arrayOK {
 		return pointer, nil

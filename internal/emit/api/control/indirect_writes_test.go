@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestIndirectWritesUseExactLexicalIdentity(test *testing.T) {
+func TestIndirectExposureUsesExactLexicalIdentity(test *testing.T) {
 	fileSet := token.NewFileSet()
 	file, err := parser.ParseFile(fileSet, "source.go", `package fixture
 type Count int
@@ -35,7 +35,21 @@ func Run() {
 		test.Fatal(err)
 	}
 	callable := file.Decls[2].(*ast.FuncDecl)
-	writes := IndirectWrites(callable, info)
+	addressed := info.ObjectOf(callable.Body.List[0].(*ast.AssignStmt).Lhs[0].(*ast.Ident))
+	writes := make(map[*types.Var]struct{})
+	for identifier, object := range info.Defs {
+		variable, ok := object.(*types.Var)
+		if !ok || identifier.Pos() < callable.Pos() {
+			continue
+		}
+		if identifier.Name == "captured" || identifier.Name == "receiver" ||
+			object == addressed {
+			if ExposedVariable(identifier, info) != variable {
+				test.Fatal("selected exposure lost its checked variable")
+			}
+			writes[variable] = struct{}{}
+		}
+	}
 	if len(writes) != 3 {
 		test.Fatalf("indirect writes = %d, want addressed, captured and receiver", len(writes))
 	}

@@ -6,57 +6,23 @@ import (
 	"go/types"
 )
 
-func IndirectWrites(source ast.Node, info *types.Info) map[*types.Var]struct{} {
-	writes := make(map[*types.Var]struct{})
-	if source != nil && info != nil {
-		ast.Walk(indirectWriteVisitor{info: info, writes: writes}, source)
-	}
-	return writes
-}
-
-type indirectWriteVisitor struct {
-	info    *types.Info
-	writes  map[*types.Var]struct{}
-	closure *ast.FuncLit
-}
-
-func (visitor indirectWriteVisitor) Visit(node ast.Node) ast.Visitor {
-	switch node := node.(type) {
-	case nil:
+func ExposedVariable(expression ast.Expr, info *types.Info) *types.Var {
+	if expression == nil || info == nil {
 		return nil
-	case *ast.FuncLit:
-		visitor.closure = node
-	case *ast.UnaryExpr:
-		if node.Op == token.AND {
-			visitor.record(node.X, false)
-		}
-	case *ast.AssignStmt:
-		for _, target := range node.Lhs {
-			visitor.record(target, true)
-		}
-	case *ast.IncDecStmt:
-		visitor.record(node.X, true)
-	case *ast.SelectorExpr:
-		if selected := visitor.info.Selections[node]; selected != nil && selected.Kind() == types.MethodVal {
-			if signature, ok := selected.Obj().Type().(*types.Signature); ok && signature.Recv() != nil {
-				if _, pointer := signature.Recv().Type().Underlying().(*types.Pointer); pointer {
-					visitor.record(node.X, false)
-				}
-			}
-		}
 	}
-	return visitor
-}
-
-func (visitor indirectWriteVisitor) record(expression ast.Expr, captured bool) {
-	if captured && visitor.closure == nil {
-		return
+	if unary, ok := ast.Unparen(expression).(*ast.UnaryExpr); ok && unary.Op == token.AND {
+		expression = unary.X
 	}
-	variable := rootVariable(expression, visitor.info)
-	if variable == nil || captured && variable.Pos() >= visitor.closure.Pos() && variable.Pos() < visitor.closure.End() {
-		return
+	variable := rootVariable(expression, info)
+	if variable == nil || variable.IsField() || variable.Parent() == nil ||
+		variable.Pkg() != nil && variable.Parent() == variable.Pkg().Scope() {
+		return nil
 	}
-	visitor.writes[variable] = struct{}{}
+	basic, scalar := variable.Type().Underlying().(*types.Basic)
+	if !scalar || basic.Info()&(types.IsBoolean|types.IsInteger|types.IsFloat|types.IsString) == 0 {
+		return nil
+	}
+	return variable
 }
 
 func IndirectlyMutable(expression ast.Expr, info *types.Info, writes map[*types.Var]struct{}) bool {

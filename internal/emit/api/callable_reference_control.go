@@ -29,6 +29,7 @@ func (c Context) WithCallableControls(
 		}
 	}
 	controls := make(map[ast.Node]CallableControlDemand)
+	indirectWrites := make(map[*types.Var]struct{})
 	gotoUses := make(map[*types.Label][]token.Pos)
 	for _, requirement := range requirements {
 		if requirement.Kind() != DeclarationRequirementCallableControl {
@@ -49,6 +50,14 @@ func (c Context) WithCallableControls(
 				Role:   c.role,
 				Reason: "callable-control requirement is foreign to its artifact",
 			}
+		}
+		if facet == CallableControlIndirectMutation {
+			variable, valid := requirement.IndirectMutationControl()
+			if !valid {
+				return Context{}, &InvariantError{Role: c.role, Reason: "indirect mutation requires an exact local variable"}
+			}
+			indirectWrites[variable] = struct{}{}
+			continue
 		}
 		demand := controls[callable]
 		if facet == CallableControlDefer {
@@ -84,7 +93,7 @@ func (c Context) WithCallableControls(
 	c.artifactOwner = owner
 	c.callableControls = controls
 	c.callableEnclosing = enclosing
-	c.indirectWrites = controlcontract.IndirectWrites(enclosing, c.typesInfo)
+	c.indirectWrites = indirectWrites
 	c.gotoUses = gotoUses
 	return c, nil
 }
@@ -528,69 +537,31 @@ func NewValueReceiverCopyRequest(
 	return newDeclarationRequirementRequest(requirement), nil
 }
 
-func NewCallableControlRequest(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-	control CallableControlFacet,
-) (RootRequest, error) {
-	requirement, err := NewCallableControlRequirement(
-		owner,
-		enclosing,
-		callable,
-		control,
-	)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
+func (context Context) AddressExposureRequests(source ast.Expr) ([]RootRequest, error) {
+	return context.indirectMutationRequests(source, false)
 }
 
-func NewDeferControlRequest(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-	source *ast.DeferStmt,
-) (RootRequest, error) {
-	requirement, err := NewDeferControlRequirement(
-		owner,
-		enclosing,
-		callable,
-		source,
-	)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
+func (context Context) CapturedStoreRequests(source ast.Expr) ([]RootRequest, error) {
+	return context.indirectMutationRequests(source, true)
 }
 
-func NewGotoControlRequest(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-	label *types.Label,
-	position token.Pos,
-) (RootRequest, error) {
-	requirement, err := NewGotoControlRequirement(
-		owner,
-		enclosing,
-		callable,
-		label,
-		position,
-	)
-	if err != nil {
-		return RootRequest{}, err
+func (context Context) indirectMutationRequests(source ast.Expr, captured bool) ([]RootRequest, error) {
+	if context.currentCallable == nil {
+		return nil, nil
 	}
-	return newDeclarationRequirementRequest(requirement), nil
-}
-
-func NewDirectCallableControlRequest(
-	owner *types.Func,
-	control CallableControlFacet,
-) (RootRequest, error) {
-	requirement, err := NewDirectCallableControlRequirement(owner, control)
-	if err != nil {
-		return RootRequest{}, err
+	variable := controlcontract.ExposedVariable(source, context.typesInfo)
+	if variable == nil {
+		return nil, nil
 	}
-	return newDeclarationRequirementRequest(requirement), nil
+	if captured {
+		closure, nested := context.currentCallable.(*ast.FuncLit)
+		if !nested || variable.Pos() >= closure.Pos() && variable.Pos() < closure.End() {
+			return nil, nil
+		}
+	}
+	requirement, err := NewIndirectMutationRequirement(context.artifactOwner, context.callableEnclosing, context.currentCallable, variable)
+	if err != nil {
+		return nil, err
+	}
+	return []RootRequest{newDeclarationRequirementRequest(requirement)}, nil
 }

@@ -566,3 +566,11 @@ func (r InterfaceContractReference) GuardName() string {
 func (r InterfaceContractReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
 }
+
+func (requirement DeclarationRequirement) IndirectMutationControl() (*types.Var, bool) {
+	if requirement.kind != DeclarationRequirementCallableControl ||
+		requirement.control != CallableControlIndirectMutation || !requirement.Valid() {
+		return nil, false
+	}
+	return requirement.controlVariable, true
+}

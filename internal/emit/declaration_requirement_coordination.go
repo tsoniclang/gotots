@@ -444,6 +444,10 @@ func compareCallableControlRequirements(
 		return -1
 	case leftControl > rightControl:
 		return 1
+	case leftControl == api.CallableControlIndirectMutation:
+		leftVariable, _ := left.IndirectMutationControl()
+		rightVariable, _ := right.IndirectMutationControl()
+		return emitordering.CompareObjects(leftVariable, rightVariable)
 	case leftControl == api.CallableControlIteratorReturn:
 		leftRange, leftOK := left.IteratorReturnControl()
 		rightRange, rightOK := right.IteratorReturnControl()

@@ -80,10 +80,68 @@ func MutationConditions() bool {
 	switch number {
 	case 7:
 		replace(&number, 9)
-		return number == 9
+		if number != 9 {
+			return false
+		}
 	default:
 		return false
 	}
+	return mutationControlEdges()
+}
+
+type mutableCount int
+
+func (value *mutableCount) change() { *value = 2 }
+
+func mutationControlEdges() bool {
+	value := mutableCount(1)
+	if value == 1 {
+		value.change()
+		if value != 2 {
+			return false
+		}
+	}
+	slot := 1
+	if slot == 1 {
+		pointer := &slot
+		replace(pointer, 2)
+		if slot != 2 {
+			return false
+		}
+	}
+	index := 0
+	step := func() {
+		for index = range [2]int{} {
+		}
+	}
+	if index == 0 {
+		step()
+		if index != 1 {
+			return false
+		}
+	}
+	captured := 3
+	nested := func() {
+		increment := func() { captured++ }
+		increment()
+	}
+	if captured == 3 {
+		nested()
+		if captured != 4 {
+			return false
+		}
+	}
+	stable := 1
+	read := func() int { return stable }
+	{
+		stable := 2
+		increment := func() { stable++ }
+		increment()
+		if stable != 3 {
+			return false
+		}
+	}
+	return read() == 1 && stable == 1
 }
 
 func LoopConditions() bool {

@@ -13,13 +13,15 @@ const (
 	CallableRecovery
 	CallableGoto
 	CallableIteratorReturn
+	CallableIndirectMutation
 )
 
 func (f CallableFacet) Valid() bool {
 	return f == CallableDefer ||
 		f == CallableRecovery ||
 		f == CallableGoto ||
-		f == CallableIteratorReturn
+		f == CallableIteratorReturn ||
+		f == CallableIndirectMutation
 }
 
 type CallableDemand struct {

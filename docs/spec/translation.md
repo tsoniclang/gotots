@@ -1784,8 +1784,12 @@ whose address is exposed, a captured write, or an indirectly accessed scalar
 may change after a call even when the TypeScript checker cannot observe that
 write. Preserve such comparison and control-selection results in mutable local
 snapshots so TypeScript cannot propagate a stale literal refinement to the
-original storage. The one lexical callable index uses checked Go identities,
-including implicit pointer receivers; it is not a call/effect graph. Keep
+original storage. Address-taking and captured stores request exact checked
+variable identities through the existing callable-control reconstruction
+owner. Implicit pointer receivers use the same address owner; range assignments
+use the same store owner. Re-emission applies discovered requirements to the
+whole callable, including earlier comparisons. There is no preparatory AST
+walk, copied source graph or call/effect analysis. Keep
 isolated local comparisons direct. Preserve short-circuit and switch evaluation
 order. Do not repair stale refinement with casts, suppressions, changed source
 fixtures or additional runtime dispatch.
