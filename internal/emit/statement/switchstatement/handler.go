@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 )
 
@@ -156,6 +157,10 @@ func emitTag(
 		return tagEmission{}, err
 	}
 	model, wrapped := directSwitchModel(sourceType)
+	target, err = operands.MutationSnapshot(context, source.Tag, target)
+	if err != nil {
+		return tagEmission{}, err
+	}
 	return tagEmission{
 		source:     source.Tag,
 		sourceType: sourceType,

@@ -1779,6 +1779,17 @@ not an admissible private dependency.
 
 ## Failure
 
+Go comparisons do not permanently refine mutable storage. A source variable
+whose address is exposed, a captured write, or an indirectly accessed scalar
+may change after a call even when the TypeScript checker cannot observe that
+write. Preserve such comparison and control-selection results in mutable local
+snapshots so TypeScript cannot propagate a stale literal refinement to the
+original storage. The one lexical callable index uses checked Go identities,
+including implicit pointer receivers; it is not a call/effect graph. Keep
+isolated local comparisons direct. Preserve short-circuit and switch evaluation
+order. Do not repair stale refinement with casts, suppressions, changed source
+fixtures or additional runtime dispatch.
+
 Translation fails at the owning occurrence when:
 
 - a construct/context has no handler;

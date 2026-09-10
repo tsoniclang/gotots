@@ -35,6 +35,11 @@ func Descriptors() bool {
 }
 
 func LiveLocations() bool {
+	private := struct{ hidden int }{hidden: 1}
+	privateField := reflect.ValueOf(&private).Elem().Field(0)
+	if !privateField.CanAddr() || privateField.CanSet() {
+		return false
+	}
 	number := 3
 	original := reflect.ValueOf(&number).Elem()
 	copied := original
@@ -46,4 +51,31 @@ func LiveLocations() bool {
 	original.SetInt(7)
 	return number == 7 && original.Int() == 7 && copied.Int() == 4 &&
 		original.CanAddr() && !copied.CanAddr()
+}
+
+func MutationConditions() bool {
+	number := 3
+	change := func() bool { number = 7; return true }
+	if number != 3 {
+		return false
+	}
+	if !(number == 3 && change() && number == 7) {
+		return false
+	}
+	flag := true
+	flip := func() { flag = false }
+	if !flag {
+		return false
+	}
+	flip()
+	if flag == true {
+		return false
+	}
+	switch number {
+	case 7:
+		replace(&number, 9)
+		return number == 9
+	default:
+		return false
+	}
 }

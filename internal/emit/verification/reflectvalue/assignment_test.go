@@ -24,3 +24,33 @@ func main() { fmt.Println(fixture.Descriptors()) }
 			}
 		})
 }
+
+func TestReflectDescriptorCopyRetainsLiveLocation(test *testing.T) {
+	source, err := os.ReadFile(filepath.Join(repositoryRoot(), "testdata/constructs/value/providerstorage/source.go"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	verifyReflectCanonicalInspect(test, string(source), "LiveLocations", "providerstorage",
+		`console.log(LiveLocations());`,
+		`package main
+import ("fmt"; fixture "example.com/reflectvalue")
+func main() { fmt.Println(fixture.LiveLocations()) }
+`, func(artifacts renderedArtifacts) {
+			if !strings.Contains(artifacts.printed, ".CanAddr()") {
+				test.Fatal("provider addressability contract was omitted")
+			}
+		})
+}
+
+func TestIndirectMutationDoesNotRefineScalarStorage(test *testing.T) {
+	source, err := os.ReadFile(filepath.Join(repositoryRoot(), "testdata/constructs/value/providerstorage/source.go"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	verifyReflectCanonicalInspect(test, string(source), "MutationConditions", "providerstorage",
+		`console.log(MutationConditions());`,
+		`package main
+import ("fmt"; fixture "example.com/reflectvalue")
+func main() { fmt.Println(fixture.MutationConditions()) }
+`, nil)
+}

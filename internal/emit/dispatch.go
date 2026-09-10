@@ -26,6 +26,7 @@ import (
 	floatliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/float"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
 	stringliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/string"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
 	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
 	sliceexpression "github.com/tsoniclang/gotots/internal/emit/expression/slice"
@@ -308,7 +309,11 @@ func (e *emitter) Condition(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	return e.Expression(context.WithExpectedType(types.Typ[types.Bool]), source)
+	value, err := e.Expression(context.WithExpectedType(types.Typ[types.Bool]), source)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return expressionoperands.MutationSnapshot(context, source, value)
 }
 
 func (e *emitter) Block(

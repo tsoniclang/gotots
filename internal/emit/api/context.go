@@ -108,6 +108,7 @@ type Context struct {
 	callableControls               map[ast.Node]CallableControlDemand
 	callableEnclosing              ast.Node
 	currentCallable                ast.Node
+	indirectWrites                 map[*types.Var]struct{}
 	currentControl                 CallableControlDemand
 	recoveryAuthority              string
 	deferControl                   DeferControl
@@ -430,6 +431,10 @@ func (c Context) TypesPackage() *types.Package {
 
 func (c Context) TypesInfo() TypeInfoView {
 	return newTypeInfoView(c.typesInfo)
+}
+
+func (c Context) IndirectlyMutable(source ast.Expr) bool {
+	return controlcontract.IndirectlyMutable(source, c.typesInfo, c.indirectWrites)
 }
 
 func (c Context) TypesSizes() types.Sizes {

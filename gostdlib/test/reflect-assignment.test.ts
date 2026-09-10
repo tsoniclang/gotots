@@ -9,6 +9,7 @@ test("reflection assignment replaces the descriptor without changing its copies"
   const first = new ProviderError("first");
   const second = new ProviderError("second");
   const original = ValueOf(first);
+  assert.equal(original.CanAddr(), false);
   const copied = ReflectValueOperations.$copy(original);
   const target = copied;
   const incoming = ValueOf(second);
@@ -25,5 +26,6 @@ test("reflection assignment replaces the descriptor without changing its copies"
   assert.equal(copied.$unbox(), second);
   ReflectValueOperations.$assign(copied, incoming);
   assert.equal(copied.IsValid(), false);
+  assert.equal(copied.CanAddr(), false);
   assert.equal(original.$unbox(), first);
 });

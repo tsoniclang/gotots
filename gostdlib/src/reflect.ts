@@ -214,6 +214,9 @@ export class Value {
     }
     return bytes(box);
   }
+  CanAddr(): bool {
+    return this.addressable;
+  }
   CanInt(): bool {
     return this.operations()?.int !== undefined;
   }

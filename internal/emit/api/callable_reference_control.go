@@ -84,6 +84,7 @@ func (c Context) WithCallableControls(
 	c.artifactOwner = owner
 	c.callableControls = controls
 	c.callableEnclosing = enclosing
+	c.indirectWrites = controlcontract.IndirectWrites(enclosing, c.typesInfo)
 	c.gotoUses = gotoUses
 	return c, nil
 }
