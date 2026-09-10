@@ -892,6 +892,14 @@ ordinary complex arithmetic keeps its existing immutable logical carrier.
 Schemas and conversions are emitted once per requested complex width. Merely
 performing arithmetic does not request raw-memory descriptors or codecs.
 
+`unsafe.SliceData` reuses the selected slice's retained data location. Nil
+slices produce nil pointers. A non-nil view with positive capacity addresses
+its first backing element, even when its length is zero; a non-nil view with
+zero capacity selects a non-nil unspecified typed location. Element storage
+and inverse pointer projections remain owned by the ordinary slice/value
+representation path. The slice expression is evaluated once. This operation
+does not infer a physical slice-header layout or require raw-byte emulation.
+
 ### Interfaces
 
 An interface value is nil or a canonical dynamic-type token plus represented

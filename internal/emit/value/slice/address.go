@@ -17,11 +17,23 @@ func Address(
 	receiver api.ExpressionEmission,
 	index api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	return addressOperation(context, source, element, api.RuntimeSliceAddress, receiver, index)
+}
+
+func Data(context api.Context, source ast.Node, element types.Type, receiver api.ExpressionEmission) (api.ExpressionEmission, error) {
+	zero, err := context.ContainerStorage().ContainerStorageZero(context.WithRole(api.RoleStorageType), source, element)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return addressOperation(context, source, element, api.RuntimeSliceData, receiver, zero)
+}
+
+func addressOperation(context api.Context, source ast.Node, element types.Type, symbol api.RuntimeSymbol, receiver, operand api.ExpressionEmission) (api.ExpressionEmission, error) {
 	ordered, err := expressionoperands.Preserve(
 		context,
 		api.TemporaryAddressOperand,
 		expressionoperands.Present(receiver),
-		expressionoperands.Present(index),
+		expressionoperands.Present(operand),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -36,7 +48,7 @@ func Address(
 		return api.ExpressionEmission{}, err
 	}
 	runtime, err := context.Names().Runtime(
-		api.RuntimeSliceAddress,
+		symbol,
 		api.ImportPhaseValue,
 	)
 	if err != nil {

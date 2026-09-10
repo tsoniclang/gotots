@@ -31,6 +31,7 @@ const (
 	RuntimeContainerStorageType       = runtimecontract.RuntimeContainerStorageType
 	RuntimeSlice                      = runtimecontract.RuntimeSlice
 	RuntimeSliceAddress               = runtimecontract.RuntimeSliceAddress
+	RuntimeSliceData                  = runtimecontract.RuntimeSliceData
 	RuntimeSliceStorage               = runtimecontract.RuntimeSliceStorage
 	RuntimeSliceProjection            = runtimecontract.RuntimeSliceProjection
 	RuntimeSliceArrayPointer          = runtimecontract.RuntimeSliceArrayPointer

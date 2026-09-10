@@ -174,6 +174,20 @@ func moduleImports(
 		}
 	}
 	if module == api.RuntimeModuleSlice &&
+		slices.Contains(symbols, api.RuntimeSliceData) {
+		declaration, err := tsoniccore.Resolve(tsoniccore.SymbolAllocatePointer)
+		if err != nil {
+			return nil, err
+		}
+		request, err := api.NewImportRequest(factory, api.ImportPhaseValue, declaration.Module(), declaration.Export(), declaration.Export())
+		if err != nil {
+			return nil, err
+		}
+		if err := placement.Apply([]api.RootRequest{request}); err != nil {
+			return nil, err
+		}
+	}
+	if module == api.RuntimeModuleSlice &&
 		(slices.Contains(symbols, api.RuntimeSliceAddress) ||
 			slices.Contains(symbols, api.RuntimeSliceArrayPointer)) {
 		for _, symbol := range []tsoniccore.Symbol{

@@ -169,6 +169,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimeSlice,
 		), nil
+	case RuntimeSliceData:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceData",
+			false,
+			RuntimeSliceAddress,
+		), nil
 	case RuntimeSliceProjection:
 		return runtimeContract(
 			RuntimeModuleSlice,
