@@ -25,7 +25,15 @@ func Data(context api.Context, source ast.Node, element types.Type, receiver api
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return addressOperation(context, source, element, api.RuntimeSliceData, receiver, zero)
+	storage, err := context.ContainerStorage().ContainerStorageType(context.WithRole(api.RoleStorageType), source, element)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	factory := api.DirectExpression(context.Factory().ArrowFunction(nil, nil, nil, storage.Value(),
+		context.Factory().EqualsGreaterThanToken(), context.Factory().Block(
+			append(zero.Before(), context.Factory().ReturnStatement(zero.Value())), true,
+		)), api.CombineRequests(storage.Requests(), zero.Requests())...)
+	return addressOperation(context, source, element, api.RuntimeSliceData, receiver, factory)
 }
 
 func addressOperation(context api.Context, source ast.Node, element types.Type, symbol api.RuntimeSymbol, receiver, operand api.ExpressionEmission) (api.ExpressionEmission, error) {

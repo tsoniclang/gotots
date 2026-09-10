@@ -784,6 +784,9 @@ zero-value, validation, duplicate-pin, unpin and reuse behavior. An unselected
 or unimplemented provider remains an explicit environment obligation; its
 ambient declarations are not executable pinning and do not establish native
 address stability. The selected native runtime must implement that contract.
+The current Node provider has no Pinner binding. Selecting it rejects the
+exact pin-set type before output publication; source-only retention of its
+method obligations is not executable support.
 
 Maps have one representation owner and three storage modes. A key with an
 identity boolean, integer, or string primitive representation and a

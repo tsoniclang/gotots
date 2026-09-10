@@ -3,6 +3,7 @@ package slice_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -16,6 +17,8 @@ func Data(values Named) *uint32 { return unsafe.SliceData(values) }
 func PointerData(values []*uint32) **uint32 { return unsafe.SliceData(values) }
 func RecordData(values []Record) *Record { return unsafe.SliceData(values) }
 func ComplexData(values []complex128) *complex128 { return unsafe.SliceData(values) }
+func ArrayData(values [][1024]uint32) *[1024]uint32 { return unsafe.SliceData(values) }
+func AggregateData(values [][2]Record) *[2]Record { return unsafe.SliceData(values) }
 `)
 	directory := test.TempDir()
 	paths, _, printed := materialize(test, directory, emission)
@@ -31,10 +34,17 @@ func ComplexData(values []complex128) *complex128 { return unsafe.SliceData(valu
 			test.Fatalf("slice data output lacks %q", required)
 		}
 	}
-	for _, required := range []string{"if (value.isNil())", "if (value.capacity === 0)", "allocatePointer<T>(zero)", "value.slice(0, 1, null).address(0)"} {
+	for _, required := range []string{"if (value.isNil())", "if (value.capacity === 0)", "zero: () => T", "allocatePointer<T>(zero())", "value.slice(0, 1, null).address(0)"} {
 		if !strings.Contains(printed.runtime, required) {
 			test.Fatalf("slice data runtime lacks %q", required)
 		}
+	}
+	if !strings.Contains(printed.source, "values, ():") {
+		test.Fatal("slice data constructs an unused aggregate zero before selecting its address")
+	}
+	if strings.Count(printed.runtime, "zero()") != 1 ||
+		!regexp.MustCompile(`if \(value.capacity === 0\) \{\s*return allocatePointer<T>\(zero\(\)\);`).MatchString(printed.runtime) {
+		test.Fatal("zero construction is not confined to the unspecified empty address")
 	}
 	for _, forbidden := range []string{"memoryLayout", "toRawPointer", " as any", " as unknown"} {
 		if strings.Contains(printed.source+printed.runtime, forbidden) {

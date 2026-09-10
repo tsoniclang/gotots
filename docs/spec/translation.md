@@ -899,6 +899,8 @@ zero capacity selects a non-nil unspecified typed location. Element storage
 and inverse pointer projections remain owned by the ordinary slice/value
 representation path. The slice expression is evaluated once. This operation
 does not infer a physical slice-header layout or require raw-byte emulation.
+Element zero construction is deferred until the non-nil, zero-capacity branch;
+nil and retained-data queries must not construct an unused aggregate value.
 
 ### Interfaces
 

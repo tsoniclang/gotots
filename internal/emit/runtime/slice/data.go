@@ -23,14 +23,14 @@ func BuildData(factory tsgo.Factory, sliceName string) (tsgo.Statement, error) {
 	value := target.id("value")
 	return factory.FunctionDeclaration([]tsgo.ModifierLike{factory.ExportKeyword()}, nil, target.id(contract.ExportedName()),
 		[]tsgo.TypeParameterDeclaration{target.typeParameter()},
-		[]tsgo.ParameterDeclaration{target.parameter("value", target.sliceType()), target.parameter("zero", target.typeT())},
+		[]tsgo.ParameterDeclaration{target.parameter("value", target.sliceType()), target.parameter("zero", factory.FunctionTypeNode(nil, nil, target.typeT()))},
 		factory.UnionTypeNode([]tsgo.TypeNode{target.pointerType(target.typeT()), factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword)}),
 		factory.Block([]tsgo.Statement{
 			factory.IfStatement(target.call(value, MemberName(MemberIsNil)),
 				factory.Block([]tsgo.Statement{factory.ReturnStatement(factory.VoidExpression(target.number("0")))}, true), nil),
 			factory.IfStatement(target.binary(target.property(value, MemberName(MemberCapacity)), tsgo.BinaryOperatorEqualsEqualsEqualsToken, target.number("0")),
 				factory.Block([]tsgo.Statement{factory.ReturnStatement(factory.CallExpression(target.id(allocate.Export()), nil,
-					[]tsgo.TypeNode{target.typeT()}, []tsgo.Expression{target.id("zero")}, tsgo.NodeFlagsNone))}, true), nil),
+					[]tsgo.TypeNode{target.typeT()}, []tsgo.Expression{factory.CallExpression(target.id("zero"), nil, nil, nil, tsgo.NodeFlagsNone)}, tsgo.NodeFlagsNone))}, true), nil),
 			factory.ReturnStatement(target.call(
 				target.call(value, MemberName(MemberSlice), target.number("0"), target.number("1"), factory.NullLiteral()),
 				MemberName(MemberAddress), target.number("0"))),
