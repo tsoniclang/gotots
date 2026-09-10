@@ -1709,6 +1709,7 @@
       "sourcePath": "src/internal/facets/named-encoding-binary.ts",
       "export": "BinaryBigEndianOperations",
       "capabilities": [
+        "assign",
         "copy",
         "equal",
         "hash",
@@ -1725,6 +1726,7 @@
       "sourcePath": "src/internal/facets/named-encoding-binary.ts",
       "export": "BinaryLittleEndianOperations",
       "capabilities": [
+        "assign",
         "copy",
         "equal",
         "hash",
@@ -1741,6 +1743,7 @@
       "sourcePath": "src/internal/facets/named-encoding-binary.ts",
       "export": "BinaryNativeEndianOperations",
       "capabilities": [
+        "assign",
         "copy",
         "equal",
         "hash",
@@ -1849,6 +1852,7 @@
       "sourcePath": "src/internal/facets/named-runtime.ts",
       "export": "RuntimeMemStatsOperations",
       "capabilities": [
+        "assign",
         "copy",
         "storage",
         "zero"
@@ -1895,6 +1899,7 @@
       "sourcePath": "src/internal/facets/named-reflect.ts",
       "export": "ReflectStructFieldOperations",
       "capabilities": [
+        "assign",
         "copy"
       ]
     },
@@ -2011,6 +2016,7 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncCondOperations",
       "capabilities": [
+        "assign",
         "copy",
         "equal",
         "hash",
@@ -2026,6 +2032,7 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncMapOperations",
       "capabilities": [
+        "assign",
         "copy",
         "storage",
         "zero"
@@ -2055,6 +2062,7 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncOnceOperations",
       "capabilities": [
+        "assign",
         "copy",
         "equal",
         "hash",
@@ -2070,6 +2078,7 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncPoolOperations",
       "capabilities": [
+        "assign",
         "copy",
         "storage",
         "zero"
@@ -2083,6 +2092,7 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncRWMutexOperations",
       "capabilities": [
+        "assign",
         "copy",
         "equal",
         "hash",
@@ -2098,6 +2108,7 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncWaitGroupOperations",
       "capabilities": [
+        "assign",
         "copy",
         "equal",
         "hash",
@@ -2113,6 +2124,7 @@
       "sourcePath": "src/internal/facets/named-sync-atomic.ts",
       "export": "SyncAtomicBoolOperations",
       "capabilities": [
+        "assign",
 		"copy",
 		"equal",
 		"hash",
@@ -2128,6 +2140,7 @@
       "sourcePath": "src/internal/facets/named-sync-atomic.ts",
       "export": "SyncAtomicInt32Operations",
       "capabilities": [
+        "assign",
 		"copy",
 		"equal",
 		"hash",
@@ -2143,6 +2156,7 @@
       "sourcePath": "src/internal/facets/named-sync-atomic.ts",
       "export": "SyncAtomicInt64Operations",
       "capabilities": [
+        "assign",
 		"copy",
 		"equal",
 		"hash",
@@ -2158,6 +2172,7 @@
       "sourcePath": "src/internal/facets/named-sync-atomic.ts",
       "export": "SyncAtomicUint32Operations",
       "capabilities": [
+        "assign",
 		"copy",
 		"equal",
 		"hash",
@@ -2173,6 +2188,7 @@
       "sourcePath": "src/internal/facets/named-sync-atomic.ts",
       "export": "SyncAtomicUint64Operations",
       "capabilities": [
+        "assign",
 		"copy",
 		"equal",
 		"hash",
@@ -2226,6 +2242,7 @@
       "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
       "export": "RuntimeMetricsDescriptionOperations",
       "capabilities": [
+        "assign",
         "copy"
       ]
     },
@@ -2236,6 +2253,7 @@
       "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
       "export": "RuntimeMetricsSampleOperations",
       "capabilities": [
+        "assign",
         "copy",
         "make",
         "zero"
@@ -2248,6 +2266,8 @@
       "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
       "export": "RuntimeMetricsValueOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "zero"
       ]
     },

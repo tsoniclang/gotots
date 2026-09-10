@@ -1,6 +1,12 @@
 package providerstorage
 
-import "reflect"
+import (
+	"reflect"
+	"runtime"
+	"runtime/metrics"
+	"sync"
+	"sync/atomic"
+)
 
 type Holder struct {
 	Value reflect.Value
@@ -78,4 +84,93 @@ func MutationConditions() bool {
 	default:
 		return false
 	}
+}
+
+func SyncReset() bool {
+	var values sync.Map
+	retained := &values
+	values.Store("key", 1)
+	values = sync.Map{}
+	if _, found := retained.Load("key"); found {
+		return false
+	}
+	var pool sync.Pool
+	poolPointer := &pool
+	pool.Put(3)
+	pool = sync.Pool{}
+	if poolPointer.Get() != nil {
+		return false
+	}
+	var once sync.Once
+	oncePointer := &once
+	count := 0
+	once.Do(func() { count++ })
+	once = sync.Once{}
+	oncePointer.Do(func() { count++ })
+	var group sync.WaitGroup
+	groupPointer := &group
+	group.Add(1)
+	group = sync.WaitGroup{}
+	groupPointer.Wait()
+	var mutex sync.RWMutex
+	mutexPointer := &mutex
+	mutex.RLock()
+	mutex = sync.RWMutex{}
+	mutexPointer.Lock()
+	mutexPointer.Unlock()
+	return count == 2
+}
+
+func AtomicReset() bool {
+	var boolean atomic.Bool
+	booleanPointer := &boolean
+	boolean.Store(true)
+	boolean = atomic.Bool{}
+	var signed32 atomic.Int32
+	signed32Pointer := &signed32
+	signed32.Store(3)
+	signed32 = atomic.Int32{}
+	var signed64 atomic.Int64
+	signed64Pointer := &signed64
+	signed64.Store(3)
+	signed64 = atomic.Int64{}
+	var unsigned32 atomic.Uint32
+	unsigned32Pointer := &unsigned32
+	unsigned32.Store(3)
+	unsigned32 = atomic.Uint32{}
+	var unsigned64 atomic.Uint64
+	unsigned64Pointer := &unsigned64
+	unsigned64.Add(3)
+	unsigned64 = atomic.Uint64{}
+	return !booleanPointer.Load() && signed32Pointer.Load() == 0 &&
+		signed64Pointer.Load() == 0 && unsigned32Pointer.Load() == 0 && unsigned64Pointer.Load() == 0
+}
+
+func MemStatsFields() bool {
+	var stats runtime.MemStats
+	pauses := &stats.PauseNs
+	first := &stats.PauseNs[0]
+	entry := &stats.BySize[0]
+	size := &stats.BySize[0].Size
+	incoming := runtime.MemStats{}
+	incoming.PauseNs[0] = 7
+	incoming.BySize[0].Size = 9
+	stats = incoming
+	return pauses[0] == 7 && *first == 7 && entry.Size == 9 && *size == 9
+}
+
+func StructFields() bool {
+	original := reflect.TypeOf(struct{ First int }{}).Field(0)
+	name := &original.Name
+	incoming := reflect.TypeOf(struct{ Second int }{}).Field(0)
+	original = incoming
+	return *name == "Second" && original.Index[0] == 0
+}
+
+func MetricsFields() bool {
+	sample := metrics.Sample{Name: "before"}
+	name := &sample.Name
+	value := &sample.Value
+	sample = metrics.Sample{Name: "after"}
+	return *name == "after" && value.Kind() == 0
 }

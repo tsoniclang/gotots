@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "5ad508990b715178aba4fefa370aa05441e16d94a4b014877113944c1b5accb1",
-  "providerDigest": "eef0d15a2cf8c320a9fa3e0a1568aa60ad6fd564420620900e516299239c9a26",
+  "providerDigest": "368d3b4f614b7b143daea1f65371e8a782005018e19e7da2ce1f79a7233bdd5f",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -9908,7 +9908,7 @@
             "src/internal/portable/runtime/metrics.ts#kindBad@90"
           ],
           "implementationSites": [
-            "src/internal/portable/runtime/metrics.ts#Description@242"
+            "src/internal/portable/runtime/metrics.ts#Description@341"
           ]
         },
         {
@@ -9943,10 +9943,11 @@
           "targetFingerprint": "02d182085bfa38b277b432f5f0deb7aa38e38ad3d22311d8878dc95ee1ac427a",
           "disposition": "implemented",
           "dependencies": [
+            "src/internal/portable/runtime/metrics.ts#$copy@159",
             "src/internal/portable/runtime/metrics.ts#Value@96"
           ],
           "implementationSites": [
-            "src/internal/portable/runtime/metrics.ts#Sample@279"
+            "src/internal/portable/runtime/metrics.ts#Sample@378"
           ]
         },
         {
@@ -9958,7 +9959,7 @@
           "sourceSignature": "defined=runtime/metrics.Value|underlying=struct{kind runtime/metrics.ValueKind; scalar uint64; pointer unsafe.Pointer}",
           "sourceLocation": "runtime/metrics/value.go:30:6",
           "implementationOwner": "src/internal/portable/runtime/metrics.ts",
-          "targetFingerprint": "3360af188fa29c55b8c0b3c66d8323426b1b8282297830a48d65861e43cfe32b",
+          "targetFingerprint": "b850d68d71ad364b01eebbcfc162e005fb18cf32e0fe7c8d157a5bea44d947da",
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/runtime/metrics.ts#kindBad@90"
@@ -9997,12 +9998,12 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/runtime/metrics.ts#KindFloat64@70",
-            "src/internal/portable/runtime/metrics.ts#floatValue@111",
-            "src/internal/portable/runtime/metrics.ts#kind@103",
+            "src/internal/portable/runtime/metrics.ts#floatValue@107",
+            "src/internal/portable/runtime/metrics.ts#kind@101",
             "src/internal/portable/runtime/metrics.ts#value@46"
           ],
           "implementationSites": [
-            "src/internal/portable/runtime/metrics.ts#Float64@169"
+            "src/internal/portable/runtime/metrics.ts#Float64@268"
           ]
         },
         {
@@ -10018,10 +10019,10 @@
           "targetFingerprint": "d7ed6a129978867d3a9e738034d7b4a1401cf62be946d21ee6bca4e34f45390d",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/runtime/metrics.ts#kind@103"
+            "src/internal/portable/runtime/metrics.ts#kind@101"
           ],
           "implementationSites": [
-            "src/internal/portable/runtime/metrics.ts#Kind@200"
+            "src/internal/portable/runtime/metrics.ts#Kind@299"
           ]
         },
         {
@@ -10038,12 +10039,12 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/runtime/metrics.ts#KindUint64@59",
-            "src/internal/portable/runtime/metrics.ts#kind@103",
-            "src/internal/portable/runtime/metrics.ts#uintValue@119",
+            "src/internal/portable/runtime/metrics.ts#kind@101",
+            "src/internal/portable/runtime/metrics.ts#uintValue@113",
             "src/internal/portable/runtime/metrics.ts#value@46"
           ],
           "implementationSites": [
-            "src/internal/portable/runtime/metrics.ts#Uint64@211"
+            "src/internal/portable/runtime/metrics.ts#Uint64@310"
           ]
         },
         {
@@ -10058,15 +10059,15 @@
           "targetFingerprint": "21c06e61cd15f7edb6f675759291ed189b948961965ac120f6c1169ded1a2338",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/runtime/metrics.ts#Cumulative@270",
-            "src/internal/portable/runtime/metrics.ts#Description@242",
-            "src/internal/portable/runtime/metrics.ts#Description@256",
-            "src/internal/portable/runtime/metrics.ts#Kind@263",
-            "src/internal/portable/runtime/metrics.ts#Name@249",
-            "src/internal/portable/runtime/metrics.ts#descriptions@325"
+            "src/internal/portable/runtime/metrics.ts#Cumulative@369",
+            "src/internal/portable/runtime/metrics.ts#Description@341",
+            "src/internal/portable/runtime/metrics.ts#Description@355",
+            "src/internal/portable/runtime/metrics.ts#Kind@362",
+            "src/internal/portable/runtime/metrics.ts#Name@348",
+            "src/internal/portable/runtime/metrics.ts#descriptions@429"
           ],
           "implementationSites": [
-            "src/internal/portable/runtime/metrics.ts#All@432"
+            "src/internal/portable/runtime/metrics.ts#All@536"
           ]
         },
         {
@@ -10082,14 +10083,15 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/node/runtime/metrics.ts#readMetric@60",
-            "src/internal/portable/runtime/metrics.ts#FromFloat64@129",
-            "src/internal/portable/runtime/metrics.ts#FromUint64@149",
-            "src/internal/portable/runtime/metrics.ts#Name@284",
-            "src/internal/portable/runtime/metrics.ts#Value@288",
+            "src/internal/portable/runtime/metrics.ts#$assign@185",
+            "src/internal/portable/runtime/metrics.ts#FromFloat64@228",
+            "src/internal/portable/runtime/metrics.ts#FromUint64@248",
+            "src/internal/portable/runtime/metrics.ts#Name@383",
+            "src/internal/portable/runtime/metrics.ts#Value@387",
             "src/internal/portable/runtime/metrics.ts#Value@96"
           ],
           "implementationSites": [
-            "src/internal/portable/runtime/metrics.ts#Read@475"
+            "src/internal/portable/runtime/metrics.ts#Read@579"
           ]
         }
       ]
@@ -14915,7 +14917,7 @@
           "sourceSignature": "defined=sync.Cond|underlying=struct{noCopy sync.noCopy; L sync.Locker; notify sync.notifyList; checker sync.copyChecker}",
           "sourceLocation": "sync/cond.go:37:6",
           "implementationOwner": "src/internal/portable/sync/cond.ts",
-          "targetFingerprint": "2131f03b19c312f1d4c8195ca514c50b4f0dcd1d0d840f86372828de74410924",
+          "targetFingerprint": "f935a2eefd16a90827803248da605334a63b4e8a522b58a1b0c7f7e7168394e6",
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/sync/cond.ts#nextConditionIdentity@34"
@@ -14975,7 +14977,7 @@
           "sourceSignature": "defined=sync.Map|underlying=struct{_ sync.noCopy; m internal/sync.HashTrieMap[any, any]}",
           "sourceLocation": "sync/map.go:38:6",
           "implementationOwner": "src/internal/portable/sync/map.ts",
-          "targetFingerprint": "9d941c3d9c3da7f4818bb8faf2adbbcfce4934aa9d3ec891aa7ea558fa7b859b",
+          "targetFingerprint": "8a1fdc6b57a6ff7732f3d5551bb4edb5b69c0b13f1b5439a6e287ee39294d7b9",
           "disposition": "implemented",
           "implementationSites": [
             "src/internal/portable/sync/map.ts#Map@50"
@@ -15005,7 +15007,7 @@
           "sourceSignature": "defined=sync.Once|underlying=struct{_ sync.noCopy; done sync/atomic.Bool; m sync.Mutex}",
           "sourceLocation": "sync/once.go:20:6",
           "implementationOwner": "src/internal/portable/sync/once.ts",
-          "targetFingerprint": "53342b6a3ff337f9dd408395aba4ef17cb74cfde9f29cdb0caf891ad57306fe8",
+          "targetFingerprint": "8ee4a6c8bd148f1d89d9e362531d688542373c15e61e52887b71459f06388871",
           "disposition": "implemented",
           "implementationSites": [
             "src/internal/portable/sync/once.ts#Once@17"
@@ -15031,7 +15033,7 @@
           "sourceSignature": "defined=sync.Pool|underlying=struct{noCopy sync.noCopy; local unsafe.Pointer; localSize uintptr; victim unsafe.Pointer; victimSize uintptr; New func() any}",
           "sourceLocation": "sync/pool.go:51:6",
           "implementationOwner": "src/internal/portable/sync/pool.ts",
-          "targetFingerprint": "f87091acbfe3fdb4de75ad115710be9f4fe170671f703baabf2b29fe042e1e04",
+          "targetFingerprint": "05402b385fbe5ac0309409981774be0999a54c78d9cac3ea021028835c5444a0",
           "disposition": "implemented",
           "implementationSites": [
             "src/internal/portable/sync/pool.ts#Pool@17"
@@ -15046,7 +15048,7 @@
           "sourceSignature": "defined=sync.RWMutex|underlying=struct{w sync.Mutex; writerSem uint32; readerSem uint32; readerCount sync/atomic.Int32; readerWait sync/atomic.Int32}",
           "sourceLocation": "sync/rwmutex.go:39:6",
           "implementationOwner": "src/internal/portable/sync/mutex.ts",
-          "targetFingerprint": "481ebf9719b9d78ef7629f3a9fadaa36b7c616bb6ebb1c56c21b153c556899c9",
+          "targetFingerprint": "f749ad525a8c8af22907ac1563ce0965253010b049f65992501bbacea423f1a2",
           "disposition": "implemented",
           "implementationSites": [
             "src/internal/portable/sync/mutex.ts#RWMutex@244"
@@ -15061,7 +15063,7 @@
           "sourceSignature": "defined=sync.WaitGroup|underlying=struct{noCopy sync.noCopy; state sync/atomic.Uint64; sema uint32}",
           "sourceLocation": "sync/waitgroup.go:48:6",
           "implementationOwner": "src/internal/portable/sync/wait-group.ts",
-          "targetFingerprint": "730e041507709ba08a1f18cb2d100eb0f8b7fc6c2ad9f17e3565bb652f9783f9",
+          "targetFingerprint": "2c5d5e2131f9d686260097a840aba6e591a111efc93e5615ef8a91502e3b6519",
           "disposition": "implemented",
           "implementationSites": [
             "src/internal/portable/sync/wait-group.ts#WaitGroup@24"
@@ -15080,10 +15082,10 @@
           "targetFingerprint": "fefcf303cd24eea81246a8cc7578639abf795c9478c1e36ad0d4965d20dcdfcd",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/cond.ts#requireCond@376"
+            "src/internal/portable/sync/cond.ts#requireCond@418"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/cond.ts#Broadcast@282"
+            "src/internal/portable/sync/cond.ts#Broadcast@324"
           ]
         },
         {
@@ -15099,10 +15101,10 @@
           "targetFingerprint": "0e1a2f9d74e365c0a4bbf5008b74a4ed1fde1d8f92cbec75f18b10a492e04bcf",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/cond.ts#requireCond@376"
+            "src/internal/portable/sync/cond.ts#requireCond@418"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/cond.ts#Signal@252"
+            "src/internal/portable/sync/cond.ts#Signal@294"
           ]
         },
         {
@@ -15118,12 +15120,12 @@
           "targetFingerprint": "f4d623d81ce55dfa1590c61dbd06fdbf2e7e5462466143c41726f530a84269b4",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/cond.ts#L@71",
-            "src/internal/portable/sync/cond.ts#requireCond@376",
-            "src/internal/portable/sync/cond.ts#requireLocker@406"
+            "src/internal/portable/sync/cond.ts#L@69",
+            "src/internal/portable/sync/cond.ts#requireCond@418",
+            "src/internal/portable/sync/cond.ts#requireLocker@448"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/cond.ts#Wait@208"
+            "src/internal/portable/sync/cond.ts#Wait@250"
           ]
         },
         {
@@ -15142,7 +15144,7 @@
             "src/internal/portable/sync/map.ts#Map@50"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/map.ts#Clear@64"
+            "src/internal/portable/sync/map.ts#Clear@149"
           ]
         },
         {
@@ -15162,7 +15164,7 @@
             "src/internal/runtime/interface.ts#goInterfaceEqual@10"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/map.ts#Delete@93"
+            "src/internal/portable/sync/map.ts#Delete@178"
           ]
         },
         {
@@ -15182,7 +15184,7 @@
             "src/internal/runtime/interface.ts#goInterfaceEqual@10"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/map.ts#Load@165"
+            "src/internal/portable/sync/map.ts#Load@250"
           ]
         },
         {
@@ -15202,7 +15204,7 @@
             "src/internal/runtime/interface.ts#goInterfaceEqual@10"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/map.ts#LoadOrStore@242"
+            "src/internal/portable/sync/map.ts#LoadOrStore@327"
           ]
         },
         {
@@ -15227,7 +15229,7 @@
             "src/internal/portable/sync/map.ts#Map@50"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/map.ts#Range@347"
+            "src/internal/portable/sync/map.ts#Range@432"
           ]
         },
         {
@@ -15247,7 +15249,7 @@
             "src/internal/runtime/interface.ts#goInterfaceEqual@10"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/map.ts#Store@432"
+            "src/internal/portable/sync/map.ts#Store@517"
           ]
         },
         {
@@ -15307,7 +15309,7 @@
           "targetFingerprint": "25b99b26c7b058a94fe0aea50458edcb77beea5e1537464f208e75e3bfe40d0e",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/once.ts#Do@111"
+            "src/internal/portable/sync/once.ts#Do@135"
           ]
         },
         {
@@ -15323,10 +15325,10 @@
           "targetFingerprint": "e19ba139d1c2c052e23e15269c4a36b97324fd9874fc794db30d3f017ca11c2c",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/pool.ts#New@38"
+            "src/internal/portable/sync/pool.ts#New@41"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/pool.ts#Get@56"
+            "src/internal/portable/sync/pool.ts#Get@150"
           ]
         },
         {
@@ -15342,7 +15344,7 @@
           "targetFingerprint": "be2c8831076ab48dbee9790b359ab8575d6690ccf691be47467c309ab4ca579b",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/pool.ts#Put@115"
+            "src/internal/portable/sync/pool.ts#Put@216"
           ]
         },
         {
@@ -15361,7 +15363,7 @@
             "src/internal/portable/sync/mutex.ts#nilReceiver@17"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Lock@382"
+            "src/internal/portable/sync/mutex.ts#Lock@406"
           ]
         },
         {
@@ -15380,7 +15382,7 @@
             "src/internal/portable/sync/mutex.ts#nilReceiver@17"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#RLock@485"
+            "src/internal/portable/sync/mutex.ts#RLock@509"
           ]
         },
         {
@@ -15399,7 +15401,7 @@
             "src/internal/portable/sync/mutex.ts#nilReceiver@17"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#RUnlock@532"
+            "src/internal/portable/sync/mutex.ts#RUnlock@556"
           ]
         },
         {
@@ -15418,7 +15420,7 @@
             "src/internal/portable/sync/mutex.ts#nilReceiver@17"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Unlock@437"
+            "src/internal/portable/sync/mutex.ts#Unlock@461"
           ]
         },
         {
@@ -15434,7 +15436,7 @@
           "targetFingerprint": "dbf1e3a61215da685c19122f3c41397af6660a5002f8ba4870cae0ce4d64f516",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Add@112"
+            "src/internal/portable/sync/wait-group.ts#Add@136"
           ]
         },
         {
@@ -15450,11 +15452,11 @@
           "targetFingerprint": "bcaa4a7ea3323b7f01841984f6611e364b6bd48bdb5b81429c184bd2b5db8ebc",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/wait-group.ts#Add@112",
+            "src/internal/portable/sync/wait-group.ts#Add@136",
             "src/internal/portable/sync/wait-group.ts#WaitGroup@24"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Done@177"
+            "src/internal/portable/sync/wait-group.ts#Done@201"
           ]
         },
         {
@@ -15476,12 +15478,12 @@
           "targetFingerprint": "1b3d653c1ae2acb36c635950e95e2a5aac534a0773e493066f5946b62514b5b7",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/wait-group.ts#Add@112",
-            "src/internal/portable/sync/wait-group.ts#Done@177",
+            "src/internal/portable/sync/wait-group.ts#Add@136",
+            "src/internal/portable/sync/wait-group.ts#Done@201",
             "src/internal/portable/sync/wait-group.ts#WaitGroup@24"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Go@201"
+            "src/internal/portable/sync/wait-group.ts#Go@225"
           ]
         },
         {
@@ -15497,7 +15499,7 @@
           "targetFingerprint": "80fc5257c3d65042c6c6acc497d95200ee4b8e76d1bb550251728a1e4c2a4a9c",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Wait@277"
+            "src/internal/portable/sync/wait-group.ts#Wait@301"
           ]
         },
         {
@@ -15515,7 +15517,7 @@
             "src/internal/portable/sync/cond.ts#Cond@55"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/cond.ts#NewCond@355"
+            "src/internal/portable/sync/cond.ts#NewCond@397"
           ]
         },
         {
@@ -15536,7 +15538,7 @@
           "targetFingerprint": "3b1c5bf896aea38e6ddf2b2233c899565516a4ab1095a53b7939126ce774244f",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/once.ts#OnceFunc@210"
+            "src/internal/portable/sync/once.ts#OnceFunc@234"
           ]
         },
         {
@@ -15563,7 +15565,7 @@
           "targetFingerprint": "6b2927821867eb6a8ee1c373bd6fa59fd77c46556c89e876fcdbc2dc31ae32d8",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/once.ts#OnceValue@337"
+            "src/internal/portable/sync/once.ts#OnceValue@361"
           ]
         }
       ]
@@ -15604,7 +15606,7 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/sync/atomic/cell.ts#Cell@25",
-            "src/internal/portable/sync/atomic/cell.ts#toInt32@925"
+            "src/internal/portable/sync/atomic/cell.ts#toInt32@950"
           ],
           "implementationSites": [
             "src/internal/portable/sync/atomic/cell.ts#Int32@180"
@@ -15641,7 +15643,7 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/sync/atomic/cell.ts#Cell@25",
-            "src/internal/portable/sync/atomic/cell.ts#toUint32@940"
+            "src/internal/portable/sync/atomic/cell.ts#toUint32@965"
           ],
           "implementationSites": [
             "src/internal/portable/sync/atomic/cell.ts#Uint32@602"
@@ -15656,7 +15658,7 @@
           "sourceSignature": "defined=sync/atomic.Uint64|underlying=struct{_ sync/atomic.noCopy; _ sync/atomic.align64; v uint64}",
           "sourceLocation": "sync/atomic/type.go:174:6",
           "implementationOwner": "src/internal/portable/sync/atomic/cell.ts",
-          "targetFingerprint": "82f096bf8f221e02b621b82b9628f09c58b5994faa563219ab55945c3b689c17",
+          "targetFingerprint": "f05418b79a989543facc104367ecd12324f7d69c7eb3096b68d38f04bee51d25",
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/sync/atomic/cell.ts#Cell@25"
@@ -15678,7 +15680,7 @@
           "targetFingerprint": "4d906d454b86028e0216f44a0905be5437cd63fd5226ff1cfceab49166c55e55",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15698,7 +15700,7 @@
           "targetFingerprint": "c27bac1f59f5376bfdb3a168b48e1002a8aa198e8e43791ce601aa5f1de53d53",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15718,7 +15720,7 @@
           "targetFingerprint": "249b316b6222c84b6cd361efa7c99807a5496d24a8805d7be7011f2d626a5dc4",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15738,8 +15740,8 @@
           "targetFingerprint": "15a3102ec9eaa89fc8dc55068e4aad40dca8d1fdcf18d0090a1cce2b00800daf",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
-            "src/internal/portable/sync/atomic/cell.ts#toInt32@925",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
+            "src/internal/portable/sync/atomic/cell.ts#toInt32@950",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15759,8 +15761,8 @@
           "targetFingerprint": "b4c3c331089174c58afc21e2b9d61b1cd8836e462f4b0adb5ff709c820cacb9a",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
-            "src/internal/portable/sync/atomic/cell.ts#toInt32@925",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
+            "src/internal/portable/sync/atomic/cell.ts#toInt32@950",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15780,7 +15782,7 @@
           "targetFingerprint": "99b13f0f77e3350a9242d6c784fe577e542bbb923e5e4aea417c2261f973756f",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15800,8 +15802,8 @@
           "targetFingerprint": "c793b92719dd5f3aaa5605058d85dcfd876370be82113bb654b004e1e47e5d08",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
-            "src/internal/portable/sync/atomic/cell.ts#toInt32@925",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
+            "src/internal/portable/sync/atomic/cell.ts#toInt32@950",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15821,8 +15823,8 @@
           "targetFingerprint": "616ebd9e83532218e4bbe9cab8875dc269191df581a336b65c1e9c3b7c0b11c9",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
-            "src/internal/portable/sync/atomic/cell.ts#toInt32@925",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
+            "src/internal/portable/sync/atomic/cell.ts#toInt32@950",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15842,7 +15844,7 @@
           "targetFingerprint": "bf70f802438771692e00c1e9adc526871e5b18ca840b39986685ff471f887860",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15862,7 +15864,7 @@
           "targetFingerprint": "b412f1a93fefb6f20fb1f2c0550a3f4347ddacfd4f0c8008c29ffff85e22bfe6",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15882,7 +15884,7 @@
           "targetFingerprint": "626d6f917fabcea1b0a4c61b9d18444cb1910a8e5e3527d9a4cc859da9e31656",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15902,7 +15904,7 @@
           "targetFingerprint": "f8df27c6e3ccbd11142d098aeb567dd71556a91e6d8be1aefe749d9f3e6c64ee",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15922,8 +15924,8 @@
           "targetFingerprint": "0154a5bd61d779a175c2e8e36c57318055e38868380b84114059b4555b40fe9a",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
-            "src/internal/portable/sync/atomic/cell.ts#toUint32@940",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
+            "src/internal/portable/sync/atomic/cell.ts#toUint32@965",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15943,7 +15945,7 @@
           "targetFingerprint": "e32033571d6c40556d330d59a57b2b530545df67531ae28ebf6dfc3be4a8b011",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15963,8 +15965,8 @@
           "targetFingerprint": "6174b973d633f56fd6597d98d7ee2bc7d83e84862c8e31ff73bbe617015c22cb",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
-            "src/internal/portable/sync/atomic/cell.ts#toUint32@940",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
+            "src/internal/portable/sync/atomic/cell.ts#toUint32@965",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
@@ -15984,11 +15986,11 @@
           "targetFingerprint": "49d2556bddd39d9d0224fa1bc536f8651563d87510b410f9ac7afe8509061352",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/atomic/cell.ts#Add@765"
+            "src/internal/portable/sync/atomic/cell.ts#Add@790"
           ]
         },
         {
@@ -16004,11 +16006,11 @@
           "targetFingerprint": "cf4e2f10503882ccec72762106a0c39dccbc8c87c91f0358d97a78152eef2c45",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/atomic/cell.ts#CompareAndSwap@806"
+            "src/internal/portable/sync/atomic/cell.ts#CompareAndSwap@831"
           ]
         },
         {
@@ -16024,11 +16026,11 @@
           "targetFingerprint": "4b03cbf52959046eafa32832b8dfd17fbf1e8ce532c396428c9380ade4b8a895",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+            "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
             "src/internal/portable/sync/atomic/cell.ts#value@37"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/atomic/cell.ts#Load@860"
+            "src/internal/portable/sync/atomic/cell.ts#Load@885"
           ]
         }
       ]
@@ -19921,6 +19923,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "encoding/binary|kind=2|receiver=|name=bigEndian",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -19932,7 +19935,7 @@
           "representationExport": "BinaryEndianRepresentation",
           "implementationOwner": "src/internal/facets/named-encoding-binary.ts",
           "storageImplementationOwner": "src/internal/facets/named-encoding-binary.ts",
-          "targetFingerprint": "1eadfcb7ce02d29000fa2400ffe80afad7765ddc76cbe0e6df306bdbb0540b85",
+          "targetFingerprint": "3cc427fc6f90e71eca343e910271ce816a36cefd545b8a61d7e14c5fa1206d2d",
           "storageTargetFingerprint": "dfccf67a694c1da3f1d0145dca0fcd49ebbb0e93bd3df0ec39375803bedf2b19",
           "implementationSites": [
             "src/internal/facets/named-encoding-binary.ts#BinaryBigEndianOperations@42"
@@ -19942,6 +19945,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "encoding/binary|kind=2|receiver=|name=littleEndian",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -19953,16 +19957,17 @@
           "representationExport": "BinaryEndianRepresentation",
           "implementationOwner": "src/internal/facets/named-encoding-binary.ts",
           "storageImplementationOwner": "src/internal/facets/named-encoding-binary.ts",
-          "targetFingerprint": "ce8a4a9baa17e46968fcd8c3ffbe3e22e0dc3e58ece406c5f47635d997eadedb",
+          "targetFingerprint": "f5e7a3eeea71037e8002376d739341a85a3c7352ac0fd55696316f6894873fe6",
           "storageTargetFingerprint": "d4c2a51f3f9624151798773336fb9c8eb78c1d860d5d7ee399b608b50c5340ad",
           "implementationSites": [
-            "src/internal/facets/named-encoding-binary.ts#BinaryLittleEndianOperations@130"
+            "src/internal/facets/named-encoding-binary.ts#BinaryLittleEndianOperations@146"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "encoding/binary|kind=2|receiver=|name=nativeEndian",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -19974,10 +19979,10 @@
           "representationExport": "BinaryEndianRepresentation",
           "implementationOwner": "src/internal/facets/named-encoding-binary.ts",
           "storageImplementationOwner": "src/internal/facets/named-encoding-binary.ts",
-          "targetFingerprint": "4094c20ad8e15204e34c632067c1dccb3d5e2f99f3451c9dbafb7cdc1deb8941",
+          "targetFingerprint": "e2c74b28dafa9283d1207825a4dec9d7856e46ab826f0e0df1bc67779bc242c8",
           "storageTargetFingerprint": "3c4bd6d6f30c258cb1b268f29d47ab3dfa337f2d8ad0816fb0db77bc68945619",
           "implementationSites": [
-            "src/internal/facets/named-encoding-binary.ts#BinaryNativeEndianOperations@218"
+            "src/internal/facets/named-encoding-binary.ts#BinaryNativeEndianOperations@250"
           ]
         }
       ]
@@ -20433,18 +20438,19 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "665302f15c37a3e94fc11550f9a0f9099dc69d8bf97e2fa02b9a919585b06ace",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@502"
+            "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@581"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "reflect|kind=2|receiver=|name=StructField",
           "capabilities": [
+            "assign",
             "copy"
           ],
           "export": "ReflectStructFieldOperations",
           "implementationOwner": "src/internal/facets/named-reflect.ts",
-          "targetFingerprint": "655f556dcff1bdb1ab6962cb7ec073b61f11513adcaf806a94aa558daee489a8",
+          "targetFingerprint": "63a53248d086528d3ab7aec00993c2f39ac446cdf1dd7469a745ba1923bb7715",
           "implementationSites": [
             "src/internal/facets/named-reflect.ts#ReflectStructFieldOperations@443"
           ]
@@ -20492,7 +20498,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "883981a6f6fa556a3f15212227c914abf65fffeb80bf86ede79012bd9f0f10f9",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectValueOperations@593"
+            "src/internal/facets/named-reflect.ts#ReflectValueOperations@672"
           ]
         }
       ]
@@ -20505,11 +20511,12 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=Description",
           "capabilities": [
+            "assign",
             "copy"
           ],
           "export": "RuntimeMetricsDescriptionOperations",
           "implementationOwner": "src/internal/facets/named-runtime-metrics.ts",
-          "targetFingerprint": "549355443338eb7abca328d39453e24134475066760142f0d3221fa2d84dc9c5",
+          "targetFingerprint": "5a1ae006baf5437a821ad72ec4129fa253ea244c1fe1a9fc44f41ccf763d17ed",
           "implementationSites": [
             "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsDescriptionOperations@65"
           ]
@@ -20518,28 +20525,31 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=Sample",
           "capabilities": [
+            "assign",
             "copy",
             "make",
             "zero"
           ],
           "export": "RuntimeMetricsSampleOperations",
           "implementationOwner": "src/internal/facets/named-runtime-metrics.ts",
-          "targetFingerprint": "bc66d0e6cc32f49773b92e08538d92472f9006f8307baab559d072b1a7fe6d01",
+          "targetFingerprint": "db5f75588901f9a7f3f501c254b8747251181ca31ecf24b8dd8ccca32f2ff321",
           "implementationSites": [
-            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsSampleOperations@99"
+            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsSampleOperations@151"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=Value",
           "capabilities": [
+            "assign",
+            "copy",
             "zero"
           ],
           "export": "RuntimeMetricsValueOperations",
           "implementationOwner": "src/internal/facets/named-runtime-metrics.ts",
-          "targetFingerprint": "f0b9db3598869beffb0f7aebd17b24a0d911a9a317405bde702b074d0e4355d3",
+          "targetFingerprint": "ac9f4e90f6197162dec56f1dcccb7b5f977fa12c3a040bfc67760b65a9f8370d",
           "implementationSites": [
-            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueOperations@163"
+            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueOperations@252"
           ]
         },
         {
@@ -20586,6 +20596,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "runtime|kind=2|receiver=|name=MemStats",
           "capabilities": [
+            "assign",
             "copy",
             "storage",
             "zero"
@@ -20594,10 +20605,10 @@
           "storageExport": "RuntimeMemStatsStorage",
           "implementationOwner": "src/internal/facets/named-runtime.ts",
           "storageImplementationOwner": "src/internal/portable/runtime/mem-stats.ts",
-          "targetFingerprint": "0ca12f60a806da839ddc6d0adab66bc5ff57b2d6ca8fd84d24809bc974ebdd6f",
+          "targetFingerprint": "56fba69d14f25a190ae4b68c1e3742ee9065bb528d459143a41ecfef030251eb",
           "storageTargetFingerprint": "1fb2c2b4040ace0842c787041540bcfd85ca187524ee621949cbfe6db891c301",
           "implementationSites": [
-            "src/internal/facets/named-runtime.ts#RuntimeMemStatsOperations@30"
+            "src/internal/facets/named-runtime.ts#RuntimeMemStatsOperations@16"
           ]
         }
       ]
@@ -20665,6 +20676,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Bool",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -20675,7 +20687,7 @@
           "storageExport": "SyncAtomicBoolStorage",
           "implementationOwner": "src/internal/facets/named-sync-atomic.ts",
           "storageImplementationOwner": "src/internal/portable/sync/atomic/cell.ts",
-          "targetFingerprint": "42fd86be962cbc484eb1b99ed21e5d7ac3972b2593dd596d6e061a6fde7f03f9",
+          "targetFingerprint": "8478913d71d2c4017221e3debf0919faec5d6a2cbbaa0672972caa9d39c7c040",
           "storageTargetFingerprint": "4b33d1f6449bc85a0cc8104a8c4eef9e2ece22a043836efd273f4436883e7f26",
           "implementationSites": [
             "src/internal/facets/named-sync-atomic.ts#SyncAtomicBoolOperations@31"
@@ -20685,6 +20697,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Int32",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -20695,16 +20708,17 @@
           "storageExport": "SyncAtomicInt32Storage",
           "implementationOwner": "src/internal/facets/named-sync-atomic.ts",
           "storageImplementationOwner": "src/internal/portable/sync/atomic/cell.ts",
-          "targetFingerprint": "014819a79b7846c524e47595400d90daeb96f2827fc2e108bf3e481147a71cf1",
+          "targetFingerprint": "7336a04e6752ae131348027b49ab7e82d2c857f78468759879946030ab57fb62",
           "storageTargetFingerprint": "fd4aef27b34de3fbd6bbe83ed143983890ec7080a44fc9f878201fd9fb9ea9e8",
           "implementationSites": [
-            "src/internal/facets/named-sync-atomic.ts#SyncAtomicInt32Operations@163"
+            "src/internal/facets/named-sync-atomic.ts#SyncAtomicInt32Operations@192"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Int64",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -20715,16 +20729,17 @@
           "storageExport": "SyncAtomicInt64Storage",
           "implementationOwner": "src/internal/facets/named-sync-atomic.ts",
           "storageImplementationOwner": "src/internal/portable/sync/atomic/cell.ts",
-          "targetFingerprint": "6e7e6ba140316620577d002e73071ac871f5fe0d7d62d665d33da449408c1baf",
+          "targetFingerprint": "490d64275027eac159e281d702e2bbc147abd029e75af7be44445e03ebd560dd",
           "storageTargetFingerprint": "3cfb693544ab737aee433991e0f7fcee178c953bf56935a205093d3bc3085a18",
           "implementationSites": [
-            "src/internal/facets/named-sync-atomic.ts#SyncAtomicInt64Operations@295"
+            "src/internal/facets/named-sync-atomic.ts#SyncAtomicInt64Operations@353"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Uint32",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -20735,16 +20750,17 @@
           "storageExport": "SyncAtomicUint32Storage",
           "implementationOwner": "src/internal/facets/named-sync-atomic.ts",
           "storageImplementationOwner": "src/internal/portable/sync/atomic/cell.ts",
-          "targetFingerprint": "7d9a491e00e6ab826aced82fc7f01f250c37b3832c93d02cfcca0bdf6b933dfb",
+          "targetFingerprint": "d0eac47a8d86f45cfff7147fa7fbcc03b5d449126b14ba810b1708dd0cfd5426",
           "storageTargetFingerprint": "518e3a9807dcaeb691282001970de0c8066c9fa051f4857824cd42470cb22535",
           "implementationSites": [
-            "src/internal/facets/named-sync-atomic.ts#SyncAtomicUint32Operations@427"
+            "src/internal/facets/named-sync-atomic.ts#SyncAtomicUint32Operations@514"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Uint64",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -20755,10 +20771,10 @@
           "storageExport": "SyncAtomicUint64Storage",
           "implementationOwner": "src/internal/facets/named-sync-atomic.ts",
           "storageImplementationOwner": "src/internal/portable/sync/atomic/cell.ts",
-          "targetFingerprint": "74e9384335ecdff4e35433c0a43c10958786e33fce36e01fbba25363c4cc3582",
+          "targetFingerprint": "1d9846cb5f07168552f37bee89b87846ab35db98f030bafd792d08ffdc6c84c1",
           "storageTargetFingerprint": "301dde5cb110d9d339570a7ecc7ff1cb0d8ae0709b35edc3e7abe0e34786e4f1",
           "implementationSites": [
-            "src/internal/facets/named-sync-atomic.ts#SyncAtomicUint64Operations@559"
+            "src/internal/facets/named-sync-atomic.ts#SyncAtomicUint64Operations@675"
           ]
         }
       ]
@@ -20771,6 +20787,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=Cond",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -20781,7 +20798,7 @@
           "storageExport": "SyncCondStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/cond.ts",
-          "targetFingerprint": "f7b831259efc5fb418b593c7b1f4e1ea1e299dd3f2441de7db8e103c14363d10",
+          "targetFingerprint": "f96cd722863026e23856a5e620637eb2451c9e7a1f916eb57a028aa48095edbd",
           "storageTargetFingerprint": "1d87b5bea913cea3d59d351e761d7ee718efcd36ee881a95f518bc6de847ae0c",
           "implementationSites": [
             "src/internal/facets/named-sync.ts#SyncCondOperations@28"
@@ -20791,6 +20808,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=Map",
           "capabilities": [
+            "assign",
             "copy",
             "storage",
             "zero"
@@ -20799,10 +20817,10 @@
           "storageExport": "SyncMapStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/map.ts",
-          "targetFingerprint": "71d6a0056fcecf1e8ddcc780d562a8f44437778078ed6c188b14d626d7825d14",
+          "targetFingerprint": "221696e2e3d9a4222cc398929b1acf0888dcca5df7704cd9d49922232cee81c2",
           "storageTargetFingerprint": "a489678083c9782ac47953a1168299626552e2c08e7a60ebd775c5b0ee9037b4",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncMapOperations@145"
+            "src/internal/facets/named-sync.ts#SyncMapOperations@169"
           ]
         },
         {
@@ -20823,13 +20841,14 @@
           "targetFingerprint": "c76b202bd2f46eda0374bc15bc95046162f1d0e30e861a084e148df4aa885d21",
           "storageTargetFingerprint": "cd7aabb3a224893419d76942ddf095072b8e4180feb06c0981bc32519132d60c",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncMutexOperations@216"
+            "src/internal/facets/named-sync.ts#SyncMutexOperations@267"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=Once",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -20840,16 +20859,17 @@
           "storageExport": "SyncOnceStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/once.ts",
-          "targetFingerprint": "eb9df8b594b396721c6cf2b4fc2efbdfd6f7e7d91b8fee062a633d418dd86dbd",
+          "targetFingerprint": "681771722ae87608327ca8a32e23d64ccb2146b7d551b53691be16d589d8e5f1",
           "storageTargetFingerprint": "85618d431bdbebbe1261382e1fb4bcdd75f54ded2a30e549544b5d91f558fdea",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncOnceOperations@357"
+            "src/internal/facets/named-sync.ts#SyncOnceOperations@408"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=Pool",
           "capabilities": [
+            "assign",
             "copy",
             "storage",
             "zero"
@@ -20858,16 +20878,17 @@
           "storageExport": "SyncPoolStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/pool.ts",
-          "targetFingerprint": "a91f0d41ff7a7207e9a0ffb7732f160a0572cb98af7879e585f7b3ec8e949087",
+          "targetFingerprint": "1a2c2cd3be1bf4ccda51b6a727443764f64a687b5f41af243dd2619f2704b0b4",
           "storageTargetFingerprint": "cef67a67c61a5b0386d321d4551396860636a13f2294cc1a5957b26165373932",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncPoolOperations@474"
+            "src/internal/facets/named-sync.ts#SyncPoolOperations@549"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=RWMutex",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -20878,16 +20899,17 @@
           "storageExport": "SyncRWMutexStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/mutex.ts",
-          "targetFingerprint": "6f1e3c681e3007cd61eac7c15c609e7ca9b81a22993baa35433802b13b92600d",
+          "targetFingerprint": "b08e727db6679da0e8a172f2f30161f8f48e7d3c8ab35ea0ea3d1eb2f8580327",
           "storageTargetFingerprint": "b3f4db5108c807b70b959f252597a0719661f3a3e0a3776486d94abd88aaeb08",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncRWMutexOperations@548"
+            "src/internal/facets/named-sync.ts#SyncRWMutexOperations@647"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=WaitGroup",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -20898,10 +20920,10 @@
           "storageExport": "SyncWaitGroupStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/wait-group.ts",
-          "targetFingerprint": "89380bac80d6f2342807c1b54f33cef0789eeadad16314061bf3dc84922f4325",
+          "targetFingerprint": "d8bc76ab9e3d74ae95d8bd621fa9d6d6eeb8b5c94d61e4f521c1815f40aa49ed",
           "storageTargetFingerprint": "82b60b062fb280c49bf3f9c78c6d1aa801a308e81a7a4a88b860f9ed0cf1b5bd",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@665"
+            "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@788"
           ]
         }
       ]
@@ -26500,8 +26522,8 @@
         "declarationPath": "dist/src/internal/facets/named-sync.d.ts",
         "export": "SyncMapOperations",
         "member": "$copy",
-        "targetType": "(_source: Map) =\u003e Map",
-        "targetFingerprint": "4fdee34478e5145fef15e2f859b9cd62145db5a4695a21fd0026d758466358be",
+        "targetType": "(source: Map) =\u003e Map",
+        "targetFingerprint": "1209d137a3436db33e7daf43206470249acbdfd18d8e702a46f7be87c039730e",
         "inputParameters": [
           0
         ],
@@ -27003,11 +27025,11 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/named-encoding-binary.ts#BinaryLittleEndianOperations@130",
+      "identity": "src/internal/facets/named-encoding-binary.ts#BinaryLittleEndianOperations@146",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/named-encoding-binary.ts#BinaryNativeEndianOperations@218",
+      "identity": "src/internal/facets/named-encoding-binary.ts#BinaryNativeEndianOperations@250",
       "disposition": "implemented"
     },
     {
@@ -27173,7 +27195,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#InvalidValue@577",
+      "identity": "src/internal/facets/named-reflect.ts#InvalidValue@656",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Value@476"
@@ -27196,7 +27218,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@502",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@581",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#$copy@4448",
@@ -27240,10 +27262,10 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectValueOperations@593",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectValueOperations@672",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/named-reflect.ts#InvalidValue@577",
+        "src/internal/facets/named-reflect.ts#InvalidValue@656",
         "src/reflect.ts#$assign@544",
         "src/reflect.ts#$copy@515",
         "src/reflect.ts#Value@476"
@@ -27253,20 +27275,22 @@
       "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsDescriptionOperations@65",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/runtime/metrics.ts#Cumulative@270",
-        "src/internal/portable/runtime/metrics.ts#Description@256",
-        "src/internal/portable/runtime/metrics.ts#Kind@263",
-        "src/internal/portable/runtime/metrics.ts#Name@249",
+        "src/internal/portable/runtime/metrics.ts#Cumulative@369",
+        "src/internal/portable/runtime/metrics.ts#Description@355",
+        "src/internal/portable/runtime/metrics.ts#Kind@362",
+        "src/internal/portable/runtime/metrics.ts#Name@348",
         "src/runtime/metrics.ts#Description@8"
       ]
     },
     {
-      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsSampleOperations@99",
+      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsSampleOperations@151",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/runtime/metrics.ts#Name@284",
-        "src/internal/portable/runtime/metrics.ts#Value@288",
-        "src/runtime/metrics.ts#Sample@18"
+        "src/internal/portable/runtime/metrics.ts#$assign@185",
+        "src/internal/portable/runtime/metrics.ts#Name@383",
+        "src/internal/portable/runtime/metrics.ts#Value@387",
+        "src/runtime/metrics.ts#Sample@18",
+        "src/runtime/metrics.ts#Value@20"
       ]
     },
     {
@@ -27278,9 +27302,11 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueOperations@163",
+      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueOperations@252",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/runtime/metrics.ts#$assign@185",
+        "src/internal/portable/runtime/metrics.ts#$copy@159",
         "src/runtime/metrics.ts#Value@20"
       ]
     },
@@ -27293,7 +27319,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-runtime.ts#RuntimeMemStatsOperations@30",
+      "identity": "src/internal/facets/named-runtime.ts#RuntimeMemStatsOperations@16",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/runtime/mem-stats.ts#Alloc@92",
@@ -27363,38 +27389,43 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/sync/atomic/cell.ts#Load@126",
+        "src/internal/portable/sync/atomic/cell.ts#Store@150",
         "src/sync/atomic.ts#Bool@6"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync-atomic.ts#SyncAtomicInt32Operations@163",
+      "identity": "src/internal/facets/named-sync-atomic.ts#SyncAtomicInt32Operations@192",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/sync/atomic/cell.ts#Load@319",
+        "src/internal/portable/sync/atomic/cell.ts#Store@343",
         "src/sync/atomic.ts#Int32@8"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync-atomic.ts#SyncAtomicInt64Operations@295",
+      "identity": "src/internal/facets/named-sync-atomic.ts#SyncAtomicInt64Operations@353",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/sync/atomic/cell.ts#Load@548",
+        "src/internal/portable/sync/atomic/cell.ts#Store@572",
         "src/sync/atomic.ts#Int64@10"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync-atomic.ts#SyncAtomicUint32Operations@427",
+      "identity": "src/internal/facets/named-sync-atomic.ts#SyncAtomicUint32Operations@514",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/sync/atomic/cell.ts#Load@681",
+        "src/internal/portable/sync/atomic/cell.ts#Store@705",
         "src/sync/atomic.ts#Uint32@12"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync-atomic.ts#SyncAtomicUint64Operations@559",
+      "identity": "src/internal/facets/named-sync-atomic.ts#SyncAtomicUint64Operations@675",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/atomic/cell.ts#Load@860",
+        "src/internal/portable/sync/atomic/cell.ts#$assign@765",
+        "src/internal/portable/sync/atomic/cell.ts#Load@885",
         "src/sync/atomic.ts#Uint64@14"
       ]
     },
@@ -27402,21 +27433,24 @@
       "identity": "src/internal/facets/named-sync.ts#SyncCondOperations@28",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/cond.ts#$copy@83",
-        "src/internal/portable/sync/cond.ts#$equal@118",
-        "src/internal/portable/sync/cond.ts#$hash@154",
+        "src/internal/portable/sync/cond.ts#$assign@126",
+        "src/internal/portable/sync/cond.ts#$copy@95",
+        "src/internal/portable/sync/cond.ts#$equal@160",
+        "src/internal/portable/sync/cond.ts#$hash@196",
         "src/sync.ts#Cond@6"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncMapOperations@145",
+      "identity": "src/internal/facets/named-sync.ts#SyncMapOperations@169",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/map.ts#$assign@98",
+        "src/internal/portable/sync/map.ts#$copy@67",
         "src/sync.ts#Map@16"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncMutexOperations@216",
+      "identity": "src/internal/facets/named-sync.ts#SyncMutexOperations@267",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/sync/mutex.ts#$assign@78",
@@ -27427,40 +27461,44 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncOnceOperations@357",
+      "identity": "src/internal/facets/named-sync.ts#SyncOnceOperations@408",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/once.ts#$assign@64",
         "src/internal/portable/sync/once.ts#$copy@33",
-        "src/internal/portable/sync/once.ts#$equal@65",
-        "src/internal/portable/sync/once.ts#$hash@90",
+        "src/internal/portable/sync/once.ts#$equal@89",
+        "src/internal/portable/sync/once.ts#$hash@114",
         "src/sync.ts#Once@30"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncPoolOperations@474",
+      "identity": "src/internal/facets/named-sync.ts#SyncPoolOperations@549",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/pool.ts#New@38",
+        "src/internal/portable/sync/pool.ts#$assign@90",
+        "src/internal/portable/sync/pool.ts#$copy@59",
         "src/sync.ts#Pool@40"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncRWMutexOperations@548",
+      "identity": "src/internal/facets/named-sync.ts#SyncRWMutexOperations@647",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/mutex.ts#$assign@286",
         "src/internal/portable/sync/mutex.ts#$copy@255",
-        "src/internal/portable/sync/mutex.ts#$equal@296",
-        "src/internal/portable/sync/mutex.ts#$hash@337",
+        "src/internal/portable/sync/mutex.ts#$equal@320",
+        "src/internal/portable/sync/mutex.ts#$hash@361",
         "src/sync.ts#RWMutex@24"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@665",
+      "identity": "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@788",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/wait-group.ts#$assign@65",
         "src/internal/portable/sync/wait-group.ts#$copy@34",
-        "src/internal/portable/sync/wait-group.ts#$equal@66",
-        "src/internal/portable/sync/wait-group.ts#$hash@91",
+        "src/internal/portable/sync/wait-group.ts#$equal@90",
+        "src/internal/portable/sync/wait-group.ts#$hash@115",
         "src/sync.ts#WaitGroup@46"
       ]
     },
@@ -28607,7 +28645,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncPoolPut@71",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/pool.ts#Put@115",
+        "src/internal/portable/sync/pool.ts#Put@216",
         "src/sync.ts#Pool@40"
       ]
     },
@@ -28615,7 +28653,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncRWMutexRUnlock@106",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/mutex.ts#RUnlock@532",
+        "src/internal/portable/sync/mutex.ts#RUnlock@556",
         "src/sync.ts#RWMutex@24"
       ]
     },
@@ -28623,7 +28661,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncRWMutexUnlock@133",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/mutex.ts#Unlock@437",
+        "src/internal/portable/sync/mutex.ts#Unlock@461",
         "src/sync.ts#RWMutex@24"
       ]
     },
@@ -28631,7 +28669,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncWaitGroupDone@160",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/wait-group.ts#Done@177",
+        "src/internal/portable/sync/wait-group.ts#Done@201",
         "src/sync.ts#WaitGroup@46"
       ]
     },
@@ -31686,15 +31724,34 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#Cumulative@270",
+      "identity": "src/internal/portable/runtime/metrics.ts#$assign@185",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/runtime/metrics.ts#floatValue@107",
+        "src/internal/portable/runtime/metrics.ts#kind@101",
+        "src/internal/portable/runtime/metrics.ts#uintValue@113"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/runtime/metrics.ts#$copy@159",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/runtime/metrics.ts#Value@96",
+        "src/internal/portable/runtime/metrics.ts#floatValue@107",
+        "src/internal/portable/runtime/metrics.ts#kind@101",
+        "src/internal/portable/runtime/metrics.ts#uintValue@113"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/runtime/metrics.ts#Cumulative@369",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#Description@256",
+      "identity": "src/internal/portable/runtime/metrics.ts#Description@355",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#FromFloat64@129",
+      "identity": "src/internal/portable/runtime/metrics.ts#FromFloat64@228",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/runtime/metrics.ts#KindFloat64@70",
@@ -31702,7 +31759,7 @@
       ]
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#FromUint64@149",
+      "identity": "src/internal/portable/runtime/metrics.ts#FromUint64@248",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/runtime/metrics.ts#KindUint64@59",
@@ -31710,7 +31767,7 @@
       ]
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#Kind@263",
+      "identity": "src/internal/portable/runtime/metrics.ts#Kind@362",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/runtime/metrics.ts#kindBad@90"
@@ -31731,43 +31788,40 @@
       ]
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#Name@249",
+      "identity": "src/internal/portable/runtime/metrics.ts#Name@348",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#Name@284",
+      "identity": "src/internal/portable/runtime/metrics.ts#Name@383",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#Value@288",
+      "identity": "src/internal/portable/runtime/metrics.ts#Value@387",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#descriptions@325",
+      "identity": "src/internal/portable/runtime/metrics.ts#descriptions@429",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/runtime/metrics.ts#floatMetric@609",
-        "src/internal/portable/runtime/metrics.ts#uintMetric@585"
+        "src/internal/portable/runtime/metrics.ts#floatMetric@722",
+        "src/internal/portable/runtime/metrics.ts#uintMetric@698"
       ]
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#floatMetric@609",
+      "identity": "src/internal/portable/runtime/metrics.ts#floatMetric@722",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/runtime/metrics.ts#Description@242",
+        "src/internal/portable/runtime/metrics.ts#Description@341",
         "src/internal/portable/runtime/metrics.ts#KindFloat64@70"
       ]
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#floatValue@111",
+      "identity": "src/internal/portable/runtime/metrics.ts#floatValue@107",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#kind@103",
-      "disposition": "implemented",
-      "dependencies": [
-        "src/internal/portable/runtime/metrics.ts#kindBad@90"
-      ]
+      "identity": "src/internal/portable/runtime/metrics.ts#kind@101",
+      "disposition": "implemented"
     },
     {
       "identity": "src/internal/portable/runtime/metrics.ts#kindBad@90",
@@ -31777,15 +31831,15 @@
       ]
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#uintMetric@585",
+      "identity": "src/internal/portable/runtime/metrics.ts#uintMetric@698",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/runtime/metrics.ts#Description@242",
+        "src/internal/portable/runtime/metrics.ts#Description@341",
         "src/internal/portable/runtime/metrics.ts#KindUint64@59"
       ]
     },
     {
-      "identity": "src/internal/portable/runtime/metrics.ts#uintValue@119",
+      "identity": "src/internal/portable/runtime/metrics.ts#uintValue@113",
       "disposition": "implemented"
     },
     {
@@ -32730,19 +32784,26 @@
       ]
     },
     {
+      "identity": "src/internal/portable/sync/atomic/cell.ts#$assign@765",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/atomic/cell.ts#value@37"
+      ]
+    },
+    {
       "identity": "src/internal/portable/sync/atomic/cell.ts#Cell@25",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/atomic/cell.ts#requireCell@884",
+      "identity": "src/internal/portable/sync/atomic/cell.ts#requireCell@909",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/atomic/cell.ts#toInt32@925",
+      "identity": "src/internal/portable/sync/atomic/cell.ts#toInt32@950",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/atomic/cell.ts#toUint32@940",
+      "identity": "src/internal/portable/sync/atomic/cell.ts#toUint32@965",
       "disposition": "implemented"
     },
     {
@@ -32750,30 +32811,37 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/cond.ts#$copy@83",
+      "identity": "src/internal/portable/sync/cond.ts#$assign@126",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/cond.ts#Cond@55",
-        "src/internal/portable/sync/cond.ts#L@71"
+        "src/internal/portable/sync/cond.ts#L@69"
       ]
     },
     {
-      "identity": "src/internal/portable/sync/cond.ts#$equal@118",
+      "identity": "src/internal/portable/sync/cond.ts#$copy@95",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/cond.ts#L@71",
+        "src/internal/portable/sync/cond.ts#$assign@126",
+        "src/internal/portable/sync/cond.ts#Cond@55"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/cond.ts#$equal@160",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/cond.ts#L@69",
         "src/internal/runtime/interface.ts#goInterfaceEqual@10"
       ]
     },
     {
-      "identity": "src/internal/portable/sync/cond.ts#$hash@154",
+      "identity": "src/internal/portable/sync/cond.ts#$hash@196",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/cond.ts#L@71"
+        "src/internal/portable/sync/cond.ts#L@69"
       ]
     },
     {
-      "identity": "src/internal/portable/sync/cond.ts#L@71",
+      "identity": "src/internal/portable/sync/cond.ts#L@69",
       "disposition": "implemented"
     },
     {
@@ -32781,11 +32849,27 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/cond.ts#requireCond@376",
+      "identity": "src/internal/portable/sync/cond.ts#requireCond@418",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/cond.ts#requireLocker@406",
+      "identity": "src/internal/portable/sync/cond.ts#requireLocker@448",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/map.ts#$assign@98",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/map.ts#$copy@67",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/map.ts#$assign@98",
+        "src/internal/portable/sync/map.ts#Map@50"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/mutex.ts#$assign@286",
       "disposition": "implemented"
     },
     {
@@ -32796,6 +32880,7 @@
       "identity": "src/internal/portable/sync/mutex.ts#$copy@255",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/mutex.ts#$assign@286",
         "src/internal/portable/sync/mutex.ts#RWMutex@244"
       ]
     },
@@ -32811,7 +32896,7 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/mutex.ts#$equal@296",
+      "identity": "src/internal/portable/sync/mutex.ts#$equal@320",
       "disposition": "implemented"
     },
     {
@@ -32819,7 +32904,7 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/mutex.ts#$hash@337",
+      "identity": "src/internal/portable/sync/mutex.ts#$hash@361",
       "disposition": "implemented"
     },
     {
@@ -32827,37 +32912,62 @@
       "disposition": "implemented"
     },
     {
+      "identity": "src/internal/portable/sync/once.ts#$assign@64",
+      "disposition": "implemented"
+    },
+    {
       "identity": "src/internal/portable/sync/once.ts#$copy@33",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/once.ts#$assign@64",
         "src/internal/portable/sync/once.ts#Once@17"
       ]
     },
     {
-      "identity": "src/internal/portable/sync/once.ts#$equal@65",
+      "identity": "src/internal/portable/sync/once.ts#$equal@89",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/once.ts#$hash@90",
+      "identity": "src/internal/portable/sync/once.ts#$hash@114",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/pool.ts#New@38",
+      "identity": "src/internal/portable/sync/pool.ts#$assign@90",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/pool.ts#New@41"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/pool.ts#$copy@59",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/pool.ts#$assign@90",
+        "src/internal/portable/sync/pool.ts#Pool@17"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/pool.ts#New@41",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/wait-group.ts#$assign@65",
       "disposition": "implemented"
     },
     {
       "identity": "src/internal/portable/sync/wait-group.ts#$copy@34",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/wait-group.ts#$assign@65",
         "src/internal/portable/sync/wait-group.ts#WaitGroup@24"
       ]
     },
     {
-      "identity": "src/internal/portable/sync/wait-group.ts#$equal@66",
+      "identity": "src/internal/portable/sync/wait-group.ts#$equal@90",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/wait-group.ts#$hash@91",
+      "identity": "src/internal/portable/sync/wait-group.ts#$hash@115",
       "disposition": "implemented"
     },
     {
@@ -34967,5 +35077,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "40e739c12fb282149850c8e46b4f76d17c73a403ec9ba7efbf15b71c1032ebc2"
+  "manifestDigest": "ddb3f2181354d672a67f99839836a195f170c2fe5741c56b7313825ab51b97c6"
 }

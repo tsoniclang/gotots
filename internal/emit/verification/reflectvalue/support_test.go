@@ -16,7 +16,6 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
@@ -107,47 +106,6 @@ func linkedProviderCertificate(t *testing.T) *certify.Certificate {
 		t.Fatal(err)
 	}
 	return certificate
-}
-
-// compileReflectFixture loads one reflection fixture package, compiles it
-// with the verified provider certificate under the serial profile, and
-// returns the emission.
-func compileReflectFixture(
-	t *testing.T,
-	project string,
-	source string,
-	roots []string,
-) emit.ProgramEmission {
-	t.Helper()
-	writeProgramFile(
-		t,
-		filepath.Join(project, "go.mod"),
-		"module example.com/reflectvalue\n\ngo 1.26.4\n",
-	)
-	writeProgramFile(t, filepath.Join(project, "source.go"), source)
-	program, err := load.Load(context.Background(), load.Request{
-		Directory:    project,
-		Pattern:      ".",
-		BuildProfile: linkedProviderBuildProfile(t),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	scope := program.Roots()[0].Types().Scope()
-	selected := make([]emit.Root, 0, len(roots))
-	for _, name := range roots {
-		selected = append(selected, mustRoot(t, scope.Lookup(name)))
-	}
-	options := emit.Options{
-		IntegerRepresentation: emit.IntegerRepresentationNumber,
-		EvaluationOrder:       emit.EvaluationOrderDirect,
-	}
-	options.StandardLibrary = linkedProviderCertificate(t)
-	emission, err := emit.CompileWithOptions(program, selected, options)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return emission
 }
 
 func materializeArtifacts(
@@ -335,6 +293,7 @@ func verifyReflectCanonicalInspect(
 	typescriptRunner string,
 	goRunner string,
 	inspect func(renderedArtifacts),
+	profiles ...emit.IntegerRepresentation,
 ) {
 	t.Helper()
 	verifyReflectCanonicalProjectInspect(
@@ -346,6 +305,7 @@ func verifyReflectCanonicalInspect(
 		goRunner,
 		nil,
 		inspect,
+		profiles...,
 	)
 }
 
@@ -358,13 +318,14 @@ func verifyReflectCanonicalProjectInspect(
 	goRunner string,
 	prepare func(string),
 	inspect func(renderedArtifacts),
+	profiles ...emit.IntegerRepresentation,
 ) {
 	t.Helper()
 	project := t.TempDir()
 	if prepare != nil {
 		prepare(project)
 	}
-	emission := compileReflectFixture(t, project, source, []string{rootName})
+	emission := compileReflectFixture(t, project, source, []string{rootName}, profiles...)
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	if inspect != nil {

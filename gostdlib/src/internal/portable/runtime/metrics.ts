@@ -19,11 +19,29 @@ export const KindFloat64Histogram = new ValueKind(3n);
 const kindBad = new ValueKind(0n);
 
 export class Value {
+  private kind: ValueKind;
+  private floatValue: float64;
+  private uintValue: uint64;
+
   constructor(
-    private readonly kind: ValueKind = kindBad,
-    private readonly floatValue: float64 = 0,
-    private readonly uintValue: uint64 = 0n,
-  ) {}
+    kind: ValueKind = kindBad,
+    floatValue: float64 = 0,
+    uintValue: uint64 = 0n,
+  ) {
+    this.kind = kind;
+    this.floatValue = floatValue;
+    this.uintValue = uintValue;
+  }
+
+  static $copy(source: Value): Value {
+    return new Value(source.kind, source.floatValue, source.uintValue);
+  }
+
+  static $assign(target: Value, source: Value): void {
+    target.kind = source.kind;
+    target.floatValue = source.floatValue;
+    target.uintValue = source.uintValue;
+  }
 
   static FromFloat64(value: float64): Value {
     return new Value(KindFloat64, value, 0n);
@@ -70,7 +88,7 @@ export class Sample {
     value: Value = new Value(),
   ) {
     this.Name = name;
-    this.Value = value;
+    this.Value = Value.$copy(value);
   }
 }
 
@@ -109,13 +127,13 @@ export function Read(m: RuntimeSlice<Sample>): void {
     const reading = readMetric(sample.Name);
     switch (reading.kind) {
       case "uint64":
-        sample.Value = Value.FromUint64(reading.value);
+        Value.$assign(sample.Value, Value.FromUint64(reading.value));
         break;
       case "float64":
-        sample.Value = Value.FromFloat64(reading.value);
+        Value.$assign(sample.Value, Value.FromFloat64(reading.value));
         break;
       case "missing":
-        sample.Value = new Value();
+        Value.$assign(sample.Value, new Value());
         break;
     }
   }

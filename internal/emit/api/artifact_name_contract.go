@@ -146,6 +146,7 @@ type Names interface {
 	PackageVariable(*types.Var) (PackageVariableReference, error)
 	NamedStructConstructor(*types.TypeName) (NameReference, error)
 	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
+	ProviderNamedStructOperationSelected(*types.TypeName, NamedStructOperation) (bool, error)
 	NamedStructStorage(*types.TypeName) (NameReference, error)
 	ProviderStructField(*types.TypeName, *types.Var) (
 		gostdlib.ProviderStructField,

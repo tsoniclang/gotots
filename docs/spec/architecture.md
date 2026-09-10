@@ -1465,6 +1465,13 @@ Host APIs that require JavaScript `number` receive it only at a provider-owned,
 range-checked host boundary. Provider algorithms whose Go contract requires
 64-bit arithmetic operate on `bigint` and never narrow through `Number`.
 
+An aggregate is not a scalar conversion. Crossing an array or anonymous record
+whose embedded integer carriers differ requires an alias-preserving aggregate
+projection. Without that projection the provider boundary rejects it before
+publication; it must not pass the incompatible value unchanged, cast it, or
+copy it and lose retained field/element addresses. Matching aggregate carriers
+and the existing scalar-field conversions remain valid.
+
 A provider bridge is revised by the same exact interface-contract demand graph
 as a generated concrete adapter. If a provider-created value of a base Go
 interface can also implement another reached Go interface, the provider

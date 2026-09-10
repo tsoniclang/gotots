@@ -26,6 +26,13 @@ export class RuntimeMetricsDescriptionOperations {
       source.Cumulative,
     );
   }
+
+  static $assign(target: Description, source: Description): void {
+    target.Name = source.Name;
+    target.Description = source.Description;
+    target.Kind = source.Kind;
+    target.Cumulative = source.Cumulative;
+  }
 }
 
 export class RuntimeMetricsSampleOperations {
@@ -40,10 +47,23 @@ export class RuntimeMetricsSampleOperations {
   static $copy(source: Sample): Sample {
     return new Sample(source.Name, source.Value);
   }
+
+  static $assign(target: Sample, source: Sample): void {
+    target.Name = source.Name;
+    Value.$assign(target.Value, source.Value);
+  }
 }
 
 export class RuntimeMetricsValueOperations {
   static $zero(): Value {
     return new Value();
+  }
+
+  static $copy(source: Value): Value {
+    return Value.$copy(source);
+  }
+
+  static $assign(target: Value, source: Value): void {
+    Value.$assign(target, source);
   }
 }

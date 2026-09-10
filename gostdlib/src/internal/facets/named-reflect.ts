@@ -136,6 +136,16 @@ export class ReflectStructFieldOperations {
       Anonymous: source.Anonymous,
     });
   }
+
+  static $assign(target: StructField, source: StructField): void {
+    target.Name = source.Name;
+    target.PkgPath = source.PkgPath;
+    target.Type = source.Type;
+    target.Tag = source.Tag;
+    target.Offset = source.Offset;
+    target.Index = source.Index;
+    target.Anonymous = source.Anonymous;
+  }
 }
 
 export class ReflectMapIterOperations {
