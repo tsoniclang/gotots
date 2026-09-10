@@ -343,6 +343,7 @@ func emitLogical(
 			tsgo.NodeFlagsLet,
 			resultName,
 			left.Value(),
+			context.Factory().KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
 		),
 		context.Factory().IfStatement(
 			condition,
@@ -485,7 +486,7 @@ func equalityOperandStatement(
 	name string,
 	value tsgo.Expression,
 ) tsgo.VariableStatement {
-	return binaryVariable(context, tsgo.NodeFlagsConst, name, value)
+	return binaryVariable(context, tsgo.NodeFlagsConst, name, value, nil)
 }
 
 func binaryVariable(
@@ -493,6 +494,7 @@ func binaryVariable(
 	flags tsgo.NodeFlags,
 	name string,
 	value tsgo.Expression,
+	valueType tsgo.TypeNode,
 ) tsgo.VariableStatement {
 	return context.Factory().VariableStatement(
 		nil,
@@ -501,7 +503,7 @@ func binaryVariable(
 				context.Factory().VariableDeclaration(
 					context.Factory().Identifier(name),
 					nil,
-					nil,
+					valueType,
 					value,
 				),
 			},

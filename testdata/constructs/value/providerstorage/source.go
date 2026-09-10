@@ -86,6 +86,31 @@ func MutationConditions() bool {
 	}
 }
 
+func LoopConditions() bool {
+	type Entry struct{ Flag bool }
+	values := []Entry{{true}, {false}}
+	seen := false
+	stable := true
+	for _, value := range values {
+		seen = seen || value.Flag
+		stable = stable && value.Flag
+	}
+	return seen && !stable
+}
+
+func EmptyAssignments() bool {
+	calls := 0
+	create := func() struct{} { calls++; return struct{}{} }
+	var value struct{}
+	pointer := &value
+	replace(pointer, create())
+	values := make(map[int]struct{})
+	values[1] = create()
+	elements := []struct{}{{}}
+	elements[0] = create()
+	return *pointer == struct{}{} && len(values) == 1 && calls == 3
+}
+
 func SyncReset() bool {
 	var values sync.Map
 	retained := &values

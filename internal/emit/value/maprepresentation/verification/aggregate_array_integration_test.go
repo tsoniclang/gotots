@@ -242,6 +242,10 @@ func (aggregateNames) NamedStructConstructor(
 	return api.NewNameReference(typeName.Name())
 }
 
+func (aggregateNames) ProviderNamedStructOperationSelected(*types.TypeName, api.NamedStructOperation) (bool, error) {
+	return false, nil
+}
+
 func (aggregateNames) NamedStructOperation(
 	typeName *types.TypeName,
 	operation api.NamedStructOperation,

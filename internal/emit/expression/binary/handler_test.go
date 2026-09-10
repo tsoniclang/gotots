@@ -144,6 +144,11 @@ func TestLogicalRightPrerequisitesStayInsideTheSelectedBranch(t *testing.T) {
 	if len(before) != 2 {
 		t.Fatalf("logical prerequisite statements = %d, want 2", len(before))
 	}
+	declaration := before[0].(tsgo.VariableStatement).DeclarationList().Declarations()[0]
+	boolean, ok := declaration.Type().(tsgo.KeywordTypeNode)
+	if !ok || boolean.Kind() != tsgo.SyntaxKind(tsgo.KeywordTypeSyntaxKindBooleanKeyword) {
+		t.Fatalf("logical temporary requires an explicit boolean type, got %T", declaration.Type())
+	}
 	if before[0] == rightPrerequisite || before[1] == rightPrerequisite {
 		t.Fatal("right prerequisite escaped to the eager outer statement list")
 	}
@@ -193,6 +198,10 @@ func (unusedNames) DefinedValueRepresentation(
 
 func (unusedNames) ProviderOwnedDeclaration(types.Object) (bool, error)    { return false, nil }
 func (unusedNames) EnvironmentOwnedDeclaration(types.Object) (bool, error) { return false, nil }
+
+func (unusedNames) ProviderNamedStructOperationSelected(*types.TypeName, api.NamedStructOperation) (bool, error) {
+	return false, nil
+}
 
 func (unusedNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")

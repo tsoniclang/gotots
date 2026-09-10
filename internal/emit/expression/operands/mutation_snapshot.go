@@ -21,7 +21,8 @@ func Snapshot(context api.Context, value api.ExpressionEmission) (api.Expression
 	}
 	before := append(value.Before(), context.Factory().VariableStatement(nil,
 		context.Factory().VariableDeclarationList([]tsgo.VariableDeclaration{
-			context.Factory().VariableDeclaration(context.Factory().Identifier(name), nil, nil, value.Value()),
+			context.Factory().VariableDeclaration(context.Factory().Identifier(name), nil,
+				context.Factory().KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword), value.Value()),
 		}, tsgo.NodeFlagsLet),
 	))
 	return api.NewExpressionEmission(before, context.Factory().Identifier(name), value.Requests())

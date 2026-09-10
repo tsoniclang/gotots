@@ -64,7 +64,7 @@ func TestProviderAssignmentClosure(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	for _, function := range []string{"SyncReset", "AtomicReset", "MemStatsFields", "StructFields", "MetricsFields"} {
+	for _, function := range []string{"SyncReset", "AtomicReset", "MemStatsFields", "StructFields", "MetricsFields", "LoopConditions", "EmptyAssignments"} {
 		test.Run(function, func(test *testing.T) {
 			profile := emit.IntegerRepresentationNumber
 			if function == "MemStatsFields" {
