@@ -124,6 +124,7 @@ func emitValueOperation(
 			memberName,
 			classType,
 			sourceFields,
+			capabilities,
 			typeParameters,
 			canonicalStorage,
 		)

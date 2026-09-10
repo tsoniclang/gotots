@@ -543,10 +543,23 @@ func (owner Owner) AssignStable(
 	target tsgo.Expression,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if parameter, generic := api.GenericTypeParameter(sourceType); generic {
+		return genericoperation.Call(context, source, api.GenericOperationAssign, []types.Type{parameter, parameter}, []types.Type{parameter}, []api.ExpressionEmission{api.DirectExpression(target), value})
+	}
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.Assign(context, source, target, value)
+	}
+	if structure, ok := isAnonymousStruct(sourceType); ok {
+		assigned, err := anonymousStructOperation(context, source, structure, api.AnonymousStructDemandAssign, api.NamedStructOperationAssign, []tsgo.Expression{target, value.Value()})
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(append(value.Before(), assigned.Before()...), assigned.Value(), api.CombineRequests(value.Requests(), assigned.Requests()))
+	}
 	if _, _, ok := namedStruct(sourceType); !ok {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
-			Reason: "stable-identity assignment requires a named struct",
+			Reason: "stable-identity assignment requires an array or struct",
 		}
 	}
 	assigned, err := owner.namedStructOperation(

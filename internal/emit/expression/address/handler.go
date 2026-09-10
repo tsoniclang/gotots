@@ -9,6 +9,7 @@ import (
 	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 )
 
 func Emit(
@@ -32,10 +33,49 @@ func Emit(
 	}
 	switch source := source.(type) {
 	case *ast.UnaryExpr:
-		return emitOperand(context, children, source.X, element)
+		return emitAddressedOperand(context, children, source.X, element)
 	default:
-		return emitOperand(context, children, source, element)
+		return emitAddressedOperand(context, children, source, element)
 	}
+}
+
+func emitAddressedOperand(context api.Context, children api.ChildEmitter, source ast.Expr, element types.Type) (api.ExpressionEmission, error) {
+	pointer, err := emitOperand(context, children, source, element)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	array, arrayOK := arrayvalue.Resolve(context, element)
+	if !arrayOK {
+		return pointer, nil
+	}
+	unwrapped := source
+	for {
+		parenthesized, ok := unwrapped.(*ast.ParenExpr)
+		if !ok {
+			break
+		}
+		unwrapped = parenthesized.X
+	}
+	if _, cancel := unwrapped.(*ast.StarExpr); cancel {
+		return pointer, nil
+	}
+	represented, err := array.EmitType(context, children, source)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	pointer, err = pointermarker.Guard(context, pointer)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	value, err := pointermarker.Operation(context, tsoniccore.SymbolLoadPointer, []api.TypeEmission{represented}, []api.ExpressionEmission{pointer})
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	address, err := array.PointerToValue(context, children, source, value)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return pointermarker.Guard(context, address)
 }
 
 func emitOperand(

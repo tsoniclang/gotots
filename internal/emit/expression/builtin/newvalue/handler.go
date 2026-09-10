@@ -53,9 +53,5 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if len(zero.Before()) != 0 {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
 	return allocate(context, children, source, element, zero)
 }

@@ -56,6 +56,28 @@ ancestor. Imports and preferred-static declarations request file scope.
 
 ## Declarations And Names
 
+Addressable aggregate storage has stable identity. Assigning an array or
+struct copies values into its existing slots recursively; it must not detach
+previously captured element pointers, field pointers or slice views. Map
+entries remain non-addressable copying accessors and replace their values.
+For example, after `p := &a[0]; a = [2]int{3, 4}`, `*p` is 3. After
+`s := record.Values[:]; record = replacement`, `s` still views that same
+array field's storage. The store-location owner preserves this distinction
+through capture and canonical/container representation projection; nested
+aggregate assignment uses the existing demand-owned assignment operations.
+Unknown type parameters request one private assignment capability whose exact
+concrete selection preserves aggregate storage or replaces a scalar/reference
+value. It must not default to slot replacement merely because the enclosing
+source is generic; its source-facing signature remains unchanged.
+
+An array's address and its slice-to-array-pointer view share one backing
+location identity: `&a == (*[2]int)(a[:])` is true. This applies to local,
+package, field, indexed and allocated arrays, including zero-length views of
+the same array. It does not require distinct zero-sized allocations to have
+distinct addresses. `&*p` retains p's identity but still panics if p is nil,
+as required by the selected Go address-operator contract. These storage rules
+do not by themselves establish byte-addressability or a native array ABI.
+
 The exact selected `runtime.KeepAlive` declaration maps to one generated
 one-argument, void-returning callable. Its body invokes the public neutral
 `keepAlive` marker on the ordinary Go interface carrier. Name resolution owns

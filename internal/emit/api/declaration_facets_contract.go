@@ -80,11 +80,12 @@ const (
 	AnonymousStructDemandHash
 	AnonymousStructDemandConvert
 	AnonymousStructDemandStorage
+	AnonymousStructDemandAssign
 )
 
 func (d AnonymousStructDemand) Valid() bool {
 	return d >= AnonymousStructDemandDefinition &&
-		d <= AnonymousStructDemandStorage
+		d <= AnonymousStructDemandAssign
 }
 
 type MapSpecializationDemand uint8

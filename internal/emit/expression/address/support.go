@@ -108,5 +108,5 @@ func cancelDereference(
 			return api.ExpressionEmission{}, err
 		}
 	}
-	return pointer, nil
+	return pointermarker.Guard(context, pointer)
 }

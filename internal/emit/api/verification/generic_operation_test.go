@@ -13,7 +13,7 @@ import (
 func TestGenericOperationIdentifiersAreTotalUniqueTargetIdentifiers(t *testing.T) {
 	targetIdentifier := regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
 	seen := make(map[string]GenericOperation)
-	for operation := GenericOperationZero; operation <= GenericOperationReflectionValue; operation++ {
+	for operation := GenericOperationZero; operation <= GenericOperationAssign; operation++ {
 		identifier := operation.Identifier()
 		if !targetIdentifier.MatchString(identifier) {
 			t.Fatalf(
@@ -33,7 +33,7 @@ func TestGenericOperationIdentifiersAreTotalUniqueTargetIdentifiers(t *testing.T
 		seen[identifier] = operation
 	}
 	if GenericOperationInvalid.Identifier() != "" ||
-		GenericOperation(GenericOperationReflectionValue+1).Identifier() != "" {
+		GenericOperation(GenericOperationAssign+1).Identifier() != "" {
 		t.Fatal("invalid generic operation has a target identifier")
 	}
 	if GenericOperationToContainerStorage != GenericOperationFromStorage+1 ||
@@ -46,7 +46,8 @@ func TestGenericOperationIdentifiersAreTotalUniqueTargetIdentifiers(t *testing.T
 		GenericOperationDeferredCallableRegistry != GenericOperationSliceFull+1 ||
 		GenericOperationAppendSpread != GenericOperationDeferredCallableRegistry+1 ||
 		GenericOperationReflectionType != GenericOperationAppendSpread+1 ||
-		GenericOperationReflectionValue != GenericOperationReflectionType+1 {
+		GenericOperationReflectionValue != GenericOperationReflectionType+1 ||
+		GenericOperationAssign != GenericOperationReflectionValue+1 {
 		t.Fatal("new generic operations were not appended canonically")
 	}
 }

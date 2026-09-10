@@ -134,7 +134,7 @@ func BuildArrayPointer(
 		nil,
 		[]tsgo.TypeNode{optionalT},
 		[]tsgo.Expression{factory.ElementAccessExpression(
-			locationElement("0"),
+			factory.Identifier("backing"),
 			nil,
 			locationElement("1"),
 			tsgo.NodeFlagsNone,
@@ -248,7 +248,7 @@ func BuildArrayPointer(
 				}, true),
 			),
 			factory.ReturnStatement(factory.ElementAccessExpression(
-				locationElement("0"),
+				factory.Identifier("backing"),
 				nil,
 				locationElement("1"),
 				tsgo.NodeFlagsNone,
@@ -332,12 +332,8 @@ func BuildArrayPointer(
 				}, true),
 				nil,
 			),
-			arrayPointerVariable(
-				factory,
-				tsgo.NodeFlagsConst,
-				"view",
-				view,
-			),
+			arrayPointerVariable(factory, tsgo.NodeFlagsConst, "backing", locationElement("0")),
+			arrayPointerVariable(factory, tsgo.NodeFlagsConst, "view", view),
 			factory.ReturnStatement(result),
 		}, true),
 	)

@@ -144,6 +144,8 @@ func emitValue(
 		return api.ExpressionEmission{}, shapeError(context, operation)
 	}
 	switch operation {
+	case api.GenericOperationAssign:
+		return emitAssignment(context, signature, arguments)
 	case api.GenericOperationZero:
 		if len(arguments) != 0 {
 			return api.ExpressionEmission{}, shapeError(context, operation)

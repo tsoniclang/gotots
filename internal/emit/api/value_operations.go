@@ -194,6 +194,7 @@ func (e StoreTargetEmission) preparePropertyLocation(
 		return StoreTargetEmission{}, nil, nil, err
 	}
 	captured.copiesValue = e.copiesValue
+	captured.stableIdentity = e.stableIdentity
 	captured.storage = e.storage
 	captured.locationCaptured = true
 	return captured,
@@ -265,6 +266,7 @@ func (e StoreTargetEmission) prepareAccessorLocation(
 		return StoreTargetEmission{}, nil, nil, err
 	}
 	captured.copiesValue = e.copiesValue
+	captured.stableIdentity = e.stableIdentity
 	captured.storage = e.storage
 	captured.locationCaptured = true
 	return captured,

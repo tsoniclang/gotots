@@ -74,6 +74,7 @@ const (
 	GenericOperationAppendSpread
 	GenericOperationReflectionType
 	GenericOperationReflectionValue
+	GenericOperationAssign
 )
 
 var genericOperationIdentifiers = [...]string{
@@ -125,11 +126,12 @@ var genericOperationIdentifiers = [...]string{
 	GenericOperationAppendSpread:             "append_spread",
 	GenericOperationReflectionType:           "reflection_type",
 	GenericOperationReflectionValue:          "reflection_value",
+	GenericOperationAssign:                   "assign",
 }
 
 func (o GenericOperation) Valid() bool {
 	return o >= GenericOperationZero &&
-		o <= GenericOperationReflectionValue
+		o <= GenericOperationAssign
 }
 
 func (o GenericOperation) Identifier() string {
@@ -145,6 +147,8 @@ func (o GenericOperation) String() string {
 		return "zero"
 	case GenericOperationCopy:
 		return "copy"
+	case GenericOperationAssign:
+		return "assign"
 	case GenericOperationEqual:
 		return "equal"
 	case GenericOperationHash:

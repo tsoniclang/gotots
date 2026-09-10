@@ -23,6 +23,20 @@ func Emit(
 	children api.ChildEmitter,
 	source ast.Expr,
 ) (api.StoreTargetEmission, error) {
+	target, err := emitTarget(context, children, source)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	if !target.CopiesValue() {
+		switch target.SourceType().Underlying().(type) {
+		case *types.Array, *types.Struct:
+			return target.WithStableIdentity()
+		}
+	}
+	return target, nil
+}
+
+func emitTarget(context api.Context, children api.ChildEmitter, source ast.Expr) (api.StoreTargetEmission, error) {
 	switch source := source.(type) {
 	case *ast.Ident:
 		return identifier(context, source)

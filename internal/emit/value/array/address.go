@@ -122,6 +122,10 @@ func (a RuntimeArray) Address(
 			tsgo.NodeFlagsNone,
 		)
 	}
+	backing, before, requests, err := captureAddressValue(context, api.DirectExpression(locationPart("0")), before, requests)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	numericIndex := context.Factory().CallExpression(
 		api.TargetIntrinsicNumber.Expression(context.Factory()),
 		nil,
@@ -130,7 +134,7 @@ func (a RuntimeArray) Address(
 		tsgo.NodeFlagsNone,
 	)
 	storageLocation := context.Factory().ElementAccessExpression(
-		locationPart("0"),
+		backing,
 		nil,
 		context.Factory().BinaryExpression(
 			nil,
