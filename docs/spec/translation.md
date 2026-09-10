@@ -675,6 +675,16 @@ zero owner. A
 certified provider may expose a positional `$make` operation; ordinary
 generated structs never gain that compatibility factory.
 
+Stable assignment to a provider-owned struct requires its certified assignment
+operation, just as copying requires its certified copy operation. Absence of
+an assignment facet never authorizes rebinding or inference of immutability.
+For reflection values, copying duplicates the descriptor payload and assignment
+updates the destination descriptor. A copied addressable descriptor still
+refers to the same reflected location; it does not copy the reflected value.
+Thus assigning a copy of `reflect.ValueOf(1)` to `reflect.ValueOf(2)` cannot
+change the first descriptor, while `SetInt` through a copy of
+`reflect.ValueOf(&number).Elem()` must still update `number`.
+
 ### Arrays And Slices
 
 Arrays have fixed length and Go value-copy semantics. Slices have descriptor

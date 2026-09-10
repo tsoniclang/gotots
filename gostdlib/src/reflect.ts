@@ -74,13 +74,24 @@ export const String = new Kind(24n);
 export const Struct = new Kind(25n);
 export const UnsafePointer = new Kind(26n);
 
-export abstract class Value {
+export class Value {
   protected constructor(
-    private readonly stored?: GoInterfaceValue,
-    private readonly location?: RuntimeValueLocation,
-    private readonly addressable: bool = false,
-    private readonly staticType?: Type,
+    private stored?: GoInterfaceValue,
+    private location?: RuntimeValueLocation,
+    private addressable: bool = false,
+    private staticType?: Type,
   ) {}
+
+  static $copy(source: Value): Value {
+    return new Value(source.stored, source.location, source.addressable, source.staticType);
+  }
+
+  static $assign(target: Value, source: Value): void {
+    target.stored = source.stored;
+    target.location = source.location;
+    target.addressable = source.addressable;
+    target.staticType = source.staticType;
+  }
 
   // $unbox exposes the canonical interface box to generated support
   // code (type assertions select exact adapters emitter-side).

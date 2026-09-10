@@ -1905,6 +1905,7 @@
       "sourcePath": "src/internal/facets/named-reflect.ts",
       "export": "ReflectValueOperations",
       "capabilities": [
+        "assign",
         "copy",
         "zero"
       ]

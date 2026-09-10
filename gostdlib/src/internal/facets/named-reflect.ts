@@ -165,6 +165,10 @@ export class ReflectValueOperations {
   }
 
   static $copy(source: Value): Value {
-    return source;
+    return Value.$copy(source);
+  }
+
+  static $assign(target: Value, source: Value): void {
+    Value.$assign(target, source);
   }
 }

@@ -166,7 +166,9 @@ test("named-struct facets expose only selected static operations", (): void => {
 
   const invalid = ReflectValueOperations.$zero();
   assert.ok(invalid instanceof ReflectValue);
-  assert.equal(ReflectValueOperations.$copy(invalid), invalid);
+  const invalidCopy = ReflectValueOperations.$copy(invalid);
+  assert.notEqual(invalidCopy, invalid);
+  assert.equal(invalidCopy.IsValid(), false);
 
   const field = new StructField({
     Name: "Original",
