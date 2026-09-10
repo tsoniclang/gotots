@@ -105,11 +105,11 @@ func emitBinary(
 		return api.ExpressionEmission{}, err
 	}
 	if isLogicalOperator(source.Op) {
-		left, err = expressionoperands.MutationSnapshot(context, source.X, left)
+		left, err = expressionoperands.BooleanMutationSnapshot(context, source.X, left)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		right, err = expressionoperands.MutationSnapshot(context, source.Y, right)
+		right, err = expressionoperands.BooleanMutationSnapshot(context, source.Y, right)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}

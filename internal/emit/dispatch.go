@@ -313,7 +313,7 @@ func (e *emitter) Condition(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return expressionoperands.MutationSnapshot(context, source, value)
+	return expressionoperands.BooleanMutationSnapshot(context, source, value)
 }
 
 func (e *emitter) Block(

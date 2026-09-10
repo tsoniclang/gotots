@@ -157,9 +157,15 @@ func emitTag(
 		return tagEmission{}, err
 	}
 	model, wrapped := directSwitchModel(sourceType)
-	target, err = operands.MutationSnapshot(context, source.Tag, target)
-	if err != nil {
-		return tagEmission{}, err
+	if context.IndirectlyMutable(source.Tag) {
+		represented, typeErr := children.RepresentedType(context.WithRole(api.RoleSwitchTag), source.Tag, sourceType)
+		if typeErr != nil {
+			return tagEmission{}, typeErr
+		}
+		target, err = operands.Snapshot(context, target, represented)
+		if err != nil {
+			return tagEmission{}, err
+		}
 	}
 	return tagEmission{
 		source:     source.Tag,

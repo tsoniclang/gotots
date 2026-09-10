@@ -7,14 +7,17 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func MutationSnapshot(context api.Context, source ast.Expr, value api.ExpressionEmission) (api.ExpressionEmission, error) {
+func BooleanMutationSnapshot(context api.Context, source ast.Expr, value api.ExpressionEmission) (api.ExpressionEmission, error) {
 	if !context.IndirectlyMutable(source) {
 		return value, nil
 	}
-	return Snapshot(context, value)
+	return Snapshot(context, value, api.DirectType(context.Factory().KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword)))
 }
 
-func Snapshot(context api.Context, value api.ExpressionEmission) (api.ExpressionEmission, error) {
+func Snapshot(context api.Context, value api.ExpressionEmission, valueType api.TypeEmission) (api.ExpressionEmission, error) {
+	if valueType.Value() == nil {
+		return api.ExpressionEmission{}, &api.InvariantError{Role: context.Role(), Reason: "value snapshot has no selected type"}
+	}
 	name, err := context.Names().Temporary(api.TemporaryLogicalResult)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -22,8 +25,8 @@ func Snapshot(context api.Context, value api.ExpressionEmission) (api.Expression
 	before := append(value.Before(), context.Factory().VariableStatement(nil,
 		context.Factory().VariableDeclarationList([]tsgo.VariableDeclaration{
 			context.Factory().VariableDeclaration(context.Factory().Identifier(name), nil,
-				context.Factory().KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword), value.Value()),
+				valueType.Value(), value.Value()),
 		}, tsgo.NodeFlagsLet),
 	))
-	return api.NewExpressionEmission(before, context.Factory().Identifier(name), value.Requests())
+	return api.NewExpressionEmission(before, context.Factory().Identifier(name), api.CombineRequests(value.Requests(), valueType.Requests()))
 }

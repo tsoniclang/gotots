@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/expression/operands"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(context api.Context, children api.ChildEmitter, source *ast.BinaryExpr) (api.ExpressionEmission, error) {
@@ -14,5 +15,5 @@ func Emit(context api.Context, children api.ChildEmitter, source *ast.BinaryExpr
 		!context.IndirectlyMutable(source.X) && !context.IndirectlyMutable(source.Y) {
 		return value, err
 	}
-	return operands.Snapshot(context, value)
+	return operands.Snapshot(context, value, api.DirectType(context.Factory().KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword)))
 }
