@@ -1,7 +1,7 @@
 package slice
 
 import (
-	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	"github.com/tsoniclang/gotots/internal/emit/runtime/memoryview"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -100,7 +100,7 @@ func (b projectionBuilder) arrayLocationMethod() tsgo.MethodDeclaration {
 		[]tsgo.TypeParameterDeclaration{b.factory.TypeParameterDeclaration(
 			nil,
 			b.id("N"),
-			b.numberType(),
+			b.integerInputType(),
 			nil,
 			nil,
 		)},
@@ -108,13 +108,7 @@ func (b projectionBuilder) arrayLocationMethod() tsgo.MethodDeclaration {
 			b.parameter(nil, "length", typeN),
 		},
 		b.factory.UnionTypeNode([]tsgo.TypeNode{
-			b.factory.TypeOperatorNode(
-				tsgo.TypeOperatorNodeOperatorKindReadonlyKeyword,
-				b.factory.TupleTypeNode([]tsgo.TypeNode{
-					b.factory.ArrayTypeNode(b.typeReference("T")),
-					b.numberType(),
-				}),
-			),
+			memoryview.RegionType(b.factory, b.typeReference("T")),
 			b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword),
 		}),
 		b.factory.Block([]tsgo.Statement{
@@ -134,14 +128,9 @@ func (b projectionBuilder) arrayLocationMethod() tsgo.MethodDeclaration {
 				}, true),
 				nil,
 			),
-			b.returnStatement(panicruntime.Call(
-				b.factory,
-				b.panicName,
-				b.factory.StringLiteral(
-					"projected slice has no contiguous target representation",
-					tsgo.TokenFlagsNone,
-				),
-			)),
+			b.returnStatement(memoryview.Pointer(b.factory, b.typeReference("T"), b.factory.ArrowFunction(nil, nil,
+				[]tsgo.ParameterDeclaration{b.parameter(nil, "index", b.integerInputType())}, b.pointerType(b.typeReference("T")),
+				b.factory.EqualsGreaterThanToken(), b.call(b.factory.ThisExpression(), MemberName(MemberAddress), b.id("index"))), b.number("0"))),
 		}, true),
 	)
 }

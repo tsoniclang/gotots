@@ -41,21 +41,46 @@ func TestStringFamilyCreatesExactTargetTrees(t *testing.T) {
 	assertRuntimeCall(t, returnExpression(t, source, "Prefix"), "goStringSlice", 3)
 	assertRuntimeCall(t, returnExpression(t, source, "Suffix"), "goStringSlice", 2)
 
-	length, ok := returnExpression(t, source, "Length").(tsgo.PropertyAccessExpression)
-	lengthName, nameOK := length.Name().(tsgo.Identifier)
-	if !ok || !nameOK || lengthName.Text() != "length" {
-		t.Fatalf("Length return = %T, want direct .length", returnExpression(t, source, "Length"))
+	length, ok := returnExpression(t, source, "Length").(tsgo.CallExpression)
+	if !ok || len(length.Arguments()) != 1 {
+		t.Fatalf("Length return = %T, want selected integer conversion", returnExpression(t, source, "Length"))
+	}
+	count, ok := length.Arguments()[0].(tsgo.CallExpression)
+	if !ok || len(count.Arguments()) != 0 {
+		t.Fatal("Length does not query the exact source count")
+	}
+	countMember, ok := count.Expression().(tsgo.PropertyAccessExpression)
+	if !ok || countMember.Name().(tsgo.Identifier).Text() != "sourceLength" {
+		t.Fatal("Length does not use the canonical descriptor count")
 	}
 
 	runtimeFile := targetFile(t, emission, emit.TargetFileSupport, "runtime/string.ts")
-	assertBoundsFunction(t, targetFunction(t, runtimeFile, "goStringIndex"))
-	assertBoundsFunction(t, targetFunction(t, runtimeFile, "goStringSlice"))
+	valueFile := targetFile(t, emission, emit.TargetFileSupport, "runtime/string-value.ts")
+	for operation, method := range map[string]string{"goStringIndex": "read", "goStringSlice": "slice"} {
+		call, ok := returnExpression(t, runtimeFile, operation).(tsgo.CallExpression)
+		if !ok {
+			t.Fatalf("%s does not delegate to its value owner", operation)
+		}
+		member, ok := call.Expression().(tsgo.PropertyAccessExpression)
+		if !ok || member.Name().(tsgo.Identifier).Text() != method {
+			t.Fatalf("%s delegates to the wrong operation", operation)
+		}
+		if !hasPanicBoundsCheck(stringValueMethod(t, valueFile, method).Body().(tsgo.Block)) {
+			t.Fatalf("GoString.%s lacks its panic bounds check", method)
+		}
+	}
 }
 
 func TestStringShapeChecksRejectRequiredMutations(t *testing.T) {
 	factory := tsgo.NewFactory()
-	if byteLiteralMatches(factory.StringLiteral("é", tsgo.TokenFlagsNone), []byte{0xc3, 0xa9}) {
+	unicodeLiteral := factory.CallExpression(
+		factory.PropertyAccessExpression(factory.Identifier("GoString"), nil, factory.Identifier("fromText"), tsgo.NodeFlagsNone),
+		nil, nil, []tsgo.Expression{factory.StringLiteral("é", tsgo.TokenFlagsNone)}, tsgo.NodeFlagsNone)
+	if byteLiteralMatches(unicodeLiteral, []byte{0xc3, 0xa9}) {
 		t.Fatal("code-point literal mutation passed byte-preserving literal check")
+	}
+	if byteLiteralMatches(factory.StringLiteral("ascii", tsgo.TokenFlagsNone), []byte("ascii")) {
+		t.Fatal("bare host string mutation passed canonical literal check")
 	}
 	nativeIndex := factory.ElementAccessExpression(
 		factory.Identifier("value"),
@@ -80,7 +105,7 @@ func TestStringShapeChecksRejectRequiredMutations(t *testing.T) {
 			true,
 		),
 	)
-	if hasPanicBoundsCheck(unchecked) {
+	if hasPanicBoundsCheck(unchecked.Body().(tsgo.Block)) {
 		t.Fatal("missing-bounds-check mutation passed runtime bounds check")
 	}
 }
@@ -132,9 +157,10 @@ func TestStringFamilyPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
     Zero,
 } from "`+module+`";
 import "./program.js";
+import { GoString } from "./runtime/string-value.js";
 
-function bytes(value: string): string {
-    return Array.from(value, value => value.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+function bytes(value: GoString): string {
+    return Array.from(value.text(), value => value.charCodeAt(0).toString(16).padStart(2, "0")).join("");
 }
 
 function panics(operation: () => void): boolean {
@@ -152,18 +178,18 @@ console.log(bytes(RawUTF8()));
 console.log(bytes(InvalidBytes()));
 console.log(bytes(Constants()));
 console.log(bytes(Zero()));
-console.log(bytes(Assign("\u00ff\u0000A")));
+console.log(bytes(Assign(GoString.fromText("\u00ff\u0000A"))));
 console.log(bytes(PackageZero()));
-console.log(bytes(PackageAssign("\u00fe")));
-console.log(bytes(Concat("\u00c3", "\u00a9")));
-console.log(Equal("a", "a"));
-console.log(NotEqual("a", "b"));
-console.log(Less("a", "b"));
-console.log(LessEqual("a", "a"));
-console.log(Greater("b", "a"));
-console.log(GreaterEqual("b", "b"));
-console.log(Less("\u0080", "\u00ff"));
-console.log(Less("\u00c3\u00a9", "\u00ff"));
+console.log(bytes(PackageAssign(GoString.fromText("\u00fe"))));
+console.log(bytes(Concat(GoString.fromText("\u00c3"), GoString.fromText("\u00a9"))));
+console.log(Equal(GoString.fromText("a"), GoString.fromText("a")));
+console.log(NotEqual(GoString.fromText("a"), GoString.fromText("b")));
+console.log(Less(GoString.fromText("a"), GoString.fromText("b")));
+console.log(LessEqual(GoString.fromText("a"), GoString.fromText("a")));
+console.log(Greater(GoString.fromText("b"), GoString.fromText("a")));
+console.log(GreaterEqual(GoString.fromText("b"), GoString.fromText("b")));
+console.log(Less(GoString.fromText("\u0080"), GoString.fromText("\u00ff")));
+console.log(Less(GoString.fromText("\u00c3\u00a9"), GoString.fromText("\u00ff")));
 console.log(Length(UTF8()).toString());
 console.log(ByteAt(UTF8(), 1).toString());
 console.log(ConstantByteAt(10).toString());
@@ -179,15 +205,15 @@ console.log(indexCallCount.toString());
 const [definedByte, definedWindow] = DefinedBounds();
 console.log(definedByte.toString());
 console.log(bytes(definedWindow));
-console.log(bytes(DefinedWindow(new Path("abcd"), 1, 3).$value));
-console.log(panics(() => ByteAt("a", -1)));
-console.log(panics(() => ByteAt("a", 1)));
-console.log(panics(() => ByteAt("a", 9007199254740992)));
-console.log(panics(() => Window("a", -1, 0)));
-console.log(panics(() => Window("a", 1, 0)));
-console.log(panics(() => Window("a", 0, 2)));
-console.log(panics(() => Suffix("a", -1)));
-console.log(panics(() => Prefix("a", 2)));
+console.log(bytes(DefinedWindow(new Path(GoString.fromText("abcd")), 1, 3).$value));
+console.log(panics(() => ByteAt(GoString.fromText("a"), -1)));
+console.log(panics(() => ByteAt(GoString.fromText("a"), 1)));
+console.log(panics(() => ByteAt(GoString.fromText("a"), 9007199254740992)));
+console.log(panics(() => Window(GoString.fromText("a"), -1, 0)));
+console.log(panics(() => Window(GoString.fromText("a"), 1, 0)));
+console.log(panics(() => Window(GoString.fromText("a"), 0, 2)));
+console.log(panics(() => Suffix(GoString.fromText("a"), -1)));
+console.log(panics(() => Prefix(GoString.fromText("a"), 2)));
 `)
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	targetPaths = append(targetPaths, runnerPath)
@@ -213,7 +239,7 @@ func TestStringFamilyStrictTypechecksWithBigIntIndices(t *testing.T) {
 	targetPaths, _, printed := materializeStringProgram(t, workingDirectory, emission)
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	compileTypeScript(t, workingDirectory, targetPaths)
-	if !strings.Contains(printed, "BigInt(value.length)") ||
+	if !strings.Contains(printed, "BigInt(value.sourceLength())") ||
 		!strings.Contains(printed, "goStringSlice(value, 0n, high)") {
 		t.Fatalf("BigInt string artifact lacks exact index adaptation:\n%s", printed)
 	}
@@ -315,7 +341,20 @@ func assertByteLiteral(t *testing.T, expression tsgo.Expression, expected []byte
 }
 
 func byteLiteralMatches(expression tsgo.Expression, expected []byte) bool {
-	literal, ok := expression.(tsgo.StringLiteral)
+	call, ok := expression.(tsgo.CallExpression)
+	if !ok || len(call.Arguments()) != 1 {
+		return false
+	}
+	member, ok := call.Expression().(tsgo.PropertyAccessExpression)
+	if !ok {
+		return false
+	}
+	name, ok := member.Name().(tsgo.Identifier)
+	owner, ownerOK := member.Expression().(tsgo.Identifier)
+	if !ok || !ownerOK || name.Text() != "fromText" || owner.Text() != "GoString" {
+		return false
+	}
+	literal, ok := call.Arguments()[0].(tsgo.StringLiteral)
 	if !ok {
 		return false
 	}
@@ -350,49 +389,6 @@ func runtimeCallMatches(expression tsgo.Expression, name string, arguments int) 
 	}
 	callee, ok := call.Expression().(tsgo.Identifier)
 	return ok && callee.Text() == name
-}
-
-func assertBoundsFunction(t *testing.T, function tsgo.FunctionDeclaration) {
-	t.Helper()
-	if !hasPanicBoundsCheck(function) {
-		t.Fatalf(
-			"runtime function %s lacks a shared-panic bounds check",
-			function.Name().Text(),
-		)
-	}
-}
-
-func hasPanicBoundsCheck(function tsgo.FunctionDeclaration) bool {
-	body, ok := function.Body().(tsgo.Block)
-	if !ok {
-		return false
-	}
-	for _, statement := range body.Statements() {
-		check, ok := statement.(tsgo.IfStatement)
-		if !ok {
-			continue
-		}
-		target, ok := check.ThenStatement().(tsgo.Block)
-		if !ok {
-			continue
-		}
-		for _, nested := range target.Statements() {
-			expression, ok := nested.(tsgo.ExpressionStatement)
-			if !ok {
-				continue
-			}
-			call, ok := expression.Expression().(tsgo.CallExpression)
-			if !ok {
-				continue
-			}
-			member, ok := call.Expression().(tsgo.PropertyAccessExpression)
-			if ok &&
-				member.Name().(tsgo.Identifier).Text() == "raiseRuntime" {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func materializeStringProgram(

@@ -131,6 +131,7 @@ const (
 	DeclarationRequirementProviderInterfaceCapability        DeclarationRequirementKind = 30
 	DeclarationRequirementProviderProfileInterfaceCapability DeclarationRequirementKind = 31
 	DeclarationRequirementReflectionValueOperations          DeclarationRequirementKind = 32
+	DeclarationRequirementReflectionRawPointer               DeclarationRequirementKind = 33
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -159,7 +160,8 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementReflectionType ||
 		k == DeclarationRequirementProviderInterfaceCapability ||
 		k == DeclarationRequirementProviderProfileInterfaceCapability ||
-		k == DeclarationRequirementReflectionValueOperations
+		k == DeclarationRequirementReflectionValueOperations ||
+		k == DeclarationRequirementReflectionRawPointer
 }
 
 type CallableControlFacet = controlcontract.CallableFacet

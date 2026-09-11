@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { Buffer } from "node:buffer";
 import { realpathSync } from "node:fs";
 
@@ -20,7 +21,7 @@ export function Abs(path: gostring): [gostring, GoError | undefined] {
   try {
     return [IsAbs(path) ? Clean(path) : joinValues([fromHostString(process.cwd()), path]), undefined];
   } catch {
-    return ["", providerError(new Error("cannot determine absolute path"))];
+    return [GoString.empty, providerError(new Error("cannot determine absolute path"))];
   }
 }
 
@@ -32,16 +33,16 @@ export function EvalSymlinks(path: gostring): [gostring, GoError | undefined] {
       return [Clean(resolvedPath), undefined];
     }
     const workingDirectory = fromHostString(process.cwd());
-    if (resolvedPath === workingDirectory) {
-      return [".", undefined];
+    if (resolvedPath.text() === workingDirectory.text()) {
+      return [GoString.fromText("."), undefined];
     }
-    const prefix = `${Clean(workingDirectory)}/`;
+    const prefix = `${Clean(workingDirectory).text()}/`;
     return [
-      resolvedPath.startsWith(prefix) ? Clean(resolvedPath.slice(prefix.length)) : Clean(resolvedPath),
+      resolvedPath.text().startsWith(prefix) ? Clean(resolvedPath.slice(prefix.length)) : Clean(resolvedPath),
       undefined,
     ];
   } catch {
-    return ["", providerError(new Error("cannot evaluate symbolic links"))];
+    return [GoString.empty, providerError(new Error("cannot evaluate symbolic links"))];
   }
 }
 

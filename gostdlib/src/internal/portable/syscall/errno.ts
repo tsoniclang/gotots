@@ -5,6 +5,7 @@ import {
 } from "@gotots/runtime/interface-value.js";
 
 import type { Errno } from "../../../syscall.js";
+import type { gostring } from "../../scalars.js";
 import { hostInteger } from "../../host-integer.js";
 
 const errnoType = Object.freeze({ comparable: true });
@@ -20,7 +21,7 @@ export class ErrnoError extends GoInterfaceValue implements GoError {
     super();
   }
 
-  Error(): string {
+  Error(): gostring {
     return this.errno.Error();
   }
 
@@ -45,7 +46,7 @@ export class ErrnoError extends GoInterfaceValue implements GoError {
     if (verb === "T") {
       return "syscall.Errno";
     }
-    const message = this.Error();
+    const message = this.Error().text();
     return verb === "q" ? JSON.stringify(message) : message;
   }
 }

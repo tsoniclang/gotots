@@ -3,6 +3,7 @@ import type { SpawnSyncOptionsWithBufferEncoding } from "node:child_process";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { gostring, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import { fromHostString, toHostString } from "../../../portable/utf8/codec.js";
 import { hostInteger, integerFromHost } from "../../../host-integer.js";
 import {
   state as ioState,
@@ -46,24 +47,24 @@ export function commandOutput(
   receiver: CommandValue | undefined,
 ): [RuntimeSlice<uint8>, GoError | undefined] {
   if (receiver === undefined) {
-    return [emptyOutput, new ProviderError("exec: nil Cmd")];
+    return [emptyOutput, ProviderError.fromText("exec: nil Cmd")];
   }
   if (receiver.Err !== undefined) {
     return [emptyOutput, receiver.Err];
   }
   if (receiver.Stdout !== undefined) {
-    return [emptyOutput, new ProviderError("exec: Stdout already set")];
+    return [emptyOutput, ProviderError.fromText("exec: Stdout already set")];
   }
   const stdout = new CaptureWriter();
   receiver.Stdout = stdout;
   if (startedCommands.has(receiver)) {
-    return [emptyOutput, new ProviderError("exec: already started")];
+    return [emptyOutput, ProviderError.fromText("exec: already started")];
   }
   startedCommands.add(receiver);
   if (receiver.Cancel !== undefined) {
     return [
       emptyOutput,
-      new ProviderError(
+      ProviderError.fromText(
         "exec: command with a non-nil Cancel was not created with CommandContext",
       ),
     ];
@@ -81,8 +82,8 @@ export function commandOutput(
   if (input !== undefined) {
     options.input = input;
   }
-  const arguments_ = sliceValues(receiver.Args).slice(1);
-  const result = spawnSync(receiver.Path, arguments_, options);
+  const arguments_ = sliceValues(receiver.Args).slice(1).map(toHostString);
+  const result = spawnSync(toHostString(receiver.Path), arguments_, options);
   receiver.Process = result.pid === undefined
     ? undefined
     : new Process(integerFromHost(result.pid));
@@ -97,7 +98,7 @@ export function commandOutput(
     }
   }
   if (result.error !== undefined) {
-    return [emptyOutput, new ProviderError(result.error.message)];
+    return [emptyOutput, new ProviderError(fromHostString(result.error.message))];
   }
 
   if (result.stdout !== undefined && result.stdout !== null) {
@@ -111,12 +112,12 @@ export function commandOutput(
     if (result.signal !== null) {
       return [
         output,
-        new ProviderError(`signal: ${result.signal}`),
+        ProviderError.fromText(`signal: ${result.signal}`),
       ];
     }
     return [
       output,
-      new ProviderError(`exit status ${result.status ?? 0}`),
+      ProviderError.fromText(`exit status ${result.status ?? 0}`),
     ];
   }
   return [output, undefined];
@@ -127,11 +128,11 @@ function spawnOptions(command: CommandValue): SpawnSyncOptionsWithBufferEncoding
     encoding: "buffer",
     maxBuffer: 64 * 1024 * 1024,
   };
-  if (command.Dir.length > 0) {
-    options.cwd = command.Dir;
+  if (command.Dir.text().length > 0) {
+    options.cwd = toHostString(command.Dir);
   }
   if (!command.Env.isNil()) {
-    options.env = environment(sliceValues(command.Env));
+    options.env = environment(sliceValues(command.Env).map(toHostString));
   }
   if (command.SysProcAttr?.Credential !== undefined) {
     options.uid = command.SysProcAttr.Credential.Uid;
@@ -170,7 +171,7 @@ function validateAttributes(
     return undefined;
   }
   if (
-    attributes.Chroot.length > 0
+    attributes.Chroot.text().length > 0
     || attributes.Ptrace
     || attributes.Setsid
     || attributes.Setpgid
@@ -193,7 +194,7 @@ function validateAttributes(
       && !attributes.Credential.Groups.isNil()
     )
   ) {
-    return new ProviderError("exec: SysProcAttr is not supported by Node");
+    return ProviderError.fromText("exec: SysProcAttr is not supported by Node");
   }
   return undefined;
 }
@@ -253,7 +254,7 @@ function readStandardInput(
       if (emptyReads >= 100) {
         return [
           undefined,
-          new ProviderError("exec: Stdin returned no data"),
+          ProviderError.fromText("exec: Stdin returned no data"),
         ];
       }
     } else {

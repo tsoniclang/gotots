@@ -11,7 +11,7 @@ import (
 )
 
 func pointerRawOperation(context api.Context, children api.ChildEmitter, pointee types.Type) (tsgo.Expression, []api.RootRequest, error) {
-	supported, err := memory.SupportsLayout(context, pointee)
+	supported, err := memory.SupportsPointerTransport(context, pointee)
 	if err != nil || !supported {
 		return nil, nil, err
 	}

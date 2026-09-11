@@ -1,4 +1,5 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type {
   gostring,
   int,
@@ -22,13 +23,13 @@ export function Atoi(value: gostring): [int, NumberError | undefined] {
 export function FormatInt(value: int64, base: int): gostring {
   validateBase(base);
   const integer = BigInt.asIntN(64, value);
-  return integer.toString(hostInteger(base));
+  return GoString.fromText(integer.toString(hostInteger(base)));
 }
 
 export function FormatUint(value: uint64, base: int): gostring {
   validateBase(base);
   const integer = BigInt.asUintN(64, value);
-  return integer.toString(hostInteger(base));
+  return GoString.fromText(integer.toString(hostInteger(base)));
 }
 
 export function Itoa(value: int): gostring {
@@ -40,11 +41,11 @@ export function ParseInt(
   base: int,
   bitSize: int,
 ): [int64, NumberError | undefined] {
-  if (value.length === 0) {
+  if (value.text().length === 0) {
     return [0n, syntaxError("ParseInt", value)];
   }
   let sign = 1n;
-  let digitsText = value;
+  let digitsText = value.text();
   if (digitsText[0] === "+" || digitsText[0] === "-") {
     sign = digitsText[0] === "-" ? -1n : 1n;
     digitsText = digitsText.slice(1);
@@ -75,10 +76,11 @@ export function ParseUint(
   base: int,
   bitSize: int,
 ): [uint64, NumberError | undefined] {
-  if (value.length === 0 || value[0] === "+" || value[0] === "-") {
+  const text = value.text();
+  if (text.length === 0 || text[0] === "+" || text[0] === "-") {
     return [0n, syntaxError("ParseUint", value)];
   }
-  const parsed = parseMagnitude(value, base);
+  const parsed = parseMagnitude(text, base);
   if (parsed.error !== undefined) {
     return [0n, syntaxError("ParseUint", value)];
   }
@@ -98,7 +100,7 @@ type Magnitude = {
   readonly error: boolean | undefined;
 };
 
-function parseMagnitude(text: gostring, requestedBase: int): Magnitude {
+function parseMagnitude(text: string, requestedBase: int): Magnitude {
   let base = hostInteger(requestedBase);
   let digitsText = text;
   let underscores = false;

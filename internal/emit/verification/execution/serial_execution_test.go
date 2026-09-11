@@ -83,7 +83,7 @@ try {
     Block();
 } catch (failure) {
     boundary = failure instanceof GoPanic && failure.value instanceof GoRuntimePanicValue
-        ? failure.value.Error()
+        ? failure.value.Error().text()
         : "non-panic";
 }
 console.log(String(Run()) + "|" + boundary);

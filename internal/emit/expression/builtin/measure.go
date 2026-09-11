@@ -108,7 +108,15 @@ func ApplyMeasure(
 				return api.ExpressionEmission{}, true, err
 			}
 		}
-		target, err := measuredProperty(context, operand, "length")
+		factory := context.Factory()
+		count := factory.CallExpression(factory.PropertyAccessExpression(operand.Value(), nil,
+			factory.Identifier("sourceLength"), tsgo.NodeFlagsNone), nil, nil, nil, tsgo.NodeFlagsNone)
+		conversion := api.TargetIntrinsicNumber
+		if context.ScalarABI().UsesBigInt(types.Typ[types.Int]) {
+			conversion = api.TargetIntrinsicBigInt
+		}
+		target, err := api.NewExpressionEmission(operand.Before(), factory.CallExpression(conversion.Expression(factory), nil, nil,
+			[]tsgo.Expression{count}, tsgo.NodeFlagsNone), operand.Requests())
 		return target, true, err
 	}
 	if array, ok := arrayvalue.Resolve(context, operandType); ok {
@@ -130,11 +138,19 @@ func ApplyMeasure(
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
-		target, err := measuredProperty(
-			context,
-			operand,
-			runtimeslice.MemberName(member),
-		)
+		countMember := runtimeslice.MemberSourceLength
+		if member == runtimeslice.MemberCapacity {
+			countMember = runtimeslice.MemberSourceCapacity
+		}
+		factory := context.Factory()
+		count := factory.CallExpression(factory.PropertyAccessExpression(operand.Value(), nil,
+			factory.Identifier(runtimeslice.MemberName(countMember)), tsgo.NodeFlagsNone), nil, nil, nil, tsgo.NodeFlagsNone)
+		conversion := api.TargetIntrinsicNumber
+		if context.ScalarABI().UsesBigInt(types.Typ[types.Int]) {
+			conversion = api.TargetIntrinsicBigInt
+		}
+		target, err := api.NewExpressionEmission(operand.Before(), factory.CallExpression(conversion.Expression(factory), nil, nil,
+			[]tsgo.Expression{count}, tsgo.NodeFlagsNone), operand.Requests())
 		return target, true, err
 	}
 	if mapType, ok := maprepresentation.Source(context, operandType); ok {

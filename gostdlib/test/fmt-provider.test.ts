@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
@@ -82,7 +83,7 @@ test("fmt parses directives and delegates exact dynamic-value rendering", () => 
     new FormattedValue("value", "value"),
     new FormattedValue("15", "f"),
   ]);
-  assert.equal(Sprintf("%s=%04x", arguments_), "value=000f");
+  assert.equal((Sprintf(GoString.fromText("%s=%04x"), arguments_))?.text(), "value=000f");
 });
 
 test("fmt Fprintln writes one Go line through io.Writer", () => {

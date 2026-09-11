@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type {
   bool,
@@ -78,7 +79,7 @@ export class Int {
     base: int,
   ): [Int | undefined, bool] {
     const target = requireInt(receiver);
-    const parsed = parseInteger(text, base);
+    const parsed = parseInteger(text.text(), base);
     if (parsed === undefined) {
       return [undefined, false];
     }
@@ -87,7 +88,7 @@ export class Int {
   }
 
   static String(receiver: Int | undefined): gostring {
-    return intValue(requireInt(receiver)).toString(10);
+    return GoString.fromText(intValue(requireInt(receiver)).toString(10));
   }
 }
 
@@ -270,7 +271,7 @@ function modularInverse(value: bigint, modulus: bigint): bigint | undefined {
   return ((oldCoefficient % modulus) + modulus) % modulus;
 }
 
-function parseInteger(text: gostring, requestedBase: int): bigint | undefined {
+function parseInteger(text: string, requestedBase: int): bigint | undefined {
   if (requestedBase !== 0n && (requestedBase < 2n || requestedBase > 62n)) {
     GoPanic.raiseRuntime("invalid number base");
   }

@@ -188,6 +188,20 @@ representation of the source program.
   express a required distinction, compilation fails until shared Tsonic
   authority defines that neutral contract.
 
+Canonical preservation changes must not silently become JavaScript runtime
+projects. Shared types and layout/pointer markers preserve native-target
+information; the JavaScript consumer must retain the established workload
+correctness and performance characteristics. Do not introduce byte-memory
+emulation, extra copies or a global provider/string representation migration
+merely to carry native facts. Unimplemented source operations remain explicit
+boundaries, never successful lossy translations or claims of full coverage.
+
+The approved canonical slice/string migration is limited to retaining backing
+identity, exact descriptor words, copied-view independence and the consumers
+necessarily affected by those value contracts. It may change those canonical
+representations and provider boundaries. It does not authorize a general
+JavaScript memory emulator or relaxing the existing runtime/performance gates.
+
 ## Environment Ownership
 
 All Go imports share the same language semantics. Toolchain metadata—not import

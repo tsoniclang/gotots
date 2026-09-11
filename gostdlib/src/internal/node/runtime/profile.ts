@@ -1,3 +1,4 @@
+import type { GoString } from "@gotots/runtime/string-value.js";
 import { cpuSeconds, memorySnapshot, stackBytes } from "./process.js";
 import {
   cpuProfile,
@@ -14,7 +15,7 @@ export interface CpuSample {
 export const ProfileNameKey: unique symbol = Symbol("gotots.pprof.profile-name");
 
 export interface ProfileIdentity {
-  readonly [ProfileNameKey]: string;
+  readonly [ProfileNameKey]: GoString;
 }
 
 type CpuProfileWrite = (content: Uint8Array) => void;

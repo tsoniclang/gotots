@@ -75,8 +75,8 @@ test("reflection metadata and value operations materialize exactly on demand", (
   assert.equal(runtimeTypeOf(new DynamicValue(dynamicType)), descriptor);
   assert.deepEqual([metadataCalls, methodCalls, operationCalls], [0, 0, 0]);
 
-  assert.equal(descriptor.String(), "example.Value");
-  assert.equal(descriptor.String(), "example.Value");
+  assert.equal((descriptor.String())?.text(), "example.Value");
+  assert.equal((descriptor.String())?.text(), "example.Value");
   assert.equal(descriptor.$go$methods.has(methodToken), true);
   assert.equal(descriptor.$go$methods.has(methodToken), true);
   assert.equal(runtimeValueOperations(descriptor)?.isZero?.(new DynamicValue(dynamicType)), true);

@@ -71,7 +71,7 @@ function providerResult(): string {
     const [count, failure] = ByteBuffer.Read(buffer, target);
     rows.push({
       n: hostInteger(count),
-      error: failure?.Error() ?? "",
+      error: failure?.Error().text() ?? "",
       destination: sliceValues(target),
     });
   }
@@ -82,7 +82,7 @@ function providerResult(): string {
   );
   rows.push({
     n: hostInteger(emptyCount),
-    error: emptyFailure?.Error() ?? "",
+    error: emptyFailure?.Error().text() ?? "",
     destination: [],
   });
   return JSON.stringify(rows);

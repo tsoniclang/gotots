@@ -25,24 +25,24 @@ export class Profile {
   ): GoError | undefined {
     void debug;
     if (receiver === undefined || w === undefined) {
-      return new ProviderError("pprof: nil profile or writer");
+      return ProviderError.fromText("pprof: nil profile or writer");
     }
-    return write(w, profileSnapshot(receiver[ProfileNameKey]));
+    return write(w, profileSnapshot(receiver[ProfileNameKey].text()));
   }
 }
 
 export function Lookup(name: gostring): Profile | undefined {
-  return knownProfile(name) ? new Profile(name) : undefined;
+  return knownProfile(name.text()) ? new Profile(name) : undefined;
 }
 
 export function StartCPUProfile(w: Writer | undefined): GoError | undefined {
   if (w === undefined) {
-    return new ProviderError("pprof: nil writer");
+    return ProviderError.fromText("pprof: nil writer");
   }
   if (!beginCpuProfile((content): void => {
     write(w, content);
   })) {
-    return new ProviderError("cpu profiling already in use");
+    return ProviderError.fromText("cpu profiling already in use");
   }
   return undefined;
 }
@@ -58,5 +58,5 @@ function write(writer: Writer, content: Uint8Array): GoError | undefined {
   }
   return count === BigInt(content.length)
     ? undefined
-    : new ProviderError("pprof: short write");
+    : ProviderError.fromText("pprof: short write");
 }

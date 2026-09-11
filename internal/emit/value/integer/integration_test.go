@@ -48,7 +48,7 @@ func TestIntegerNumberProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 	)
 	assertIntegerAliases(t, emission, false)
 	printed := printIntegerFamily(t, emission)
-	assertDirectIntegerArtifact(t, printed, false)
+	assertDirectIntegerArtifact(t, emission, printed, false)
 
 	workingDirectory := t.TempDir()
 	goOutput := executeIntegerFamilyGo(t, workingDirectory, false)
@@ -77,7 +77,7 @@ func TestIntegerBigIntProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 	assertIntegerAliases(t, emission, true)
 	assertBigIntDivisionUsesRuntime(t, emission)
 	printed := printIntegerFamily(t, emission)
-	assertDirectIntegerArtifact(t, printed, true)
+	assertDirectIntegerArtifact(t, emission, printed, true)
 
 	workingDirectory := t.TempDir()
 	goOutput := executeIntegerFamilyGo(t, workingDirectory, true)
@@ -249,7 +249,7 @@ func compileIntegerFamily(
 	return emission
 }
 
-func assertDirectIntegerArtifact(t *testing.T, printed string, bigint bool) {
+func assertDirectIntegerArtifact(t *testing.T, emission emit.ProgramEmission, printed string, bigint bool) {
 	t.Helper()
 	for _, forbidden := range []string{
 		" as any",
@@ -274,8 +274,19 @@ func assertDirectIntegerArtifact(t *testing.T, printed string, bigint bool) {
 			!strings.Contains(printed, "export type int = TsonicInt64;")) {
 		t.Fatalf("exact-width artifact lacks its number/BigInt carrier split:\n%s", printed)
 	}
-	if !bigint && regexp.MustCompile(`[0-9]n(?:\W|$)`).MatchString(printed) {
-		t.Fatalf("number artifact contains BigInt syntax:\n%s", printed)
+	if !bigint {
+		client, err := tsgo.StartClient(repositoryRoot(), t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer client.Close()
+		source, err := client.PrintNode(integerFamilySourceFile(t, emission), tsgo.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if regexp.MustCompile(`[0-9]n(?:\W|$)`).MatchString(source) {
+			t.Fatalf("number source artifact contains BigInt syntax:\n%s", source)
+		}
 	}
 }
 

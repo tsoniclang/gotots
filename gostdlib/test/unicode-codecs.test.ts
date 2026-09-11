@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import test from "node:test";
@@ -87,10 +88,10 @@ test("unicode properties and case mappings match selected Go tables", () => {
 test("unicode utf8 decoders preserve Go invalid-sequence widths", () => {
   assert.equal(RuneError, 0xfffd);
   assert.equal(RuneSelf, 0x80);
-  assert.deepEqual(DecodeRuneInString(goText("é")), [0x00e9, 2n]);
-  assert.deepEqual(DecodeRuneInString(String.fromCharCode(0xff, 0x41)), [0xfffd, 1n]);
-  assert.deepEqual(DecodeLastRuneInString(goText("A𝄞")), [0x1d11e, 4n]);
-  assert.deepEqual(DecodeLastRuneInString(""), [0xfffd, 0n]);
+  assert.deepEqual(DecodeRuneInString(GoString.fromText(goText("é"))), [0x00e9, 2n]);
+  assert.deepEqual(DecodeRuneInString(GoString.fromText(String.fromCharCode(0xff, 0x41))), [0xfffd, 1n]);
+  assert.deepEqual(DecodeLastRuneInString(GoString.fromText(goText("A𝄞"))), [0x1d11e, 4n]);
+  assert.deepEqual(DecodeLastRuneInString(GoString.fromText("")), [0xfffd, 0n]);
 });
 
 test("unicode utf8 byte operations preserve Go widths and append behavior", () => {
@@ -99,16 +100,16 @@ test("unicode utf8 byte operations preserve Go widths and append behavior", () =
   assert.deepEqual(DecodeUTF8Rune(encoded), [0x00e9, 2n]);
   assert.equal(FullRune(encoded), true);
   assert.equal(FullRune(byteSlice(String.fromCharCode(0xe2, 0x82))), false);
-  assert.equal(FullRuneInString(goText("é")), true);
-  assert.equal(FullRuneInString(String.fromCharCode(0xe2, 0x82)), false);
-  assert.equal(FullRuneInString(String.fromCharCode(0xe0, 0x80)), true);
-  assert.equal(FullRuneInString(String.fromCharCode(0xf0, 0x90, 0x80)), false);
-  assert.equal(FullRuneInString(String.fromCharCode(0xf0, 0x80)), true);
+  assert.equal(FullRuneInString(GoString.fromText(goText("é"))), true);
+  assert.equal(FullRuneInString(GoString.fromText(String.fromCharCode(0xe2, 0x82))), false);
+  assert.equal(FullRuneInString(GoString.fromText(String.fromCharCode(0xe0, 0x80))), true);
+  assert.equal(FullRuneInString(GoString.fromText(String.fromCharCode(0xf0, 0x90, 0x80))), false);
+  assert.equal(FullRuneInString(GoString.fromText(String.fromCharCode(0xf0, 0x80))), true);
   assert.equal(RuneCount(byteSlice(String.fromCharCode(0xff, 0x41))), 2n);
   assert.equal(RuneStart(0x80), false);
   assert.equal(RuneStart(0x41), true);
-  assert.equal(ValidString(goText("A🙂")), true);
-  assert.equal(ValidString(String.fromCharCode(0xff)), false);
+  assert.equal(ValidString(GoString.fromText(goText("A🙂"))), true);
+  assert.equal(ValidString(GoString.fromText(String.fromCharCode(0xff))), false);
 
   const target = RuntimeSlice.make<number>(4, null, 0);
   assert.equal(EncodeUTF8Rune(target, 0x1f642), 4n);
@@ -140,7 +141,7 @@ test("host byte conversion preserves canonical Go strings exactly", () => {
   ]);
   const value = fromHostBytes(expected);
   assert.deepEqual(toHostBytes(value), expected);
-  assert.throws(() => toHostBytes("🙂"), /non-canonical Go string byte/);
+  assert.throws(() => toHostBytes(GoString.fromText("🙂")), /non-canonical Go string byte/);
 });
 
 function goText(value: string): string {

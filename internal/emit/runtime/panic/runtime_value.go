@@ -40,6 +40,11 @@ func runtimePanicValue(
 				factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
 				factory.TrueLiteral(),
 			),
+			factory.PropertyDeclaration(
+				[]tsgo.ModifierLike{factory.PrivateKeyword(), factory.ReadonlyKeyword()},
+				factory.Identifier("sourceMessage"), nil,
+				factory.TypeReferenceNode(factory.Identifier("GoString"), nil), nil,
+			),
 			factory.ConstructorDeclaration(
 				nil,
 				nil,
@@ -63,6 +68,12 @@ func runtimePanicValue(
 						nil,
 						tsgo.NodeFlagsNone,
 					)),
+					factory.ExpressionStatement(factory.BinaryExpression(nil,
+						factory.PropertyAccessExpression(factory.ThisExpression(), nil, factory.Identifier("sourceMessage"), tsgo.NodeFlagsNone),
+						nil, factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
+						factory.CallExpression(factory.PropertyAccessExpression(factory.Identifier("GoString"), nil,
+							factory.Identifier("fromText"), tsgo.NodeFlagsNone), nil, nil,
+							[]tsgo.Expression{factory.Identifier("message")}, tsgo.NodeFlagsNone))),
 				}, true),
 			),
 			factory.PropertyDeclaration(
@@ -257,14 +268,14 @@ func errorMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 		nil,
 		nil,
 		nil,
-		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
+		factory.TypeReferenceNode(factory.Identifier("GoString"), nil),
 		factory.Block(
 			[]tsgo.Statement{
 				factory.ReturnStatement(
 					factory.PropertyAccessExpression(
 						factory.ThisExpression(),
 						nil,
-						factory.Identifier("message"),
+						factory.Identifier("sourceMessage"),
 						tsgo.NodeFlagsNone,
 					),
 				),

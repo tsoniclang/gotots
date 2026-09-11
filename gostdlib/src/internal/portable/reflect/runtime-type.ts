@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import {
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
@@ -34,30 +35,30 @@ import {
 } from "./runtime-value.js";
 
 export interface RuntimeStructFieldMetadata {
-  readonly name: gostring;
+  readonly name: string;
   readonly type: () => Type;
-  readonly pkgPath?: gostring;
-  readonly tag?: gostring;
+  readonly pkgPath?: string;
+  readonly tag?: string;
   readonly offset?: uint64;
   readonly index?: readonly int64[];
   readonly anonymous?: bool;
 }
 
 export interface RuntimeMethodMetadata {
-  readonly name: gostring;
-  readonly pkgPath: gostring;
+  readonly name: string;
+  readonly pkgPath: string;
   readonly type: () => Type;
   readonly index: int64;
 }
 
 export interface RuntimeTypeMetadata {
-  readonly identity: gostring;
+  readonly identity: string;
   readonly kind: uint64;
-  readonly text: gostring;
+  readonly text: string;
   readonly size: uint64;
   readonly align: int64;
-  readonly name?: gostring;
-  readonly pkgPath?: gostring;
+  readonly name?: string;
+  readonly pkgPath?: string;
   readonly bits?: int64;
   readonly comparable?: bool;
   readonly length?: int64;
@@ -69,8 +70,8 @@ export interface RuntimeTypeMetadata {
   readonly methods?: () => readonly RuntimeMethodMetadata[];
   readonly inputs?: () => readonly Type[];
   readonly outputs?: () => readonly Type[];
-  readonly methodSet?: gostring;
-  readonly pointerMethodSet?: gostring;
+  readonly methodSet?: string;
+  readonly pointerMethodSet?: string;
   readonly pointerInheritsMethods?: bool;
 }
 
@@ -114,7 +115,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     return this.resolvedMetadata;
   }
 
-  private get sourceMethodSet(): gostring {
+  private get sourceMethodSet(): string {
     return this.metadata.methodSet ?? "";
   }
 
@@ -213,7 +214,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   FieldByName(name: gostring): [StructField, bool] {
     const fields = this.structFields();
     const index = fields.findIndex(
-      (field: RuntimeStructFieldMetadata): boolean => field.name === name,
+      (field: RuntimeStructFieldMetadata): boolean => field.name === name.text(),
     );
     const selected = fields[index];
     return selected === undefined
@@ -229,7 +230,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     }
     const fields = this.structFields();
     const index = fields.findIndex(
-      (field: RuntimeStructFieldMetadata): boolean => match(field.name),
+      (field: RuntimeStructFieldMetadata): boolean => match(GoString.fromText(field.name)),
     );
     const selected = fields[index];
     return selected === undefined
@@ -288,7 +289,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
 
   MethodByName(name: gostring): [Method, bool] {
     const method = this.runtimeMethods().find(
-      (selected: RuntimeMethodMetadata): boolean => selected.name === name,
+      (selected: RuntimeMethodMetadata): boolean => selected.name === name.text(),
     );
     return method === undefined
       ? [zeroMethod(), false]
@@ -307,7 +308,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     );
   }
 
-  Name(): gostring { return this.metadata.name ?? ""; }
+  Name(): gostring { return GoString.fromText(this.metadata.name ?? ""); }
   NumField(): int64 { return integerFromHost(this.structFields().length); }
   NumIn(): int64 { return integerFromHost(this.inputs().length); }
   NumMethod(): int64 { return integerFromHost(this.runtimeMethods().length); }
@@ -335,9 +336,9 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     return value < 0n || value >= (1n << BigInt(bits));
   }
 
-  PkgPath(): gostring { return this.metadata.pkgPath ?? ""; }
+  PkgPath(): gostring { return GoString.fromText(this.metadata.pkgPath ?? ""); }
   Size(): uint64 { return this.metadata.size; }
-  String(): gostring { return this.metadata.text; }
+  String(): gostring { return GoString.fromText(this.metadata.text); }
 
   private inputs(): readonly Type[] { return this.metadata.inputs?.() ?? []; }
   private outputs(): readonly Type[] { return this.metadata.outputs?.() ?? []; }
@@ -378,7 +379,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   }
 }
 
-function methodSetIncludes(source: gostring, target: gostring): bool {
+function methodSetIncludes(source: string, target: string): bool {
   let sourceOffset = 0;
   let targetOffset = 0;
   while (targetOffset < target.length) {
@@ -406,7 +407,7 @@ function methodSetIncludes(source: gostring, target: gostring): bool {
   return true;
 }
 
-function mergeMethodSets(left: gostring, right: gostring): gostring {
+function mergeMethodSets(left: string, right: string): string {
   let leftOffset = 0;
   let rightOffset = 0;
   let merged = "";
@@ -481,10 +482,10 @@ function materializeField(
   ordinal: number,
 ): StructField {
   return new StructField({
-    Name: field.name,
-    PkgPath: field.pkgPath ?? "",
+    Name: GoString.fromText(field.name),
+    PkgPath: GoString.fromText(field.pkgPath ?? ""),
     Type: field.type(),
-    Tag: new StructTag(field.tag ?? ""),
+    Tag: new StructTag(GoString.fromText(field.tag ?? "")),
     Offset: field.offset ?? 0n,
     Index: RuntimeSlice.literal([...(field.index ?? [integerFromHost(ordinal)])]),
     Anonymous: field.anonymous ?? false,
@@ -493,8 +494,8 @@ function materializeField(
 
 function materializeMethod(method: RuntimeMethodMetadata): Method {
   return new Method({
-    Name: method.name,
-    PkgPath: method.pkgPath,
+    Name: GoString.fromText(method.name),
+    PkgPath: GoString.fromText(method.pkgPath),
     Type: method.type(),
     Func: invalidRuntimeValue,
     Index: method.index,
@@ -509,10 +510,10 @@ const invalidRuntimeValue = new InvalidRuntimeValue();
 
 function zeroStructField(): StructField {
   return new StructField({
-    Name: "",
-    PkgPath: "",
+    Name: GoString.empty,
+    PkgPath: GoString.empty,
     Type: undefined,
-    Tag: new StructTag(""),
+    Tag: new StructTag(GoString.empty),
     Offset: 0n,
     Index: RuntimeSlice.nil<int64>(),
     Anonymous: false,
@@ -520,7 +521,7 @@ function zeroStructField(): StructField {
 }
 
 function zeroMethod(): Method {
-  return new Method({ Name: "", PkgPath: "", Type: undefined, Func: invalidRuntimeValue, Index: 0n });
+  return new Method({ Name: GoString.empty, PkgPath: GoString.empty, Type: undefined, Func: invalidRuntimeValue, Index: 0n });
 }
 
 function sequenceAt(
@@ -543,8 +544,8 @@ function typeSequence(values: readonly Type[]): Seq<Type | undefined> {
   );
 }
 
-function invalidTypeOperation(type: gostring, operation: string): never {
+function invalidTypeOperation(type: string, operation: string): never {
   return GoPanic.raise(
-    new ProviderError(`reflect: ${operation} of non-${type} type`),
+    ProviderError.fromText(`reflect: ${operation} of non-${type} type`),
   );
 }

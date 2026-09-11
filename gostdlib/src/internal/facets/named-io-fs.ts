@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { GoMapHash } from "@gotots/runtime/map.js";
 import { GoPanic, type GoRecovery } from "@gotots/runtime/panic.js";
 import type { uint32 } from "@gotots/gostdlib/internal/scalars.js";
@@ -56,15 +57,15 @@ export class DirectPathError<Failure extends ProviderErrorInterface> {
     left: DirectPathError<Failure>,
     right: DirectPathError<Failure>,
   ): boolean {
-    return left.Op === right.Op && left.Path === right.Path &&
+    return left.Op.text() === right.Op.text() && left.Path.text() === right.Path.text() &&
       goInterfaceEqual(left.Err, right.Err);
   }
 
   static $hash<Failure extends ProviderErrorInterface>(
     source: DirectPathError<Failure>,
   ): number {
-    let hash = GoMapHash.string(source.Op);
-    hash = GoMapHash.mix(hash, GoMapHash.string(source.Path));
+    let hash = GoMapHash.string(source.Op.text());
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.Path.text()));
     return GoMapHash.mix(hash, source.Err?.$go$hash() ?? 0);
   }
 
@@ -84,7 +85,7 @@ export class DirectPathError<Failure extends ProviderErrorInterface> {
     receiver: DirectPathError<Failure> | undefined,
     _recovery?: GoRecovery,
   ): gostring {
-    return receiver === undefined ? "<nil>" : receiver.Error();
+    return receiver === undefined ? GoString.fromText("<nil>") : receiver.Error();
   }
 
   static Unwrap<Failure extends ProviderErrorInterface>(
@@ -97,14 +98,14 @@ export class DirectPathError<Failure extends ProviderErrorInterface> {
   }
 
   Error(_recovery?: GoRecovery): gostring {
-    const detail = this.Err === undefined ? "<nil>" : this.Err.Error();
-    if (this.Op === "") {
-      return `${this.Path}: ${detail}`;
+    const detail = this.Err === undefined ? "<nil>" : this.Err.Error().text();
+    if (this.Op.text() === "") {
+      return GoString.fromText(`${this.Path.text()}: ${detail}`);
     }
-    if (this.Path === "") {
-      return `${this.Op}: ${detail}`;
+    if (this.Path.text() === "") {
+      return GoString.fromText(`${this.Op.text()}: ${detail}`);
     }
-    return `${this.Op} ${this.Path}: ${detail}`;
+    return GoString.fromText(`${this.Op.text()} ${this.Path.text()}: ${detail}`);
   }
 
   Unwrap(): Failure | undefined {

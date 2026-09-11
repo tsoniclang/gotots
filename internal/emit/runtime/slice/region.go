@@ -1,92 +1,33 @@
 package slice
 
 import (
+	"github.com/tsoniclang/gotots/internal/emit/runtime/memoryview"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func BuildRegion(
-	factory tsgo.Factory,
-	functionName string,
-	sliceName string,
-	panicName string,
-) tsgo.FunctionDeclaration {
-	b := builder{factory: factory, className: sliceName, panicName: panicName}
-	locationType := b.factory.TypeOperatorNode(
-		tsgo.TypeOperatorNodeOperatorKindReadonlyKeyword,
-		b.factory.TupleTypeNode([]tsgo.TypeNode{
-			b.factory.ArrayTypeNode(b.typeT()),
-			b.numberType(),
-		}),
-	)
-	optionalLocation := b.factory.UnionTypeNode([]tsgo.TypeNode{
-		locationType,
-		b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword),
-	})
-	location := b.id("location")
-	length := b.id("numericLength")
-	backing := b.factory.ElementAccessExpression(location, nil, b.number("0"), tsgo.NodeFlagsNone)
-	offset := b.factory.ElementAccessExpression(location, nil, b.number("1"), tsgo.NodeFlagsNone)
-	panicStatement := func(message string) tsgo.ExpressionStatement {
-		return b.factory.ExpressionStatement(panicruntime.Call(
-			b.factory,
-			panicName,
-			b.factory.StringLiteral(message, tsgo.TokenFlagsNone),
-		))
+func BuildRegion(factory tsgo.Factory, functionName, sliceName, panicName string) tsgo.FunctionDeclaration {
+	target := builder{factory: factory, className: sliceName, panicName: panicName}
+	location := target.id("location")
+	length := target.id("length")
+	undefined := factory.VoidExpression(target.number("0"))
+	fail := func(message string) tsgo.Statement {
+		return factory.ExpressionStatement(panicruntime.Call(factory, panicName, factory.StringLiteral(message, tsgo.TokenFlagsNone)))
 	}
-	return b.factory.FunctionDeclaration(
-		[]tsgo.ModifierLike{b.factory.ExportKeyword()},
-		nil,
-		b.id(functionName),
-		[]tsgo.TypeParameterDeclaration{b.typeParameter()},
-		[]tsgo.ParameterDeclaration{
-			b.parameter("location", optionalLocation),
-			b.parameter("length", b.integerInputType()),
-		},
-		b.sliceType(),
-		b.factory.Block([]tsgo.Statement{
-			b.variable(tsgo.NodeFlagsConst, "numericLength", b.toNumber(b.id("length"))),
-			b.factory.IfStatement(
-				b.binary(length, tsgo.BinaryOperatorLessThanToken, b.number("0")),
-				panicStatement("unsafe slice length is negative"),
-				nil,
-			),
-			b.factory.IfStatement(
-				b.binary(location, tsgo.BinaryOperatorEqualsEqualsEqualsToken, b.factory.VoidExpression(b.number("0"))),
-				b.factory.Block([]tsgo.Statement{
-					b.factory.IfStatement(
-						b.binary(length, tsgo.BinaryOperatorEqualsEqualsEqualsToken, b.number("0")),
-						b.factory.Block([]tsgo.Statement{b.returnStatement(
-							b.factory.CallExpression(
-								b.property(b.id(sliceName), MemberName(MemberNil)),
-								nil,
-								[]tsgo.TypeNode{b.typeT()},
-								nil,
-								tsgo.NodeFlagsNone,
-							),
-						)}, true),
-						nil,
-					),
-					panicStatement("unsafe slice on nil pointer"),
-				}, true),
-				nil,
-			),
-			b.factory.IfStatement(
-				b.binary(
-					length,
-					tsgo.BinaryOperatorGreaterThanToken,
-					b.binary(b.property(backing, "length"), tsgo.BinaryOperatorMinusToken, offset),
-				),
-				panicStatement("unsafe slice exceeds pointer region"),
-				nil,
-			),
-			b.returnStatement(b.factory.CallExpression(
-				b.property(b.id(sliceName), ArrayViewMember),
-				nil,
-				[]tsgo.TypeNode{b.typeT()},
-				[]tsgo.Expression{backing, offset, length, length},
-				tsgo.NodeFlagsNone,
-			)),
-		}, true),
-	)
+	return factory.FunctionDeclaration([]tsgo.ModifierLike{factory.ExportKeyword()}, nil, target.id(functionName),
+		[]tsgo.TypeParameterDeclaration{target.typeParameter()}, []tsgo.ParameterDeclaration{
+			target.parameter("location", factory.UnionTypeNode([]tsgo.TypeNode{memoryview.RegionType(factory, target.typeT()),
+				factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword)})),
+			target.parameter("length", target.integerInputType()),
+		}, target.sliceType(), factory.Block([]tsgo.Statement{
+			factory.IfStatement(target.binary(length, tsgo.BinaryOperatorLessThanToken, target.number("0")), fail("unsafe slice length is negative"), nil),
+			factory.IfStatement(target.binary(location, tsgo.BinaryOperatorEqualsEqualsEqualsToken, undefined), factory.Block([]tsgo.Statement{
+				factory.IfStatement(target.binary(length, tsgo.BinaryOperatorEqualsEqualsToken, target.number("0")), factory.Block([]tsgo.Statement{
+					target.returnStatement(factory.CallExpression(target.property(target.id(sliceName), MemberName(MemberNil)), nil,
+						[]tsgo.TypeNode{target.typeT()}, nil, tsgo.NodeFlagsNone)),
+				}, true), nil), fail("unsafe slice on nil pointer"),
+			}, true), nil),
+			target.returnStatement(factory.CallExpression(target.id("goSliceFromRegion"), nil, []tsgo.TypeNode{target.typeT()},
+				[]tsgo.Expression{location, length, length}, tsgo.NodeFlagsNone)),
+		}, true))
 }

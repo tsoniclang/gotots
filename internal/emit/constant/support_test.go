@@ -225,9 +225,10 @@ func executeConstantFamilyTS(
 		huge = "console.log(String(values.HugeAsUint()));\n"
 	}
 	runner := `import * as values from "` + artifacts.module(t, "source.ts") + `";
+import { GoString } from "./runtime/string-value.js";
 
 const row = (value: readonly unknown[]): string =>
-	value.map((entry) => String(entry)).join(" ");
+	value.map((entry) => entry instanceof GoString ? entry.text() : String(entry)).join(" ");
 
 console.log(row(values.Enum()));
 console.log(row(values.Inherited()));

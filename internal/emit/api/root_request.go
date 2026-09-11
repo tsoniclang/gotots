@@ -178,8 +178,8 @@ func NewRuntimeImportRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	if phase != ImportPhaseValue &&
-		(phase != ImportPhaseType || !contract.TypeUsable()) {
+	if (phase == ImportPhaseValue && contract.TypeOnly()) ||
+		(phase != ImportPhaseValue && (phase != ImportPhaseType || !contract.TypeUsable())) {
 		return RootRequest{}, &RootRequestError{
 			Reason: "runtime symbol does not allow the requested import phase",
 		}

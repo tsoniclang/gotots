@@ -21,7 +21,7 @@ func TestLifetimeRuntimeHasOneExactCallableOwner(test *testing.T) {
 	}
 	for _, symbols := range [][]api.RuntimeSymbol{
 		{api.RuntimeKeepAlive, api.RuntimeKeepAlive},
-		{api.RuntimeUnsafeString},
+		{api.RuntimeStringValue},
 	} {
 		if _, err := Build(factory, api.RuntimeModuleLifetime, symbols); err == nil {
 			test.Fatal("lifetime module accepted duplicated or foreign ownership")

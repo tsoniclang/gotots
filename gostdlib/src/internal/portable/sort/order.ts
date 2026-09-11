@@ -24,9 +24,11 @@ export function Strings(values: RuntimeSlice<gostring>): void {
   for (let index = 0; index < values.length; index += 1) {
     sorted.push(values.get(index));
   }
-  sorted.sort((left, right): number => left < right ? -1 : left > right ? 1 : 0);
+  sorted.sort((left, right): number => left.text() < right.text() ? -1 : left.text() > right.text() ? 1 : 0);
   for (let index = 0; index < sorted.length; index += 1) {
-    values.set(index, sorted[index] ?? "");
+    const value = sorted[index];
+    if (value === undefined) GoPanic.raiseRuntime("sort: missing string element");
+    values.set(index, value);
   }
 }
 

@@ -26,6 +26,8 @@ func TestRuntimeSliceProjectionPreservesBidirectionalAlias(t *testing.T) {
 			api.RuntimeSliceProjection:   {},
 			api.RuntimeSliceAddress:      {},
 			api.RuntimeSliceArrayPointer: {},
+			api.RuntimeRegionRead:        {},
+			api.RuntimeRegionWrite:       {},
 		},
 		nil,
 	)
@@ -69,8 +71,8 @@ func TestRuntimeSliceProjectionPreservesBidirectionalAlias(t *testing.T) {
 		"this.source.slice(low, high, max)",
 		"this.source.append(this.sourceZero, converted)",
 		"projectPointer<F, T>",
-		"projectPointer<T | undefined, GoArray<T, N>>",
-		"projected slice has no contiguous target representation",
+		"viewPointer<T, GoArray<T, N>>",
+		"override $arrayLocation",
 	} {
 		if !strings.Contains(sliceSource, fragment) {
 			t.Fatalf("projected slice runtime lacks %q:\n%s", fragment, sliceSource)
@@ -118,11 +120,6 @@ const nilTarget = new RuntimeSliceProjection<bigint, number>(
   0,
 );
 console.log(nilTarget.isNil(), nilTarget.length, nilTarget.capacity);
-try {
-  target.$arrayLocation(1);
-} catch {
-  console.log("projected-contiguous-unsupported");
-}
 `)
 	targetPaths = append(targetPaths, runnerPath)
 	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
@@ -140,7 +137,7 @@ try {
 		"node",
 		filepath.Join(workingDirectory, "out", "runner.js"),
 	)
-	const expected = "7n 7\n9 9\n3 5n\n5 8 7 1n\n2 1 9\n2 13n 9n\ntrue 0 0\nprojected-contiguous-unsupported\n"
+	const expected = "7n 7\n9 9\n3 5n\n5 8 7 1n\n2 1 9\n2 13n 9n\ntrue 0 0\n"
 	if output != expected {
 		t.Fatalf("projected slice output = %q, want %q", output, expected)
 	}

@@ -10,6 +10,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { int64 } from "../src/internal/scalars.js";
 import {
   hostInteger,
@@ -83,10 +84,10 @@ test("sort interface operations are in-place and stable when requested", (): voi
 });
 
 test("sort.Strings mutates the selected runtime slice", (): void => {
-  const values = RuntimeSlice.literal(["beta", "alpha", "gamma"]);
+  const values = RuntimeSlice.literal(["beta", "alpha", "gamma"].map(GoString.fromText));
   Strings(values);
   assert.deepEqual(
-    [values.get(0), values.get(1), values.get(2)],
+    [values.get(0).text(), values.get(1).text(), values.get(2).text()],
     ["alpha", "beta", "gamma"],
   );
 });
@@ -116,7 +117,7 @@ test("encoding/hex appends encoded and partially decoded bytes", (): void => {
     RuntimeSlice.literal([0x36, 0x31, 0x67, 0x30]),
   );
   assert.deepEqual(sliceValues(partial), [0x78, 0x61]);
-  assert.equal(partialFailure?.Error().includes("invalid byte"), true);
+  assert.equal(partialFailure?.Error().text().includes("invalid byte"), true);
 });
 
 test("encoding/hex append family agrees with Go", (): void => {
@@ -154,9 +155,9 @@ function hexProviderResult(): string {
   );
   return [
     text(encoded),
-    `${text(decoded)}:${decodedFailure?.Error() ?? ""}`,
-    `${text(partial)}:${partialFailure?.Error() ?? ""}`,
-    `${text(odd)}:${oddFailure?.Error() ?? ""}`,
+    `${text(decoded)}:${decodedFailure?.Error().text() ?? ""}`,
+    `${text(partial)}:${partialFailure?.Error().text() ?? ""}`,
+    `${text(odd)}:${oddFailure?.Error().text() ?? ""}`,
   ].join("|");
 }
 

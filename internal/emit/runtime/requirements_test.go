@@ -9,11 +9,12 @@ import (
 
 func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 	contract, err := runtimecontract.Decode([]byte(`{
-	  "schemaVersion": 3,
+	  "schemaVersion": 4,
 	  "integerRepresentations": ["number", "fixed64-bigint", "bigint"],
 	  "providerIntegerRepresentation": "bigint",
 	  "providerScalarModule": "./internal/scalars.js",
 	  "providerPointerModule": "./internal/runtime/pointer.js",
+	  "providerStringModule": "./internal/portable/utf8/codec.js",
 	  "nativeIntegerBits": 64,
 	  "primitiveAliases": [
 	    {"id": 4, "export": "int32", "providerCarrier": "number"}
@@ -64,11 +65,12 @@ func TestPackageRequirementsRejectRetiredExecutionSymbols(t *testing.T) {
 		`{"id": 1300, "export": "Awaitable"}`,
 	} {
 		contract, err := runtimecontract.Decode([]byte(`{
-		  "schemaVersion": 3,
+		  "schemaVersion": 4,
 		  "integerRepresentations": ["number"],
 		  "providerIntegerRepresentation": "number",
 		  "providerScalarModule": "./internal/scalars.js",
 		  "providerPointerModule": "./internal/runtime/pointer.js",
+		  "providerStringModule": "./internal/portable/utf8/codec.js",
 		  "nativeIntegerBits": 64,
 		  "primitiveAliases": [],
 		  "runtimeSymbols": [` + symbol + `]
@@ -85,31 +87,34 @@ func TestPackageRequirementsRejectRetiredExecutionSymbols(t *testing.T) {
 func TestPackageRequirementsRejectIdentityMutations(t *testing.T) {
 	for _, source := range []string{
 		`{
-		  "schemaVersion": 3,
+		  "schemaVersion": 4,
 		  "integerRepresentations": ["number", "bigint"],
 		  "providerIntegerRepresentation": "bigint",
 		  "providerScalarModule": "./internal/scalars.js",
 		  "providerPointerModule": "./internal/runtime/pointer.js",
+		  "providerStringModule": "./internal/portable/utf8/codec.js",
 		  "nativeIntegerBits": 64,
 		  "primitiveAliases": [{"id": 4, "export": "uint32", "providerCarrier": "number"}],
 		  "runtimeSymbols": [{"id": 300, "export": "RuntimeSlice"}]
 		}`,
 		`{
-		  "schemaVersion": 3,
+		  "schemaVersion": 4,
 		  "integerRepresentations": ["number", "bigint"],
 		  "providerIntegerRepresentation": "bigint",
 		  "providerScalarModule": "./internal/scalars.js",
 		  "providerPointerModule": "./internal/runtime/pointer.js",
+		  "providerStringModule": "./internal/portable/utf8/codec.js",
 		  "nativeIntegerBits": 64,
 		  "primitiveAliases": [{"id": 4, "export": "int32", "providerCarrier": "number"}],
 		  "runtimeSymbols": [{"id": 300, "export": "GoSlice"}]
 		}`,
 		`{
-		  "schemaVersion": 3,
+		  "schemaVersion": 4,
 		  "integerRepresentations": ["number", "number"],
 		  "providerIntegerRepresentation": "number",
 		  "providerScalarModule": "./internal/scalars.js",
 		  "providerPointerModule": "./internal/runtime/pointer.js",
+		  "providerStringModule": "./internal/portable/utf8/codec.js",
 		  "nativeIntegerBits": 64,
 		  "primitiveAliases": [{"id": 4, "export": "int32", "providerCarrier": "number"}],
 		  "runtimeSymbols": [{"id": 300, "export": "RuntimeSlice"}]

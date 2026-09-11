@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type {
@@ -72,8 +73,8 @@ export class Value {
 
 export class Description {
   constructor(
-    public Name: gostring = "",
-    public Description: gostring = "",
+    public Name: gostring = GoString.empty,
+    public Description: gostring = GoString.empty,
     public Kind: ValueKind = kindBad,
     public Cumulative: bool = false,
   ) {}
@@ -84,7 +85,7 @@ export class Sample {
   Value: Value;
 
   constructor(
-    name: gostring = "",
+    name: gostring = GoString.empty,
     value: Value = new Value(),
   ) {
     this.Name = name;
@@ -124,7 +125,7 @@ export function All(): RuntimeSlice<Description> {
 export function Read(m: RuntimeSlice<Sample>): void {
   for (let index = 0; index < m.length; index += 1) {
     const sample = m.get(index);
-    const reading = readMetric(sample.Name);
+    const reading = readMetric(sample.Name.text());
     switch (reading.kind) {
       case "uint64":
         Value.$assign(sample.Value, Value.FromUint64(reading.value));
@@ -144,9 +145,9 @@ function uintMetric(
   description: string,
   cumulative: boolean,
 ): Description {
-  return new Description(name, description, KindUint64, cumulative);
+  return new Description(GoString.fromText(name), GoString.fromText(description), KindUint64, cumulative);
 }
 
 function floatMetric(name: string, description: string): Description {
-  return new Description(name, description, KindFloat64, true);
+  return new Description(GoString.fromText(name), GoString.fromText(description), KindFloat64, true);
 }

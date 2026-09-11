@@ -1,96 +1,22 @@
 package array
 
-import (
-	"github.com/tsoniclang/gotots/internal/emit/api"
-	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
-)
+import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
-func checkMethod(
-	factory tsgo.Factory,
-	panicName string,
-) tsgo.MethodDeclaration {
+func checkMethod(factory tsgo.Factory, panicName string) tsgo.MethodDeclaration {
 	index := factory.Identifier("index")
-	offset := factory.Identifier("offset")
-	negative := binary(
-		factory,
-		offset,
-		tsgo.BinaryOperatorLessThanToken,
-		factory.NumericLiteral("0", tsgo.TokenFlagsNone),
-	)
-	tooLarge := binary(
-		factory,
-		offset,
-		tsgo.BinaryOperatorGreaterThanEqualsToken,
-		runtimeProperty(
-			factory,
-			factory.ThisExpression(),
-			arraymember.Length,
-		),
-	)
-	return method(
-		factory,
-		[]tsgo.ModifierLike{factory.PrivateKeyword()},
-		"$check",
-		nil,
-		[]tsgo.ParameterDeclaration{parameter(
-			factory,
-			nil,
-			"index",
-			indexType(factory),
-		)},
-		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
-		[]tsgo.Statement{
-			variable(
-				factory,
-				tsgo.NodeFlagsConst,
-				"offset",
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindNumberKeyword,
-				),
-				call(
-					factory,
-					api.TargetIntrinsicNumber.Expression(factory),
-					nil,
-					index,
-				),
-			),
-			factory.IfStatement(
-				binary(
-					factory,
-					binary(
-						factory,
-						factory.PrefixUnaryExpression(
-							tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
-							call(
-								factory,
-								property(
-									factory,
-									api.TargetIntrinsicNumber.Expression(factory),
-									"isInteger",
-								),
-								nil,
-								offset,
-							),
-						),
-						tsgo.BinaryOperatorBarBarToken,
-						negative,
-					),
-					tsgo.BinaryOperatorBarBarToken,
-					tooLarge,
-				),
-				factory.Block([]tsgo.Statement{
-					boundsPanic(
-						factory,
-						panicName,
-						"array index out of bounds",
-					),
-				}, true),
-				nil,
-			),
-			factory.ReturnStatement(offset),
-		},
-	)
+	invalidNumber := binary(factory,
+		binary(factory, factory.TypeOfExpression(index), tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+			factory.StringLiteral("number", tsgo.TokenFlagsNone)), tsgo.BinaryOperatorAmpersandAmpersandToken,
+		factory.PrefixUnaryExpression(tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+			call(factory, property(factory, factory.Identifier("Number"), "isInteger"), nil, index)))
+	invalid := binary(factory, invalidNumber, tsgo.BinaryOperatorBarBarToken,
+		binary(factory, binary(factory, index, tsgo.BinaryOperatorLessThanToken, factory.NumericLiteral("0", tsgo.TokenFlagsNone)),
+			tsgo.BinaryOperatorBarBarToken, binary(factory, index, tsgo.BinaryOperatorGreaterThanEqualsToken,
+				property(factory, factory.ThisExpression(), "length"))))
+	return method(factory, []tsgo.ModifierLike{factory.PrivateKeyword()}, "$check", nil,
+		[]tsgo.ParameterDeclaration{parameter(factory, nil, "index", indexType(factory))}, indexType(factory),
+		[]tsgo.Statement{factory.IfStatement(invalid, factory.Block([]tsgo.Statement{
+			boundsPanic(factory, panicName, "array index out of bounds")}, true), nil), factory.ReturnStatement(index)})
 }
 
 func indexType(factory tsgo.Factory) tsgo.UnionTypeNode {

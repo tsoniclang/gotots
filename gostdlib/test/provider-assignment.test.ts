@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ProviderError, isGoError } from "../src/internal/runtime/error.js";
@@ -20,8 +21,8 @@ test("sync reset preserves the destination and rejects invalid copy sources", ()
   const source = new Map();
   const target = SyncMapOperations.$copy(source);
   const retained = target;
-  const key = new ProviderError("key");
-  const value = new ProviderError("value");
+  const key = new ProviderError(GoString.fromText("key"));
+  const value = new ProviderError(GoString.fromText("value"));
   Map.Store(target, key, value);
   SyncMapOperations.$assign(target, source);
   assert.equal(target, retained);
@@ -73,21 +74,21 @@ test("Cond assignment copies its checker state but not its location identity", (
 
 test("StructField assignment copies the descriptor and shares its slice data", () => {
   const field = (name: string, index: bigint) => new StructField({
-    Name: name, PkgPath: "", Type: undefined, Tag: new StructTag(""),
+    Name: GoString.fromText(name), PkgPath: GoString.empty, Type: undefined, Tag: new StructTag(GoString.fromText("")),
     Offset: 0n, Index: RuntimeSlice.literal([index]), Anonymous: false,
   });
   const target = field("before", 1n);
   const oldIndex = target.Index;
   const source = field("after", 2n);
   ReflectStructFieldOperations.$assign(target, source);
-  assert.equal(target.Name, "after");
+  assert.equal(target.Name.text(), "after");
   assert.equal(oldIndex.get(0), 1n);
   assert.equal(target.Index, source.Index);
   source.Index.set(0, 3n);
   assert.equal(target.Index.get(0), 3n);
   const copied = ReflectStructFieldOperations.$copy(source);
-  source.Name = "changed";
-  assert.equal(copied.Name, "after");
+  source.Name = GoString.fromText("changed");
+  assert.equal((copied.Name)?.text(), "after");
 });
 
 test("zero-sized endian assignment preserves the selected implementation", () => {
@@ -147,34 +148,34 @@ test("MemStats assignment retains all array and element locations", () => {
 
 test("metrics assignment copies nested values without retargeting retained fields", () => {
   const initial = Value.FromUint64(3n);
-  const target = new Sample("before", initial);
+  const target = new Sample(GoString.fromText("before"), initial);
   const retained = target.Value;
-  const source = new Sample("after", Value.FromUint64(7n));
+  const source = new Sample(GoString.fromText("after"), Value.FromUint64(7n));
   RuntimeMetricsSampleOperations.$assign(target, source);
   assert.equal(target.Value, retained);
   assert.equal(retained.Uint64(), 7n);
   assert.equal(initial.Uint64(), 3n);
   const copied = RuntimeMetricsSampleOperations.$copy(source);
-  RuntimeMetricsSampleOperations.$assign(source, new Sample("again", Value.FromUint64(9n)));
+  RuntimeMetricsSampleOperations.$assign(source, new Sample(GoString.fromText("again"), Value.FromUint64(9n)));
   assert.equal(copied.Value.Uint64(), 7n);
-  const description = new Description("before");
-  RuntimeMetricsDescriptionOperations.$assign(description, new Description("after"));
-  assert.equal(description.Name, "after");
+  const description = new Description(GoString.fromText("before"));
+  RuntimeMetricsDescriptionOperations.$assign(description, new Description(GoString.fromText("after")));
+  assert.equal(description.Name.text(), "after");
 });
 
 test("metrics Read updates a retained Value field instead of replacing it", () => {
-  const sample = new Sample("/gc/gogc:percent");
+  const sample = new Sample(GoString.fromText("/gc/gogc:percent"));
   const retained = sample.Value;
   const samples = RuntimeSlice.literal([sample]);
   Read(samples);
   assert.equal(sample.Value, retained);
   assert.equal(retained.Uint64(), 100n);
-  sample.Name = "not-a-selected-metric";
+  sample.Name = GoString.fromText("not-a-selected-metric");
   Read(samples);
   assert.equal(sample.Value, retained);
   assert.equal(retained.Kind().value, 0n);
 });
 
 function panicWith(pattern: RegExp): (failure: object) => boolean {
-  return failure => failure instanceof GoPanic && isGoError(failure.value) && pattern.test(failure.value.Error());
+  return failure => failure instanceof GoPanic && isGoError(failure.value) && pattern.test(failure.value.Error().text());
 }

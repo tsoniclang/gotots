@@ -1,9 +1,11 @@
+import { toHostBytes } from "./internal/portable/utf8/codec.js";
 import type {
   GoError,
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { gostring, int } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { Writer } from "./io.js";
@@ -21,14 +23,14 @@ export function Errorf(
   format: gostring,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
 ): GoError {
-  const formatted = formatText(format, arguments_);
+  const formatted = formatText(format.text(), arguments_);
   if (formatted.wrapped.length === 1) {
     return new MessageWrappedError(formatted.text, formatted.wrapped[0]!);
   }
   if (formatted.wrapped.length > 1) {
     return new MessageWrappedErrors(formatted.text, formatted.wrapped);
   }
-  return new ProviderError(formatted.text);
+  return ProviderError.fromText(formatted.text);
 }
 
 export function Fprint(
@@ -43,7 +45,7 @@ export function Fprintf(
   format: gostring,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
 ): [int, GoError | undefined] {
-  return write(writer, formatText(format, arguments_).text);
+  return write(writer, formatText(format.text(), arguments_).text);
 }
 
 export function Fprintln(
@@ -57,20 +59,20 @@ export function Println(
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
 ): [int, GoError | undefined] {
   const text = formatOperands(arguments_, true);
-  return File.Write(osState.Stdout, byteSlice(new TextEncoder().encode(text)));
+  return File.Write(osState.Stdout, byteSlice(toHostBytes(GoString.fromText(text))));
 }
 
 export function Sprint(
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
 ): gostring {
-  return formatOperands(arguments_, false);
+  return GoString.fromText(formatOperands(arguments_, false));
 }
 
 export function Sprintf(
   format: gostring,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
 ): gostring {
-  return formatText(format, arguments_).text;
+  return GoString.fromText(formatText(format.text(), arguments_).text);
 }
 
 function write(
@@ -80,5 +82,5 @@ function write(
   if (writer === undefined) {
     return GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
-  return writer.Write(byteSlice(new TextEncoder().encode(text)));
+  return writer.Write(byteSlice(toHostBytes(GoString.fromText(text))));
 }

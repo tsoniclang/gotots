@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
+	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -31,6 +32,10 @@ func emitString(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
+	}
+	operand, err = stringvalue.Text(context, operand)
+	if err != nil {
+		return api.StatementEmission{}, err
 	}
 	receiver, before, requests, err := capture(
 		context,

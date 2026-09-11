@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { GoPanic } from "@gotots/runtime/panic.js";
@@ -106,7 +107,7 @@ test("OnceValue replays the first panic", () => {
   let count = 0;
   const onceValue = OnceValue<number>(() => {
     count += 1;
-    GoPanic.raise(new ProviderError("once failure"));
+    GoPanic.raise(new ProviderError(GoString.fromText("once failure")));
   });
 
   let first: object | undefined;
@@ -154,9 +155,9 @@ test("WaitGroup propagates an inline task failure", () => {
 });
 
 test("sync Map and Pool preserve stored interface values", () => {
-  const key = new ProviderError("key");
-  const first = new ProviderError("first");
-  const second = new ProviderError("second");
+  const key = new ProviderError(GoString.fromText("key"));
+  const first = new ProviderError(GoString.fromText("first"));
+  const second = new ProviderError(GoString.fromText("second"));
   const values = new SyncMap();
 
   assert.deepEqual(SyncMap.Load(values, key), [undefined, false]);
@@ -184,5 +185,5 @@ test("sync Map and Pool preserve stored interface values", () => {
 function panicWith(pattern: RegExp): (failure: object) => boolean {
   return (failure: object): boolean => failure instanceof GoPanic
     && isGoError(failure.value)
-    && pattern.test(failure.value.Error());
+    && pattern.test(failure.value.Error().text());
 }

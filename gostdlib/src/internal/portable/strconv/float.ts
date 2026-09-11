@@ -9,7 +9,7 @@ export function ParseFloat(
   value: gostring,
   bitSize: int,
 ): [float64, NumberError | undefined] {
-  const lower = value.toLowerCase();
+  const lower = value.text().toLowerCase();
   if (lower === "nan") {
     return [Number.NaN, undefined];
   }
@@ -20,7 +20,7 @@ export function ParseFloat(
     return [Number.NEGATIVE_INFINITY, undefined];
   }
 
-  const parsed = parseFinite(value);
+  const parsed = parseFinite(value.text());
   if (parsed === undefined) {
     return [0, syntaxError("ParseFloat", value)];
   }
@@ -31,7 +31,7 @@ export function ParseFloat(
   return [rounded, undefined];
 }
 
-function parseFinite(value: gostring): number | undefined {
+function parseFinite(value: string): number | undefined {
   if (decimalPattern.test(value)) {
     if (!/[0-9]/.test(value)) {
       return undefined;

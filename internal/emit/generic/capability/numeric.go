@@ -180,7 +180,7 @@ func emitOrderedComparison(
 			right,
 		)
 	} else {
-		result, handled = basicbinary.Apply(
+		result, handled, err = basicbinary.Apply(
 			context,
 			leftType,
 			sourceToken,

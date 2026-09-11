@@ -95,7 +95,7 @@ func emitSlice(
 		slicevalue.RangeLength(context, receiver),
 		targetBody.Value(),
 		targetBody.Requests(),
-		false,
+		context.ScalarABI().UsesBigInt(types.Typ[types.Int]),
 		targetLabel,
 	)
 }

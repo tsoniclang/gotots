@@ -21,8 +21,13 @@ func TestCallableReturnTypeIdentityExactJoinsExport(t *testing.T) {
 	writeProjectFile(t, entryPath, `
 export class Result {}
 export class Other {}
+type RenamedResult = Result;
 export class Operations {
   static create(): Result { return new Result(); }
+  static renamed(): RenamedResult { return new Result(); }
+  static optional(): Result | undefined { return undefined; }
+  static nullable(): Result | null { return null; }
+  static accept(value: RenamedResult | undefined): void {}
 }
 `)
 	client, err := StartClientWithTool(selectedTool(t), projectDirectory)
@@ -55,7 +60,31 @@ export class Operations {
 		t.Fatal(err)
 	}
 	if !identity.Matches(projectExportByName(t, exports, "Result")) ||
-		identity.Matches(projectExportByName(t, exports, "Other")) {
+		identity.Matches(projectExportByName(t, exports, "Other")) || identity.IncludesNullish() {
 		t.Fatal("callable return identity did not exact-join its export")
+	}
+	for _, name := range []string{"renamed", "optional", "nullable"} {
+		member, ok := operations.ValueMember(name)
+		if !ok {
+			t.Fatalf("Operations.%s is absent", name)
+		}
+		identity, err := project.CallableReturnTypeIdentity(member)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !identity.Matches(projectExportByName(t, exports, "Result")) || identity.IncludesNullish() != (name != "renamed") {
+			t.Fatalf("%s lost its exact declaration identity or nullability", name)
+		}
+	}
+	accept, ok := operations.ValueMember("accept")
+	if !ok {
+		t.Fatal("Operations.accept is absent")
+	}
+	parameter, err := project.CallableParameterTypeIdentity(accept, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !parameter.Matches(projectExportByName(t, exports, "Result")) || !parameter.IncludesNullish() {
+		t.Fatal("parameter nullability was erased from its declared identity")
 	}
 }

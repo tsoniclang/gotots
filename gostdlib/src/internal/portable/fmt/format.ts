@@ -163,7 +163,7 @@ function formatValue(
     return verb === "v" || verb === "T" ? "<nil>" : `%!${verb}(<nil>)`;
   }
   if (isGoError(value) && (verb === "v" || verb === "s" || verb === "q")) {
-    const message = value.Error();
+    const message = value.Error().text();
     return verb === "q" ? JSON.stringify(message) : message;
   }
   return value.$go$format(verb, flags, precision);

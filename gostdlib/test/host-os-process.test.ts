@@ -1,3 +1,6 @@
+import { textValues } from "./text.js";
+import { GoString } from "@gotots/runtime/string-value.js";
+import { fromHostString, toHostString } from "../src/internal/portable/utf8/codec.js";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -25,10 +28,10 @@ test("os environment and process facts come from the Node host", () => {
   const previous = process.env[key];
   process.env[key] = "selected";
   try {
-    assert.equal(Getenv(key), "selected");
-    assert.equal(Getenv(`${key}_MISSING`), "");
-    assert.deepEqual(Executable(), [process.execPath, undefined]);
-    assert.deepEqual(Getwd(), [process.cwd(), undefined]);
+    assert.equal((Getenv(GoString.fromText(key)))?.text(), "selected");
+    assert.equal((Getenv(GoString.fromText(`${key}_MISSING`)))?.text(), "");
+    assert.deepEqual(textValues(Executable()), [process.execPath, undefined]);
+    assert.deepEqual(textValues(Getwd()), [process.cwd(), undefined]);
     assert.equal(Getpid(), integerFromHost(process.pid));
     assert.equal(UserCacheDir()[1], undefined);
   } finally {
@@ -41,7 +44,7 @@ test("os environment and process facts come from the Node host", () => {
 });
 
 test("os.Args uses the generated entry as Go argument zero", () => {
-  assert.deepEqual(sliceValues(state.Args), process.argv.slice(1));
+  assert.deepEqual(sliceValues(state.Args).map(toHostString), process.argv.slice(1));
 });
 
 test("Process value operations preserve Go struct assignment", () => {
@@ -58,9 +61,9 @@ test("DirFS accepts descendants of a filesystem root", () => {
   const sourcePath = fileURLToPath(import.meta.url);
   const root = parse(sourcePath).root;
   const name = relative(root, sourcePath).split(sep).join("/");
-  const fileSystem = DirFS(root);
+  const fileSystem = DirFS(fromHostString(root));
   assert.ok(fileSystem !== undefined);
-  const [file, failure] = fileSystem.Open(name);
+  const [file, failure] = fileSystem.Open(fromHostString(name));
   assert.equal(failure, undefined);
   assert.ok(file !== undefined);
   assert.equal(file.Close(), undefined);

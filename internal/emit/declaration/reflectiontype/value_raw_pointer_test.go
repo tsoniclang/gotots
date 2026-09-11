@@ -40,6 +40,10 @@ func (*rawContractServices) RequiresStorageProjection(api.Context, types.Type) (
 	return false, nil
 }
 
+func (services *rawContractServices) MemoryStorageType(context api.Context, source ast.Node, value types.Type) (api.TypeEmission, error) {
+	return services.RepresentedType(context, source, value)
+}
+
 func (services *rawContractServices) RepresentedType(context api.Context, source ast.Node, value types.Type) (api.TypeEmission, error) {
 	element := api.DirectType(context.Factory().TypeReferenceNode(context.Factory().Identifier("uint32"), nil))
 	if _, pointer := value.(*types.Pointer); !pointer {

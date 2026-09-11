@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { bool, gostring, int, int32, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 import {
@@ -51,18 +52,19 @@ export function FullRune(source: RuntimeSlice<uint8>): bool {
 }
 
 export function FullRuneInString(source: gostring): bool {
+  const length = Number(source.sourceLength());
   return fullRunePrefix(
-    source.length,
-    source.length > 0 ? source.charCodeAt(0) : 0,
-    source.length > 1 ? source.charCodeAt(1) : 0,
-    source.length > 2 ? source.charCodeAt(2) : 0,
+    length,
+    length > 0 ? source.read(0) : 0,
+    length > 1 ? source.read(1) : 0,
+    length > 2 ? source.read(2) : 0,
   );
 }
 
 export function RuneCount(source: RuntimeSlice<uint8>): int {
   const value = byteString(source);
   let count = 0;
-  for (let index = 0; index < value.length; count += 1) {
+  for (let index = 0; index < Number(value.sourceLength()); count += 1) {
     const [, width] = decodeRuneAt(value, index);
     index += Math.max(1, hostInteger(width));
   }
@@ -74,7 +76,7 @@ export function RuneStart(value: uint8): bool {
 }
 
 export function ValidString(value: gostring): bool {
-  for (let index = 0; index < value.length; ) {
+  for (let index = 0; index < Number(value.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(value, index);
     if (rune === RuneError && width === 1n) {
       return false;
@@ -89,7 +91,7 @@ function byteString(source: RuntimeSlice<uint8>): gostring {
   for (let index = 0; index < source.length; index += 1) {
     value += String.fromCharCode(source.get(index));
   }
-  return value;
+  return GoString.fromText(value);
 }
 
 function fullRunePrefix(

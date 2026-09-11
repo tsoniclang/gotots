@@ -41,8 +41,10 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 	}
 	wantPaths := []string{
 		"runtime/interface-value.ts",
+		"runtime/memory-view.ts",
 		"runtime/panic.ts",
 		"runtime/scalars.ts",
+		"runtime/string-value.ts",
 		"runtime/string.ts",
 	}
 	if !slices.Equal(paths, wantPaths) {
@@ -187,8 +189,12 @@ func TestProviderCertificationRuntimeHasOneExactSynchronousContract(t *testing.T
 			}
 		}
 	}
-	if errorResult == nil ||
-		errorResult.Kind() != tsgo.SyntaxKindStringKeyword {
+	errorReference, ok := errorResult.(tsgo.TypeReferenceNode)
+	if !ok {
+		t.Fatalf("provider GoError result = %T", errorResult)
+	}
+	errorName, ok := errorReference.TypeName().(tsgo.Identifier)
+	if !ok || errorName.Text() != "GoString" {
 		t.Fatalf("provider GoError result = %T", errorResult)
 	}
 	if _, ok := receiveResult.(tsgo.TupleTypeNode); !ok {
@@ -266,13 +272,20 @@ func TestDependencyClosureIncludesEveryTransitiveOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[api.RuntimeSymbol]struct{}{
-		api.RuntimeArray:             {},
-		api.RuntimeIntegerDivide:     {},
-		api.RuntimePanic:             {},
-		api.RuntimePanicValue:        {},
-		api.RuntimeInterfaceValue:    {},
-		api.RuntimeErrorMethodToken:  {},
-		api.RuntimeRuntimeErrorToken: {},
+		api.RuntimeArray:                {},
+		api.RuntimeIntegerDivide:        {},
+		api.RuntimePanic:                {},
+		api.RuntimePanicValue:           {},
+		api.RuntimeInterfaceValue:       {},
+		api.RuntimeErrorMethodToken:     {},
+		api.RuntimeRuntimeErrorToken:    {},
+		api.RuntimeStorageRegion:        {},
+		api.RuntimeRegionAddress:        {},
+		api.RuntimeRegionRead:           {},
+		api.RuntimeRegionWrite:          {},
+		api.RuntimeStringTextBacking:    {},
+		api.RuntimeStringPointerBacking: {},
+		api.RuntimeStringValue:          {},
 	}
 	if len(closure) != len(want) {
 		t.Fatalf("runtime closure = %v, want %v", closure, want)
@@ -295,22 +308,36 @@ func TestModuleImportsExactDependencyContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(imports) != 1 {
-		t.Fatalf("array runtime imports = %d, want one", len(imports))
+	if len(imports) != 3 {
+		t.Fatalf("array runtime imports = %d, want three", len(imports))
 	}
-	got := make(map[string]string, len(imports))
+	type importedBinding struct {
+		module   string
+		name     string
+		typeOnly bool
+	}
+	got := make(map[importedBinding]bool)
 	for _, statement := range imports {
 		declaration := statement.(tsgo.ImportDeclaration)
 		module := declaration.ModuleSpecifier().(tsgo.StringLiteral)
 		bindings := declaration.ImportClause().NamedBindings().(tsgo.NamedImports).
 			Elements()
-		if len(bindings) != 1 || bindings[0].PropertyName() != nil {
-			t.Fatalf("array runtime bindings = %#v, want one direct binding", bindings)
+		for _, binding := range bindings {
+			if binding.PropertyName() != nil {
+				t.Fatalf("array runtime binding is aliased: %#v", binding)
+			}
+			key := importedBinding{module.Text(), binding.Name().Text(), declaration.ImportClause().PhaseModifier() == tsgo.ImportPhaseModifierSyntaxKindTypeKeyword}
+			if got[key] {
+				t.Fatalf("duplicate runtime import: %#v", key)
+			}
+			got[key] = true
 		}
-		got[module.Text()] = bindings[0].Name().Text()
 	}
-	wantImports := map[string]string{
-		"./panic.js": "GoPanic",
+	wantImports := map[importedBinding]bool{
+		{"./panic.js", "GoPanic", false}:              true,
+		{"./memory-view.js", "GoStorageRegion", true}: true,
+		{"./memory-view.js", "goRegionRead", false}:   true,
+		{"./memory-view.js", "goRegionWrite", false}:  true,
 	}
 	if !maps.Equal(got, wantImports) {
 		t.Fatalf("array runtime imports = %v, want %v", got, wantImports)

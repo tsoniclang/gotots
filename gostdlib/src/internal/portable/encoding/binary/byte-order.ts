@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type {
@@ -99,7 +100,7 @@ export class BigEndianOrder extends EndianOrder {
   }
 
   String(): gostring {
-    return "BigEndian";
+    return GoString.fromText("BigEndian");
   }
 
   Uint16(buffer: RuntimeSlice<uint8>): uint16 {
@@ -169,7 +170,7 @@ export class LittleEndianOrder extends EndianOrder {
   }
 
   String(): gostring {
-    return "LittleEndian";
+    return GoString.fromText("LittleEndian");
   }
 
   Uint16(buffer: RuntimeSlice<uint8>): uint16 {

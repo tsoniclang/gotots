@@ -12,9 +12,9 @@ const (
 	RuntimeStringDecodeRune           RuntimeSymbol = 6
 	RuntimeArray                      RuntimeSymbol = 200
 	RuntimeArrayAllocate              RuntimeSymbol = 201
-	RuntimeArrayView                  RuntimeSymbol = 202
 	RuntimeArrayLocation              RuntimeSymbol = 203
 	RuntimeArrayPacked                RuntimeSymbol = 204
+	RuntimeArrayFromRegion            RuntimeSymbol = 206
 	RuntimeStorageTypeToken           RuntimeSymbol = 250
 	RuntimeStoredValue                RuntimeSymbol = 251
 	RuntimeStorageType                RuntimeSymbol = 252
@@ -31,6 +31,8 @@ const (
 	RuntimeSliceClear                 RuntimeSymbol = 308
 	RuntimeSliceRegion                RuntimeSymbol = 309
 	RuntimeSliceData                  RuntimeSymbol = 310
+	RuntimeSliceFromRegion            RuntimeSymbol = 311
+	RuntimeSlicePointer               RuntimeSymbol = 312
 	RuntimeMap                        RuntimeSymbol = 400
 	RuntimeMapHash                    RuntimeSymbol = 401
 	RuntimeMapClear                   RuntimeSymbol = 402
@@ -97,6 +99,17 @@ const (
 	RuntimeGoSpawn                    RuntimeSymbol = 1105
 	RuntimeSelectReady                RuntimeSymbol = 1106
 	RuntimeSelectAttempt              RuntimeSymbol = 1107
-	RuntimeUnsafeString               RuntimeSymbol = 1210
 	RuntimeKeepAlive                  RuntimeSymbol = 1300
+	RuntimeSliceHeader32              RuntimeSymbol = 1400
+	RuntimeSliceHeader64              RuntimeSymbol = 1401
+	RuntimeStringHeader32             RuntimeSymbol = 1402
+	RuntimeStringHeader64             RuntimeSymbol = 1403
+	RuntimeStorageRegion              RuntimeSymbol = 1410
+	RuntimeRegionAddress              RuntimeSymbol = 1411
+	RuntimeRegionRead                 RuntimeSymbol = 1412
+	RuntimeRegionWrite                RuntimeSymbol = 1413
+	RuntimeRegionView                 RuntimeSymbol = 1414
+	RuntimeStringTextBacking          RuntimeSymbol = 1500
+	RuntimeStringPointerBacking       RuntimeSymbol = 1501
+	RuntimeStringValue                RuntimeSymbol = 1502
 )

@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -86,11 +87,11 @@ class ShortWriter extends ProviderInterfaceValue implements Writer {
 }
 
 test("errors preserve sentinel identity", () => {
-  const first = New("first");
-  const second = New("first");
+  const first = New(GoString.fromText("first"));
+  const second = New(GoString.fromText("first"));
   assert.equal(Is(first, first), true);
   assert.equal(Is(first, second), false);
-  assert.equal(first.Error(), "first");
+  assert.equal((first.Error())?.text(), "first");
   const [selected, ok] = AsType<GoError | undefined>(
     (failure): [GoError | undefined, boolean] => [
       failure === first ? first : undefined,
@@ -101,12 +102,12 @@ test("errors preserve sentinel identity", () => {
   assert.equal(selected, first);
   assert.equal(ok, true);
   assert.equal(Is(errorState.ErrUnsupported, errorState.ErrUnsupported), true);
-  assert.equal(Is(errorState.ErrUnsupported, New("unsupported operation")), false);
-  assert.equal(errorState.ErrUnsupported.Error(), "unsupported operation");
-  assert.equal(state.ErrShortWrite.Error(), "short write");
-  assert.equal(state.ErrShortBuffer.Error(), "short buffer");
-  assert.equal(state.ErrUnexpectedEOF.Error(), "unexpected EOF");
-  assert.equal(state.ErrNoProgress.Error(), "multiple Read calls return no data or error");
+  assert.equal(Is(errorState.ErrUnsupported, New(GoString.fromText("unsupported operation"))), false);
+  assert.equal((errorState.ErrUnsupported.Error())?.text(), "unsupported operation");
+  assert.equal((state.ErrShortWrite.Error())?.text(), "short write");
+  assert.equal((state.ErrShortBuffer.Error())?.text(), "short buffer");
+  assert.equal((state.ErrUnexpectedEOF.Error())?.text(), "unexpected EOF");
+  assert.equal((state.ErrNoProgress.Error())?.text(), "multiple Read calls return no data or error");
   assert.notEqual(state.EOF, state.ErrUnexpectedEOF);
 });
 
@@ -163,5 +164,5 @@ test("buffered writer converts an unexplained partial write to short write", () 
   const writer = NewWriter(new ShortWriter());
   assert.notEqual(writer, undefined);
   assert.deepEqual(BufferedWriter.Write(writer, byteSlice([1, 2, 3])), [3n, undefined]);
-  assert.equal(BufferedWriter.Flush(writer)?.Error(), "short write");
+  assert.equal((BufferedWriter.Flush(writer)?.Error())?.text(), "short write");
 });

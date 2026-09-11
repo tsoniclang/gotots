@@ -59,6 +59,7 @@ const facetExports = contractManifest.facetModules
 const supportExports = [
   runtimeContract.providerPointerModule,
   runtimeContract.providerScalarModule,
+  runtimeContract.providerStringModule,
 ];
 if (
   supportExports.some((modulePath) =>

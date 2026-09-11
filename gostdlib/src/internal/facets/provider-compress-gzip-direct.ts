@@ -2,6 +2,7 @@ import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 import { integerFromHost } from "../host-integer.js";
 
@@ -243,12 +244,12 @@ export function GzipNewReaderDirect<
   return [
     new DirectGzipReader(
       new Header(
-        header.comment,
+        GoString.fromText(header.comment),
         header.extra,
         header.modificationTimeSeconds === 0
           ? new Time()
           : UnixMilli(integerFromHost(header.modificationTimeSeconds * 1000)),
-        header.name,
+        GoString.fromText(header.name),
         header.operatingSystem,
       ),
       new DirectGzipReaderState(sourceState, source, canonicalEOF, invalidError),

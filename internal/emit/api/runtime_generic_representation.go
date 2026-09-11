@@ -20,8 +20,11 @@ const (
 	RuntimeStringDecodeRune           = runtimecontract.RuntimeStringDecodeRune
 	RuntimeArray                      = runtimecontract.RuntimeArray
 	RuntimeArrayAllocate              = runtimecontract.RuntimeArrayAllocate
-	RuntimeArrayView                  = runtimecontract.RuntimeArrayView
 	RuntimeArrayLocation              = runtimecontract.RuntimeArrayLocation
+	RuntimeStringTextBacking          = runtimecontract.RuntimeStringTextBacking
+	RuntimeStringPointerBacking       = runtimecontract.RuntimeStringPointerBacking
+	RuntimeStringValue                = runtimecontract.RuntimeStringValue
+	RuntimeArrayFromRegion            = runtimecontract.RuntimeArrayFromRegion
 	RuntimeArrayPacked                = runtimecontract.RuntimeArrayPacked
 	RuntimeStorageTypeToken           = runtimecontract.RuntimeStorageTypeToken
 	RuntimeStoredValue                = runtimecontract.RuntimeStoredValue
@@ -32,6 +35,8 @@ const (
 	RuntimeSlice                      = runtimecontract.RuntimeSlice
 	RuntimeSliceAddress               = runtimecontract.RuntimeSliceAddress
 	RuntimeSliceData                  = runtimecontract.RuntimeSliceData
+	RuntimeSliceFromRegion            = runtimecontract.RuntimeSliceFromRegion
+	RuntimeSlicePointer               = runtimecontract.RuntimeSlicePointer
 	RuntimeSliceStorage               = runtimecontract.RuntimeSliceStorage
 	RuntimeSliceProjection            = runtimecontract.RuntimeSliceProjection
 	RuntimeSliceArrayPointer          = runtimecontract.RuntimeSliceArrayPointer
@@ -105,8 +110,16 @@ const (
 	RuntimeGoSpawn                    = runtimecontract.RuntimeGoSpawn
 	RuntimeSelectReady                = runtimecontract.RuntimeSelectReady
 	RuntimeSelectAttempt              = runtimecontract.RuntimeSelectAttempt
-	RuntimeUnsafeString               = runtimecontract.RuntimeUnsafeString
 	RuntimeKeepAlive                  = runtimecontract.RuntimeKeepAlive
+	RuntimeSliceHeader32              = runtimecontract.RuntimeSliceHeader32
+	RuntimeSliceHeader64              = runtimecontract.RuntimeSliceHeader64
+	RuntimeStringHeader32             = runtimecontract.RuntimeStringHeader32
+	RuntimeStringHeader64             = runtimecontract.RuntimeStringHeader64
+	RuntimeStorageRegion              = runtimecontract.RuntimeStorageRegion
+	RuntimeRegionAddress              = runtimecontract.RuntimeRegionAddress
+	RuntimeRegionRead                 = runtimecontract.RuntimeRegionRead
+	RuntimeRegionWrite                = runtimecontract.RuntimeRegionWrite
+	RuntimeRegionView                 = runtimecontract.RuntimeRegionView
 )
 
 type RuntimeModule = runtimecontract.RuntimeModule
@@ -126,12 +139,14 @@ const (
 	RuntimeModuleInterfaceValue   = runtimecontract.RuntimeModuleInterfaceValue
 	RuntimeModulePanicNil         = runtimecontract.RuntimeModulePanicNil
 	RuntimeModuleChannel          = runtimecontract.RuntimeModuleChannel
-	RuntimeModuleUnsafe           = runtimecontract.RuntimeModuleUnsafe
 	RuntimeModuleStruct           = runtimecontract.RuntimeModuleStruct
 	RuntimeModuleStorage          = runtimecontract.RuntimeModuleStorage
 	RuntimeModuleDeferredRegistry = runtimecontract.RuntimeModuleDeferredRegistry
 	RuntimeModuleScalar           = runtimecontract.RuntimeModuleScalar
 	RuntimeModuleLifetime         = runtimecontract.RuntimeModuleLifetime
+	RuntimeModuleMemoryDescriptor = runtimecontract.RuntimeModuleMemoryDescriptor
+	RuntimeModuleMemoryView       = runtimecontract.RuntimeModuleMemoryView
+	RuntimeModuleStringValue      = runtimecontract.RuntimeModuleStringValue
 )
 
 type RuntimeSymbolContract = runtimecontract.RuntimeSymbolContract

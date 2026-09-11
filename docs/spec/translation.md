@@ -857,6 +857,13 @@ a private same-shaped brand fails. A reflected supported typed pointer uses a
 generated `toRawPointer(pointer, exactLayout)` callback; reflection forwards
 that value after the exact box guard. Reflecting an already-raw value preserves
 it. Nil remains nil. No address is synthesized by casting a provider object.
+Physical pointer callbacks are demanded only when the exact certified
+`reflect.Value.UnsafePointer` declaration is selected. Its distinct declaration
+requirement requeues already-emitted value descriptors and covers later
+descriptors through the same root scheduler. Ordinary reflective field access
+does not acquire physical layouts or conversion codecs. Header layout support
+alone does not establish a transport for its backing elements; unsupported
+transports keep the provider's explicit operation boundary.
 The callback parameter retains its explicit logical `Pointer<T> | undefined`
 annotation from the normal Go type owner. Contextual callable inference alone
 is not evidence for a neutral pointee marker domain. Storage projections keep
@@ -912,6 +919,18 @@ in both directions. Layout metadata must never attach to logical accessors.
 This preserves the source contract; an executable target still needs an exact
 aggregate codec or must reject it. It is not a claim of Node aggregate support.
 
+Records containing strings, slices or arrays distinguish ordinary field
+storage from their raw-memory projection. For example, `type Holder struct {
+Text string; Values []uint32 }` keeps a `GoString` and a `RuntimeSlice<uint32>`
+in ordinary storage. Assigning `holder.Text = text` does not produce a raw
+address. A selected `unsafe.Pointer(&holder)` instead requests physical fields
+containing the string's data/length and the slice's data/length/capacity under
+the selected ABI. The value owner supplies typed inverse field projections;
+native targets consume their exact layouts, not wrapper names. A raw write
+commits the updated descriptor through the owning slot. Copies made before
+that replacement retain their original backing and bounds. This is not a
+requirement for the JavaScript target to implement every aggregate codec.
+
 Complex storage uses the same value-record contract, not the logical arithmetic
 class. A `complex64` storage schema has `real: float32` and `imag: float32`
 fields at offsets 0 and 4; `complex128` uses `float64` at offsets 0 and 8.
@@ -923,6 +942,16 @@ Record fields and container elements use that same storage selection, while
 ordinary complex arithmetic keeps its existing immutable logical carrier.
 Schemas and conversions are emitted once per requested complex width. Merely
 performing arithmetic does not request raw-memory descriptors or codecs.
+
+Physical array fields use `FixedArray<ElementStorage, Extent>`. For example,
+`[2][3]uint32` stores two arrays of three uint32 elements, not one flattened
+array and not two logical window objects. Ordinary array value copies retain
+the existing element-copy policy. A raw view instead retains the selected
+backing element address, including a slice-derived array pointer's offset;
+converting that view never invokes a copying value projection. Empty and
+zero-sized shapes retain their exact source extents, including bigint literal
+extents, without synthesizing a record field for each element. The source
+array owner and the storage owner share one extent selection.
 
 `unsafe.SliceData` reuses the selected slice's retained data location. Nil
 slices produce nil pointers. A non-nil view with positive capacity addresses

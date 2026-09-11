@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type {
   GoError,
   GoInterfaceValue,
@@ -14,7 +15,7 @@ import type {
   uint8,
 } from "@gotots/gostdlib/internal/scalars.js";
 
-import { New } from "../errors.js";
+import { ProviderError } from "../internal/runtime/error.js";
 import {
   closed,
   exists,
@@ -65,7 +66,7 @@ export class FileMode {
         ? permissionLetters[index] ?? ""
         : "-";
     }
-    return result;
+    return GoString.fromText(result);
   }
 
   Type(): FileMode {
@@ -136,14 +137,14 @@ export class PathError extends WrappedProviderError {
   }
 
   static $equal(left: PathError, right: PathError): boolean {
-    return left.Op === right.Op &&
-      left.Path === right.Path &&
+    return left.Op.text() === right.Op.text() &&
+      left.Path.text() === right.Path.text() &&
       goInterfaceEqual(left.Err, right.Err);
   }
 
   static $hash(source: PathError): number {
-    let hash = GoMapHash.string(source.Op);
-    hash = GoMapHash.mix(hash, GoMapHash.string(source.Path));
+    let hash = GoMapHash.string(source.Op.text());
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.Path.text()));
     return GoMapHash.mix(hash, source.Err?.$go$hash() ?? 0);
   }
 
@@ -157,20 +158,20 @@ export class PathError extends WrappedProviderError {
 
   static Error(receiver: PathError | undefined): gostring {
     if (receiver === undefined) {
-      return "<nil>";
+      return GoString.fromText("<nil>");
     }
     return receiver.Error();
   }
 
   Error(): gostring {
-    const detail = this.Err?.Error() ?? "<nil>";
-    if (this.Op === "") {
-      return `${this.Path}: ${detail}`;
+    const detail = this.Err?.Error().text() ?? "<nil>";
+    if (this.Op.text() === "") {
+      return GoString.fromText(`${this.Path.text()}: ${detail}`);
     }
-    if (this.Path === "") {
-      return `${this.Op}: ${detail}`;
+    if (this.Path.text() === "") {
+      return GoString.fromText(`${this.Op.text()}: ${detail}`);
     }
-    return `${this.Op} ${this.Path}: ${detail}`;
+    return GoString.fromText(`${this.Op.text()} ${this.Path.text()}: ${detail}`);
   }
 
   Unwrap(): GoError | undefined {
@@ -205,8 +206,8 @@ export const state: {
   ErrInvalid: invalid,
   ErrNotExist: notExists,
   ErrPermission: permission,
-  SkipAll: New("skip everything and stop the walk"),
-  SkipDir: New("skip this directory"),
+  SkipAll: ProviderError.fromText("skip everything and stop the walk"),
+  SkipDir: ProviderError.fromText("skip this directory"),
 };
 
 const dirEntryType = Object.freeze({ comparable: true });
@@ -249,15 +250,15 @@ export function ReadDir(
     file.Close();
     return [
       RuntimeSlice.nil<DirEntry | undefined>(),
-      new PathError("readdir", name, state.ErrInvalid),
+      new PathError(GoString.fromText("readdir"), name, state.ErrInvalid),
     ];
   }
   const [entries, readFailure] = file.ReadDir(-1n);
   const closeFailure = file.Close();
   const values = sliceValues(entries);
   values.sort((left, right): number => {
-    const leftName = left?.Name() ?? "";
-    const rightName = right?.Name() ?? "";
+    const leftName = left?.Name().text() ?? "";
+    const rightName = right?.Name().text() ?? "";
     return leftName < rightName ? -1 : leftName > rightName ? 1 : 0;
   });
   return [
@@ -290,7 +291,7 @@ export function ReadFile(
       break;
     }
     if (count === 0n) {
-      failure = New("multiple Read calls return no data or error");
+      failure = ProviderError.fromText("multiple Read calls return no data or error");
       break;
     }
   }
@@ -334,7 +335,7 @@ export function WalkDir(
 
 function walk(
   fileSystem: FS | undefined,
-  path: string,
+  path: gostring,
   entry: DirEntry,
   visit: WalkDirFunc,
 ): GoError | undefined {
@@ -354,7 +355,7 @@ function walk(
     if (child === undefined) {
       continue;
     }
-    const childPath = path === "." ? child.Name() : `${path}/${child.Name()}`;
+    const childPath = path.text() === "." ? child.Name() : GoString.fromText(`${path.text()}/${child.Name().text()}`);
     const childFailure = walk(fileSystem, childPath, child, visit);
     if (childFailure === state.SkipDir && child.IsDir()) {
       continue;
@@ -380,10 +381,10 @@ function invokeWalkDir(
 
 function open(
   fileSystem: FS | undefined,
-  name: string,
+  name: gostring,
 ): [File | undefined, GoError | undefined] {
   if (fileSystem === undefined) {
-    return [undefined, new PathError("open", name, state.ErrInvalid)];
+    return [undefined, new PathError(GoString.fromText("open"), name, state.ErrInvalid)];
   }
   return fileSystem.Open(name);
 }

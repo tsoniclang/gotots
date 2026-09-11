@@ -98,7 +98,7 @@ func Facts() string {
 	writeFile(t, runnerPath, `import "./program.js";
 import { Facts } from "`+artifacts.module(t, "source.ts")+`";
 
-console.log(Facts());
+console.log(Facts().text());
 `)
 	writeFile(
 		t,

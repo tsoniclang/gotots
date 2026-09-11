@@ -48,7 +48,13 @@ func (n *File) requireUse(
 	object types.Object,
 	demand environmentcontract.UseDemand,
 ) error {
-	return n.observer.RequireUse(object, demand, gostdlib.NoUseSelection())
+	if err := n.observer.RequireUse(object, demand, gostdlib.NoUseSelection()); err != nil {
+		return err
+	}
+	if demand == environmentcontract.UseDemandCallable && n.owner.registry != nil {
+		return n.owner.registry.observeReflectionRawPointerUse(object)
+	}
+	return nil
 }
 
 // ObserveEnvironmentImplementation forwards a compiler-intrinsic or
@@ -249,6 +255,8 @@ type Registry struct {
 	deferredCallableRegistryNames       map[string]string
 	reflectionTypes                     map[string]reflectionTypeBinding
 	reflectionValueDemands              map[string]struct{}
+	reflectionRawPointerSelected        bool
+	reflectionRawPointerDelivered       map[string]struct{}
 	reflectionValueContracts            map[string]interfaceContractSelection
 	reflectionTypeNames                 map[string]string
 }
@@ -273,6 +281,8 @@ func (r *Registry) TransferCanonicalIdentity() (*Registry, error) {
 		map[interfaceDemandRequestKey][]api.RootRequest,
 	)
 	r.reflectionValueDemands = make(map[string]struct{})
+	r.reflectionRawPointerSelected = false
+	r.reflectionRawPointerDelivered = nil
 	r.reflectionValueContracts = make(map[string]interfaceContractSelection)
 	r.transferReady = true
 	return r, nil

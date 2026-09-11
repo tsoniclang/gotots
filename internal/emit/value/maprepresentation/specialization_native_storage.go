@@ -63,7 +63,7 @@ func (b specializationBuilder) nativeStorageType() tsgo.TypeNode {
 	return b.factory.UnionTypeNode([]tsgo.TypeNode{
 		b.factory.TypeReferenceNode(
 			b.id("Map"),
-			[]tsgo.TypeNode{b.storageKeyType, b.valueType},
+			[]tsgo.TypeNode{b.nativeIndexType(), b.nativeValueType()},
 		),
 		b.undefinedType(),
 	})
@@ -130,8 +130,8 @@ func (b specializationBuilder) nativeMakeMethod() tsgo.MethodDeclaration {
 					b.factory.NewExpression(
 						b.id("Map"),
 						[]tsgo.TypeNode{
-							b.storageKeyType,
-							b.valueType,
+							b.nativeIndexType(),
+							b.nativeValueType(),
 						},
 						nil,
 					),
@@ -179,10 +179,10 @@ func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 			tsgo.NodeFlagsConst,
 			"storedValue",
 			b.factory.UnionTypeNode([]tsgo.TypeNode{
-				b.valueType,
+				b.nativeValueType(),
 				b.undefinedType(),
 			}),
-			b.call(values, "get", storageKey),
+			b.call(values, "get", b.nativeIndex(storageKey)),
 		),
 		b.factory.ReturnStatement(b.staticCall(
 			specializationCopyValueOperation,
@@ -191,7 +191,7 @@ func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 				b.factory.QuestionToken(),
 				b.property(b.factory.ThisExpression(), "zeroValue"),
 				b.factory.ColonToken(),
-				storedValue,
+				b.nativeStoredValue(storedValue),
 			),
 		)),
 	)
@@ -247,10 +247,10 @@ func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 			tsgo.NodeFlagsConst,
 			"storedValue",
 			b.factory.UnionTypeNode([]tsgo.TypeNode{
-				b.valueType,
+				b.nativeValueType(),
 				b.undefinedType(),
 			}),
-			b.call(values, "get", storageKey),
+			b.call(values, "get", b.nativeIndex(storageKey)),
 		),
 		b.factory.IfStatement(
 			b.undefined(storedValue),
@@ -258,7 +258,7 @@ func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 				b.factory.IfStatement(
 					b.factory.PrefixUnaryExpression(
 						tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
-						b.call(values, "has", storageKey),
+						b.call(values, "has", b.nativeIndex(storageKey)),
 					),
 					b.returnBlock(missing()),
 					nil,
@@ -269,7 +269,7 @@ func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 			}, true),
 			nil,
 		),
-		b.factory.ReturnStatement(present(storedValue)),
+		b.factory.ReturnStatement(present(b.nativeStoredValue(storedValue))),
 	)
 }
 
@@ -306,11 +306,11 @@ func (b specializationBuilder) nativeStoreMethod() tsgo.MethodDeclaration {
 		b.factory.ExpressionStatement(b.call(
 			values,
 			"set",
-			storageKey,
-			b.staticCall(
+			b.nativeIndex(storageKey),
+			b.nativeEntry(storageKey, b.staticCall(
 				specializationCopyValueOperation,
 				b.id("value"),
-			),
+			)),
 		)),
 	)
 }
@@ -335,7 +335,7 @@ func (b specializationBuilder) nativeDeleteMethod() tsgo.MethodDeclaration {
 				tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
 				b.undefined(values),
 			),
-			b.factory.ExpressionStatement(b.call(values, "delete", storageKey)),
+			b.factory.ExpressionStatement(b.call(values, "delete", b.nativeIndex(storageKey))),
 			nil,
 		),
 	)
@@ -395,6 +395,9 @@ func (b specializationBuilder) nativeClearMethod() tsgo.MethodDeclaration {
 }
 
 func (b specializationBuilder) nativeKeysMethod() tsgo.MethodDeclaration {
+	if b.stringKey {
+		return b.nativeStringKeysMethod()
+	}
 	values := b.id("values")
 	if !b.keyProjection {
 		return b.method(

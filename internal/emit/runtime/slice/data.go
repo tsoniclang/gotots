@@ -15,24 +15,44 @@ func BuildData(factory tsgo.Factory, sliceName string) (tsgo.Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	allocate, err := tsoniccore.Resolve(tsoniccore.SymbolAllocatePointer)
-	if err != nil {
-		return nil, err
-	}
 	target := builder{factory: factory, className: sliceName, pointerName: pointer.Export()}
-	value := target.id("value")
 	return factory.FunctionDeclaration([]tsgo.ModifierLike{factory.ExportKeyword()}, nil, target.id(contract.ExportedName()),
-		[]tsgo.TypeParameterDeclaration{target.typeParameter()},
-		[]tsgo.ParameterDeclaration{target.parameter("value", target.sliceType()), target.parameter("zero", factory.FunctionTypeNode(nil, nil, target.typeT()))},
-		factory.UnionTypeNode([]tsgo.TypeNode{target.pointerType(target.typeT()), factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword)}),
-		factory.Block([]tsgo.Statement{
-			factory.IfStatement(target.call(value, MemberName(MemberIsNil)),
-				factory.Block([]tsgo.Statement{factory.ReturnStatement(factory.VoidExpression(target.number("0")))}, true), nil),
-			factory.IfStatement(target.binary(target.property(value, MemberName(MemberCapacity)), tsgo.BinaryOperatorEqualsEqualsEqualsToken, target.number("0")),
-				factory.Block([]tsgo.Statement{factory.ReturnStatement(factory.CallExpression(target.id(allocate.Export()), nil,
-					[]tsgo.TypeNode{target.typeT()}, []tsgo.Expression{factory.CallExpression(target.id("zero"), nil, nil, nil, tsgo.NodeFlagsNone)}, tsgo.NodeFlagsNone))}, true), nil),
-			factory.ReturnStatement(target.call(
-				target.call(value, MemberName(MemberSlice), target.number("0"), target.number("1"), factory.NullLiteral()),
-				MemberName(MemberAddress), target.number("0"))),
+		[]tsgo.TypeParameterDeclaration{target.typeParameter()}, []tsgo.ParameterDeclaration{
+			target.parameter("value", target.sliceType()), target.parameter("zero", factory.FunctionTypeNode(nil, nil, target.typeT())),
+		}, target.optionalDataType(), factory.Block([]tsgo.Statement{
+			target.returnStatement(target.call(target.id("value"), MemberName(MemberData), target.id("zero"))),
 		}, true)), nil
+}
+
+func (b builder) optionalDataType() tsgo.TypeNode {
+	return b.factory.UnionTypeNode([]tsgo.TypeNode{b.pointerType(b.typeT()), b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword)})
+}
+
+func (b builder) dataMethod() tsgo.MethodDeclaration {
+	return b.method(nil, MemberName(MemberData), nil,
+		[]tsgo.ParameterDeclaration{b.parameter("zero", b.factory.FunctionTypeNode(nil, nil, b.typeT()))}, b.optionalDataType(),
+		b.factory.IfStatement(b.call(b.factory.ThisExpression(), MemberName(MemberIsNil)), b.returnStatement(b.factory.VoidExpression(b.number("0"))), nil),
+		b.factory.IfStatement(b.binary(b.thisProperty(MemberName(MemberCapacity)), tsgo.BinaryOperatorEqualsEqualsEqualsToken, b.number("0")),
+			b.returnStatement(b.factory.CallExpression(b.id("allocatePointer"), nil, []tsgo.TypeNode{b.typeT()},
+				[]tsgo.Expression{b.factory.CallExpression(b.id("zero"), nil, nil, nil, tsgo.NodeFlagsNone)}, tsgo.NodeFlagsNone)), nil),
+		b.returnStatement(b.call(b.call(b.factory.ThisExpression(), MemberName(MemberSlice), b.number("0"), b.number("1"), b.factory.NullLiteral()),
+			MemberName(MemberAddress), b.number("0"))))
+}
+
+func (b pointerSliceBuilder) pointerData() tsgo.MethodDeclaration {
+	return b.method(nil, MemberName(MemberData), nil,
+		[]tsgo.ParameterDeclaration{b.parameter("_zero", b.factory.FunctionTypeNode(nil, nil, b.typeT()))}, b.optionalDataType(),
+		b.returnStatement(b.regionCall("goRegionAddress", b.thisProperty("region"), b.number("0"))))
+}
+
+func (b projectionBuilder) dataMethod() tsgo.MethodDeclaration {
+	from := b.typeReference("F")
+	to := b.typeReference("T")
+	zero := b.factory.ArrowFunction(nil, nil, nil, from, b.factory.EqualsGreaterThanToken(), b.thisProperty("sourceZero"))
+	data := b.call(b.source(), MemberName(MemberData), zero)
+	projected := b.factory.CallExpression(b.id(b.pointerProject), nil, []tsgo.TypeNode{from, to},
+		[]tsgo.Expression{data, b.thisProperty("fromSource"), b.thisProperty("toSource")}, tsgo.NodeFlagsNone)
+	return b.method(MemberName(MemberData), []tsgo.ParameterDeclaration{
+		b.parameter(nil, "_zero", b.factory.FunctionTypeNode(nil, nil, to)),
+	}, b.factory.UnionTypeNode([]tsgo.TypeNode{b.pointerType(to), b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword)}), b.returnStatement(projected))
 }

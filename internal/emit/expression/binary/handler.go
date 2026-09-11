@@ -124,22 +124,14 @@ func emitBinary(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return expressionoperands.Finish(
-		operands,
-		api.DirectExpression(
-			context.Factory().BinaryExpression(
-				nil,
-				operands.Left().Value(),
-				nil,
-				operator,
-				operands.Right().Value(),
-			),
-			api.CombineRequests(
-				operands.Left().Requests(),
-				operands.Right().Requests(),
-			)...,
-		),
-	)
+	result, handled, err := basicbinary.Apply(context, operandType, source.Op, operands.Left(), operands.Right())
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if !handled {
+		return api.ExpressionEmission{}, api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return expressionoperands.Finish(operands, result)
 }
 
 func emitGeneric(

@@ -241,7 +241,8 @@ func (r DeclarationRequirement) Valid() bool {
 			GeneratedArtifactInterfaceDynamicTypeToken,
 		)
 	case DeclarationRequirementReflectionType,
-		DeclarationRequirementReflectionValueOperations:
+		DeclarationRequirementReflectionValueOperations,
+		DeclarationRequirementReflectionRawPointer:
 		return r.validGeneratedDefinition(GeneratedArtifactReflectionType)
 	case DeclarationRequirementGenericCapability:
 		return r.operation == NamedStructOperationInvalid &&

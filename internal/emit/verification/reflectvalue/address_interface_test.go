@@ -181,3 +181,55 @@ func main() {
 		},
 	)
 }
+
+func TestReflectRawPointerDemandUsesExistingDescriptorQueue(t *testing.T) {
+	const source = `package reflectvalue
+import (
+    "reflect"
+    "unsafe"
+)
+type Record struct { Value uint32 }
+func Fields() int {
+    value := Record{Value: 7}
+    return reflect.ValueOf(&value).Elem().NumField()
+}
+func Address() unsafe.Pointer {
+    value := uint32(9)
+    return reflect.ValueOf(&value).UnsafePointer()
+}
+`
+	for _, roots := range [][]string{{"Fields"}, {"Fields", "Address"}, {"Address", "Fields"}} {
+		t.Run(strings.Join(roots, "-"), func(t *testing.T) {
+			emission := compileReflectFixture(t, t.TempDir(), source, roots)
+			working := t.TempDir()
+			artifacts := materializeArtifacts(t, emission, working)
+			selected := len(roots) == 2
+			if strings.Contains(artifacts.printed, "toRawPointer<") != selected {
+				t.Fatal("raw-pointer codecs do not match the selected reflection operation")
+			}
+			waveThreeTypecheck(t, working, artifacts.paths)
+		})
+	}
+}
+
+func TestReflectHeaderLayoutDoesNotImplyPayloadTransport(t *testing.T) {
+	const source = `package reflectvalue
+import (
+    "reflect"
+    "unsafe"
+)
+type Recursive []Recursive
+func Headers() (unsafe.Pointer, unsafe.Pointer) {
+    var interfaces []interface{}
+    var recursive Recursive
+    return reflect.ValueOf(&interfaces).UnsafePointer(), reflect.ValueOf(&recursive).UnsafePointer()
+}
+`
+	emission := compileReflectFixture(t, t.TempDir(), source, []string{"Headers"})
+	working := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, working)
+	if strings.Contains(artifacts.printed, "toRawPointer<") {
+		t.Fatal("a known slice header incorrectly implies implemented payload projection")
+	}
+	waveThreeTypecheck(t, working, artifacts.paths)
+}

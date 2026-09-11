@@ -132,27 +132,28 @@ func runOrderedTypeScript(
 ) string {
 	t.Helper()
 	runner := `import * as values from "` + sourceModule + `";
+import { GoString } from "./runtime/string-value.js";
 const scalar = (value: number): string =>
     Object.is(value, -0) ? "-0" : String(value);
-const hex = (value: string): string =>
-    Array.from(value, byte => byte.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+const hex = (value: GoString): string =>
+    Array.from(value.text(), byte => byte.charCodeAt(0).toString(16).padStart(2, "0")).join("");
 console.log(String(values.MaxInt32(-4, 9, 3)));
 console.log(String(values.MinUint64(8` + wideSuffix + `, 2` + wideSuffix + `, 5` + wideSuffix + `)));
 console.log(scalar(values.MaxFloat32(-0, 0, -1)));
 console.log(scalar(values.MinFloat64(-0, 0, 1)));
 console.log(scalar(values.MaxFloat32(NaN, 1, 2)));
 console.log(scalar(values.MinFloat64(Infinity, 7, -Infinity)));
-console.log(hex(values.MaxString("a", String.fromCharCode(255), "z")));
-console.log(hex(values.MinString("a", String.fromCharCode(255), "z")));
+console.log(hex(values.MaxString(GoString.fromText("a"), GoString.fromText(String.fromCharCode(255)), GoString.fromText("z"))));
+console.log(hex(values.MinString(GoString.fromText("a"), GoString.fromText(String.fromCharCode(255)), GoString.fromText("z"))));
 console.log(String(values.One(12)));
 console.log(String(values.Mixed(4)));
 console.log(String(values.ConstantInteger()));
 console.log(scalar(values.ConstantFloat()));
-console.log(values.ConstantString());
+console.log(values.ConstantString().text());
 const [value, order] = values.OrderedMax();
-console.log(String(value), order);
+console.log(String(value), order.text());
 const [prerequisiteValue, prerequisiteOrder] = values.OrderedWithPrerequisite();
-console.log(String(prerequisiteValue), prerequisiteOrder);
+console.log(String(prerequisiteValue), prerequisiteOrder.text());
 `
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, runner)

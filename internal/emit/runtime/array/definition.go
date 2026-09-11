@@ -3,14 +3,15 @@ package array
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
+	"github.com/tsoniclang/gotots/internal/emit/runtime/memoryview"
 	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type Capabilities struct {
-	Allocate bool
-	View     bool
-	Location bool
+	Allocate   bool
+	Location   bool
+	FromRegion bool
 }
 
 func Build(
@@ -47,7 +48,7 @@ func BuildWithCapabilities(
 		factory.TypeParameterDeclaration(
 			nil,
 			factory.Identifier("N"),
-			factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
+			indexType(factory),
 			nil,
 			nil,
 		),
@@ -58,8 +59,8 @@ func BuildWithCapabilities(
 	if capabilities.Allocate {
 		members = append(members, allocateMethod(factory, exportedName))
 	}
-	if capabilities.View {
-		members = append(members, viewMethod(factory, exportedName))
+	if capabilities.FromRegion {
+		members = append(members, regionMethod(factory, exportedName))
 	}
 	if capabilities.Location {
 		members = append(members, locationMethod(factory))
@@ -69,7 +70,7 @@ func BuildWithCapabilities(
 		zeroMethod(factory, exportedName),
 		literalMethod(factory, exportedName, panicName),
 		copyMethod(factory, exportedName, elementType, lengthType),
-		getMethod(factory, elementType, panicName),
+		getMethod(factory, elementType),
 		setMethod(factory, elementType),
 		checkMethod(factory, panicName),
 	)
@@ -117,8 +118,7 @@ func allocateMethod(
 			factory.Identifier(exportedName),
 			[]tsgo.TypeNode{elementType, lengthType},
 			[]tsgo.Expression{
-				values,
-				factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+				memoryview.Indexed(factory, elementType, values, factory.NumericLiteral("0", tsgo.TokenFlagsNone)),
 				length,
 			},
 		))},
@@ -140,19 +140,8 @@ func constructor(
 					factory.PrivateKeyword(),
 					factory.ReadonlyKeyword(),
 				},
-				"$values",
-				factory.ArrayTypeNode(elementType),
-			),
-			parameter(
-				factory,
-				[]tsgo.ModifierLike{
-					factory.PrivateKeyword(),
-					factory.ReadonlyKeyword(),
-				},
-				"$offset",
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindNumberKeyword,
-				),
+				"$region",
+				memoryview.RegionType(factory, elementType),
 			),
 			parameter(
 				factory,
@@ -219,8 +208,7 @@ func zeroMethod(
 			factory.Identifier(exportedName),
 			[]tsgo.TypeNode{elementType, lengthType},
 			[]tsgo.Expression{
-				values,
-				factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+				memoryview.Indexed(factory, elementType, values, factory.NumericLiteral("0", tsgo.TokenFlagsNone)),
 				length,
 			},
 		)),
@@ -377,50 +365,13 @@ func copyMethod(
 		nil,
 		nil,
 		arrayType(factory, exportedName, elementType, lengthType),
-		[]tsgo.Statement{factory.ReturnStatement(factory.NewExpression(
-			factory.Identifier(exportedName),
-			[]tsgo.TypeNode{elementType, lengthType},
-			[]tsgo.Expression{
-				call(
-					factory,
-					property(
-						factory,
-						property(factory, factory.ThisExpression(), "$values"),
-						"slice",
-					),
-					nil,
-					property(factory, factory.ThisExpression(), "$offset"),
-					binary(
-						factory,
-						property(factory, factory.ThisExpression(), "$offset"),
-						tsgo.BinaryOperatorPlusToken,
-						call(
-							factory,
-							api.TargetIntrinsicNumber.Expression(factory),
-							nil,
-							runtimeProperty(
-								factory,
-								factory.ThisExpression(),
-								arraymember.Length,
-							),
-						),
-					),
-				),
-				factory.NumericLiteral("0", tsgo.TokenFlagsNone),
-				runtimeProperty(
-					factory,
-					factory.ThisExpression(),
-					arraymember.Length,
-				),
-			},
-		))},
+		copyBody(factory, exportedName, elementType, lengthType),
 	)
 }
 
 func getMethod(
 	factory tsgo.Factory,
 	elementType tsgo.TypeNode,
-	panicName string,
 ) tsgo.MethodDeclaration {
 	index := factory.Identifier("index")
 	return runtimeMethod(
@@ -435,34 +386,8 @@ func getMethod(
 			indexType(factory),
 		)},
 		elementType,
-		[]tsgo.Statement{
-			variable(
-				factory,
-				tsgo.NodeFlagsConst,
-				"offset",
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindNumberKeyword,
-				),
-				call(
-					factory,
-					property(factory, factory.ThisExpression(), "$check"),
-					nil,
-					index,
-				),
-			),
-			factory.ReturnStatement(definedElement(
-				factory,
-				panicName,
-				property(factory, factory.ThisExpression(), "$values"),
-				binary(
-					factory,
-					property(factory, factory.ThisExpression(), "$offset"),
-					tsgo.BinaryOperatorPlusToken,
-					factory.Identifier("offset"),
-				),
-				elementType,
-			)),
-		},
+		[]tsgo.Statement{factory.ReturnStatement(call(factory, factory.Identifier("goRegionRead"), []tsgo.TypeNode{elementType},
+			regionValue(factory), call(factory, property(factory, factory.ThisExpression(), "$check"), nil, index)))},
 	)
 }
 
@@ -486,36 +411,7 @@ func setMethod(
 			parameter(factory, nil, "value", elementType),
 		},
 		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindVoidKeyword),
-		[]tsgo.Statement{
-			variable(
-				factory,
-				tsgo.NodeFlagsConst,
-				"offset",
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindNumberKeyword,
-				),
-				call(
-					factory,
-					property(factory, factory.ThisExpression(), "$check"),
-					nil,
-					index,
-				),
-			),
-			factory.ExpressionStatement(binary(
-				factory,
-				element(
-					factory,
-					property(factory, factory.ThisExpression(), "$values"),
-					binary(
-						factory,
-						property(factory, factory.ThisExpression(), "$offset"),
-						tsgo.BinaryOperatorPlusToken,
-						factory.Identifier("offset"),
-					),
-				),
-				tsgo.BinaryOperatorEqualsToken,
-				factory.Identifier("value"),
-			)),
-		},
+		[]tsgo.Statement{factory.ExpressionStatement(call(factory, factory.Identifier("goRegionWrite"), []tsgo.TypeNode{elementType},
+			regionValue(factory), call(factory, property(factory, factory.ThisExpression(), "$check"), nil, index), factory.Identifier("value")))},
 	)
 }

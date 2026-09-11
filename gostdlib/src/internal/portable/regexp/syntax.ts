@@ -58,9 +58,9 @@ export function translatePattern(expression: gostring): CompiledPattern {
 }
 
 function assertValidPatternBytes(expression: gostring): void {
-  for (let index = 0; index < expression.length; ) {
+  for (let index = 0; index < Number(expression.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(expression, index);
-    if (rune === 0xfffd && width === 1n && expression.charCodeAt(index) >= 0x80) {
+    if (rune === 0xfffd && width === 1n && expression.read(index) >= 0x80) {
       throw new Error("invalid UTF-8");
     }
     index += Math.max(1, hostInteger(width));

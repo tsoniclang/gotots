@@ -41,8 +41,9 @@ func TestErrorRuntimeContractIsSynchronous(t *testing.T) {
 	}
 	contract := definitions[1].Statement().(tsgo.InterfaceDeclaration)
 	method := contract.Members()[0].(tsgo.MethodSignatureDeclaration)
-	if method.Type().Kind() != tsgo.SyntaxKindStringKeyword {
-		t.Fatalf("Error result = %T, want string", method.Type())
+	result, ok := method.Type().(tsgo.TypeReferenceNode)
+	if !ok || result.TypeName().(tsgo.Identifier).Text() != "GoString" {
+		t.Fatalf("Error result = %T, want canonical synchronous GoString", method.Type())
 	}
 }
 
@@ -165,27 +166,29 @@ func TestEmptyStructRuntimeHasOneExactNominalOwner(t *testing.T) {
 	}
 }
 
-func TestUnsafeRuntimeExactJoinsStringIntrinsicDefinition(t *testing.T) {
+func TestStringValueRuntimeExactJoinsDefinitions(t *testing.T) {
 	symbols := []api.RuntimeSymbol{
-		api.RuntimeUnsafeString,
+		api.RuntimeStringTextBacking,
+		api.RuntimeStringPointerBacking,
+		api.RuntimeStringValue,
 	}
 	definitions, err := Build(
 		tsgo.NewFactory(),
-		api.RuntimeModuleUnsafe,
+		api.RuntimeModuleStringValue,
 		symbols,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(definitions) != len(symbols) {
-		t.Fatalf("unsafe runtime definitions = %d, want %d", len(definitions), len(symbols))
+		t.Fatalf("string value definitions = %d, want %d", len(definitions), len(symbols))
 	}
 	for index, definition := range definitions {
 		if definition.Symbol() != symbols[index] {
-			t.Fatalf("unsafe definition %d = %d, want %d", index, definition.Symbol(), symbols[index])
+			t.Fatalf("string value definition %d = %d, want %d", index, definition.Symbol(), symbols[index])
 		}
-		if _, ok := definition.Statement().(tsgo.FunctionDeclaration); !ok {
-			t.Fatalf("unsafe definition %d = %T, want function", index, definition.Statement())
+		if _, ok := definition.Statement().(tsgo.ClassDeclaration); !ok {
+			t.Fatalf("string value definition %d = %T, want class", index, definition.Statement())
 		}
 	}
 }
@@ -195,7 +198,6 @@ func TestAggregateArrayRuntimeAssemblyExactJoinsDemandedOperations(t *testing.T)
 	symbols := []api.RuntimeSymbol{
 		api.RuntimeArray,
 		api.RuntimeArrayAllocate,
-		api.RuntimeArrayView,
 		api.RuntimeArrayLocation,
 		api.RuntimeArrayPacked,
 	}

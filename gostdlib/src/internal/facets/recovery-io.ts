@@ -1,7 +1,7 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import type { gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { Reader as BufioReader, Writer as BufioWriter } from "../../bufio.js";
 import { Buffer as BytesBuffer } from "../../bytes.js";
@@ -60,7 +60,7 @@ export function GzipReaderRead(
 export function IoFsPathErrorError(
   receiver: PathError | undefined,
   _recovery?: GoRecovery,
-): string {
+): gostring {
   return PathError.Error(receiver);
 }
 

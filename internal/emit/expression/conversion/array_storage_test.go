@@ -45,7 +45,8 @@ func TestArrayStorageKeepsAddressAndAssignmentOwners(test *testing.T) {
 		"static $assign(",
 		"Record.$assign(",
 		"projectPointer<GoArray<uint32, 2>, Pair>",
-		"addressOf<T | undefined>(backing[location[1]])",
+		"goRegionAddress<T>(location, 0)",
+		"viewPointer<T, GoArray<T, N>>",
 		"$go$assign$T0_T0_to_T0",
 	} {
 		if !strings.Contains(printed.String(), required) {

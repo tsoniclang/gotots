@@ -328,7 +328,7 @@ func primitiveBinaryUpdate(
 			rightValue,
 		)
 	} else {
-		result, handled = basicbinary.Apply(
+		result, handled, err = basicbinary.Apply(
 			context,
 			sourceType,
 			operator,

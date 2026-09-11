@@ -40,6 +40,8 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 	registry.interfaceReflectionDemands["reflection"] =
 		interfaceReflectionDemand{}
 	registry.reflectionValueDemands["value"] = struct{}{}
+	registry.reflectionRawPointerSelected = true
+	registry.reflectionRawPointerDelivered = map[string]struct{}{"value": {}}
 	registry.reflectionValueContracts["contract"] = interfaceContractSelection{}
 	registry.interfaceDemandRequests[interfaceDemandRequestKey{
 		kind:      interfaceDemandTransition,
@@ -67,6 +69,8 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 		len(registry.interfaceContractDemands) != 0 ||
 		len(registry.interfaceReflectionDemands) != 0 ||
 		len(registry.reflectionValueDemands) != 0 ||
+		registry.reflectionRawPointerSelected ||
+		len(registry.reflectionRawPointerDelivered) != 0 ||
 		len(registry.reflectionValueContracts) != 0 ||
 		len(registry.interfaceDemandRequests) != 0 {
 		t.Fatal("registry transfer retained first-session observations")

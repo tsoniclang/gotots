@@ -34,6 +34,8 @@ func TestResolutionFixtureIsComplete(t *testing.T) {
 		"reinterpretRawPointer",
 		"offsetRawPointer",
 		"memoryLayout",
+		"memoryArrayLayout",
+		"defaultValue",
 		"memoryField",
 		"equalRawPointer",
 		"hashRawPointer",
@@ -49,6 +51,8 @@ func TestResolutionFixtureIsComplete(t *testing.T) {
 	}
 	for _, declaration := range []string{
 		"interface RawPointer",
+		"interface FixedArray<T, TLength extends number | bigint>",
+		"readonly length: TLength",
 		"type int32 = number",
 		"type int64 = bigint",
 		"type float64 = number",

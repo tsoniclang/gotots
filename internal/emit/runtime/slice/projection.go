@@ -33,6 +33,8 @@ func BuildProjection(
 	}
 	members := []tsgo.ClassElement{
 		builder.constructor(),
+		builder.sourceCountMethod(MemberSourceLength),
+		builder.sourceCountMethod(MemberSourceCapacity),
 		builder.isNilMethod(),
 		builder.getMethod(),
 		builder.setMethod(),
@@ -54,6 +56,9 @@ func BuildProjection(
 	}
 	if capabilities.Address {
 		members = append(members, builder.addressMethod())
+	}
+	if capabilities.Data {
+		members = append(members, builder.dataMethod())
 	}
 	if capabilities.Address || capabilities.ArrayPointer || capabilities.Region {
 		members = append(members, builder.arrayLocationMethod())

@@ -182,12 +182,12 @@ func assertIntegerAliases(
 		}
 	}
 	for _, file := range emission.Files() {
-		if file.Kind() != emit.TargetFileSupport {
+		if file.OutputPath() != "runtime/scalars.ts" {
 			continue
 		}
 		for _, statement := range file.SourceFile().Statements() {
 			alias, ok := statement.(tsgo.TypeAliasDeclaration)
-			if !ok || alias.Name().Text() == "bool" {
+			if !ok || alias.Name().Text() == "bool" || alias.Name().Text() == "gostring" {
 				continue
 			}
 			if sharedName, selected := shared[alias.Name().Text()]; selected {

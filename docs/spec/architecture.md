@@ -476,14 +476,15 @@ in `@tsonic/core` are not a menu to attach speculatively:
 - an ordinary Go function value remains an ordinary TypeScript callable because
   it may close over storage; `FunctionPointer` would assert a stronger native
   ABI fact that GoToTS has not selected;
-- a Go fixed array remains the exact executable `GoArray<T, N>` class for this
-  profile, with `N` present as a literal type argument. The class does not
-  claim the structurally different `FixedArray<T, N>` contract. A target must
-  compile the ordinary class unless a future representation owner selects that
-  neutral marker before publication;
-- `struct`, `field`, and `defaultValue` are not annotations for generated
-  classes. Existing class declarations and explicit copy/zero operations are
-  the ordinary carrier for this profile; and
+- a logical Go array uses `GoArray<T, N>` for checked indexing and live windows;
+  it is not itself physical inline storage. The value-storage owner separately
+  selects `FixedArray<T, N>` for actual array storage. Physical fields retain
+  that type recursively. A value conversion copies values; a location conversion
+  retains the backing address and must not use the copying conversion;
+- `struct`, `field`, and `defaultValue` describe actual selected storage, not
+  annotations attached to arbitrary generated classes. Exact zero-sized arrays
+  beyond the number-safe extent use the shared default-value contract instead
+  of an expanded field set or a rounded allocation count; and
 - reference-mode, borrow, and move markers are selected only by a future owner
   that proves their complete target-neutral contract. They are not inferred
   from Go pointer spelling or added as optimization hints.
@@ -718,25 +719,47 @@ ABI supplies a registered `DataLayout` token carrying byte order and address
 width; it is not inferred from the machine running the target. The
 GoToTS-owned ABI provider is source configuration, not a target implementation.
 
-A logical wrapper is not a physical layout. Raw conversion demands the
-existing value/storage projection first. For example, `Pointer<Pair>` projects
+A logical wrapper is not a physical layout. The value owner distinguishes
+ordinary storage from physical-memory storage. Raw conversion demands the
+physical projection first. For example, `Pointer<Pair>` projects
 to `Pointer<Pair$Storage>` using the existing storage-of/from-storage inverse;
 `memoryField` then selects the storage type's real property declarations, not
 a logical getter or constructor parameter. Reinterpretation applies the same
 inverse projection. There is no second descriptor registry or weakened shared
-field selector. Scalar and pointer leaves and finite nested structs with those
-fields have this closed source representation. Blank-field aggregates,
-array/slice/string/interface descriptors, complex values, and runtime handles
-without a physical projection remain source boundaries; publishing their
+field selector. Scalar and pointer leaves, complex component records, fixed
+arrays, blank fields and finite nested structs with those fields have this
+closed source representation. Slice and string physical projections use their
+source-width headers. Interface descriptors and runtime handles without a
+physical projection remain source boundaries; publishing their
 logical wrapper with only a byte size is not information preservation.
 
 Fixed-array extent/type evidence is not an element-layout descriptor. A raw
 array representation must retain the exact element child layout and element
 stride as well as the array's total size, alignment and stride. An indexed
 element is not a declared record field: it must not be passed to `memoryField`
-as though it were one. Until the shared contract can carry that relationship,
-the source boundary remains; expanding every array element into a synthetic
-record property is not a replacement for the missing array contract.
+as though it were one. `memoryArrayLayout` owns the array relationship and uses
+the selected ABI, whole dimensions, exact child descriptor and exact extent.
+Extents beyond the number-safe range use bigint literals, including zero-sized
+arrays. Expanding elements into synthetic record fields is forbidden.
+
+The physical array value is dense indexed storage, not the logical window
+wrapper. A physical value conversion visits exactly that array's elements,
+projects their physical values and validates the exact extent before assigning
+the closed `FixedArray` type. It is not a location conversion. An inverse view
+retains typed locations into that physical storage and uses the same element
+projection in both directions. Ordinary whole-array shallow copies use the
+native bulk-copy primitive; aggregate element copies retain their Go-owned
+semantics. Ordinary arrays and array fields do not request physical conversion.
+Converting an array location to raw storage selects its original backing and
+offset, then uses the child descriptor and whole-array descriptor to establish
+the typed view. It must not take the address of a copied array value or attach
+an array descriptor to a logical wrapper. Nil locations remain nil without
+loading them. A target without an executable inline-array codec rejects that
+operation; ordinary fixed-array type consumption does not require that codec.
+An array with zero physical size does not require a first backing element. Its
+location uses the reversible logical/storage projection instead; no element
+pointer is fabricated. This preserves the location contract, not a claim of
+executable native backing for arbitrary logical projections.
 
 Slice and string headers are Go-owned descriptors. Existing neutral record
 fields can express the data address and signed source-width length/capacity.
@@ -744,6 +767,47 @@ That metadata alone does not implement a raw-backed view: the Go-owned inverse
 projections must also preserve backing ownership, copied-header aliasing and
 header replacement. No JavaScript byte-memory emulator is implied by those
 canonical requirements.
+
+Ordinary string/slice fields retain logical `GoString`/`RuntimeSlice` values,
+not physical headers. An ordinary field read must not materialize a data
+address or reconstruct a pointer-backed string. Only a raw-layout request
+projects affected record fields through typed accessors. Fields whose ordinary
+storage already matches physical storage retain that existing representation.
+The inverse setter preserves aggregate locations and commits descriptor
+replacement, while an earlier copied string/slice view retains its original
+backing and extent. The obsolete whole-window array-storage accessor is not
+a second physical conversion route.
+
+Physical record conversions retain field addresses explicitly. The layout owner
+captures each `memoryField` declaration once and reuses that exact descriptor
+in both its root `memoryLayout` and `bindMemoryField`. `bindMemoryRecord`
+constructs the forwarding record; an ordinary getter does not establish
+location identity. Unchanged field representations bind their existing
+`addressOf` directly. Changed field representations use `viewPointer` with
+explicit conversions and aggregate-preserving writeback. The inverse also
+binds its logical storage fields: those binding-only layouts describe the same
+selected Go storage footprint and pair with explicit physical/logical pointer
+views. They do not replace the physical descriptors or authorize raw conversion
+of a wrapper. Only the physical-layout owner supplies raw-operation layouts.
+No getter-pattern recognition or object-shape identity inference is permitted.
+
+Slice-to-array pointer conversion uses `viewPointer`, not `projectPointer`.
+For `(*[0]T)(values[len(values):])`, constructing, loading and storing the
+zero-length array view never accesses an element. The base retains the actual
+slice position, including a valid one-past position; nil remains nil. A
+nonzero-sized element load/store at one-past still fails. Pointer views retain
+base ownership and established raw provenance without allocating substitute
+storage. This does not change ordinary value-projection semantics.
+
+Canonical preservation and JavaScript execution are separate acceptance
+obligations. Native-relevant layout and pointer facts must survive in shared
+neutral contracts without forcing a JavaScript byte-memory implementation.
+The established JavaScript workload correctness and performance characteristics
+remain mandatory. Native metadata is not a reason to add copies, globally
+replace string carriers or migrate provider signatures. Unsupported raw
+slice/string header operations remain explicit source boundaries until exact
+descriptor and backing-identity preservation is implemented. Rejection is not
+full language coverage, and those boundaries must remain visible in reports.
 
 The separately built `abi/` package implements that source-configuration
 boundary. Its production code registers immutable declarations and descriptors

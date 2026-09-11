@@ -12,9 +12,7 @@ func errorInterface(
 	valueName string,
 	runtimeError bool,
 ) tsgo.InterfaceDeclaration {
-	result := factory.KeywordTypeNode(
-		tsgo.KeywordTypeSyntaxKindStringKeyword,
-	)
+	result := factory.TypeReferenceNode(factory.Identifier("GoString"), nil)
 	members := []tsgo.TypeElement{
 		factory.MethodSignatureDeclaration(
 			nil,

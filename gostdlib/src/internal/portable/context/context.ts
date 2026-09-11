@@ -16,8 +16,8 @@ import { Duration } from "../time/duration.js";
 import { Now, Time } from "../time/time.js";
 
 const contextMethodToken = {};
-const canceled = new ProviderError("context canceled");
-const deadlineExceeded = new ProviderError("context deadline exceeded");
+const canceled = ProviderError.fromText("context canceled");
+const deadlineExceeded = ProviderError.fromText("context deadline exceeded");
 
 export interface Context extends GoInterfaceValue {
   Deadline(): [Time, bool];
@@ -58,7 +58,7 @@ export abstract class ContextValue extends InterfaceValue implements Context {
       return this.$contextName();
     }
     return GoPanic.raise(
-      new ProviderError(`context: unsupported format verb %${verb}`),
+      ProviderError.fromText(`context: unsupported format verb %${verb}`),
     );
   }
 
@@ -117,7 +117,7 @@ class CancelContext extends ContextValue {
       return `${parentContextName(this.parent)}.WithCancel`;
     }
     return GoPanic.raise(
-      new ProviderError(
+      ProviderError.fromText(
         "context: deadline context formatting requires time formatting",
       ),
     );
@@ -173,7 +173,7 @@ class CancelContext extends ContextValue {
 class ValueContext extends ContextValue {
   $contextName(): string {
     return GoPanic.raise(
-      new ProviderError(
+      ProviderError.fromText(
         "context: value context formatting requires key and value formatting",
       ),
     );

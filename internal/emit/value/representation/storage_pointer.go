@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	memorymarker "github.com/tsoniclang/gotots/internal/emit/marker/memory"
 	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -16,7 +17,18 @@ func (owner Owner) ProjectStoragePointer(
 	sourceType types.Type,
 	pointer api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	return owner.projectStoredPointer(context, source, sourceType, pointer, false)
+}
+
+func (owner Owner) ProjectMemoryPointer(context api.Context, source ast.Node, sourceType types.Type, pointer api.ExpressionEmission) (api.ExpressionEmission, error) {
+	return owner.projectStoredPointer(context, source, sourceType, pointer, true)
+}
+
+func (owner Owner) projectStoredPointer(context api.Context, source ast.Node, sourceType types.Type, pointer api.ExpressionEmission, physical bool) (api.ExpressionEmission, error) {
 	required, err := owner.RequiresStorageProjection(context, sourceType)
+	if physical {
+		required, err = memorymarker.RequiresProjection(context, sourceType)
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -31,7 +43,13 @@ func (owner Owner) ProjectStoragePointer(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	storageType, err := owner.StorageType(
+	storageTypeOf := owner.StorageType
+	toStored := owner.ToStorage
+	fromStored := owner.FromStorage
+	if physical {
+		storageTypeOf, toStored, fromStored = owner.MemoryStorageType, owner.ToMemoryStorage, owner.FromMemoryStorage
+	}
+	storageType, err := storageTypeOf(
 		context.WithRole(api.RoleStorageType),
 		source,
 		sourceType,
@@ -39,9 +57,15 @@ func (owner Owner) ProjectStoragePointer(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	storageName := "$go$storage"
-	logicalName := "$go$value"
-	fromStorage, err := owner.FromStorage(
+	storageName, err := context.Names().Temporary(api.TemporaryConversionOperand)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	logicalName, err := context.Names().Temporary(api.TemporaryConversionOperand)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	fromStorage, err := fromStored(
 		context.WithRole(api.RoleStorageType),
 		source,
 		sourceType,
@@ -50,7 +74,7 @@ func (owner Owner) ProjectStoragePointer(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	toStorage, err := owner.ToStorage(
+	toStorage, err := toStored(
 		context.WithRole(api.RoleStorageType),
 		source,
 		sourceType,

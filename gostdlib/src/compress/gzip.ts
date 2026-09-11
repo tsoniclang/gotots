@@ -1,6 +1,7 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type {
   gostring,
   int,
@@ -43,7 +44,7 @@ class GzipReader {
 
   Read(destination: RuntimeSlice<uint8>): [int, GoError | undefined] {
     if (this.closed) {
-      return [0n, new ProviderError("gzip: reader is closed")];
+      return [0n, ProviderError.fromText("gzip: reader is closed")];
     }
     if (destination.length === 0) {
       return [0n, undefined];
@@ -92,7 +93,7 @@ export function NewReader(
   source: IoReader | undefined,
 ): [Reader | undefined, GoError | undefined] {
   if (source === undefined) {
-    return [undefined, new ProviderError("gzip: nil Reader")];
+    return [undefined, ProviderError.fromText("gzip: nil Reader")];
   }
   const gzipSource = new GzipSource(source);
   const [header, failure] = gzipSource.ReadHeader();
@@ -100,17 +101,17 @@ export function NewReader(
     return [undefined, failure];
   }
   if (header === undefined) {
-    return [undefined, new ProviderError("gzip: invalid header")];
+    return [undefined, ProviderError.fromText("gzip: invalid header")];
   }
   return [
     new GzipReader(
       new Header(
-        header.comment,
+        GoString.fromText(header.comment),
         header.extra,
         header.modificationTimeSeconds === 0
           ? new Time()
           : UnixMilli(integerFromHost(header.modificationTimeSeconds * 1000)),
-        header.name,
+        GoString.fromText(header.name),
         header.operatingSystem,
       ),
       (): [Uint8Array | undefined, GoError | undefined] => {
@@ -121,7 +122,7 @@ export function NewReader(
         try {
           return [decodeGzip(bytes(encoded)), undefined];
         } catch {
-          return [undefined, new ProviderError("gzip: invalid checksum")];
+          return [undefined, ProviderError.fromText("gzip: invalid checksum")];
         }
       },
     ),

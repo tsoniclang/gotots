@@ -5,6 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
+	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -106,6 +107,12 @@ func formatOperationBody(
 			value, _, _, err = formatValue(context, sourceType, sourceValue)
 			if err != nil {
 				return nil, nil, err
+			}
+			if basic.Info()&types.IsString != 0 {
+				value, err = stringvalue.Text(context, value)
+				if err != nil {
+					return nil, nil, err
+				}
 			}
 			arguments = append([]tsgo.Expression{value.Value()}, arguments...)
 		}

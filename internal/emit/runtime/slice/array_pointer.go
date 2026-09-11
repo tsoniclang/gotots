@@ -1,16 +1,13 @@
 package slice
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/runtime/memoryview"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 func (b builder) arrayLocationMethod() tsgo.MethodDeclaration {
 	lengthType := b.factory.TypeReferenceNode(b.id("N"), nil)
-	locationType := b.factory.TypeOperatorNode(
-		tsgo.TypeOperatorNodeOperatorKindReadonlyKeyword,
-		b.factory.TupleTypeNode([]tsgo.TypeNode{
-			b.factory.ArrayTypeNode(b.typeT()),
-			b.numberType(),
-		}),
-	)
+	locationType := memoryview.RegionType(b.factory, b.typeT())
 	resultType := b.factory.UnionTypeNode([]tsgo.TypeNode{
 		locationType,
 		b.factory.KeywordTypeNode(
@@ -24,7 +21,7 @@ func (b builder) arrayLocationMethod() tsgo.MethodDeclaration {
 			b.factory.TypeParameterDeclaration(
 				nil,
 				b.id("N"),
-				b.numberType(),
+				b.integerInputType(),
 				nil,
 				nil,
 			),
@@ -36,7 +33,7 @@ func (b builder) arrayLocationMethod() tsgo.MethodDeclaration {
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"requested",
-			b.toNumber(b.id("length")),
+			b.id("length"),
 		),
 		b.factory.IfStatement(
 			b.binary(
@@ -67,13 +64,7 @@ func (b builder) arrayLocationMethod() tsgo.MethodDeclaration {
 			}, true),
 			nil,
 		),
-		b.returnStatement(b.factory.ArrayLiteralExpression(
-			[]tsgo.Expression{
-				b.id("backing"),
-				b.thisProperty("offset"),
-			},
-			false,
-		)),
+		b.returnStatement(memoryview.Indexed(b.factory, b.typeT(), b.id("backing"), b.thisProperty("offset"))),
 	)
 }
 
@@ -82,19 +73,12 @@ func BuildArrayPointer(
 	functionName string,
 	sliceName string,
 	pointerName string,
-	addressName string,
-	projectName string,
+	viewName string,
 	arrayName string,
 	arrayViewName string,
 ) tsgo.FunctionDeclaration {
 	typeT := typeReference(factory, "T")
 	typeN := typeReference(factory, "N")
-	optionalT := factory.UnionTypeNode([]tsgo.TypeNode{
-		typeT,
-		factory.KeywordTypeNode(
-			tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-		),
-	})
 	arrayType := factory.TypeReferenceNode(
 		factory.Identifier(arrayName),
 		[]tsgo.TypeNode{typeT, typeN},
@@ -110,45 +94,27 @@ func BuildArrayPointer(
 		),
 	})
 	location := factory.Identifier("location")
-	locationElement := func(index string) tsgo.ElementAccessExpression {
-		return factory.ElementAccessExpression(
-			location,
-			nil,
-			factory.NumericLiteral(index, tsgo.TokenFlagsNone),
-			tsgo.NodeFlagsNone,
-		)
-	}
 	view := factory.CallExpression(
 		factory.Identifier(arrayViewName),
 		nil,
 		[]tsgo.TypeNode{typeT, typeN},
 		[]tsgo.Expression{
-			locationElement("0"),
-			locationElement("1"),
+			location,
 			factory.Identifier("length"),
 		},
 		tsgo.NodeFlagsNone,
 	)
 	base := factory.CallExpression(
-		factory.Identifier(addressName),
+		factory.Identifier("goRegionAddress"),
 		nil,
-		[]tsgo.TypeNode{optionalT},
-		[]tsgo.Expression{factory.ElementAccessExpression(
-			factory.Identifier("backing"),
-			nil,
-			locationElement("1"),
-			tsgo.NodeFlagsNone,
-		)},
+		[]tsgo.TypeNode{typeT},
+		[]tsgo.Expression{location, factory.NumericLiteral("0", tsgo.TokenFlagsNone)},
 		tsgo.NodeFlagsNone,
 	)
 	fromSource := factory.ArrowFunction(
 		nil,
 		nil,
-		[]tsgo.ParameterDeclaration{parameter(
-			factory,
-			"_source",
-			optionalT,
-		)},
+		nil,
 		arrayType,
 		factory.EqualsGreaterThanToken(),
 		factory.Identifier("view"),
@@ -200,7 +166,7 @@ func BuildArrayPointer(
 			"target",
 			arrayType,
 		)},
-		optionalT,
+		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindVoidKeyword),
 		factory.EqualsGreaterThanToken(),
 		factory.Block([]tsgo.Statement{
 			arrayPointerVariable(
@@ -247,18 +213,12 @@ func BuildArrayPointer(
 					factory.ExpressionStatement(setElement),
 				}, true),
 			),
-			factory.ReturnStatement(factory.ElementAccessExpression(
-				factory.Identifier("backing"),
-				nil,
-				locationElement("1"),
-				tsgo.NodeFlagsNone,
-			)),
 		}, true),
 	)
 	result := factory.CallExpression(
-		factory.Identifier(projectName),
+		factory.Identifier(viewName),
 		nil,
-		[]tsgo.TypeNode{optionalT, arrayType},
+		[]tsgo.TypeNode{typeT, arrayType},
 		[]tsgo.Expression{base, fromSource, toSource},
 		tsgo.NodeFlagsNone,
 	)
@@ -271,9 +231,10 @@ func BuildArrayPointer(
 			factory.TypeParameterDeclaration(
 				nil,
 				factory.Identifier("N"),
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindNumberKeyword,
-				),
+				factory.UnionTypeNode([]tsgo.TypeNode{
+					factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
+					factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBigIntKeyword),
+				}),
 				nil,
 				nil,
 			),
@@ -332,7 +293,6 @@ func BuildArrayPointer(
 				}, true),
 				nil,
 			),
-			arrayPointerVariable(factory, tsgo.NodeFlagsConst, "backing", locationElement("0")),
 			arrayPointerVariable(factory, tsgo.NodeFlagsConst, "view", view),
 			factory.ReturnStatement(result),
 		}, true),

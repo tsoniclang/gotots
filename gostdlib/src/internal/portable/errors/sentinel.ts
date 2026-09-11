@@ -6,12 +6,12 @@ import type { uint64 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderError } from "../../runtime/error.js";
 
-export const closed: GoError = new ProviderError("file already closed");
-export const exists: GoError = new ProviderError("file already exists");
-export const invalid: GoError = new ProviderError("invalid argument");
-export const notExists: GoError = new ProviderError("file does not exist");
-export const permission: GoError = new ProviderError("permission denied");
-export const unsupported: GoError = new ProviderError("unsupported operation");
+export const closed: GoError = ProviderError.fromText("file already closed");
+export const exists: GoError = ProviderError.fromText("file already exists");
+export const invalid: GoError = ProviderError.fromText("invalid argument");
+export const notExists: GoError = ProviderError.fromText("file does not exist");
+export const permission: GoError = ProviderError.fromText("permission denied");
+export const unsupported: GoError = ProviderError.fromText("unsupported operation");
 
 export function errnoMatchesSentinel(
   value: uint64,

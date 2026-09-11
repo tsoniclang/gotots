@@ -5,11 +5,12 @@ type RuntimeSymbolContract struct {
 	outputPath   string
 	exportedName string
 	typeUsable   bool
+	typeOnly     bool
 	dependencies []RuntimeSymbol
 }
 
 func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
-	if contract, ok := unsafeRuntimeContract(symbol); ok {
+	if contract, ok := descriptorRuntimeContract(symbol); ok {
 		return contract, nil
 	}
 	switch symbol {
@@ -21,7 +22,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/string.ts",
 			"goStringIndex",
 			false,
-			RuntimePanic,
+			RuntimeStringValue,
 		), nil
 	case RuntimeStringSlice:
 		return runtimeContract(
@@ -29,7 +30,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/string.ts",
 			"goStringSlice",
 			false,
-			RuntimePanic,
+			RuntimeStringValue,
 		), nil
 	case RuntimeStringMax:
 		return runtimeContract(
@@ -37,6 +38,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/string.ts",
 			"goStringMax",
 			false,
+			RuntimeStringValue,
 		), nil
 	case RuntimeStringMin:
 		return runtimeContract(
@@ -44,6 +46,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/string.ts",
 			"goStringMin",
 			false,
+			RuntimeStringValue,
 		), nil
 	case RuntimeStringEncodeRune:
 		return runtimeContract(
@@ -66,20 +69,17 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoArray",
 			true,
 			RuntimePanic,
+			RuntimeStorageRegion,
+			RuntimeRegionRead,
+			RuntimeRegionWrite,
 		), nil
+	case RuntimeArrayFromRegion:
+		return runtimeContract(RuntimeModuleArray, "runtime/array.ts", "goArrayFromRegion", false, RuntimeArray), nil
 	case RuntimeArrayAllocate:
 		return runtimeContract(
 			RuntimeModuleArray,
 			"runtime/array.ts",
 			"goArrayAllocate",
-			false,
-			RuntimeArray,
-		), nil
-	case RuntimeArrayView:
-		return runtimeContract(
-			RuntimeModuleArray,
-			"runtime/array.ts",
-			"goArrayView",
 			false,
 			RuntimeArray,
 		), nil
@@ -160,6 +160,8 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goSliceAddress",
 			false,
 			RuntimeSlice,
+			RuntimeStorageRegion,
+			RuntimeRegionAddress,
 		), nil
 	case RuntimeSliceStorage:
 		return runtimeContract(
@@ -192,8 +194,10 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goSliceArrayPointer",
 			false,
 			RuntimeSlice,
+			RuntimeSliceAddress,
 			RuntimeArray,
-			RuntimeArrayView,
+			RuntimeArrayFromRegion,
+			RuntimeRegionAddress,
 		), nil
 	case RuntimeArraySlice:
 		return runtimeContract(
@@ -204,6 +208,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeSlice,
 			RuntimeArray,
 			RuntimeArrayLocation,
+			RuntimeSliceFromRegion,
 		), nil
 	case RuntimeSliceAppendSlice:
 		return runtimeContract(
@@ -228,8 +233,17 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goSliceRegion",
 			false,
 			RuntimeSlice,
+			RuntimeSliceAddress,
 			RuntimePanic,
+			RuntimeSliceFromRegion,
 		), nil
+	case RuntimeSliceFromRegion:
+		return runtimeContract(RuntimeModuleSlice, "runtime/slice.ts", "goSliceFromRegion", false,
+			RuntimeSlice, RuntimeSlicePointer, RuntimeStorageRegion), nil
+	case RuntimeSlicePointer:
+		return runtimeContract(RuntimeModuleSlice, "runtime/slice.ts", "RuntimePointerSlice", true,
+			RuntimeSlice, RuntimeSliceAddress, RuntimeSliceStorage, RuntimeStorageRegion,
+			RuntimeRegionAddress, RuntimeRegionRead, RuntimeRegionWrite, RuntimeRegionView), nil
 	case RuntimeMap:
 		return runtimeContract(
 			RuntimeModuleMap,
@@ -284,6 +298,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/panic.ts",
 			"GoRuntimePanicValue",
 			true,
+			RuntimeStringValue,
 			RuntimeInterfaceValue,
 			RuntimeErrorMethodToken,
 			RuntimeRuntimeErrorToken,

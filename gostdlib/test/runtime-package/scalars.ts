@@ -1,3 +1,4 @@
+import type { GoString } from "./string-value.js";
 import type { bool as TsonicBool, float32 as TsonicFloat32, float64 as TsonicFloat64, int16 as TsonicInt16, int32 as TsonicInt32, int8 as TsonicInt8, uint16 as TsonicUint16, uint32 as TsonicUint32, uint8 as TsonicUint8 } from "@tsonic/core/types.js";
 export type bool = TsonicBool;
 export type int8 = TsonicInt8;
@@ -8,7 +9,7 @@ export type uint8 = TsonicUint8;
 export type uint16 = TsonicUint16;
 export type uint32 = TsonicUint32;
 export type uint64 = number;
-export type gostring = string;
+export type gostring = GoString;
 export type float32 = TsonicFloat32;
 export type float64 = TsonicFloat64;
 export type int = number;

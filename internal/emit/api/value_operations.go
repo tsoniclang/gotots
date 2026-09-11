@@ -10,6 +10,10 @@ import (
 )
 
 type Values interface {
+	MemoryStorageType(Context, ast.Node, types.Type) (TypeEmission, error)
+	ToMemoryStorage(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
+	FromMemoryStorage(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
+	ProjectMemoryPointer(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
 	Pointee(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
 	RequiresCustomEquality(Context, types.Type) bool
 	RequiresExplicitType(Context, types.Type) bool

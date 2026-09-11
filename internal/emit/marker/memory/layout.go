@@ -3,16 +3,15 @@ package memory
 import (
 	"go/ast"
 	"go/types"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/contracts/goabi"
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	runtimecomplex "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
-	"github.com/tsoniclang/gotots/internal/emit/value/structconstruction"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	descriptorvalue "github.com/tsoniclang/gotots/internal/emit/value/memorydescriptor"
 )
 
 type sourceLayoutNames interface {
@@ -36,6 +35,9 @@ func DataLayout(context api.Context) (api.ExpressionEmission, error) {
 }
 
 func Layout(context api.Context, children api.ChildEmitter, source ast.Node, pointee types.Type) (api.ExpressionEmission, api.TypeEmission, error) {
+	if model, ok := descriptorvalue.Resolve(context, pointee); ok {
+		return DescriptorLayout(context, model)
+	}
 	supported, err := SupportsLayout(context, pointee)
 	if err != nil {
 		return api.ExpressionEmission{}, api.TypeEmission{}, err
@@ -43,50 +45,29 @@ func Layout(context api.Context, children api.ChildEmitter, source ast.Node, poi
 	if !supported {
 		return api.ExpressionEmission{}, api.TypeEmission{}, api.Unsupported(context, api.CategoryExpression, source)
 	}
-	projected, err := context.Values().RequiresStorageProjection(context, pointee)
-	if err != nil {
-		return api.ExpressionEmission{}, api.TypeEmission{}, err
-	}
-	var represented api.TypeEmission
-	if projected {
-		represented, err = context.Values().StorageType(context.WithRole(api.RoleStorageType), source, pointee)
-	} else {
-		represented, err = children.RepresentedType(context.WithRole(api.RoleResultType), nil, pointee)
-	}
-	if err != nil {
-		return api.ExpressionEmission{}, api.TypeEmission{}, err
-	}
-	abi, err := DataLayout(context)
-	if err != nil {
-		return api.ExpressionEmission{}, api.TypeEmission{}, err
-	}
-	size := context.TypesSizes().Sizeof(pointee)
-	alignment := context.TypesSizes().Alignof(pointee)
-	stride := context.TypesSizes().Sizeof(types.NewArray(pointee, 2)) - size
-	if size < 0 || alignment <= 0 || stride < size || size > 9007199254740991 || stride > 9007199254740991 {
-		return api.ExpressionEmission{}, api.TypeEmission{}, api.Unsupported(context, api.CategoryExpression, source)
-	}
-	number := func(value int64) api.ExpressionEmission {
-		return api.DirectExpression(context.Factory().NumericLiteral(strconv.FormatInt(value, 10), tsgo.TokenFlagsNone))
-	}
-	arguments := []api.ExpressionEmission{abi, number(size), number(alignment), number(stride)}
 	if structure, ok := pointee.Underlying().(*types.Struct); ok {
-		fields := make([]*types.Var, structure.NumFields())
-		for index := range fields {
-			fields[index] = structure.Field(index)
+		layout, represented, _, err := recordBindingLayout(context, children, source, pointee, structure, true, false)
+		return layout, represented, err
+	}
+	represented, err := context.Values().MemoryStorageType(context.WithRole(api.RoleStorageType), source, pointee)
+	if err != nil {
+		return api.ExpressionEmission{}, api.TypeEmission{}, err
+	}
+	arguments, err := layoutDimensions(context, source, pointee)
+	if err != nil {
+		return api.ExpressionEmission{}, api.TypeEmission{}, err
+	}
+	layoutType := represented
+	if array, ok := pointee.Underlying().(*types.Array); ok {
+		child, element, childErr := Layout(context, children, source, array.Elem())
+		if childErr != nil {
+			return api.ExpressionEmission{}, api.TypeEmission{}, childErr
 		}
-		offsets := context.TypesSizes().Offsetsof(fields)
-		for index, field := range fields {
-			name, nameErr := structconstruction.FieldName(context.Names(), field, index)
-			if nameErr != nil {
-				return api.ExpressionEmission{}, api.TypeEmission{}, nameErr
-			}
-			selected, fieldErr := fieldLayout(context, children, source, represented, name, field.Type(), offsets[index])
-			if fieldErr != nil {
-				return api.ExpressionEmission{}, api.TypeEmission{}, fieldErr
-			}
-			arguments = append(arguments, selected)
-		}
+		extent := arrayvalue.ExtentLiteral(context.Factory(), array)
+		result, callErr := pointermarker.Operation(context, tsoniccore.SymbolMemoryArrayLayout,
+			[]api.TypeEmission{element, api.DirectType(context.Factory().LiteralTypeNode(extent))},
+			append(arguments, child, api.DirectExpression(extent)))
+		return result, represented, callErr
 	}
 	if carrier, ok := complexvalue.Describe(pointee.Underlying()); ok {
 		component := carrier.ComponentType()
@@ -98,6 +79,6 @@ func Layout(context api.Context, children api.ChildEmitter, source ast.Node, poi
 			arguments = append(arguments, selected)
 		}
 	}
-	result, err := pointermarker.Operation(context, tsoniccore.SymbolMemoryLayout, []api.TypeEmission{represented}, arguments)
+	result, err := pointermarker.Operation(context, tsoniccore.SymbolMemoryLayout, []api.TypeEmission{layoutType}, arguments)
 	return result, represented, err
 }

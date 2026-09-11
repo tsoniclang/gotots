@@ -451,7 +451,7 @@ func TestWaveSevenGeneratedTailIsEncodedAndBounded(t *testing.T) {
 		maximum := waveSevenTailBounds[artifact.kind]
 		if artifact.bytes > maximum.bytes ||
 			artifact.nodes > maximum.nodes {
-			t.Fatalf(
+			t.Errorf(
 				"%s %s:%s tail = %d bytes/%d nodes, bound %d/%d",
 				artifact.kind,
 				artifact.path,

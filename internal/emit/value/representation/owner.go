@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
+	stringvalue "github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
@@ -32,6 +33,9 @@ func (Owner) RequiresCustomEquality(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok && basic.Info()&types.IsString != 0 {
+		return true
+	}
 	if _, ok := api.GenericTypeParameter(sourceType); ok {
 		return true
 	}
@@ -197,7 +201,7 @@ func (owner Owner) Zero(
 		case api.PrimitiveBool:
 			literal = context.Factory().FalseLiteral()
 		case api.PrimitiveString:
-			literal = context.Factory().StringLiteral("", tsgo.TokenFlagsNone)
+			return stringvalue.FromText(context, api.DirectExpression(context.Factory().StringLiteral("", tsgo.TokenFlagsNone)))
 		case api.PrimitiveFloat32, api.PrimitiveFloat64:
 			literal = context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone)
 		default:

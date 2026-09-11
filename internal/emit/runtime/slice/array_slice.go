@@ -56,14 +56,6 @@ func BuildArraySlice(
 	})
 	value := factory.Identifier("value")
 	location := factory.Identifier("location")
-	locationElement := func(index string) tsgo.ElementAccessExpression {
-		return factory.ElementAccessExpression(
-			location,
-			nil,
-			factory.NumericLiteral(index, tsgo.TokenFlagsNone),
-			tsgo.NodeFlagsNone,
-		)
-	}
 	length := factory.PropertyAccessExpression(
 		value,
 		nil,
@@ -71,17 +63,11 @@ func BuildArraySlice(
 		tsgo.NodeFlagsNone,
 	)
 	view := factory.CallExpression(
-		factory.PropertyAccessExpression(
-			factory.Identifier(sliceName),
-			nil,
-			factory.Identifier(ArrayViewMember),
-			tsgo.NodeFlagsNone,
-		),
+		factory.Identifier("goSliceFromRegion"),
 		nil,
 		[]tsgo.TypeNode{typeT},
 		[]tsgo.Expression{
-			locationElement("0"),
-			locationElement("1"),
+			location,
 			length,
 			length,
 		},
@@ -112,9 +98,7 @@ func BuildArraySlice(
 			factory.TypeParameterDeclaration(
 				nil,
 				factory.Identifier("N"),
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindNumberKeyword,
-				),
+				integerType,
 				nil,
 				nil,
 			),

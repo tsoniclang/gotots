@@ -22,7 +22,7 @@ export function AppendFloat(
   precision: int,
   bitSize: int,
 ): RuntimeSlice<uint8> {
-  return appendASCII(target, FormatFloat(value, format, precision, bitSize));
+  return appendASCII(target, FormatFloat(value, format, precision, bitSize).text());
 }
 
 export function AppendInt(
@@ -30,7 +30,7 @@ export function AppendInt(
   value: int64,
   base: int,
 ): RuntimeSlice<uint8> {
-  return appendASCII(target, FormatInt(value, base));
+  return appendASCII(target, FormatInt(value, base).text());
 }
 
 export function AppendUint(
@@ -38,7 +38,7 @@ export function AppendUint(
   value: uint64,
   base: int,
 ): RuntimeSlice<uint8> {
-  return appendASCII(target, FormatUint(value, base));
+  return appendASCII(target, FormatUint(value, base).text());
 }
 
 function appendASCII(target: RuntimeSlice<uint8>, value: string): RuntimeSlice<uint8> {

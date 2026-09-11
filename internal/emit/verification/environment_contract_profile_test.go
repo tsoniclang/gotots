@@ -216,7 +216,7 @@ func NativeUint16(value []byte) uint16 {
 		"export declare function Context$is",
 		"export declare class Pool",
 		"export declare function Pool_Get($receiver: Pointer<Pool>",
-		"export function goUnsafeString<",
+		"export class GoString",
 		"export declare const RuneSelf$uint8",
 		"littleEndian: littleEndian;",
 		".littleEndian",

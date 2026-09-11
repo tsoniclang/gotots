@@ -3,6 +3,7 @@ package slicevalue
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -43,6 +44,10 @@ func CopyString(
 		return api.ExpressionEmission{}, err
 	}
 	destination := context.Factory().Identifier(destinationName)
+	text, err := stringvalue.Text(context, api.DirectExpression(operands[1]))
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	source := context.Factory().Identifier(sourceName)
 	count := context.Factory().Identifier(countName)
 	index := context.Factory().Identifier(indexName)
@@ -65,7 +70,7 @@ func CopyString(
 			context,
 			tsgo.NodeFlagsConst,
 			sourceName,
-			operands[1],
+			text.Value(),
 		),
 		sliceVariable(
 			context,

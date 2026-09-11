@@ -1,3 +1,5 @@
+import { GoString } from "@gotots/runtime/string-value.js";
+import { textValues } from "./text.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -126,7 +128,7 @@ test("named-struct facets expose only selected static operations", (): void => {
   ), true);
   assert.equal(BinaryLittleEndianOperations.$hash(binaryState.LittleEndian), 0);
   const integer = MathBigIntOperations.$zero();
-  assert.equal(BigInteger.String(integer), "0");
+  assert.equal((BigInteger.String(integer))?.text(), "0");
   const floating = MathBigFloatOperations.$zero();
   assert.deepEqual(BigFloat.Float64(floating), [0, new Accuracy(0)]);
   const range = UnicodeRange16Operations.$make(1, 4, 1);
@@ -145,20 +147,20 @@ test("named-struct facets expose only selected static operations", (): void => {
   const builder = StringsBuilderOperations.$zero();
   const builderCopy = StringsBuilderOperations.$copy(builder);
   assert.notEqual(builderCopy, builder);
-  StringBuilder.WriteString(builder, "source");
-  assert.equal(StringBuilder.String(builderCopy), "");
+  StringBuilder.WriteString(builder, GoString.fromText("source"));
+  assert.equal((StringBuilder.String(builderCopy))?.text(), "");
   assert.equal(StringsBuilderOperations.$fromStorage(
     StringsBuilderOperations.$storageOf(builder),
   ), builder);
 
   const sample = RuntimeMetricsSampleOperations.$copy(
-    new Sample("/metric", new Value()),
+    new Sample(GoString.fromText("/metric"), new Value()),
   );
-  assert.equal(sample.Name, "/metric");
+  assert.equal((sample.Name)?.text(), "/metric");
   const description = RuntimeMetricsDescriptionOperations.$copy(
-    new Description("/metric", "detail"),
+    new Description(GoString.fromText("/metric"), GoString.fromText("detail")),
   );
-  assert.equal(description.Description, "detail");
+  assert.equal(description.Description.text(), "detail");
 
   const memStats = RuntimeMemStatsOperations.$zero();
   assert.equal(memStats.Alloc, 0n);
@@ -171,17 +173,17 @@ test("named-struct facets expose only selected static operations", (): void => {
   assert.equal(invalidCopy.IsValid(), false);
 
   const field = new StructField({
-    Name: "Original",
-    PkgPath: "",
+    Name: GoString.fromText("Original"),
+    PkgPath: GoString.empty,
     Type: undefined,
-    Tag: new StructTag('json:"original"'),
+    Tag: new StructTag(GoString.fromText('json:"original"')),
     Offset: 8n,
     Index: RuntimeSlice.literal([1n, 2n]),
     Anonymous: false,
   });
   const fieldCopy = ReflectStructFieldOperations.$copy(field);
-  field.Name = "Changed";
-  assert.equal(fieldCopy.Name, "Original");
+  field.Name = GoString.fromText("Changed");
+  assert.equal((fieldCopy.Name)?.text(), "Original");
   assert.equal(fieldCopy.Index, field.Index);
 
   const atomicBool = SyncAtomicBoolOperations.$zero();
@@ -286,22 +288,22 @@ test("named-struct facets expose only selected static operations", (): void => {
 
 test("provider assignment facets preserve selected Go representations", (): void => {
   const parseSource = new ParseError(
-    "layout",
-    "value",
-    "layout-elem",
-    "value-elem",
-    "message",
+    GoString.fromText("layout"),
+    GoString.fromText("value"),
+    GoString.fromText("layout-elem"),
+    GoString.fromText("value-elem"),
+    GoString.fromText("message"),
   );
-  const parseTarget = new ParseError("", "", "", "", "");
+  const parseTarget = new ParseError(GoString.fromText(""), GoString.fromText(""), GoString.fromText(""), GoString.fromText(""), GoString.fromText(""));
   TimeParseErrorOperations.$assign(parseTarget, parseSource);
   assert.deepEqual(
-    [
+    textValues([
       parseTarget.Layout,
       parseTarget.Value,
       parseTarget.LayoutElem,
       parseTarget.ValueElem,
       parseTarget.Message,
-    ],
+    ]),
     ["layout", "value", "layout-elem", "value-elem", "message"],
   );
 
@@ -312,32 +314,32 @@ test("provider assignment facets preserve selected Go representations", (): void
   Mutex.Unlock(mutexTarget);
 
   const builderSource = new StringBuilder();
-  StringBuilder.WriteString(builderSource, "source");
+  StringBuilder.WriteString(builderSource, GoString.fromText("source"));
   const builderTarget = new StringBuilder();
   StringsBuilderOperations.$assign(builderTarget, builderSource);
-  assert.equal(StringBuilder.String(builderTarget), "source");
+  assert.equal((StringBuilder.String(builderTarget))?.text(), "source");
   assert.throws(
-    () => StringBuilder.WriteString(builderTarget, "-copy"),
+    () => StringBuilder.WriteString(builderTarget, GoString.fromText("-copy")),
     (failure: unknown): boolean => failure instanceof GoPanic &&
       failure.value.$go$format("v", "", undefined) ===
         "strings: illegal use of non-zero Builder copied by value",
   );
   const builderCopy = StringsBuilderOperations.$copy(builderSource);
-  assert.equal(StringBuilder.String(builderCopy), "source");
+  assert.equal((StringBuilder.String(builderCopy))?.text(), "source");
   assert.throws(
-    () => StringBuilder.WriteString(builderCopy, "-copy"),
+    () => StringBuilder.WriteString(builderCopy, GoString.fromText("-copy")),
     (failure: unknown): boolean => failure instanceof GoPanic &&
       failure.value.$go$format("v", "", undefined) ===
         "strings: illegal use of non-zero Builder copied by value",
   );
   StringsBuilderOperations.$assign(builderSource, builderSource);
-  StringBuilder.WriteString(builderSource, "-self");
-  assert.equal(StringBuilder.String(builderSource), "source-self");
+  StringBuilder.WriteString(builderSource, GoString.fromText("-self"));
+  assert.equal((StringBuilder.String(builderSource))?.text(), "source-self");
   const zeroBuilder = new StringBuilder();
   const assignedZeroBuilder = new StringBuilder();
   StringsBuilderOperations.$assign(assignedZeroBuilder, zeroBuilder);
-  StringBuilder.WriteString(assignedZeroBuilder, "zero");
-  assert.equal(StringBuilder.String(assignedZeroBuilder), "zero");
+  StringBuilder.WriteString(assignedZeroBuilder, GoString.fromText("zero"));
+  assert.equal((StringBuilder.String(assignedZeroBuilder))?.text(), "zero");
 
   const duration = new Duration(3_600_000_000_000n);
   const timerSource = NewTimer(duration);
@@ -453,13 +455,13 @@ test("recovery facets preserve the direct provider ABI", (): void => {
   );
   assert.equal(SyscallErrnoIs(EPERM, fsState.ErrPermission), true);
   const parseFailure = new ParseError(
-    "2006",
-    "bad",
-    "2006",
-    "bad",
-    "",
+    GoString.fromText("2006"),
+    GoString.fromText("bad"),
+    GoString.fromText("2006"),
+    GoString.fromText("bad"),
+    GoString.fromText(""),
   );
-  assert.equal(TimeParseErrorError(parseFailure), parseFailure.Error());
+  assert.equal(TimeParseErrorError(parseFailure).text(), parseFailure.Error().text());
   const [text, textFailure] = TimeTimeAppendText(
     new Time(),
     RuntimeSlice.literal([0x70, 0x3d]),

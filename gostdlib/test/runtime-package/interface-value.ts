@@ -1,3 +1,4 @@
+import type { GoString } from "./string-value.js";
 export abstract class GoInterfaceValue {
     abstract readonly $go$type: {
         readonly comparable: boolean;
@@ -13,5 +14,5 @@ export abstract class GoInterfaceValue {
 export const GoErrorMethodToken: object = Object.freeze({});
 export const GoRuntimeErrorMethodToken: object = Object.freeze({});
 export interface GoError extends GoInterfaceValue {
-    Error(): string;
+    Error(): GoString;
 }

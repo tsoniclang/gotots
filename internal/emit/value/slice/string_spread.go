@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -52,6 +53,10 @@ func AppendString(
 		return api.ExpressionEmission{}, err
 	}
 	receiver := context.Factory().Identifier(receiverName)
+	textValue, err := stringvalue.Text(context, api.DirectExpression(operands[1]))
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	text := context.Factory().Identifier(textName)
 	bytesValue := context.Factory().Identifier(bytesName)
 	index := context.Factory().Identifier(indexName)
@@ -75,7 +80,7 @@ func AppendString(
 			context,
 			tsgo.NodeFlagsConst,
 			textName,
-			operands[1],
+			textValue.Value(),
 		),
 		sliceVariable(
 			context,

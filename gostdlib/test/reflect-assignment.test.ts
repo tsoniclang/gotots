@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -6,8 +7,8 @@ import { ReflectValueOperations } from "../src/internal/facets/named-reflect.js"
 import { ProviderError } from "../src/internal/runtime/error.js";
 
 test("reflection assignment replaces the descriptor without changing its copies", () => {
-  const first = new ProviderError("first");
-  const second = new ProviderError("second");
+  const first = new ProviderError(GoString.fromText("first"));
+  const second = new ProviderError(GoString.fromText("second"));
   const original = ValueOf(first);
   assert.equal(original.CanAddr(), false);
   const copied = ReflectValueOperations.$copy(original);

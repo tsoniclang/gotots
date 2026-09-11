@@ -1,3 +1,5 @@
+import { GoString } from "@gotots/runtime/string-value.js";
+import { fromHostString } from "../../portable/utf8/codec.js";
 import { getHeapStatistics } from "node:v8";
 import type {
   gostring,
@@ -14,7 +16,7 @@ import type { MemorySnapshot } from "../../portable/runtime/mem-stats.js";
 export function goOperatingSystem(): gostring {
   switch (process.platform) {
     case "win32":
-      return "windows";
+      return GoString.fromText("windows");
     case "aix":
     case "android":
     case "darwin":
@@ -22,11 +24,11 @@ export function goOperatingSystem(): gostring {
     case "linux":
     case "netbsd":
     case "openbsd":
-      return process.platform;
+      return GoString.fromText(process.platform);
     case "sunos":
-      return "solaris";
+      return GoString.fromText("solaris");
     case "cygwin":
-      return "windows";
+      return GoString.fromText("windows");
     case "haiku":
       throw new RangeError("the selected Go toolchain has no haiku GOOS");
   }
@@ -35,9 +37,9 @@ export function goOperatingSystem(): gostring {
 export function goArchitecture(): gostring {
   switch (process.arch) {
     case "x64":
-      return "amd64";
+      return GoString.fromText("amd64");
     case "ia32":
-      return "386";
+      return GoString.fromText("386");
     case "arm":
     case "arm64":
     case "loong64":
@@ -45,9 +47,9 @@ export function goArchitecture(): gostring {
     case "ppc64":
     case "riscv64":
     case "s390x":
-      return process.arch;
+      return GoString.fromText(process.arch);
     case "mipsel":
-      return "mipsle";
+      return GoString.fromText("mipsle");
   }
 }
 
@@ -68,20 +70,20 @@ export function memorySnapshot(): MemorySnapshot {
 export function caller(skip: int64): [uint64, gostring, int64, boolean] {
   const stack = new Error().stack;
   if (stack === undefined) {
-    return [0n, "", 0n, false];
+    return [0n, GoString.empty, 0n, false];
   }
   const frames = stack.split("\n").slice(2);
   const frame = frames[Math.max(0, hostInteger(skip)) + 1];
   if (frame === undefined) {
-    return [0n, "", 0n, false];
+    return [0n, GoString.empty, 0n, false];
   }
   const match = /\(?(.+):(\d+):(\d+)\)?$/u.exec(frame.trim());
   if (match === null) {
-    return [0n, "", 0n, false];
+    return [0n, GoString.empty, 0n, false];
   }
   const file = match[1]?.replaceAll("\\", "/") ?? "";
   const line = Number(match[2] ?? 0);
-  return [0n, file, integerFromHost(line), file !== "" && line > 0];
+  return [0n, fromHostString(file), integerFromHost(line), file !== "" && line > 0];
 }
 
 export function stackBytes(): Uint8Array {

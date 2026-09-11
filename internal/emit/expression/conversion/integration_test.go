@@ -46,10 +46,9 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 				}
 			}
 			for _, required := range []string{
-				"export function goSliceArrayPointer<T, N extends number>",
-				"public static $view<T, N extends number>",
-				"private readonly $offset: number",
-				"projectPointer<T | undefined, GoArray<T, N>>",
+				"export function goSliceArrayPointer<T, N extends number | bigint>",
+				"static $fromRegion<T, N extends number | bigint>",
+				"viewPointer<T, GoArray<T, N>>",
 				"Pointer<Pair>",
 				"export function String(value: gostring): gostring",
 				"globalThis.String.fromCharCode",

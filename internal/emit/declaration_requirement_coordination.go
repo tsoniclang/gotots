@@ -377,6 +377,11 @@ func (s *programSession) scheduleReflectionInterfaceDemands() (
 	if err != nil {
 		return false, err
 	}
+	raw, err := s.registry.FlushReflectionRawPointerDemands()
+	if err != nil {
+		return false, err
+	}
+	requests = api.CombineRequests(requests, raw)
 	if len(requests) == 0 {
 		return false, nil
 	}
@@ -516,7 +521,8 @@ func artifactKinds(kind api.DeclarationRequirementKind) bool {
 		kind == api.DeclarationRequirementGenericCapability ||
 		kind == api.DeclarationRequirementCallableABI ||
 		kind == api.DeclarationRequirementReflectionType ||
-		kind == api.DeclarationRequirementReflectionValueOperations
+		kind == api.DeclarationRequirementReflectionValueOperations ||
+		kind == api.DeclarationRequirementReflectionRawPointer
 }
 
 func compareGeneratedArtifacts(

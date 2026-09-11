@@ -283,10 +283,11 @@ func executeIntegerOverflowTS(
 	writeFile(t, runnerPath, `import * as values from "`+
 		artifacts.module(t, "source.ts")+`";
 
+import { GoString } from "./runtime/string-value.js";
 const row = (values: readonly bigint[]): string => values.map(String).join(" ");
 console.log(row(values.BigOverflowBinary(18446744073709551615n, -9223372036854775808n)));
 console.log(row(values.BigOverflowUpdate(18446744073709551615n)));
-console.log(values.WideHash("a").toString(), values.WideHash("b").toString(), values.WideHash("cache-key").toString());
+console.log(values.WideHash(GoString.fromText("a")).toString(), values.WideHash(GoString.fromText("b")).toString(), values.WideHash(GoString.fromText("cache-key")).toString());
 `)
 	return executeMaterializedTypeScript(
 		t,
@@ -363,7 +364,8 @@ func executeWideHashTS(
 	writeFile(t, runnerPath, `import * as values from "`+
 		artifacts.module(t, "source.ts")+`";
 
-console.log(values.WideHash("a"), values.WideHash("b"), values.WideHash("cache-key"));
+import { GoString } from "./runtime/string-value.js";
+console.log(values.WideHash(GoString.fromText("a")), values.WideHash(GoString.fromText("b")), values.WideHash(GoString.fromText("cache-key")));
 `)
 	return executeMaterializedTypeScript(
 		t,

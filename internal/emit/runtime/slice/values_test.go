@@ -33,8 +33,8 @@ func TestScalarSlicesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		".slice(",
 		".append(",
 		"RuntimeSlice.copy<int32>(",
-		".length",
-		".capacity",
+		".sourceLength()",
+		".sourceCapacity()",
 		".isNil()",
 	} {
 		if !strings.Contains(printed.source, fragment) {
@@ -47,7 +47,8 @@ func TestScalarSlicesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	for _, fragment := range []string{
 		"export class RuntimeSlice<T>",
 		"GoPanic.raise",
-		"copyWithin",
+		"targetBacking === sourceBacking && target.offset > source.offset",
+		"index--",
 		"this.offset + numericIndex in backing",
 	} {
 		if !strings.Contains(printed.runtime, fragment) {
@@ -59,6 +60,9 @@ func TestScalarSlicesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 			"dense RuntimeSlice retained a redundant indexed-storage helper:\n%s",
 			printed.runtime,
 		)
+	}
+	if strings.Contains(printed.runtime, ".copyWithin(") {
+		t.Fatal("indexed slice storage assumed an Array-only method")
 	}
 	if strings.Contains(printed.runtime, "]!") {
 		t.Fatalf("RuntimeSlice retained an unchecked indexed read:\n%s", printed.runtime)
@@ -132,7 +136,7 @@ console.log(AppendDistinctNamedSlices());
 	console.log(AppendUntypedStringConstantBytes());
 console.log(AppendLargeSpread());
 console.log(IndexUpdates());
-console.log(StringIndexCompound());
+console.log(StringIndexCompound().text());
 console.log(ParallelStoreOrder());
 console.log(CopyOverlapping());
 console.log(CopyDistinct());
@@ -189,8 +193,8 @@ func TestScalarSlicesBigIntProfileRemainsStrictAndTyped(t *testing.T) {
 		"RuntimeSlice.make<int32>(0n, null, 0)",
 		".get(1n)",
 		".set(1n, 9)",
-		"BigInt(values.length)",
-		"BigInt(values.capacity)",
+		"BigInt(values.sourceLength())",
+		"BigInt(values.sourceCapacity())",
 		"BigInt(RuntimeSlice.copy<int32>(",
 	} {
 		if !strings.Contains(printed.source, fragment) {

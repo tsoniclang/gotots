@@ -17,6 +17,7 @@ type specializationBuilder struct {
 	projectKey     operationBody
 	reifyKey       operationBody
 	keyProjection  bool
+	stringKey      bool
 	members        specializationMemberNames
 }
 

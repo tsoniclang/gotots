@@ -2,49 +2,20 @@ package array
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/runtime/memoryview"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 const StorageLocationMember = "$location"
 
+func regionValue(factory tsgo.Factory) tsgo.Expression {
+	return property(factory, factory.ThisExpression(), "$region")
+}
+
 func locationMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
-	elementType := typeReference(factory, "T")
-	locationType := factory.TypeOperatorNode(
-		tsgo.TypeOperatorNodeOperatorKindReadonlyKeyword,
-		factory.TupleTypeNode([]tsgo.TypeNode{
-			factory.ArrayTypeNode(elementType),
-			factory.KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindNumberKeyword,
-			),
-		}),
-	)
-	return method(
-		factory,
-		[]tsgo.ModifierLike{factory.PublicKeyword()},
-		StorageLocationMember,
-		nil,
-		nil,
-		locationType,
-		[]tsgo.Statement{factory.ReturnStatement(
-			factory.ArrayLiteralExpression(
-				[]tsgo.Expression{
-					factory.PropertyAccessExpression(
-						factory.ThisExpression(),
-						nil,
-						factory.Identifier("$values"),
-						tsgo.NodeFlagsNone,
-					),
-					factory.PropertyAccessExpression(
-						factory.ThisExpression(),
-						nil,
-						factory.Identifier("$offset"),
-						tsgo.NodeFlagsNone,
-					),
-				},
-				false,
-			),
-		)},
-	)
+	return method(factory, nil, StorageLocationMember, nil, nil,
+		memoryview.RegionType(factory, typeReference(factory, "T")),
+		[]tsgo.Statement{factory.ReturnStatement(regionValue(factory))})
 }
 
 func buildLocationOperation(factory tsgo.Factory) (tsgo.Statement, error) {
@@ -58,41 +29,9 @@ func buildLocationOperation(factory tsgo.Factory) (tsgo.Statement, error) {
 	}
 	elementType := typeReference(factory, "T")
 	lengthType := typeReference(factory, "N")
-	locationType := factory.TypeOperatorNode(
-		tsgo.TypeOperatorNodeOperatorKindReadonlyKeyword,
-		factory.TupleTypeNode([]tsgo.TypeNode{
-			factory.ArrayTypeNode(elementType),
-			factory.KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindNumberKeyword,
-			),
-		}),
-	)
-	value := factory.Identifier("value")
-	return factory.FunctionDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		nil,
-		factory.Identifier(locationContract.ExportedName()),
-		typeParameters(factory),
-		[]tsgo.ParameterDeclaration{
-			parameter(
-				factory,
-				nil,
-				"value",
-				arrayType(
-					factory,
-					arrayContract.ExportedName(),
-					elementType,
-					lengthType,
-				),
-			),
-		},
-		locationType,
-		factory.Block([]tsgo.Statement{
-			factory.ReturnStatement(call(
-				factory,
-				property(factory, value, StorageLocationMember),
-				nil,
-			)),
-		}, true),
-	), nil
+	return factory.FunctionDeclaration([]tsgo.ModifierLike{factory.ExportKeyword()}, nil, factory.Identifier(locationContract.ExportedName()),
+		typeParameters(factory), []tsgo.ParameterDeclaration{parameter(factory, nil, "value",
+			arrayType(factory, arrayContract.ExportedName(), elementType, lengthType))}, memoryview.RegionType(factory, elementType),
+		factory.Block([]tsgo.Statement{factory.ReturnStatement(call(factory,
+			property(factory, factory.Identifier("value"), StorageLocationMember), nil))}, true)), nil
 }

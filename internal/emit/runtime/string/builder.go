@@ -72,7 +72,7 @@ func orderedString(
 ) tsgo.FunctionDeclaration {
 	left := factory.Identifier("left")
 	right := factory.Identifier("right")
-	targetType := stringType(factory)
+	targetType := stringValueType(factory)
 	return factory.FunctionDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		nil,
@@ -85,7 +85,7 @@ func orderedString(
 		targetType,
 		factory.Block([]tsgo.Statement{
 			factory.ReturnStatement(factory.ConditionalExpression(
-				binary(factory, left, operator, right),
+				binary(factory, methodCall(factory, left, "text", nil), operator, methodCall(factory, right, "text", nil)),
 				factory.QuestionToken(),
 				left,
 				factory.ColonToken(),
@@ -102,50 +102,13 @@ func stringIndex(
 ) tsgo.FunctionDeclaration {
 	value := factory.Identifier("value")
 	index := factory.Identifier("index")
-	offset := factory.Identifier("offset")
-	return factory.FunctionDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		nil,
-		factory.Identifier(exportedName),
-		nil,
-		[]tsgo.ParameterDeclaration{
-			parameter(factory, value, stringType(factory), false),
+	return factory.FunctionDeclaration([]tsgo.ModifierLike{factory.ExportKeyword()}, nil,
+		factory.Identifier(exportedName), nil, []tsgo.ParameterDeclaration{
+			parameter(factory, value, stringValueType(factory), false),
 			parameter(factory, index, indexType(factory), false),
-		},
-		numberType(factory),
-		factory.Block(
-			[]tsgo.Statement{
-				constNumber(factory, offset, index),
-				boundsCheck(
-					factory,
-					panicName,
-					or(
-						factory,
-						notSafeInteger(factory, offset),
-						or(
-							factory,
-							lessThan(factory, offset, numeric(factory, "0")),
-							greaterThanOrEqual(
-								factory,
-								offset,
-								length(factory, value),
-							),
-						),
-					),
-					"Go string index out of range",
-				),
-				factory.ReturnStatement(
-					methodCall(
-						factory,
-						value,
-						"charCodeAt",
-						[]tsgo.Expression{offset},
-					),
-				),
-			},
-			true,
-		),
-	)
+		}, numberType(factory), factory.Block([]tsgo.Statement{
+			factory.ReturnStatement(methodCall(factory, value, "read", []tsgo.Expression{index})),
+		}, true))
 }
 
 func stringSlice(
@@ -156,59 +119,19 @@ func stringSlice(
 	value := factory.Identifier("value")
 	low := factory.Identifier("low")
 	high := factory.Identifier("high")
-	start := factory.Identifier("start")
-	end := factory.Identifier("end")
-	return factory.FunctionDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		nil,
-		factory.Identifier(exportedName),
-		nil,
-		[]tsgo.ParameterDeclaration{
-			parameter(factory, value, stringType(factory), false),
+	return factory.FunctionDeclaration([]tsgo.ModifierLike{factory.ExportKeyword()}, nil,
+		factory.Identifier(exportedName), nil, []tsgo.ParameterDeclaration{
+			parameter(factory, value, stringValueType(factory), false),
 			parameter(factory, low, indexType(factory), false),
 			parameter(factory, high, indexType(factory), true),
-		},
-		stringType(factory),
-		factory.Block(
-			[]tsgo.Statement{
-				constNumber(factory, start, low),
-				constSliceHigh(factory, end, high, value),
-				boundsCheck(
-					factory,
-					panicName,
-					or(
-						factory,
-						notSafeInteger(factory, start),
-						or(
-							factory,
-							notSafeInteger(factory, end),
-							or(
-								factory,
-								lessThan(factory, start, numeric(factory, "0")),
-								or(
-									factory,
-									greaterThan(factory, start, end),
-									greaterThan(factory, end, length(factory, value)),
-								),
-							),
-						),
-					),
-					"Go string slice bounds out of range",
-				),
-				factory.ReturnStatement(
-					methodCall(
-						factory,
-						value,
-						"slice",
-						[]tsgo.Expression{start, end},
-					),
-				),
-			},
-			true,
-		),
-	)
+		}, stringValueType(factory), factory.Block([]tsgo.Statement{
+			factory.ReturnStatement(methodCall(factory, value, "slice", []tsgo.Expression{low, high})),
+		}, true))
 }
 
+func stringValueType(factory tsgo.Factory) tsgo.TypeReferenceNode {
+	return factory.TypeReferenceNode(factory.Identifier("GoString"), nil)
+}
 func parameter(
 	factory tsgo.Factory,
 	name tsgo.Identifier,

@@ -71,7 +71,7 @@ export class BufferedReaderState {
         return;
       }
     }
-    this.pendingFailure = new ProviderError("multiple Read calls return no data or error");
+    this.pendingFailure = ProviderError.fromText("multiple Read calls return no data or error");
   }
 
   private takeFailure(): GoError | undefined {

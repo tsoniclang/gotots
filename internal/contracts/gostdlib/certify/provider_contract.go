@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	runtimecontract "github.com/tsoniclang/gotots/internal/contracts/runtime"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"io/fs"
 	"os"
@@ -161,6 +162,7 @@ func verifyPackageModules(
 	document packageDocument,
 	providerScalarSubpath string,
 	providerPointerSubpath string,
+	providerStringSubpath string,
 	seeds []moduleSeed,
 	facets []facetSeed,
 	profiles []providerCallableProfileSeed,
@@ -171,11 +173,12 @@ func verifyPackageModules(
 	expected := make(
 		map[string]packageExport,
 		len(seeds)+len(facets)+len(profiles)+len(statefulProfiles)+
-			len(providerInterfaces)+len(providerCapabilities)+2,
+			len(providerInterfaces)+len(providerCapabilities)+3,
 	)
 	for _, support := range []string{
 		providerScalarSubpath,
 		providerPointerSubpath,
+		providerStringSubpath,
 	} {
 		base := strings.TrimSuffix(strings.TrimPrefix(support, "./"), ".js")
 		if support == "" {
@@ -448,6 +451,71 @@ func verifyContractTypeParameters(
 		); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func verifyProviderStringContract(config resolvedConfig, project *tsgo.ProjectInspection, requirements runtimecontract.Requirements) error {
+	runtimePath := filepath.Join(config.providerRoot, "test", "runtime-package", "string-value.ts")
+	runtimeExports, err := project.Exports(runtimePath)
+	if err != nil {
+		return err
+	}
+	var canonical tsgo.ProjectExport
+	found := false
+	for _, declaration := range runtimeExports {
+		if declaration.Name() == "GoString" {
+			if found {
+				return certifyError("verify provider strings", runtimePath, "canonical declaration is duplicated")
+			}
+			canonical, found = declaration, true
+		}
+	}
+	if !found {
+		return certifyError("verify provider strings", runtimePath, "canonical declaration is absent")
+	}
+	module := strings.TrimPrefix(requirements.ProviderStringModule(), "./")
+	path := filepath.Join(config.providerRoot, "src", filepath.FromSlash(strings.TrimSuffix(module, ".js")+".ts"))
+	exports, err := project.Exports(path)
+	if err != nil {
+		return err
+	}
+	expected := map[string]bool{"fromHostString": true, "toHostString": false}
+	for _, target := range exports {
+		incoming, selected := expected[target.Name()]
+		if !selected {
+			continue
+		}
+		count, err := project.CallableParameterCount(target)
+		if err != nil {
+			return err
+		}
+		if count != 1 || target.TypeParameterCount() != 0 {
+			return certifyError("verify provider strings", target.Name(), "host conversion requires one non-generic parameter")
+		}
+		var identity tsgo.ProjectTypeIdentity
+		var hostType string
+		if incoming {
+			identity, err = project.CallableReturnTypeIdentity(target)
+			if err == nil {
+				hostType, err = project.CallableParameterTypeString(target, 0)
+			}
+		} else {
+			identity, err = project.CallableParameterTypeIdentity(target, 0)
+			if err == nil {
+				hostType, err = project.CallableReturnTypeString(target)
+			}
+		}
+		if err != nil {
+			return err
+		}
+		if hostType != "string" || identity.IncludesNullish() || !identity.Matches(canonical) {
+			return certifyError("verify provider strings", target.Name(), "conversion does not join host string to the canonical runtime string")
+		}
+		delete(expected, target.Name())
+	}
+	if len(expected) != 0 {
+		return certifyError("verify provider strings", path, "host conversion is absent")
 	}
 	return nil
 }

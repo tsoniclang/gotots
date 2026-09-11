@@ -34,7 +34,7 @@ func AggregateData(values [][2]Record) *[2]Record { return unsafe.SliceData(valu
 			test.Fatalf("slice data output lacks %q", required)
 		}
 	}
-	for _, required := range []string{"if (value.isNil())", "if (value.capacity === 0)", "zero: () => T", "allocatePointer<T>(zero())", "value.slice(0, 1, null).address(0)"} {
+	for _, required := range []string{"return value.$data(zero)", "if (this.isNil())", "if (this.capacity === 0)", "zero: () => T", "allocatePointer<T>(zero())", "this.slice(0, 1, null).address(0)"} {
 		if !strings.Contains(printed.runtime, required) {
 			test.Fatalf("slice data runtime lacks %q", required)
 		}
@@ -43,7 +43,7 @@ func AggregateData(values [][2]Record) *[2]Record { return unsafe.SliceData(valu
 		test.Fatal("slice data constructs an unused aggregate zero before selecting its address")
 	}
 	if strings.Count(printed.runtime, "zero()") != 1 ||
-		!regexp.MustCompile(`if \(value.capacity === 0\) \{\s*return allocatePointer<T>\(zero\(\)\);`).MatchString(printed.runtime) {
+		!regexp.MustCompile(`if \(this.capacity === 0\)\s*(?:\{\s*)?return allocatePointer<T>\(zero\(\)\);`).MatchString(printed.runtime) {
 		test.Fatal("zero construction is not confined to the unspecified empty address")
 	}
 	for _, forbidden := range []string{"memoryLayout", "toRawPointer", " as any", " as unknown"} {

@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { GoMapHash } from "@gotots/runtime/map.js";
 import type { gostring, int64 } from "@gotots/gostdlib/internal/scalars.js";
 
@@ -104,21 +105,21 @@ export class TimeParseErrorOperations {
 
   static $hash(source: ParseError): number {
     let hash = 2166136261;
-    hash = GoMapHash.mix(hash, GoMapHash.string(source.Layout));
-    hash = GoMapHash.mix(hash, GoMapHash.string(source.Value));
-    hash = GoMapHash.mix(hash, GoMapHash.string(source.LayoutElem));
-    hash = GoMapHash.mix(hash, GoMapHash.string(source.ValueElem));
-    hash = GoMapHash.mix(hash, GoMapHash.string(source.Message));
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.Layout.text()));
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.Value.text()));
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.LayoutElem.text()));
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.ValueElem.text()));
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.Message.text()));
     return hash;
   }
 
   static $equal(left: ParseError, right: ParseError): boolean {
     return (
-      left.Layout === right.Layout &&
-      left.Value === right.Value &&
-      left.LayoutElem === right.LayoutElem &&
-      left.ValueElem === right.ValueElem &&
-      left.Message === right.Message
+      left.Layout.text() === right.Layout.text() &&
+      left.Value.text() === right.Value.text() &&
+      left.LayoutElem.text() === right.LayoutElem.text() &&
+      left.ValueElem.text() === right.ValueElem.text() &&
+      left.Message.text() === right.Message.text()
     );
   }
 

@@ -296,7 +296,7 @@ export class GzipSource {
       ioState.EOF,
       unexpectedEOF,
       ioState.ErrNoProgress,
-      () => new ProviderError("gzip: invalid header"),
+      () => ProviderError.fromText("gzip: invalid header"),
     );
   }
 

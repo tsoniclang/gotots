@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
@@ -101,7 +102,7 @@ function parseRFC3339(source: string): ParsedRFC3339 | RejectedRFC3339 {
 function rejected(source: string): RejectedRFC3339 {
   return {
     ok: false,
-    failure: new ParseError(layout, source, layout, source, ""),
+    failure: new ParseError(GoString.fromText(layout), GoString.fromText(source), GoString.fromText(layout), GoString.fromText(source), GoString.empty),
   };
 }
 

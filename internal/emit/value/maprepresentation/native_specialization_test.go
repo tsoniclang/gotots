@@ -20,7 +20,7 @@ import (
 func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 	targetContext, key, value, pointer := nativeSpecializationContext(t)
 	factory := targetContext.Factory()
-	keyType := factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword)
+	keyType := factory.TypeReferenceNode(factory.Identifier("GoString"), nil)
 	valueType := factory.TypeReferenceNode(factory.Identifier("Box"), nil)
 	pointerType := factory.UnionTypeNode([]tsgo.TypeNode{
 		valueType,
@@ -51,10 +51,10 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 		for _, required := range []string{
 			"private readonly values: Map<string, ",
 			"private static $copyValue",
-			"values.set(key, ",
-			"values.has(key)",
-			"values.delete(key)",
-			"Array.from(values.keys())",
+			"values.set(key.text(), [key, ",
+			"values.has(key.text())",
+			"values.delete(key.text())",
+			"Array.from(values.values()",
 		} {
 			if !strings.Contains(source, required) {
 				t.Fatalf("native-key specialization lacks %q:\n%s", required, source)
@@ -69,8 +69,6 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 			"count",
 			"GoDenseIndex",
 			"GoMapHash",
-			"private readonly values: Map<string, [",
-			"values.set(key, [",
 			" as ",
 		} {
 			if strings.Contains(source, forbidden) {
@@ -82,17 +80,18 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 		lookupOK := specializationMethodSource(t, source, "lookupOk", "store")
 		if strings.Contains(store, "values.get(") ||
 			strings.Contains(store, "entry === undefined") ||
-			strings.Count(store, "values.set(key, ") != 1 ||
+			strings.Count(store, "values.set(key.text(), [key, ") != 1 ||
 			strings.Count(store, "$copyValue(value)") != 1 {
 			t.Fatalf("native store is not one copy-and-set operation:\n%s", store)
 		}
-		if strings.Contains(lookup, "entry[0]") ||
-			strings.Contains(lookupOK, "entry[0]") {
-			t.Fatalf("native lookup retains a value cell:\n%s\n%s", lookup, lookupOK)
+		if !strings.Contains(lookup, "storedValue[1]") ||
+			!strings.Contains(lookupOK, "storedValue[1]") {
+			t.Fatalf("string-map lookup does not project its value from the retained key/value entry:\n%s\n%s", lookup, lookupOK)
 		}
 	}
-	t.Log("native store work: map-get=0 map-set=1 value-copy=1 tuple-allocation=0 semantic-branches=0")
-	typeScriptOutput := compileAndRunSpecialization(t, mapValueTestContract+`class Box {
+	t.Log("string-key store work: map-get=0 map-set=1 value-copy=1 retained-key/value-entry=1 semantic-branches=0")
+	typeScriptOutput := compileAndRunSpecialization(t, `import { GoString } from "./runtime/string-value.js";
+`+mapValueTestContract+`class Box {
     constructor(public value: number) {}
 }
 
@@ -101,34 +100,34 @@ class GoPanic {
 }
 `+valueSource+pointerSource+`
 const nilValues = NativeBoxMap.nil();
-const firstMissing = nilValues.lookup("missing");
+const firstMissing = nilValues.lookup(GoString.fromText("missing"));
 firstMissing.value = 99;
 let nilStoreFailed = false;
-try { nilValues.store("missing", new Box(1)); } catch { nilStoreFailed = true; }
-console.log(nilValues.lookup("missing").value, nilValues.length(), nilValues.isNil(), nilStoreFailed);
+try { nilValues.store(GoString.fromText("missing"), new Box(1)); } catch { nilStoreFailed = true; }
+console.log(nilValues.lookup(GoString.fromText("missing")).value, nilValues.length(), nilValues.isNil(), nilStoreFailed);
 
 const values = NativeBoxMap.make(0, []);
 const source = new Box(10);
-values.store("alpha", source);
+values.store(GoString.fromText("alpha"), source);
 source.value = 90;
-const read = values.lookup("alpha");
+const read = values.lookup(GoString.fromText("alpha"));
 read.value = 70;
 const alias = values;
-alias.store("beta", new Box(20));
-alias.store("alpha", new Box(30));
-console.log(values.lookup("alpha").value, values.lookup("beta").value, values.length());
+alias.store(GoString.fromText("beta"), new Box(20));
+alias.store(GoString.fromText("alpha"), new Box(30));
+console.log(values.lookup(GoString.fromText("alpha")).value, values.lookup(GoString.fromText("beta")).value, values.length());
 
 const pointers = NativePointerMap.make(0, []);
-pointers.store("nil", undefined);
-const [stored, storedOK] = pointers.lookupOk("nil");
-const [absent, absentOK] = pointers.lookupOk("absent");
+pointers.store(GoString.fromText("nil"), undefined);
+const [stored, storedOK] = pointers.lookupOk(GoString.fromText("nil"));
+const [absent, absentOK] = pointers.lookupOk(GoString.fromText("absent"));
 console.log(stored === undefined, storedOK, absent === undefined, absentOK, pointers.length());
 
-values.delete("alpha");
-console.log(values.lookup("beta").value, values.length(), values.keys().sort().join(","));
+values.delete(GoString.fromText("alpha"));
+console.log(values.lookup(GoString.fromText("beta")).value, values.length(), values.keys().map(key => key.text()).sort().join(","));
 values.clear();
-console.log(values.length(), values.isNil(), values.lookup("beta").value);
-`)
+console.log(values.length(), values.isNil(), values.lookup(GoString.fromText("beta")).value);
+`, api.RuntimeStringValue)
 	goOutput := executeNativeKeyMapGo(t)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)

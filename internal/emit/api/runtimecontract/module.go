@@ -22,12 +22,14 @@ const (
 	RuntimeModuleInterfaceValue   RuntimeModule = 12
 	RuntimeModulePanicNil         RuntimeModule = 13
 	RuntimeModuleChannel          RuntimeModule = 14
-	RuntimeModuleUnsafe           RuntimeModule = 17
 	RuntimeModuleStruct           RuntimeModule = 18
 	RuntimeModuleStorage          RuntimeModule = 19
 	RuntimeModuleDeferredRegistry RuntimeModule = 20
 	RuntimeModuleScalar           RuntimeModule = 21
 	RuntimeModuleLifetime         RuntimeModule = 22
+	RuntimeModuleMemoryDescriptor RuntimeModule = 23
+	RuntimeModuleMemoryView       RuntimeModule = 24
+	RuntimeModuleStringValue      RuntimeModule = 25
 )
 
 func runtimeContract(
@@ -44,26 +46,6 @@ func runtimeContract(
 		typeUsable:   typeUsable,
 		dependencies: slices.Clone(dependencies),
 	}
-}
-
-func unsafeRuntimeContract(
-	symbol RuntimeSymbol,
-) (RuntimeSymbolContract, bool) {
-	var contract RuntimeSymbolContract
-	switch symbol {
-	case RuntimeUnsafeString:
-		contract = runtimeContract(
-			RuntimeModuleUnsafe,
-			"runtime/unsafe.ts",
-			"goUnsafeString",
-			false,
-			RuntimeSlice,
-			RuntimePanic,
-		)
-	default:
-		return RuntimeSymbolContract{}, false
-	}
-	return contract, true
 }
 
 func concurrencyRuntimeContract(
@@ -174,6 +156,10 @@ func (c RuntimeSymbolContract) TypeUsable() bool {
 	return c.typeUsable
 }
 
+func (c RuntimeSymbolContract) TypeOnly() bool {
+	return c.typeOnly
+}
+
 type RuntimeSymbolError struct {
 	Symbol RuntimeSymbol
 }
@@ -233,7 +219,9 @@ func interfaceRuntimeContract(
 			true,
 			RuntimeInterfaceValue,
 			RuntimeErrorMethodToken,
+			RuntimeStringValue,
 		)
+		contract.typeOnly = true
 	case RuntimeBuiltinErrorContract:
 		contract = runtimeContract(
 			RuntimeModuleInterfaceValue,
@@ -260,7 +248,9 @@ func interfaceRuntimeContract(
 			RuntimeInterfaceValue,
 			RuntimeErrorMethodToken,
 			RuntimeRuntimeErrorToken,
+			RuntimeStringValue,
 		)
+		contract.typeOnly = true
 	case RuntimeErrorContract:
 		contract = runtimeContract(
 			RuntimeModuleInterfaceValue,

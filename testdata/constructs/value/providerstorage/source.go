@@ -257,3 +257,19 @@ func MetricsFields() bool {
 	sample = metrics.Sample{Name: "after"}
 	return *name == "after" && value.Kind() == 0
 }
+
+func ProjectedProviderRegion() bool {
+	entries := metrics.All()
+	if len(entries) == 0 {
+		return false
+	}
+	entries = append(entries[:0:0], entries...)
+	view := (*[1]metrics.Description)(entries)
+	original := view[0]
+	entries[0] = metrics.Description{Name: "first"}
+	if view[0].Name != "first" {
+		return false
+	}
+	view[0] = original
+	return entries[0].Name == original.Name
+}

@@ -70,7 +70,7 @@ export class ReflectTypeMetadataOperations {
   static $registerOpaqueStruct<T>(
     type: Type,
     resolveAdapter: RuntimeValueAdapterResolver<T>,
-    unavailableFields: readonly gostring[],
+    unavailableFields: readonly string[],
   ): void {
     registerRuntimeOpaqueStructValueOperations(
       type,

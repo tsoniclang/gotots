@@ -1,3 +1,4 @@
+import { fromHostString } from "../utf8/codec.js";
 import type { float64, gostring, int64 } from "@gotots/gostdlib/internal/scalars.js";
 
 const nanosecondsPerSecond = 1_000_000_000n;
@@ -20,6 +21,10 @@ export class Duration {
   }
 
   String(): gostring {
+    return fromHostString(this.formatText());
+  }
+
+  private formatText(): string {
     if (this.#value === 0n) {
       return "0s";
     }

@@ -51,7 +51,7 @@ func verifyProviderScalarContract(
 			)
 		}
 		if target.TypeParameterCount() != 0 ||
-			target.DeclaredTypeString() != carrier.String() {
+			carrier != runtimecontract.PrimitiveCarrierGoString && target.DeclaredTypeString() != carrier.String() {
 			return certifyError(
 				"verify provider scalars",
 				target.Name(),
@@ -61,6 +61,14 @@ func verifyProviderScalarContract(
 					carrier,
 				),
 			)
+		}
+		if carrier == runtimecontract.PrimitiveCarrierGoString {
+			declarations := target.Declarations()
+			canonical := filepath.Join(config.providerRoot, "test", "runtime-package", "string-value.ts")
+			if len(declarations) != 1 || filepath.Clean(declarations[0]) != filepath.Clean(canonical) {
+				return certifyError("verify provider scalars", target.Name(),
+					"Go string carrier does not resolve to the selected generated runtime declaration")
+			}
 		}
 		delete(expected, target.Name())
 	}

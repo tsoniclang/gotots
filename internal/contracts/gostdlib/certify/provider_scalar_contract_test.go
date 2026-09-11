@@ -55,13 +55,27 @@ func TestProviderScalarContractRejectsMissingCertifiedAlias(t *testing.T) {
 	if err := os.WriteFile(scalarPath, []byte(mutated), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	runtimePath := filepath.Join(providerRoot, "test", "runtime-package", "string-value.ts")
+	if err := os.MkdirAll(filepath.Dir(runtimePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(runtimePath, []byte(`export class GoString {
+  private readonly bytes = "";
+  text(): string { return this.bytes; }
+}
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	tsconfigPath := filepath.Join(providerRoot, "tsconfig.json")
 	if err := os.WriteFile(tsconfigPath, []byte(`{
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "strict": true
+    "strict": true,
+    "paths": {
+      "@gotots/runtime/*.js": ["./test/runtime-package/*.ts"]
+    }
   },
   "include": ["src/**/*.ts"]
 }

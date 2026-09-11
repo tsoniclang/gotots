@@ -107,7 +107,7 @@ func ResolvePackageRequirements(
 		if err != nil {
 			return PackageRequirements{}, err
 		}
-		if !providerCarrierMatches(keyword, entry.ProviderCarrier()) {
+		if !providerCarrierMatches(alias, keyword, entry.ProviderCarrier()) {
 			return PackageRequirements{}, &AssemblyError{
 				Reason: fmt.Sprintf(
 					"primitive alias %d provider carrier is %q and does not match the certified scalar ABI",
@@ -146,9 +146,13 @@ func ResolvePackageRequirements(
 }
 
 func providerCarrierMatches(
+	alias api.PrimitiveAlias,
 	keyword tsgo.KeywordTypeSyntaxKind,
 	carrier runtimecontract.PrimitiveCarrier,
 ) bool {
+	if alias == api.PrimitiveString {
+		return carrier == runtimecontract.PrimitiveCarrierGoString
+	}
 	switch keyword {
 	case tsgo.KeywordTypeSyntaxKindBooleanKeyword:
 		return carrier == runtimecontract.PrimitiveCarrierBoolean
@@ -156,8 +160,6 @@ func providerCarrierMatches(
 		return carrier == runtimecontract.PrimitiveCarrierNumber
 	case tsgo.KeywordTypeSyntaxKindBigIntKeyword:
 		return carrier == runtimecontract.PrimitiveCarrierBigInt
-	case tsgo.KeywordTypeSyntaxKindStringKeyword:
-		return carrier == runtimecontract.PrimitiveCarrierString
 	default:
 		return false
 	}

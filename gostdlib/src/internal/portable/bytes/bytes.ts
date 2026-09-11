@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { bool, gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
@@ -55,7 +56,7 @@ export function Equal(left: RuntimeSlice<uint8>, right: RuntimeSlice<uint8>): bo
 export function IndexAny(source: RuntimeSlice<uint8>, characters: gostring): int {
   const selected = runeSet(characters);
   const value = toByteString(source);
-  for (let index = 0; index < value.length; ) {
+  for (let index = 0; index < Number(value.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(value, index);
     if (selected.has(rune)) {
       return integerFromHost(index);
@@ -115,7 +116,7 @@ export function TrimRight(source: RuntimeSlice<uint8>, cutset: gostring): Runtim
 export function TrimSpace(source: RuntimeSlice<uint8>): RuntimeSlice<uint8> {
   const byteString = toByteString(source);
   let start = 0;
-  while (start < byteString.length) {
+  while (start < Number(byteString.sourceLength())) {
     const [rune, width] = decodeRuneAt(byteString, start);
     if (!IsSpace(rune)) {
       break;
@@ -125,7 +126,7 @@ export function TrimSpace(source: RuntimeSlice<uint8>): RuntimeSlice<uint8> {
 
   let end = start;
   let lastNonSpace = start;
-  while (end < byteString.length) {
+  while (end < Number(byteString.sourceLength())) {
     const [rune, width] = decodeRuneAt(byteString, end);
     end += Math.max(1, hostInteger(width));
     if (!IsSpace(rune)) {
@@ -155,12 +156,12 @@ function indexOf(source: RuntimeSlice<uint8>, separator: RuntimeSlice<uint8>): n
   return -1;
 }
 
-function toByteString(source: RuntimeSlice<uint8>): string {
+function toByteString(source: RuntimeSlice<uint8>): gostring {
   let result = "";
   for (let index = 0; index < source.length; index += 1) {
     result += String.fromCharCode(source.get(index));
   }
-  return result;
+  return GoString.fromText(result);
 }
 
 function appendSlice(
@@ -183,7 +184,7 @@ function trim(
   const selected = runeSet(cutset);
   const value = toByteString(source);
   let start = 0;
-  let end = value.length;
+  let end = Number(value.sourceLength());
   if (left) {
     while (start < end) {
       const [rune, width] = decodeRuneAt(value, start);
@@ -210,7 +211,7 @@ function trim(
 
 function runeSet(value: gostring): Set<number> {
   const result = new Set<number>();
-  for (let index = 0; index < value.length; ) {
+  for (let index = 0; index < Number(value.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(value, index);
     result.add(rune);
     index += Math.max(1, hostInteger(width));

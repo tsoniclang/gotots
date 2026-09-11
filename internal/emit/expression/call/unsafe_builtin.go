@@ -47,13 +47,12 @@ func emitUnsafeBuiltin(
 			target, err := emitUnsafeAdd(context, children, source)
 			return target, true, err
 		}
-		if kind == unsafeoperation.String {
-			target, err := emitUnsafeString(
-				context,
-				children,
-				source,
-				discarded,
-			)
+		if kind == unsafeoperation.String || kind == unsafeoperation.Slice {
+			target, err := emitUnsafeView(context, children, source, kind, discarded)
+			return target, true, err
+		}
+		if kind == unsafeoperation.StringData {
+			target, err := emitUnsafeStringData(context, children, source)
 			return target, true, err
 		}
 		return api.ExpressionEmission{}, true, api.Unsupported(

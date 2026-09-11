@@ -11,6 +11,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	runtimecontract "github.com/tsoniclang/gotots/internal/contracts/runtime"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestProviderPointerContractRejectsSurfaceMutations(t *testing.T) {
@@ -137,15 +138,13 @@ func TestSourceRawPointerContractRequiresExactCanonicalIdentity(test *testing.T)
 			test.Fatal(err)
 		}
 	}
-	core, err := os.ReadFile(filepath.Join(repository, "gostdlib", coreResolutionPath))
-	if err != nil {
+	if err := corefixture.InstallResolutionOnly(root); err != nil {
 		test.Fatal(err)
 	}
-	write(coreResolutionPath, string(core))
 	write("package.json", `{"type":"module"}`)
 	write("tsconfig.json", `{"compilerOptions":{"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext","strict":true},"include":["*.ts","test/**/*.ts"]}`)
 	write("surface.ts", `
-import type { RawPointer } from "./test/core-resolution/types.js";
+import type { RawPointer } from "@tsonic/core/types.js";
 interface Wrong extends RawPointer {}
 export declare function Good(value: RawPointer | undefined): RawPointer | undefined;
 export declare function WrongInput(value: Wrong | undefined): RawPointer | undefined;

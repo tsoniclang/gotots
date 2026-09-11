@@ -11,10 +11,10 @@ import { ProviderError } from "../../runtime/error.js";
 import { goInterfaceEqual } from "../../runtime/interface.js";
 import type { Writer } from "../../../io.js";
 
-export const unexpectedEOF: GoError = new ProviderError("unexpected EOF");
-export const shortWrite: GoError = new ProviderError("short write");
-export const shortBuffer: GoError = new ProviderError("short buffer");
-export const noProgress: GoError = new ProviderError("multiple Read calls return no data or error");
+export const unexpectedEOF: GoError = ProviderError.fromText("unexpected EOF");
+export const shortWrite: GoError = ProviderError.fromText("short write");
+export const shortBuffer: GoError = ProviderError.fromText("short buffer");
+export const noProgress: GoError = ProviderError.fromText("multiple Read calls return no data or error");
 
 export function readFullSync<Failure extends GoInterfaceValue>(
   read: (destination: RuntimeSlice<uint8>) => [int, Failure | undefined],
@@ -51,7 +51,7 @@ export function writeAll(
     const [goCount, failure] = writer.Write(remaining);
     const count = hostInteger(goCount);
     if (count < 0 || count > remaining.length) {
-      return [integerFromHost(total), new ProviderError("invalid write result")];
+      return [integerFromHost(total), ProviderError.fromText("invalid write result")];
     }
     total += count;
     if (failure !== undefined) {

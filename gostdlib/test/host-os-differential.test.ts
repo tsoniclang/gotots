@@ -1,3 +1,5 @@
+import { GoString } from "@gotots/runtime/string-value.js";
+import { fromHostString } from "../src/internal/portable/utf8/codec.js";
 import assert from "node:assert/strict";
 import {
   mkdtempSync,
@@ -56,23 +58,23 @@ test("host OS slice agrees with Go on selected deterministic behavior", () => {
 });
 
 function providerResult(root: string): string {
-  const flags = NewFlagSet("provider", ContinueOnError);
+  const flags = NewFlagSet(GoString.fromText("provider"), ContinueOnError);
   assert.ok(flags !== undefined);
-  const verbose = FlagSet.Bool(flags, "verbose", false, "");
-  const name = FlagSet.String(flags, "name", "", "");
+  const verbose = FlagSet.Bool(flags, GoString.fromText("verbose"), false, GoString.fromText(""));
+  const name = FlagSet.String(flags, GoString.fromText("name"), GoString.fromText(""), GoString.fromText(""));
   assert.ok(verbose !== undefined);
   assert.ok(name !== undefined);
   assert.equal(
     FlagSet.Parse(
       flags,
-      RuntimeSlice.literal(["-verbose", "-name=value"]),
+      RuntimeSlice.literal([GoString.fromText("-verbose"), GoString.fromText("-name=value")]),
     ),
     undefined,
   );
 
-  assert.equal(MkdirAll(root, new FileMode(0o755)), undefined);
+  assert.equal(MkdirAll(fromHostString(root), new FileMode(0o755)), undefined);
   const path = join(root, "sample.txt");
-  const [file, createError] = Create(path);
+  const [file, createError] = Create(fromHostString(path));
   assert.equal(createError, undefined);
   assert.ok(file !== undefined);
   const payload = Buffer.from([
@@ -82,34 +84,34 @@ function providerResult(root: string): string {
     0x00, 0xff,
   ]);
   assert.deepEqual(
-    File.WriteString(file, payload.toString("latin1")),
+    File.WriteString(file, GoString.fromText(payload.toString("latin1"))),
     [11n, undefined],
   );
   assert.equal(File.Close(file), undefined);
-  const [information, statError] = Stat(path);
+  const [information, statError] = Stat(fromHostString(path));
   assert.equal(statError, undefined);
-  const [opened, openError] = Open(path);
+  const [opened, openError] = Open(fromHostString(path));
   assert.equal(openError, undefined);
   assert.ok(opened !== undefined);
   const contents = RuntimeSlice.make<number>(11, null, 0);
   assert.deepEqual(File.Read(opened, contents), [11n, undefined]);
   assert.equal(File.Close(opened), undefined);
 
-  const command = Command("printf", RuntimeSlice.literal(["child"]));
+  const command = Command(GoString.fromText("printf"), RuntimeSlice.literal([GoString.fromText("child")]));
   assert.ok(command !== undefined);
   const [output, outputError] = Cmd.Output(command);
   assert.equal(outputError, undefined);
   const child = Buffer.from(sliceValues(output)).toString("utf8");
 
-  const missing = IsNotExist(Remove(join(root, "missing")));
+  const missing = IsNotExist(Remove(fromHostString(join(root, "missing"))));
   return [
     verbose.value,
-    name.value,
+    name.value.text(),
     information?.Size(),
     Buffer.from(sliceValues(contents)).toString("hex"),
     child,
     missing,
-    SIGINT.String(),
+    SIGINT.String().text(),
   ].join("|");
 }
 

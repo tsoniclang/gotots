@@ -1,3 +1,5 @@
+import { GoString } from "@gotots/runtime/string-value.js";
+import { fromHostString } from "../src/internal/portable/utf8/codec.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
@@ -11,10 +13,10 @@ import { Duration } from "../src/time.js";
 
 test("Cmd.Output captures stdout and preserves exit errors", () => {
   const success = Command(
-    process.execPath,
+    fromHostString(process.execPath),
     RuntimeSlice.literal([
-      "-e",
-      "process.stdout.write('provider-output')",
+      GoString.fromText("-e"),
+      GoString.fromText("process.stdout.write('provider-output')"),
     ]),
   );
   assert.ok(success !== undefined);
@@ -24,40 +26,40 @@ test("Cmd.Output captures stdout and preserves exit errors", () => {
   assert.ok(success.Process !== undefined);
   assert.ok(success.ProcessState !== undefined);
   assert.ok(success.Stdout !== undefined);
-  assert.equal(Cmd.Output(success)[1]?.Error(), "exec: Stdout already set");
+  assert.equal((Cmd.Output(success)[1]?.Error())?.text(), "exec: Stdout already set");
 
   const failure = Command(
-    process.execPath,
-    RuntimeSlice.literal(["-e", "process.exit(7)"]),
+    fromHostString(process.execPath),
+    RuntimeSlice.literal([GoString.fromText("-e"), GoString.fromText("process.exit(7)")]),
   );
   assert.ok(failure !== undefined);
   const [failedOutput, failureError] = Cmd.Output(failure);
   assert.equal(failedOutput.length, 0);
-  assert.equal(failureError?.Error(), "exit status 7");
+  assert.equal((failureError?.Error())?.text(), "exit status 7");
 });
 
 test("Cmd.Output supplies selected environment entries", () => {
   const command = Command(
-    process.execPath,
+    fromHostString(process.execPath),
     RuntimeSlice.literal([
-      "-e",
-      "process.stdout.write(process.env.GOTOTS_CHILD ?? '')",
+      GoString.fromText("-e"),
+      GoString.fromText("process.stdout.write(process.env.GOTOTS_CHILD ?? '')"),
     ]),
   );
   assert.ok(command !== undefined);
-  command.Env = RuntimeSlice.literal(["GOTOTS_CHILD=present"]);
+  command.Env = RuntimeSlice.literal([GoString.fromText("GOTOTS_CHILD=present")]);
   const [output, error] = Cmd.Output(command);
   assert.equal(error, undefined);
   assert.equal(Buffer.from(sliceValues(output)).toString("utf8"), "present");
 });
 
 test("Cmd value operations preserve shallow Go struct assignment", () => {
-  const source = Command("node", RuntimeSlice.literal(["source"]));
-  const target = Command("node", RuntimeSlice.literal(["target"]));
+  const source = Command(GoString.fromText("node"), RuntimeSlice.literal([GoString.fromText("source")]));
+  const target = Command(GoString.fromText("node"), RuntimeSlice.literal([GoString.fromText("target")]));
   assert.ok(source !== undefined);
   assert.ok(target !== undefined);
-  source.Env = RuntimeSlice.literal(["VALUE=source"]);
-  source.Dir = "/source";
+  source.Env = RuntimeSlice.literal([GoString.fromText("VALUE=source")]);
+  source.Dir = GoString.fromText("/source");
   source.WaitDelay = new Duration(7n);
 
   OsExecCmdOperations.$assign(target, source);

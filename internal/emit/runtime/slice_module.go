@@ -30,8 +30,11 @@ func buildSlice(
 		seen[symbol] = struct{}{}
 		switch symbol {
 		case api.RuntimeSlice:
-		case api.RuntimeSliceAddress, api.RuntimeSliceData:
+		case api.RuntimeSliceAddress:
 			capabilities.Address = true
+		case api.RuntimeSliceData:
+			capabilities.Address = true
+			capabilities.Data = true
 		case api.RuntimeSliceArrayPointer:
 			capabilities.ArrayPointer = true
 		case api.RuntimeArraySlice:
@@ -45,6 +48,9 @@ func buildSlice(
 			capabilities.Clear = true
 		case api.RuntimeSliceRegion:
 			capabilities.Region = true
+		case api.RuntimeSliceFromRegion:
+			capabilities.ArrayView = true
+		case api.RuntimeSlicePointer:
 		default:
 			return nil, &api.RuntimeSymbolError{Symbol: symbol}
 		}
@@ -97,6 +103,19 @@ func buildSlice(
 	}
 	definitions := []Definition{class}
 	for _, symbol := range symbols[1:] {
+		if symbol == api.RuntimeSlicePointer {
+			pointerSliceContract, err := api.RuntimeContract(symbol)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, runtimeslice.BuildPointerSlice(factory,
+				pointerSliceContract.ExportedName(), sliceContract.ExportedName(), panicContract.ExportedName(), capabilities))
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+			continue
+		}
 		if symbol == api.RuntimeSliceProjection {
 			projectionContract, err := api.RuntimeContract(symbol)
 			if err != nil {
@@ -142,6 +161,9 @@ func buildSliceOperation(
 	symbol api.RuntimeSymbol,
 	sliceName string,
 ) (tsgo.Statement, error) {
+	if symbol == api.RuntimeSliceFromRegion {
+		return runtimeslice.BuildFromRegion(factory, sliceName)
+	}
 	if symbol == api.RuntimeSliceData {
 		return runtimeslice.BuildData(factory, sliceName)
 	}
@@ -160,14 +182,8 @@ func buildSliceOperation(
 		return nil, err
 	}
 	if symbol == api.RuntimeSliceArrayPointer {
-		addressOfContract, err := tsoniccore.Resolve(
-			tsoniccore.SymbolAddressOf,
-		)
-		if err != nil {
-			return nil, err
-		}
-		projectContract, err := tsoniccore.Resolve(
-			tsoniccore.SymbolProjectPointer,
+		viewContract, err := tsoniccore.Resolve(
+			tsoniccore.SymbolViewPointer,
 		)
 		if err != nil {
 			return nil, err
@@ -176,7 +192,7 @@ func buildSliceOperation(
 		if err != nil {
 			return nil, err
 		}
-		arrayViewContract, err := api.RuntimeContract(api.RuntimeArrayView)
+		arrayViewContract, err := api.RuntimeContract(api.RuntimeArrayFromRegion)
 		if err != nil {
 			return nil, err
 		}
@@ -185,8 +201,7 @@ func buildSliceOperation(
 			addressContract.ExportedName(),
 			sliceName,
 			pointerContract.Export(),
-			addressOfContract.Export(),
-			projectContract.Export(),
+			viewContract.Export(),
 			arrayContract.ExportedName(),
 			arrayViewContract.ExportedName(),
 		), nil

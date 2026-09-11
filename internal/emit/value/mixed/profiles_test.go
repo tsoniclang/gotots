@@ -73,6 +73,7 @@ func TestMixedValueFamiliesNumberProfileTypechecksAndExecutes(
     StringWindow,
 } from "`+artifacts.apiModule+`";
 import { GoPanic } from "./runtime/panic.js";
+import { GoString } from "./runtime/string-value.js";
 
 const panics = (operation: () => void): boolean => {
     try {
@@ -83,8 +84,8 @@ const panics = (operation: () => void): boolean => {
     }
 };
 
-console.log(StringByte("abc"));
-console.log(StringWindow("abcd"));
+console.log(StringByte(GoString.fromText("abc")));
+console.log(StringWindow(GoString.fromText("abcd")).text());
 console.log(ArrayValue(3));
 console.log(SliceValue(4));
 console.log(MapValue(5));
@@ -92,7 +93,7 @@ console.log(SliceStoreOrder());
 console.log(MapStoreOrder());
 console.log(panics(() => { ArrayPanic(1); }));
 console.log(panics(() => { SlicePanic(1); }));
-console.log(panics(() => { StringPanic("a", 1); }));
+console.log(panics(() => { StringPanic(GoString.fromText("a"), 1); }));
 console.log(panics(() => { MapPanic(); }));
 `)
 	writeFile(

@@ -23,7 +23,7 @@ import {
 } from "../internal/portable/encoding/binary/reflection-codec.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice as RuntimeSliceValue } from "@gotots/runtime/slice.js";
-import { New as newError } from "../errors.js";
+import { ProviderError } from "../internal/runtime/error.js";
 import { ReadFull } from "../io.js";
 import type { Reader, Writer } from "../io.js";
 import * as reflect from "../reflect.js";
@@ -92,14 +92,14 @@ export function Read(
   return undefined;
 }
 
-function invalidCodecType(operation: gostring, value: reflect.Value): GoError {
-  return newError(`${operation}: invalid type ${codecTypeText(value)}`);
+function invalidCodecType(operation: string, value: reflect.Value): GoError {
+  return ProviderError.fromText(`${operation}: invalid type ${codecTypeText(value)}`);
 }
 
-function codecTypeText(value: reflect.Value): gostring {
+function codecTypeText(value: reflect.Value): string {
   const kind = value.Kind().value;
   const type = kind === reflect.Invalid.value ? undefined : value.Type();
-  return type === undefined ? "<nil>" : type.String();
+  return type === undefined ? "<nil>" : type.String().text();
 }
 
 export function Write(
@@ -115,7 +115,7 @@ export function Write(
   const value = reflect.Indirect(reflect.ValueOf(data));
   const size = encodedSize(value);
   if (size < 0n) {
-    return newError(
+    return ProviderError.fromText(
       `binary.Write: some values are not fixed-sized in type ${codecTypeText(value)}`,
     );
   }

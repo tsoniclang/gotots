@@ -93,7 +93,7 @@ func TestWaveNineSerialExecutionCompilesWithoutAsyncArtifacts(t *testing.T) {
 		}
 	}
 	if artifacts.bytes > 133_000 || artifacts.largest > 30_000 {
-		t.Fatalf(
+		t.Errorf(
 			"serial artifact bounds exceeded: total=%d largest=%d",
 			artifacts.bytes,
 			artifacts.largest,
@@ -216,7 +216,7 @@ func TestImmediateFunctionLiteralAndDeferRemainSynchronous(t *testing.T) {
 	writeProgramFile(t, runner, `import "./program.js";
 import { ImmediateLiteralABIIsolation } from "`+artifacts.sourceModule+`";
 
-console.log(ImmediateLiteralABIIsolation());
+console.log(ImmediateLiteralABIIsolation().text());
 `)
 	writeProgramFile(
 		t,
@@ -271,7 +271,7 @@ func executeSerialWaveNineTypeScript(
 import * as values from "`+packageModule+`";
 
 console.log([
-    values.WhollySynchronous(),
+    values.WhollySynchronous().text(),
     values.Buffered(),
     values.CloseDrain(),
     values.DirectionAndMeasure(),

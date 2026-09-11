@@ -104,9 +104,9 @@ func Result(path string) (bool, string) {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Result"},
-		"const [missing, message] = Result("+
+		"import { GoString } from \"./runtime/string-value.js\";\nconst [missing, message] = Result(GoString.fromText("+
 			strconv.Quote(missing)+
-			");\nconsole.log(missing + \" \" + message);\n",
+			"));\nconsole.log(missing + \" \" + message.text());\n",
 	)
 }
 

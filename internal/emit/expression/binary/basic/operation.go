@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -14,12 +15,24 @@ func Apply(
 	operator token.Token,
 	left api.ExpressionEmission,
 	right api.ExpressionEmission,
-) (api.ExpressionEmission, bool) {
+) (api.ExpressionEmission, bool, error) {
 	targetOperator, ok := Operator(context, sourceType, operator)
 	if !ok {
-		return api.ExpressionEmission{}, false
+		return api.ExpressionEmission{}, false, nil
 	}
-	return api.DirectExpression(
+	basic := types.Unalias(sourceType).(*types.Basic)
+	if basic.Info()&types.IsString != 0 {
+		var err error
+		left, err = stringvalue.Text(context, left)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		right, err = stringvalue.Text(context, right)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+	}
+	result := api.DirectExpression(
 		context.Factory().BinaryExpression(
 			nil,
 			left.Value(),
@@ -28,7 +41,12 @@ func Apply(
 			right.Value(),
 		),
 		api.CombineRequests(left.Requests(), right.Requests())...,
-	), true
+	)
+	if basic.Info()&types.IsString != 0 && operator == token.ADD {
+		value, err := stringvalue.FromText(context, result)
+		return value, true, err
+	}
+	return result, true, nil
 }
 
 func Operator(

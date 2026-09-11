@@ -38,7 +38,7 @@ func Convert(value *Pair) *Pair { return (*Pair)(unsafe.Pointer(value)) }
 }
 
 func TestRawMemoryRejectsUnrepresentedDescriptorFamilies(t *testing.T) {
-	for _, spelling := range []string{"[2]uint32", "[]uint32", "string", "interface{}", "map[int]int", "chan int", "func()"} {
+	for _, spelling := range []string{"interface{}", "map[int]int", "chan int", "func()"} {
 		t.Run(spelling, func(t *testing.T) {
 			loaded := loadMemoryStorageCase(t, "func Convert(value *"+spelling+") unsafe.Pointer { return unsafe.Pointer(value) }")
 			root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Convert"))

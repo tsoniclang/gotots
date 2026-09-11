@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { fromHostString } from "../src/internal/portable/utf8/codec.js";
 import { spawnSync } from "node:child_process";
 import {
   mkdirSync,
@@ -49,11 +50,11 @@ test("os Lstat and ReadDir agree with Go on deterministic metadata and errors", 
 
 function providerResult(directory: string): string {
   const link = join(directory, "link.txt");
-  const [linkInformation, linkError] = Lstat(link);
-  const [targetInformation, targetError] = Stat(link);
-  const [entries, readError] = ReadDir(directory);
+  const [linkInformation, linkError] = Lstat(fromHostString(link));
+  const [targetInformation, targetError] = Stat(fromHostString(link));
+  const [entries, readError] = ReadDir(fromHostString(directory));
   const [notDirectoryEntries, notDirectoryError] = ReadDir(
-    join(directory, "alpha.txt"),
+    fromHostString(join(directory, "alpha.txt")),
   );
 
   assert.equal(linkError, undefined);
@@ -65,7 +66,7 @@ function providerResult(directory: string): string {
   return [
     linkInformation.Mode().Type().value === ModeSymlink.value,
     targetInformation.Mode().Type().value === ModeSymlink.value,
-    sliceValues(entries).map((entry) => entry?.Name()).join(","),
+    sliceValues(entries).map((entry) => entry?.Name().text()).join(","),
     notDirectoryEntries.isNil(),
     Is(notDirectoryError, errnoError(ENOTDIR)),
   ].join("|");

@@ -1,8 +1,11 @@
 import { GoErrorMethodToken, GoInterfaceValue, GoRuntimeErrorMethodToken } from "./interface-value.js";
+import { GoString } from "./string-value.js";
 export class GoRuntimePanicValue extends GoInterfaceValue {
     static readonly comparable: boolean = true;
+    private readonly sourceMessage: GoString;
     constructor(public readonly message: string) {
         super();
+        this.sourceMessage = GoString.fromText(message);
     }
     readonly $go$type: {
         readonly comparable: boolean;
@@ -24,8 +27,8 @@ export class GoRuntimePanicValue extends GoInterfaceValue {
         }
         return this.message;
     }
-    Error(): string {
-        return this.message;
+    Error(): GoString {
+        return this.sourceMessage;
     }
     RuntimeError(): void {
     }

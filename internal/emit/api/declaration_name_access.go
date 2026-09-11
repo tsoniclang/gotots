@@ -335,7 +335,8 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementDeferredCallableRegistry,
 		DeclarationRequirementGenericConcretization,
 		DeclarationRequirementReflectionType,
-		DeclarationRequirementReflectionValueOperations:
+		DeclarationRequirementReflectionValueOperations,
+		DeclarationRequirementReflectionRawPointer:
 		return r.generated, true
 	case DeclarationRequirementTypeRepresentation:
 		if r.generated != nil {

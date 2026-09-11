@@ -1,7 +1,7 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderError } from "../../runtime/error.js";
 import { byteSlice, sliceValues } from "../../runtime/slice.js";
@@ -10,15 +10,15 @@ const standardAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const hexadecimalAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
 const standardPadding = 0x3d;
 
-let createEncoding: (alphabet: gostring) => Encoding;
+let createEncoding: (alphabet: string) => Encoding;
 let copyEncoding: (source: Encoding) => Encoding;
 let assignEncoding: (target: Encoding, source: Encoding) => void;
 
 export class Encoding {
-  #alphabet: gostring;
+  #alphabet: string;
   readonly #decode = new Map<uint8, uint8>();
 
-  private constructor(alphabet: gostring) {
+  private constructor(alphabet: string) {
     this.#alphabet = alphabet;
     for (let index = 0; index < alphabet.length; index += 1) {
       this.#decode.set(alphabet.charCodeAt(index), index);
@@ -26,7 +26,7 @@ export class Encoding {
   }
 
   static {
-    createEncoding = (alphabet: gostring): Encoding => new Encoding(alphabet);
+    createEncoding = (alphabet: string): Encoding => new Encoding(alphabet);
     copyEncoding = (source: Encoding): Encoding => new Encoding(source.#alphabet);
     assignEncoding = (target: Encoding, source: Encoding): void => {
       if (target === source) {
@@ -193,7 +193,7 @@ function requireEncoding(encoding: Encoding | undefined): Encoding {
 }
 
 function corruptInput(offset: number): ProviderError {
-  return new ProviderError(`illegal base32 data at input byte ${offset}`);
+  return ProviderError.fromText(`illegal base32 data at input byte ${offset}`);
 }
 
 export function standardEncoding(): Encoding {

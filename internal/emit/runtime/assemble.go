@@ -13,9 +13,11 @@ import (
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
 	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
 	lifetimeruntime "github.com/tsoniclang/gotots/internal/emit/runtime/lifetime"
+	descriptorruntime "github.com/tsoniclang/gotots/internal/emit/runtime/memorydescriptor"
+	memoryviewruntime "github.com/tsoniclang/gotots/internal/emit/runtime/memoryview"
 	storagefacetruntime "github.com/tsoniclang/gotots/internal/emit/runtime/storagefacet"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
-	unsaferuntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafeoperation"
+	stringvalueruntime "github.com/tsoniclang/gotots/internal/emit/runtime/stringvalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -108,6 +110,69 @@ func Build(
 		}
 		return definitions, nil
 	}
+	if module == api.RuntimeModuleMemoryDescriptor {
+		definitions := make([]Definition, 0, len(symbols))
+		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
+		for _, symbol := range symbols {
+			if _, duplicate := seen[symbol]; duplicate {
+				return nil, &AssemblyError{Module: module, Symbol: symbol, Reason: "memory descriptor is duplicated"}
+			}
+			seen[symbol] = struct{}{}
+			statement, err := descriptorruntime.Build(factory, symbol)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, statement)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModuleStringValue {
+		definitions := make([]Definition, 0, len(symbols))
+		for _, symbol := range symbols {
+			statement, err := stringvalueruntime.Build(factory, symbol)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, statement)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModuleMemoryView {
+		definitions := make([]Definition, 0, len(symbols))
+		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
+		for _, symbol := range symbols {
+			if _, duplicate := seen[symbol]; duplicate {
+				return nil, &AssemblyError{Module: module, Symbol: symbol, Reason: "memory view operation is duplicated"}
+			}
+			seen[symbol] = struct{}{}
+			contract, err := api.RuntimeContract(symbol)
+			if err != nil {
+				return nil, err
+			}
+			statement, err := memoryviewruntime.BuildOperation(factory, symbol, contract.ExportedName(), panicContract.ExportedName())
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, statement)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
 	if module == api.RuntimeModuleDeferredRegistry {
 		if len(symbols) != 1 || symbols[0] != api.RuntimeDeferredRegistry {
 			return nil, &AssemblyError{
@@ -151,13 +216,10 @@ func Build(
 			factory,
 			panicContract.ExportedName(),
 			runtimearray.Capabilities{
+				FromRegion: slices.Contains(symbols, api.RuntimeArrayFromRegion),
 				Allocate: slices.Contains(
 					symbols,
 					api.RuntimeArrayAllocate,
-				),
-				View: slices.Contains(
-					symbols,
-					api.RuntimeArrayView,
 				),
 				Location: slices.Contains(
 					symbols,
@@ -362,30 +424,6 @@ func Build(
 			return nil, err
 		}
 		return []Definition{definition}, nil
-	}
-	if module == api.RuntimeModuleUnsafe {
-		definitions := make([]Definition, 0, len(symbols))
-		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
-		for _, symbol := range symbols {
-			if _, duplicate := seen[symbol]; duplicate {
-				return nil, &AssemblyError{
-					Module: module,
-					Symbol: symbol,
-					Reason: "unsafe runtime symbol is duplicated",
-				}
-			}
-			seen[symbol] = struct{}{}
-			statement, err := unsaferuntime.Build(factory, symbol)
-			if err != nil {
-				return nil, err
-			}
-			definition, err := NewDefinition(symbol, statement)
-			if err != nil {
-				return nil, err
-			}
-			definitions = append(definitions, definition)
-		}
-		return definitions, nil
 	}
 	if module == api.RuntimeModulePanic ||
 		module == api.RuntimeModulePanicNil {

@@ -9,14 +9,14 @@ import { ProviderError } from "./error.js";
 // evidence reaches this symbol; the message is runtime diagnostics only and
 // never selects behavior.
 export function providerPlaceholder(message: string): never {
-  return GoPanic.raise(new ProviderError(message));
+  return GoPanic.raise(ProviderError.fromText(message));
 }
 
 // providerPlaceholderError is the canonical typed error form of the same
 // boundary for Go contracts that report an unimplemented provider behavior
 // through an error result instead of a panic.
 export function providerPlaceholderError(message: string): GoError {
-  return new ProviderError(message);
+  return ProviderError.fromText(message);
 }
 
 // providerPlaceholderMessage is the canonical placeholder form for profile

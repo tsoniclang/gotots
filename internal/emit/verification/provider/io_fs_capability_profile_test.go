@@ -137,12 +137,13 @@ func ReadProviderDir(root string) (string, int64, error) {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"ReadGenerated", "ReadProvider", "ReadProviderDir"},
-		`const [fallback, fast, generatedFailure] = ReadGenerated();
-console.log(fallback + "|" + fast + "|" + (generatedFailure === undefined));
-const [raw, rawFailure] = ReadProvider(`+strconv.Quote(project)+`);
-console.log(raw + "|" + (rawFailure === undefined));
-const [name, size, dirFailure] = ReadProviderDir(`+strconv.Quote(project)+`);
-console.log(name + "|" + size + "|" + (dirFailure === undefined));
+		`import { GoString } from "./runtime/string-value.js";
+const [fallback, fast, generatedFailure] = ReadGenerated();
+console.log(fallback.text() + "|" + fast.text() + "|" + (generatedFailure === undefined));
+const [raw, rawFailure] = ReadProvider(GoString.fromText(`+strconv.Quote(project)+`));
+console.log(raw.text() + "|" + (rawFailure === undefined));
+const [name, size, dirFailure] = ReadProviderDir(GoString.fromText(`+strconv.Quote(project)+`));
+console.log(name.text() + "|" + size + "|" + (dirFailure === undefined));
 `,
 	)
 	for _, required := range []string{

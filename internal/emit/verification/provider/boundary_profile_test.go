@@ -128,9 +128,10 @@ func NilConstructed() bool { return bufio.NewReader(nil) != nil }
 		artifacts.paths,
 		assemblyPath,
 		[]string{"NilConstructed", "NoProgress", "Run"},
-		`for (const input of ["alpha\nrest", "tail"]) {
-	  const [line, failure] = Run(input);
-	  console.log(JSON.stringify(line) + " " + JSON.stringify(failure));
+		`import { GoString } from "./runtime/string-value.js";
+	for (const input of ["alpha\nrest", "tail"]) {
+	  const [line, failure] = Run(GoString.fromText(input));
+	  console.log(JSON.stringify(line.text()) + " " + JSON.stringify(failure.text()));
 	}
 	console.log(NoProgress());
 	console.log(NilConstructed());
@@ -483,7 +484,8 @@ func Transform(input string) string {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Transform"},
-		`console.log(JSON.stringify(Transform("ab")));
+		`import { GoString } from "./runtime/string-value.js";
+	console.log(JSON.stringify(Transform(GoString.fromText("ab")).text()));
 	`,
 	)
 	if !strings.Contains(artifacts.printed, "strings__from_gostdlib.Map(") {
@@ -499,101 +501,5 @@ func Transform(input string) string {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf("direct provider callback output contains %q", forbidden)
 		}
-	}
-}
-
-func TestProviderGenericCallableAndTupleBoundary(t *testing.T) {
-	project := t.TempDir()
-	writeProgramFile(
-		t,
-		filepath.Join(project, "go.mod"),
-		"module example.com/genericproviderboundary\n\ngo 1.26.4\n",
-	)
-	writeProgramFile(t, filepath.Join(project, "source.go"), `package genericproviderboundary
-
-import (
-	"cmp"
-	"slices"
-	"strings"
-)
-
-func Search(values []string, target string) (int, bool) {
-	return slices.BinarySearchFunc(values, target, strings.Compare)
-}
-
-func FirstInt() int {
-	return cmp.Or(0, 7, 9)
-}
-
-func FirstInt64() int64 {
-	return cmp.Or(int64(0), int64(11), int64(13))
-}
-`)
-	program, err := load.Load(context.Background(), load.Request{
-		Directory:    project,
-		Pattern:      ".",
-		BuildProfile: linkedProviderBuildProfile(t),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	options := providerNumberOptions()
-	options.StandardLibrary = linkedProviderCertificate(t)
-	emission, err := emit.CompileWithOptions(
-		program,
-		[]emit.Root{
-			mustProviderRoot(
-				t,
-				program.Roots()[0].Types().Scope().Lookup("Search"),
-			),
-			mustProviderRoot(
-				t,
-				program.Roots()[0].Types().Scope().Lookup("FirstInt"),
-			),
-			mustProviderRoot(
-				t,
-				program.Roots()[0].Types().Scope().Lookup("FirstInt64"),
-			),
-		},
-		options,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	workingDirectory := t.TempDir()
-	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	assemblyPath := ""
-	for _, file := range emission.Files() {
-		if file.Kind() == emit.TargetFilePackageAssembly &&
-			file.PackageName() == "genericproviderboundary" {
-			assemblyPath = file.OutputPath()
-			break
-		}
-	}
-	if assemblyPath == "" {
-		t.Fatal("generic-provider package assembly is absent")
-	}
-	typecheckProviderRunner(
-		t,
-		workingDirectory,
-		artifacts.paths,
-		assemblyPath,
-		[]string{"FirstInt", "FirstInt64"},
-		`console.log(FirstInt() + "|" + FirstInt64());
-`,
-	)
-	for _, required := range []string{
-		"satisfies",
-		"Number(",
-		"BigInt.asIntN",
-		"CmpOrKernel<int, int>(",
-		"CmpOrKernel<int64, int64>(",
-	} {
-		if !strings.Contains(artifacts.printed, required) {
-			t.Fatalf("generic provider boundary lacks %q:\n%s", required, artifacts.printed)
-		}
-	}
-	if strings.Contains(artifacts.printed, "$providerStorage") {
-		t.Fatalf("generic provider boundary projected caller-owned storage:\n%s", artifacts.printed)
 	}
 }

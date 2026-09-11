@@ -542,6 +542,18 @@ Mutations that restore object-only binding, fabricate native addresses, drop
 layout operands, select markers by spelling, or fabricate facts must fail.
 Declaration-only resolution fixtures never count as semantic certification.
 
+Read-free pointer-view fixtures must include nil and non-nil empty slices,
+one-past slice windows, pointer-backed regions, callback read/write counters,
+and nonempty copy/store controls. The emitted slice-array converter must not
+load or store its base element. Field-binding fixtures must cover ordinary and
+physical record round trips, descriptor replacement, array/nested fields,
+and an unchanged scalar field whose address was taken before conversion.
+Exact field descriptors are reused, not regenerated for the binding call.
+Ordinary getter/setter forwarding is a negative identity control. The target
+must reject missing or changed binding/view facts before printing and must
+not demand byte codecs for binding-only layouts. Native preservation does
+not count as JavaScript execution proof.
+
 ## Struct, Receiver, And Embedding Proof
 
 Fixtures cover:

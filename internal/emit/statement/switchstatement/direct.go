@@ -5,6 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
+	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -40,7 +41,7 @@ func nativeTaggedSwitchEligible(
 		equalityType = tag.model.Underlying()
 	}
 	if !directSwitchType(tag.sourceType, tag.model, tag.wrapped) ||
-		context.Values().RequiresCustomEquality(context, equalityType) {
+		(context.Values().RequiresCustomEquality(context, equalityType) && !stringSwitch(tag)) {
 		return false
 	}
 	for _, clause := range clauses {
@@ -153,16 +154,50 @@ func directTagTarget(
 	tag tagEmission,
 	nativeNumeric bool,
 ) (api.ExpressionEmission, error) {
-	if !tag.wrapped || nativeNumeric {
-		return tag.target, nil
+	value := tag.target
+	if tag.wrapped && !nativeNumeric {
+		var err error
+		value, err = tag.model.Project(context.WithRole(api.RoleSwitchTag), value)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
-	return tag.model.Project(
-		context.WithRole(api.RoleSwitchTag),
-		tag.target,
-	)
+	if stringSwitch(tag) {
+		return stringvalue.Text(context, value)
+	}
+	return value, nil
 }
 
 func directCaseTarget(
+	context api.Context,
+	operationContext api.Context,
+	tag tagEmission,
+	clause clauseEmission,
+	index int,
+	expression api.ExpressionEmission,
+	nativeNumeric bool,
+) (tsgo.Expression, []api.RootRequest, error) {
+	value, requests, err := directCaseValue(context, operationContext, tag, clause, index, expression, nativeNumeric)
+	if err != nil || !stringSwitch(tag) {
+		return value, requests, err
+	}
+	text, err := stringvalue.Text(context, api.DirectExpression(value, requests...))
+	if err != nil {
+		return nil, nil, err
+	}
+	return text.Value(), text.Requests(), nil
+}
+
+func stringSwitch(tag tagEmission) bool {
+	sourceType := tag.sourceType
+	if tag.wrapped {
+		sourceType = tag.model.Underlying()
+	}
+	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	return ok && basic.Info()&types.IsString != 0
+}
+
+func directCaseValue(
 	context api.Context,
 	operationContext api.Context,
 	tag tagEmission,
