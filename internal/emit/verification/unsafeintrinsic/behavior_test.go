@@ -110,6 +110,7 @@ func assertUnsafeStringRuntimeShape(t *testing.T, printed string) {
 		"GoString.fromRegion(",
 		"bytes.sourceLength()",
 		"reinterpretRawPointer<uint8>",
+		": int128 = globalThis.BigInt(",
 		"globalThis.Number",
 	} {
 		if !strings.Contains(printed, required) {

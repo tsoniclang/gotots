@@ -138,6 +138,7 @@ func primitiveTypeDeclarations() (string, error) {
 		{corecontract.SymbolInt32, "number"},
 		{corecontract.SymbolUint32, "number"},
 		{corecontract.SymbolInt64, "bigint"},
+		{corecontract.SymbolInt128, "bigint"},
 		{corecontract.SymbolUint64, "bigint"},
 		{corecontract.SymbolFloat32, "number"},
 		{corecontract.SymbolFloat64, "number"},

@@ -34,7 +34,16 @@ func ElementLocation(context api.Context, children api.ChildEmitter, source ast.
 	offset := factory.BinaryExpression(nil, factory.CallExpression(api.TargetIntrinsicBigInt.Expression(factory), nil, nil,
 		[]tsgo.Expression{factory.Identifier(name)}, tsgo.NodeFlagsNone), nil, factory.BinaryOperatorToken(tsgo.BinaryOperatorAsteriskToken),
 		factory.BigIntLiteral(strconv.FormatInt(stride, 10)+"n", tsgo.TokenFlagsNone))
-	raw, err := pointermarker.Operation(context, tsoniccore.SymbolOffsetRawPointer, nil, []api.ExpressionEmission{data, api.DirectExpression(offset), abi})
+	offsetType, err := context.Names().TsonicCore(tsoniccore.SymbolInt128)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	offsetName, err := context.Names().Temporary(api.TemporaryAddressOperand)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	offsetValue := factory.Identifier(offsetName)
+	raw, err := pointermarker.Operation(context, tsoniccore.SymbolOffsetRawPointer, nil, []api.ExpressionEmission{data, api.DirectExpression(offsetValue), abi})
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -63,7 +72,11 @@ func ElementLocation(context api.Context, children api.ChildEmitter, source ast.
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	body := append(address.Before(), factory.VariableStatement(nil, factory.VariableDeclarationList([]tsgo.VariableDeclaration{
+	body := []tsgo.Statement{factory.VariableStatement(nil, factory.VariableDeclarationList([]tsgo.VariableDeclaration{
+		factory.VariableDeclaration(offsetValue, nil, factory.TypeReferenceNode(offsetType.EntityName(factory), nil), offset),
+	}, tsgo.NodeFlagsConst))}
+	body = append(body, address.Before()...)
+	body = append(body, factory.VariableStatement(nil, factory.VariableDeclarationList([]tsgo.VariableDeclaration{
 		factory.VariableDeclaration(addressValue, nil, nil, address.Value()),
 	}, tsgo.NodeFlagsConst)), factory.IfStatement(factory.BinaryExpression(nil, addressValue, nil,
 		factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsEqualsEqualsToken), factory.VoidExpression(factory.NumericLiteral("0", tsgo.TokenFlagsNone))),
@@ -73,7 +86,7 @@ func ElementLocation(context api.Context, children api.ChildEmitter, source ast.
 	return api.DirectExpression(factory.ArrowFunction(nil, nil, []tsgo.ParameterDeclaration{
 		factory.ParameterDeclaration(nil, nil, factory.Identifier(name), nil, memoryview.CountType(factory), nil),
 	}, pointer.Value(), factory.EqualsGreaterThanToken(), factory.Block(body, true)),
-		api.CombineRequests(pointer.Requests(), address.Requests(), projected.Requests(), panicReference.Requests())...), nil
+		api.CombineRequests(pointer.Requests(), address.Requests(), projected.Requests(), panicReference.Requests(), offsetType.Requests())...), nil
 }
 
 func PointerRegion(context api.Context, children api.ChildEmitter, source ast.Node, element types.Type, pointer api.ExpressionEmission) (api.ExpressionEmission, error) {

@@ -77,6 +77,7 @@ func TestResolutionFixtureIsComplete(t *testing.T) {
 		"readonly length: TLength",
 		"type int32 = number",
 		"type int64 = bigint",
+		"type int128 = bigint",
 		"type float64 = number",
 	} {
 		if !strings.Contains(string(types), declaration) {

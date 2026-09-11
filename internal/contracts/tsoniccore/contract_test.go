@@ -43,6 +43,7 @@ func TestContractIsPinned(t *testing.T) {
 		{SymbolInt32, "@tsonic/core/types.js", "int32", PhaseType},
 		{SymbolUint32, "@tsonic/core/types.js", "uint32", PhaseType},
 		{SymbolInt64, "@tsonic/core/types.js", "int64", PhaseType},
+		{SymbolInt128, "@tsonic/core/types.js", "int128", PhaseType},
 		{SymbolUint64, "@tsonic/core/types.js", "uint64", PhaseType},
 		{SymbolFloat32, "@tsonic/core/types.js", "float32", PhaseType},
 		{SymbolFloat64, "@tsonic/core/types.js", "float64", PhaseType},

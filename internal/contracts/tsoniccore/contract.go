@@ -52,6 +52,7 @@ const (
 	SymbolBindMemoryField
 	SymbolBindMemoryRecord
 	SymbolMemoryFieldBinding
+	SymbolInt128
 )
 
 type Phase uint8
@@ -146,6 +147,8 @@ func Resolve(symbol Symbol) (Declaration, error) {
 		return typeDeclaration("uint32"), nil
 	case SymbolInt64:
 		return typeDeclaration("int64"), nil
+	case SymbolInt128:
+		return typeDeclaration("int128"), nil
 	case SymbolUint64:
 		return typeDeclaration("uint64"), nil
 	case SymbolFloat32:
