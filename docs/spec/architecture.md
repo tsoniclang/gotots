@@ -1207,6 +1207,13 @@ Restoring a full import path inside every generated identifier is a source-size
 regression even though it remains semantically exact, and fails generated-size
 and largest-line evidence.
 
+An artifact's retained temporary-name checkpoint contains only its initial
+per-kind counters. It never copies the entire file's generated-name or
+ownership registry. Replay uses a temporary working registry to preserve
+all current source, import and other-artifact reservations, then commits only
+the selected owner's names or rolls back completely. Historical checkpoints
+therefore do not multiply file-wide naming state by the number of artifacts.
+
 For example, Go accepts `append(dst, src...)` when `src` has type parameter
 `B ~[]byte | ~string`. TypeScript has no one static append expression over
 both target representations. The function owner requests one internal

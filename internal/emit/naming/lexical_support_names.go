@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/output"
 	"go/ast"
 	"go/types"
+	"maps"
 	"strconv"
 )
 
@@ -421,44 +422,10 @@ func (n *File) Runtime(
 
 type TemporarySnapshot struct {
 	counters map[api.TemporaryKind]uint64
-	names    map[string]struct{}
-	owners   map[string]api.ArtifactOwner
 }
 
 func (n *File) SnapshotTemporaries() TemporarySnapshot {
-	snapshot := TemporarySnapshot{
-		counters: make(map[api.TemporaryKind]uint64, len(n.temporaries)),
-		names:    make(map[string]struct{}, len(n.generatedNames)),
-		owners:   make(map[string]api.ArtifactOwner, len(n.temporaryOwners)),
-	}
-	for kind, value := range n.temporaries {
-		snapshot.counters[kind] = value
-	}
-	for name := range n.generatedNames {
-		snapshot.names[name] = struct{}{}
-	}
-	for name, owner := range n.temporaryOwners {
-		snapshot.owners[name] = owner
-	}
-	return snapshot
-}
-
-func (n *File) restoreTemporaries(snapshot TemporarySnapshot) {
-	n.temporaries = make(map[api.TemporaryKind]uint64, len(snapshot.counters))
-	for kind, value := range snapshot.counters {
-		n.temporaries[kind] = value
-	}
-	n.generatedNames = make(map[string]struct{}, len(snapshot.names))
-	for name := range snapshot.names {
-		n.generatedNames[name] = struct{}{}
-	}
-	n.temporaryOwners = make(
-		map[string]api.ArtifactOwner,
-		len(snapshot.owners),
-	)
-	for name, owner := range snapshot.owners {
-		n.temporaryOwners[name] = owner
-	}
+	return TemporarySnapshot{counters: maps.Clone(n.temporaries)}
 }
 
 func (n *File) BeginTemporaryReplay(
@@ -471,15 +438,13 @@ func (n *File) BeginTemporaryReplay(
 			Reason: "temporary replay owner is invalid",
 		}
 	}
-	current := n.SnapshotTemporaries()
-	n.restoreTemporaries(current)
-	n.temporaries = make(
-		map[api.TemporaryKind]uint64,
-		len(start.counters),
-	)
-	for kind, value := range start.counters {
-		n.temporaries[kind] = value
-	}
+	currentCounters := n.temporaries
+	currentNames := n.generatedNames
+	currentOwners := n.temporaryOwners
+	n.temporaries = make(map[api.TemporaryKind]uint64, len(start.counters))
+	maps.Copy(n.temporaries, start.counters)
+	n.generatedNames = maps.Clone(currentNames)
+	n.temporaryOwners = maps.Clone(currentOwners)
 	for name, selectedOwner := range n.temporaryOwners {
 		if selectedOwner != owner {
 			continue
@@ -488,8 +453,11 @@ func (n *File) BeginTemporaryReplay(
 		delete(n.temporaryOwners, name)
 	}
 	return func(commit bool) {
-		replayed := n.SnapshotTemporaries()
-		n.restoreTemporaries(current)
+		replayedCounters := n.temporaries
+		replayedOwners := n.temporaryOwners
+		n.temporaries = currentCounters
+		n.generatedNames = currentNames
+		n.temporaryOwners = currentOwners
 		if !commit {
 			return
 		}
@@ -500,14 +468,14 @@ func (n *File) BeginTemporaryReplay(
 			delete(n.generatedNames, name)
 			delete(n.temporaryOwners, name)
 		}
-		for name, selectedOwner := range replayed.owners {
+		for name, selectedOwner := range replayedOwners {
 			if selectedOwner != owner {
 				continue
 			}
 			n.generatedNames[name] = struct{}{}
 			n.temporaryOwners[name] = owner
 		}
-		for kind, value := range replayed.counters {
+		for kind, value := range replayedCounters {
 			if value > n.temporaries[kind] {
 				n.temporaries[kind] = value
 			}
