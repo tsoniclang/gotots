@@ -50,7 +50,7 @@ func buildSlice(
 			capabilities.Region = true
 		case api.RuntimeSliceFromRegion:
 			capabilities.ArrayView = true
-		case api.RuntimeSlicePointer:
+		case api.RuntimeSlicePointer, api.RuntimeSliceElementRegion:
 		default:
 			return nil, &api.RuntimeSymbolError{Symbol: symbol}
 		}
@@ -170,7 +170,8 @@ func buildSliceOperation(
 	if symbol != api.RuntimeSliceAddress &&
 		symbol != api.RuntimeSliceArrayPointer &&
 		symbol != api.RuntimeArraySlice &&
-		symbol != api.RuntimeSliceRegion {
+		symbol != api.RuntimeSliceRegion &&
+		symbol != api.RuntimeSliceElementRegion {
 		return runtimeslice.BuildOperation(factory, symbol)
 	}
 	addressContract, err := api.RuntimeContract(symbol)
@@ -223,10 +224,13 @@ func buildSliceOperation(
 			locationContract.ExportedName(),
 		), nil
 	}
-	if symbol == api.RuntimeSliceRegion {
+	if symbol == api.RuntimeSliceRegion || symbol == api.RuntimeSliceElementRegion {
 		panicContract, err := api.RuntimeContract(api.RuntimePanic)
 		if err != nil {
 			return nil, err
+		}
+		if symbol == api.RuntimeSliceElementRegion {
+			return runtimeslice.BuildElementRegion(factory, addressContract.ExportedName(), sliceName, panicContract.ExportedName()), nil
 		}
 		return runtimeslice.BuildRegion(
 			factory,

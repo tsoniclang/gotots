@@ -8,7 +8,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	unsafeoperation "github.com/tsoniclang/gotots/internal/emit/expression/builtin/unsafeoperation"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
-	memorymarker "github.com/tsoniclang/gotots/internal/emit/marker/memory"
 	runtimestring "github.com/tsoniclang/gotots/internal/emit/runtime/stringvalue"
 	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -29,7 +28,7 @@ func emitUnsafeView(context api.Context, children api.ChildEmitter, source *ast.
 	if !ok || kind == unsafeoperation.String && !types.Identical(pointer.Elem(), types.Typ[types.Uint8]) {
 		return api.ExpressionEmission{}, api.Unsupported(context, api.CategoryExpression, source)
 	}
-	argument, err := children.Expression(context.WithRole(api.RoleCallArgument).WithExpectedType(argumentType), source.Args[0])
+	region, err := emitUnsafeViewRegion(context, children, source.Args[0], pointer)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -37,14 +36,11 @@ func emitUnsafeView(context api.Context, children api.ChildEmitter, source *ast.
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	ordered, err := expressionoperands.Preserve(context, api.TemporaryCallArgument, expressionoperands.Present(argument), expressionoperands.Present(length))
+	ordered, err := expressionoperands.Preserve(context, api.TemporaryCallArgument, expressionoperands.Present(region), expressionoperands.Present(length))
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	region, err := memorymarker.PointerRegion(context, children, source, pointer.Elem(), api.DirectExpression(ordered.Values()[0]))
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
+	region = api.DirectExpression(ordered.Values()[0])
 	var result api.ExpressionEmission
 	if kind == unsafeoperation.String {
 		result, err = stringvalue.Construct(context, runtimestring.FromRegionMember, region, api.DirectExpression(ordered.Values()[1]))

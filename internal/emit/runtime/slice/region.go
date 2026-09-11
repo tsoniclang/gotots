@@ -6,6 +6,27 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+func BuildElementRegion(factory tsgo.Factory, functionName, sliceName, panicName string) tsgo.FunctionDeclaration {
+	target := builder{factory: factory, className: sliceName, panicName: panicName}
+	index := target.id("index")
+	value := target.id("value")
+	location := target.id("location")
+	invalid := target.binary(target.binary(index, tsgo.BinaryOperatorLessThanToken, target.number("0")),
+		tsgo.BinaryOperatorBarBarToken, target.binary(index, tsgo.BinaryOperatorGreaterThanEqualsToken,
+			target.call(value, MemberName(MemberSourceLength))))
+	return factory.FunctionDeclaration([]tsgo.ModifierLike{factory.ExportKeyword()}, nil, target.id(functionName),
+		[]tsgo.TypeParameterDeclaration{target.typeParameter()}, []tsgo.ParameterDeclaration{
+			target.parameter("value", target.sliceType()), target.parameter("index", target.integerInputType()),
+		}, memoryview.RegionType(factory, target.typeT()), factory.Block([]tsgo.Statement{
+			factory.IfStatement(invalid, target.throwBounds(), nil),
+			target.variable(tsgo.NodeFlagsConst, "location", target.call(value, MemberName(MemberArrayLocation), target.number("0"))),
+			factory.IfStatement(target.binary(location, tsgo.BinaryOperatorEqualsEqualsEqualsToken, factory.VoidExpression(target.number("0"))),
+				target.throwBounds(), nil),
+			target.returnStatement(factory.CallExpression(target.id("goRegionView"), nil, []tsgo.TypeNode{target.typeT()},
+				[]tsgo.Expression{location, index}, tsgo.NodeFlagsNone)),
+		}, true))
+}
+
 func BuildRegion(factory tsgo.Factory, functionName, sliceName, panicName string) tsgo.FunctionDeclaration {
 	target := builder{factory: factory, className: sliceName, panicName: panicName}
 	location := target.id("location")

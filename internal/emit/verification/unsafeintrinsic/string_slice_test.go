@@ -43,9 +43,10 @@ func Build(bytes []byte, offset int, length int) string {
 	artifacts := materializeArtifacts(t, emission, t.TempDir())
 	for _, required := range []string{
 		"GoString.fromRegion(",
-		"offsetRawPointer(",
-		"reinterpretRawPointer<uint8>",
-		"toRawPointer<uint8>",
+		"goSliceElementRegion<uint8>(bytes, offset)",
+		"value.$arrayLocation(0)",
+		"return goRegionView<T>(location, index)",
+		"index >= value.sourceLength()",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("unsafe string output lacks %q:\n%s", required, artifacts.printed)
@@ -56,6 +57,9 @@ func Build(bytes []byte, offset int, length int) string {
 		"GoUnsafePointer",
 		"goPointerRegion",
 		"goUnsafeString<",
+		"offsetRawPointer(",
+		"reinterpretRawPointer<",
+		"toRawPointer<",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf("unsafe string output retains %q:\n%s", forbidden, artifacts.printed)

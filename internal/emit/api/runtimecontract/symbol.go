@@ -33,6 +33,7 @@ const (
 	RuntimeSliceData                  RuntimeSymbol = 310
 	RuntimeSliceFromRegion            RuntimeSymbol = 311
 	RuntimeSlicePointer               RuntimeSymbol = 312
+	RuntimeSliceElementRegion         RuntimeSymbol = 313
 	RuntimeMap                        RuntimeSymbol = 400
 	RuntimeMapHash                    RuntimeSymbol = 401
 	RuntimeMapClear                   RuntimeSymbol = 402

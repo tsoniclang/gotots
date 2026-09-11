@@ -237,6 +237,9 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimePanic,
 			RuntimeSliceFromRegion,
 		), nil
+	case RuntimeSliceElementRegion:
+		return runtimeContract(RuntimeModuleSlice, "runtime/slice.ts", "goSliceElementRegion", false,
+			RuntimeSlice, RuntimeSliceAddress, RuntimeStorageRegion, RuntimeRegionView, RuntimePanic), nil
 	case RuntimeSliceFromRegion:
 		return runtimeContract(RuntimeModuleSlice, "runtime/slice.ts", "goSliceFromRegion", false,
 			RuntimeSlice, RuntimeSlicePointer, RuntimeStorageRegion), nil

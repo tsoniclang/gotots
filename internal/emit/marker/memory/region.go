@@ -125,8 +125,20 @@ func PointerRegion(context api.Context, children api.ChildEmitter, source ast.No
 		factory.VariableDeclaration(dataValue, nil, nil, data.Value()),
 	}, tsgo.NodeFlagsConst)))
 	body = append(body, location.Before()...)
-	return api.NewExpressionEmission(body, factory.ConditionalExpression(factory.BinaryExpression(nil, dataValue, nil,
+	value := factory.ConditionalExpression(factory.BinaryExpression(nil, dataValue, nil,
 		factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsEqualsEqualsToken), undefined), factory.QuestionToken(), undefined,
-		factory.ColonToken(), memoryview.Pointer(factory, elementStorage.Value(), location.Value(), factory.NumericLiteral("0", tsgo.TokenFlagsNone))),
+		factory.ColonToken(), memoryview.Pointer(factory, elementStorage.Value(), location.Value(), factory.NumericLiteral("0", tsgo.TokenFlagsNone)))
+	regionName, err := context.Names().Temporary(api.TemporaryAddressOperand)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	regionValue := factory.Identifier(regionName)
+	body = append(body, factory.VariableStatement(nil, factory.VariableDeclarationList([]tsgo.VariableDeclaration{
+		factory.VariableDeclaration(regionValue, nil, factory.UnionTypeNode([]tsgo.TypeNode{
+			factory.TypeReferenceNode(factory.Identifier(region.Name()), []tsgo.TypeNode{elementStorage.Value()}),
+			factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword),
+		}), value),
+	}, tsgo.NodeFlagsConst)))
+	return api.NewExpressionEmission(body, regionValue,
 		api.CombineRequests(data.Requests(), location.Requests(), region.Requests(), elementStorage.Requests()))
 }

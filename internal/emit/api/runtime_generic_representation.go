@@ -44,6 +44,7 @@ const (
 	RuntimeSliceAppendSlice           = runtimecontract.RuntimeSliceAppendSlice
 	RuntimeSliceClear                 = runtimecontract.RuntimeSliceClear
 	RuntimeSliceRegion                = runtimecontract.RuntimeSliceRegion
+	RuntimeSliceElementRegion         = runtimecontract.RuntimeSliceElementRegion
 	RuntimeMap                        = runtimecontract.RuntimeMap
 	RuntimeMapHash                    = runtimecontract.RuntimeMapHash
 	RuntimeMapClear                   = runtimecontract.RuntimeMapClear

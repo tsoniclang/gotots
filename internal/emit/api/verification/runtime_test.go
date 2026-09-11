@@ -105,6 +105,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeArrayFromRegion, 206, api.RuntimeModuleArray, "runtime/array.ts", "goArrayFromRegion", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeSliceFromRegion, 311, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceFromRegion", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimeSlicePointer, api.RuntimeStorageRegion}},
 		{api.RuntimeSlicePointer, 312, api.RuntimeModuleSlice, "runtime/slice.ts", "RuntimePointerSlice", true, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimeSliceAddress, api.RuntimeSliceStorage, api.RuntimeStorageRegion, api.RuntimeRegionAddress, api.RuntimeRegionRead, api.RuntimeRegionWrite, api.RuntimeRegionView}},
+		{api.RuntimeSliceElementRegion, 313, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceElementRegion", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimeSliceAddress, api.RuntimeStorageRegion, api.RuntimeRegionView, api.RuntimePanic}},
 		{api.RuntimeSliceHeader32, 1400, api.RuntimeModuleMemoryDescriptor, "runtime/memory-descriptor.ts", "GoSliceHeader32", true, nil},
 		{api.RuntimeSliceHeader64, 1401, api.RuntimeModuleMemoryDescriptor, "runtime/memory-descriptor.ts", "GoSliceHeader64", true, nil},
 		{api.RuntimeStringHeader32, 1402, api.RuntimeModuleMemoryDescriptor, "runtime/memory-descriptor.ts", "GoStringHeader32", true, nil},

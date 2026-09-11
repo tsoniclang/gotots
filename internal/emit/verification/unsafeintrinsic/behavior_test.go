@@ -37,7 +37,7 @@ func TestUnsafeStringIntrinsicPrintsAndTypechecksCanonicalContract(t *testing.T)
 			}
 			scope := program.Roots()[0].Types().Scope()
 			roots := make([]emit.Root, 0, 1)
-			for _, name := range []string{"BuildString", "EmptyString"} {
+			for _, name := range []string{"BuildString", "BuildPointerString", "EmptyString"} {
 				root, rootErr := emit.NewRoot(scope.Lookup(name))
 				if rootErr != nil {
 					t.Fatal(rootErr)
@@ -96,6 +96,10 @@ func BuildString(bytes []byte) string {
 	return unsafe.String(&bytes[0], len(bytes))
 }
 
+func BuildPointerString(data *byte, length int) string {
+	return unsafe.String(data, length)
+}
+
 func EmptyString() bool {
 	return unsafe.String(nil, 0) == ""
 }
@@ -108,6 +112,7 @@ func assertUnsafeStringRuntimeShape(t *testing.T, printed string) {
 	t.Helper()
 	for _, required := range []string{
 		"GoString.fromRegion(",
+		"goSliceElementRegion<uint8>(bytes, 0",
 		"bytes.sourceLength()",
 		"reinterpretRawPointer<uint8>",
 		": int128 = globalThis.BigInt(",
