@@ -24,7 +24,7 @@ func emitUnsafeView(context api.Context, children api.ChildEmitter, source *ast.
 	if err := validateResults(context, source, signature, discarded); err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	argumentType := context.TypesInfo().TypeOf(source.Args[0])
+	argumentType := signature.Params().At(0).Type()
 	pointer, ok := types.Unalias(argumentType).(*types.Pointer)
 	if !ok || kind == unsafeoperation.String && !types.Identical(pointer.Elem(), types.Typ[types.Uint8]) {
 		return api.ExpressionEmission{}, api.Unsupported(context, api.CategoryExpression, source)

@@ -32,6 +32,7 @@ func BuildOperation(factory tsgo.Factory, symbol api.RuntimeSymbol, name, panicN
 	pointerIndex := binary(call("BigInt", offset), tsgo.BinaryOperatorPlusToken, call("BigInt", index))
 	address := factory.CallExpression(member(region, LocateMember), nil, nil, []tsgo.Expression{pointerIndex}, tsgo.NodeFlagsNone)
 	var direct, indirect tsgo.Expression
+	var directBody []tsgo.Statement
 	var resultType tsgo.TypeNode
 	parameters := []tsgo.ParameterDeclaration{
 		factory.ParameterDeclaration(nil, nil, region, nil, RegionType(factory, element), nil),
@@ -40,8 +41,12 @@ func BuildOperation(factory tsgo.Factory, symbol api.RuntimeSymbol, name, panicN
 	switch symbol {
 	case api.RuntimeRegionAddress:
 		resultType = PointerType(factory, element)
+		values := factory.Identifier("values")
+		directBody = append(directBody, factory.VariableStatement(nil, factory.VariableDeclarationList([]tsgo.VariableDeclaration{
+			factory.VariableDeclaration(values, nil, nil, member(region, ValuesMember)),
+		}, tsgo.NodeFlagsConst)))
 		direct = factory.CallExpression(factory.Identifier("addressOf"), nil, []tsgo.TypeNode{element}, []tsgo.Expression{
-			factory.ElementAccessExpression(member(region, ValuesMember), nil, numericIndex, tsgo.NodeFlagsNone),
+			factory.ElementAccessExpression(values, nil, numericIndex, tsgo.NodeFlagsNone),
 		}, tsgo.NodeFlagsNone)
 		indirect = address
 	case api.RuntimeRegionRead:
@@ -63,7 +68,8 @@ func BuildOperation(factory tsgo.Factory, symbol api.RuntimeSymbol, name, panicN
 	if symbol == api.RuntimeRegionWrite {
 		indirectBody = []tsgo.Statement{factory.ExpressionStatement(indirect), factory.ReturnStatement(factory.Identifier("value"))}
 	}
-	statements := []tsgo.Statement{factory.IfStatement(indexed, factory.Block([]tsgo.Statement{factory.ReturnStatement(direct)}, true), nil)}
+	directBody = append(directBody, factory.ReturnStatement(direct))
+	statements := []tsgo.Statement{factory.IfStatement(indexed, factory.Block(directBody, true), nil)}
 	statements = append(statements, indirectBody...)
 	return factory.FunctionDeclaration([]tsgo.ModifierLike{factory.ExportKeyword()}, nil, factory.Identifier(name),
 		[]tsgo.TypeParameterDeclaration{factory.TypeParameterDeclaration(nil, factory.Identifier("Element"), nil, nil, nil)},

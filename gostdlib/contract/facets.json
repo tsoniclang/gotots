@@ -2243,7 +2243,9 @@
       "export": "RuntimeMetricsDescriptionOperations",
       "capabilities": [
         "assign",
-        "copy"
+        "copy",
+        "make",
+        "zero"
       ]
     },
     {

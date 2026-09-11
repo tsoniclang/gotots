@@ -12,7 +12,8 @@ export type GoStorageRegion<Element> = {
 };
 export function goRegionAddress<Element>(region: GoStorageRegion<Element>, index: number | bigint): Pointer<Element> {
     if (region.kind === "indexed") {
-        return addressOf<Element>(region.values[region.offset + Number(index)]);
+        const values = region.values;
+        return addressOf<Element>(values[region.offset + Number(index)]);
     }
     return region.at(BigInt(region.offset) + BigInt(index));
 }

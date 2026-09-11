@@ -37,7 +37,7 @@ func TestUnsafeStringIntrinsicPrintsAndTypechecksCanonicalContract(t *testing.T)
 			}
 			scope := program.Roots()[0].Types().Scope()
 			roots := make([]emit.Root, 0, 1)
-			for _, name := range []string{"BuildString"} {
+			for _, name := range []string{"BuildString", "EmptyString"} {
 				root, rootErr := emit.NewRoot(scope.Lookup(name))
 				if rootErr != nil {
 					t.Fatal(rootErr)
@@ -94,6 +94,10 @@ import "unsafe"
 
 func BuildString(bytes []byte) string {
 	return unsafe.String(&bytes[0], len(bytes))
+}
+
+func EmptyString() bool {
+	return unsafe.String(nil, 0) == ""
 }
 
 `)

@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "08a0dea4dfcd2ae1adf4c16e0d2fd3ad36a686af321eedef4a8c95e5da02ce22",
-  "providerDigest": "200c3e2d666cd9a5af42dc8b03b37640ec580660068ce7c66ec97bf47f0d2ab8",
+  "providerDigest": "38a155eef85b975da1c268e64ef42b962fd882068a920d5f48911c777ee1d923",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -20540,13 +20540,15 @@
           "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=Description",
           "capabilities": [
             "assign",
-            "copy"
+            "copy",
+            "make",
+            "zero"
           ],
           "export": "RuntimeMetricsDescriptionOperations",
           "implementationOwner": "src/internal/facets/named-runtime-metrics.ts",
-          "targetFingerprint": "5a1ae006baf5437a821ad72ec4129fa253ea244c1fe1a9fc44f41ccf763d17ed",
+          "targetFingerprint": "717da991d57be3721e9cfc8675a59000068447ef00c0bee5ab50ab82cdc23566",
           "implementationSites": [
-            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsDescriptionOperations@65"
+            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsDescriptionOperations@67"
           ]
         },
         {
@@ -20562,7 +20564,7 @@
           "implementationOwner": "src/internal/facets/named-runtime-metrics.ts",
           "targetFingerprint": "f8d6cd465c94c85c8e026a21b3b5040de59edd8bdee32b95258e4d9aaae1b982",
           "implementationSites": [
-            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsSampleOperations@151"
+            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsSampleOperations@199"
           ]
         },
         {
@@ -20577,7 +20579,7 @@
           "implementationOwner": "src/internal/facets/named-runtime-metrics.ts",
           "targetFingerprint": "ac9f4e90f6197162dec56f1dcccb7b5f977fa12c3a040bfc67760b65a9f8370d",
           "implementationSites": [
-            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueOperations@252"
+            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueOperations@300"
           ]
         },
         {
@@ -20591,7 +20593,7 @@
           "implementationOwner": "src/internal/facets/named-runtime-metrics.ts",
           "targetFingerprint": "3ef826e769cf597618ca441455e10cd090a991fc01a7065651f66c6d94c52370",
           "implementationSites": [
-            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueKindValueOperations@25"
+            "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueKindValueOperations@27"
           ]
         }
       ]
@@ -27297,7 +27299,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsDescriptionOperations@65",
+      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsDescriptionOperations@67",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/runtime/metrics.ts#Cumulative@380",
@@ -27308,7 +27310,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsSampleOperations@151",
+      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsSampleOperations@199",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/runtime/metrics.ts#$assign@192",
@@ -27319,7 +27321,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueKindValueOperations@25",
+      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueKindValueOperations@27",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/runtime/metrics.ts#value@53",
@@ -27327,7 +27329,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueOperations@252",
+      "identity": "src/internal/facets/named-runtime-metrics.ts#RuntimeMetricsValueOperations@300",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/runtime/metrics.ts#$assign@192",
@@ -35174,5 +35176,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "40bc832d3b932e175bd54c3989039fd9bda164f737cdff9c136a5792948ab54a"
+  "manifestDigest": "7f89d39ea88a94bfa16b98c7a98789861cdfa78de35246885e6f4887466e8813"
 }

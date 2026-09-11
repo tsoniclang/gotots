@@ -1,4 +1,4 @@
-import type { gostring, int64 } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool, gostring, int64 } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   Description,
@@ -18,6 +18,14 @@ export class RuntimeMetricsValueKindValueOperations {
 }
 
 export class RuntimeMetricsDescriptionOperations {
+  static $zero(): Description {
+    return new Description();
+  }
+
+  static $make(name: gostring, description: gostring, kind: ValueKind, cumulative: bool): Description {
+    return new Description(name, description, kind, cumulative);
+  }
+
   static $copy(source: Description): Description {
     return new Description(
       source.Name,

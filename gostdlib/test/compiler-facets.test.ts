@@ -162,6 +162,20 @@ test("named-struct facets expose only selected static operations", (): void => {
   );
   assert.equal(description.Description.text(), "detail");
 
+  const emptyDescription = RuntimeMetricsDescriptionOperations.$zero();
+  assert.notEqual(emptyDescription, RuntimeMetricsDescriptionOperations.$zero());
+  assert.deepEqual([
+    emptyDescription.Name.text(), emptyDescription.Description.text(),
+    emptyDescription.Kind.value, emptyDescription.Cumulative,
+  ], ["", "", 0n, false]);
+  const constructedDescription = RuntimeMetricsDescriptionOperations.$make(
+    description.Name, description.Description, description.Kind, true,
+  );
+  assert.deepEqual([
+    constructedDescription.Name, constructedDescription.Description,
+    constructedDescription.Kind, constructedDescription.Cumulative,
+  ], [description.Name, description.Description, description.Kind, true]);
+
   const memStats = RuntimeMemStatsOperations.$zero();
   assert.equal(memStats.Alloc, 0n);
   assert.equal(memStats.EnableGC, false);
