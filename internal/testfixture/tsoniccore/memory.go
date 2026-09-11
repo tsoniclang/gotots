@@ -56,7 +56,15 @@ func memoryOperationRuntime() string {
 
 func installABIResolution(root string) error {
 	files := map[string]string{
-		"package.json": `{"type":"module","exports":{"./layout.js":"./layout.js"}}`,
+		"package.json": `{
+  "name": "@gotots/abi",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": ["layout.d.ts", "layout.js"],
+  "peerDependencies": {"@tsonic/core": "0.0.0"},
+  "exports": {"./layout.js": "./layout.js"}
+}`,
 		"layout.d.ts": `import type { DataLayout } from "@tsonic/core/types.js";
 export declare const little32: DataLayout;
 export declare const little64: DataLayout;

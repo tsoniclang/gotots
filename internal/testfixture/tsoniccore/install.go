@@ -72,7 +72,11 @@ func fixtureFiles() (map[string]string, error) {
 	}
 	return map[string]string{
 		"package.json": `{
+  "name": "@tsonic/core",
+  "version": "0.0.0",
+  "private": true,
   "type": "module",
+  "files": ["lang.d.ts", "lang.js", "types.d.ts", "types.js"],
   "exports": {
     "./lang.js": "./lang.js",
     "./types.js": "./types.js"
