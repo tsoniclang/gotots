@@ -232,10 +232,15 @@ func buildSliceOperation(
 		if symbol == api.RuntimeSliceElementRegion {
 			return runtimeslice.BuildElementRegion(factory, addressContract.ExportedName(), sliceName, panicContract.ExportedName()), nil
 		}
+		pointerSliceContract, err := api.RuntimeContract(api.RuntimeSlicePointer)
+		if err != nil {
+			return nil, err
+		}
 		return runtimeslice.BuildRegion(
 			factory,
 			addressContract.ExportedName(),
 			sliceName,
+			pointerSliceContract.ExportedName(),
 			panicContract.ExportedName(),
 		), nil
 	}

@@ -130,7 +130,12 @@ func (b projectionBuilder) arrayLocationMethod() tsgo.MethodDeclaration {
 			),
 			b.returnStatement(memoryview.Pointer(b.factory, b.typeReference("T"), b.factory.ArrowFunction(nil, nil,
 				[]tsgo.ParameterDeclaration{b.parameter(nil, "index", b.integerInputType())}, b.pointerType(b.typeReference("T")),
-				b.factory.EqualsGreaterThanToken(), b.call(b.factory.ThisExpression(), MemberName(MemberAddress), b.id("index"))), b.number("0"))),
+				b.factory.EqualsGreaterThanToken(), b.factory.CallExpression(b.id(b.pointerProject), nil,
+					[]tsgo.TypeNode{b.typeReference("F"), b.typeReference("T")}, []tsgo.Expression{
+						b.factory.CallExpression(b.id("goRegionAddress"), nil, []tsgo.TypeNode{b.typeReference("F")},
+							[]tsgo.Expression{b.id("sourceLocation"), b.id("index")}, tsgo.NodeFlagsNone),
+						b.thisProperty("fromSource"), b.thisProperty("toSource"),
+					}, tsgo.NodeFlagsNone)), b.number("0"))),
 		}, true),
 	)
 }

@@ -27,7 +27,7 @@ func BuildElementRegion(factory tsgo.Factory, functionName, sliceName, panicName
 		}, true))
 }
 
-func BuildRegion(factory tsgo.Factory, functionName, sliceName, panicName string) tsgo.FunctionDeclaration {
+func BuildRegion(factory tsgo.Factory, functionName, sliceName, pointerSliceName, panicName string) tsgo.FunctionDeclaration {
 	target := builder{factory: factory, className: sliceName, panicName: panicName}
 	location := target.id("location")
 	length := target.id("length")
@@ -48,6 +48,9 @@ func BuildRegion(factory tsgo.Factory, functionName, sliceName, panicName string
 						[]tsgo.TypeNode{target.typeT()}, nil, tsgo.NodeFlagsNone)),
 				}, true), nil), fail("unsafe slice on nil pointer"),
 			}, true), nil),
+			factory.IfStatement(target.binary(length, tsgo.BinaryOperatorEqualsEqualsToken, target.number("0")),
+				target.returnStatement(factory.NewExpression(target.id(pointerSliceName), []tsgo.TypeNode{target.typeT()},
+					[]tsgo.Expression{location, length, length})), nil),
 			target.returnStatement(factory.CallExpression(target.id("goSliceFromRegion"), nil, []tsgo.TypeNode{target.typeT()},
 				[]tsgo.Expression{location, length, length}, tsgo.NodeFlagsNone)),
 		}, true))

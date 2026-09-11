@@ -6,6 +6,7 @@ import (
 	"runtime/metrics"
 	"sync"
 	"sync/atomic"
+	"unsafe"
 )
 
 type Holder struct {
@@ -271,5 +272,12 @@ func ProjectedProviderRegion() bool {
 		return false
 	}
 	view[0] = original
-	return entries[0].Name == original.Name
+	if entries[0].Name != original.Name {
+		return false
+	}
+	entries = append(entries[:0:0], metrics.Description{Name: "one"}, metrics.Description{Name: "two"})
+	window := entries[:1]
+	alias := unsafe.Slice(&window[0], 2)
+	alias[1].Name = "updated"
+	return entries[1].Name == "updated" && alias[0].Name == "one"
 }
