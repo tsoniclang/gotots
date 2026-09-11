@@ -43,7 +43,8 @@ func Build(bytes []byte, offset int, length int) string {
 	artifacts := materializeArtifacts(t, emission, t.TempDir())
 	for _, required := range []string{
 		"GoString.fromRegion(",
-		"goSliceElementRegion<uint8>(bytes, offset)",
+		"goSliceElementRegion<uint8>(",
+		"let logicalResult",
 		"value.$arrayLocation(0)",
 		"return goRegionView<T>(location, index)",
 		"index >= value.sourceLength()",

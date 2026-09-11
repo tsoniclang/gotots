@@ -966,8 +966,8 @@ nil and retained-data queries must not construct an unused aggregate value.
 For `unsafe.String(&slice[index], length)` and
 `unsafe.Slice(&slice[index], length)`, the unsafe-view owner retains the
 selected slice's existing typed backing region and shifts its offset. It
-checks the original address index against the original slice length before
-evaluating the view length. The backing allocation is not reduced to one
+checks the original address index against the original slice length after
+the argument calls execute in source order. The backing is not reduced to one
 element or to the original slice length. Both operands are evaluated once;
 later descriptor replacement cannot retarget the captured backing. Named
 slices use their existing projection. Pointer-only arguments retain the

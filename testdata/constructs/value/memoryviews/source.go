@@ -59,7 +59,7 @@ func OrderedBacking() bool {
 
 func InvalidAddress() (result bool) {
 	calls := 0
-	defer func() { result = recover() != nil && calls == 0 }()
+	defer func() { result = recover() != nil && calls == 1 }()
 	bytes := []byte{65}
 	index := len(bytes)
 	length := func() int { calls++; return 0 }

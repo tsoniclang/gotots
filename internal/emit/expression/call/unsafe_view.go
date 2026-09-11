@@ -11,7 +11,6 @@ import (
 	runtimestring "github.com/tsoniclang/gotots/internal/emit/runtime/stringvalue"
 	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
-	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -28,11 +27,7 @@ func emitUnsafeView(context api.Context, children api.ChildEmitter, source *ast.
 	if !ok || kind == unsafeoperation.String && !types.Identical(pointer.Elem(), types.Typ[types.Uint8]) {
 		return api.ExpressionEmission{}, api.Unsupported(context, api.CategoryExpression, source)
 	}
-	region, err := emitUnsafeViewRegion(context, children, source.Args[0], pointer)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	length, err := integeroperand.Emit(context.WithRole(api.RoleCallArgument), children, source.Args[1])
+	region, length, err := emitUnsafeViewRegion(context, children, source, pointer)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

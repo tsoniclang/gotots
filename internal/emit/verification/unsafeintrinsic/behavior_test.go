@@ -112,7 +112,7 @@ func assertUnsafeStringRuntimeShape(t *testing.T, printed string) {
 	t.Helper()
 	for _, required := range []string{
 		"GoString.fromRegion(",
-		"goSliceElementRegion<uint8>(bytes, 0",
+		"goSliceElementRegion<uint8>(",
 		"bytes.sourceLength()",
 		"reinterpretRawPointer<uint8>",
 		": int128 = globalThis.BigInt(",
