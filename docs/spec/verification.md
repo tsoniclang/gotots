@@ -1589,6 +1589,60 @@ Aggregate improvement cannot hide a worsening tail. A material increase
 without typed necessity reopens the owner; thresholds are not raised to absorb
 it.
 
+### Canonical Memory Source-Size Calibration
+
+The maintainer approved the following bounded recalibration on 2026-09-12 for
+the canonical string, backing-region and pointer-view contracts. It supersedes
+the earlier two-total request; it is not permission to raise other limits.
+The baseline is GoToTS `9cf7f865`, using the existing fixtures, root selections,
+profiles and pinned TS-Go printer. Bytes are printed TypeScript source bytes;
+nodes are encoded TS-Go AST nodes, not JavaScript size or runtime allocation.
+
+| Existing gate | Measured baseline | Previous limit | Approved limit |
+| --- | ---: | ---: | ---: |
+| Wave 3 expression matrix, each integer profile | 62,823 bytes / 13,520 nodes | 55,000 / 11,250 | 64,000 / 14,000 |
+| Wave 7 `runtime/slice.ts:RuntimeSlice` declaration | 7,738 bytes / 1,582 nodes | 7,500 / 1,525 | 8,000 / 1,650 |
+| Wave 9 serial-execution fixture | 137,239 bytes | 133,000 | 140,000 |
+
+The previously quoted Wave 3 62,792/13,514 and Wave 9 137,208 totals precede
+the baseline above. Fresh accounting and the completed pre-recalibration suite
+agree on the current totals. Remaining headroom is 1,177 bytes/480 nodes for
+Wave 3, 262 bytes/68 nodes for RuntimeSlice, and 2,761 bytes for Wave 9.
+
+Per-file accounting separates the affected support families from the rest of
+each complete fixture. Wave 3 has 20 files; Wave 9 has 34. The two Wave 3
+integer profiles have identical totals here; that is measured, not assumed.
+
+| Emitted source | Wave 3 bytes / nodes | Wave 9 bytes / nodes |
+| --- | ---: | ---: |
+| `runtime/string-value.ts` | 3,909 / 826 | 3,909 / 826 |
+| `runtime/string.ts` | 188 / 45 | Not selected |
+| `runtime/memory-view.ts` | 1,893 / 467 | 1,532 / 358 |
+| `runtime/slice.ts` | 14,559 / 3,146 | 5,794 / 1,196 |
+| All remaining fixture files | 42,274 / 9,036 | 126,004 / 21,213 |
+| Total | 62,823 / 13,520 | 137,239 / 23,593 |
+
+These rows account for current artifacts, not a claim that every listed byte
+was newly added. The separately measured RuntimeSlice declaration is already
+inside its fixture's slice module and must not be added to module totals.
+String support retains backing and descriptor identity. Region and slice
+support retain aliasing, exact view boundaries and non-nil zero-length views;
+for example, `unsafe.Slice(&window[0], n)` must use the selected backing rather
+than copy the currently visible values. Removing that evidence to recover an
+old total would weaken the canonical contract. This recalibration changes no
+emitted source or runtime behavior.
+
+Only the exact RuntimeSlice declaration receives its new class limit. Every
+other generic class retains 7,500 bytes/1,525 nodes; generic aliases, functions
+and capability limits are unchanged. Wave 3 still permits only one
+concretization, at most 850 concretization bytes, and zero capabilities. Its
+largest-file cap remains 25,000 bytes (measured 24,904). Wave 9 retains 30,000
+bytes (measured 25,668), all synchronous-only checks, strict typechecking and
+the unchanged exact Go/TypeScript execution comparison. Runtime/performance,
+timeout, memory and concurrency limits are unchanged. Run the owning tests
+and the complete Go gate after this batch; a passing size gate is not evidence
+of full-product target validation, runtime parity or performance certification.
+
 The declaration-order gate places declarations from two source files into one
 target module, deliberately reverses their raw `token.Pos` allocation order,
 and requires canonical source-path order. Removing the source-path key makes

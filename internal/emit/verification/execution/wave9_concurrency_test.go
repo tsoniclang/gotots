@@ -92,7 +92,7 @@ func TestWaveNineSerialExecutionCompilesWithoutAsyncArtifacts(t *testing.T) {
 			t.Fatalf("serial artifacts lack %q", required)
 		}
 	}
-	if artifacts.bytes > 133_000 || artifacts.largest > 30_000 {
+	if artifacts.bytes > 140_000 || artifacts.largest > 30_000 {
 		t.Errorf(
 			"serial artifact bounds exceeded: total=%d largest=%d",
 			artifacts.bytes,
