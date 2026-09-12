@@ -97,6 +97,15 @@ Every checkpoint runs, in dependency order:
 11. selected-target AST transform and strict output checks;
 12. applicable differential/runtime and artifact-size gates.
 
+Provider-linked Go tests require built provider declarations and runtime files.
+Before the full Go suite, complete `npm --prefix gostdlib run check`, then
+`npm --prefix externals run check`, under the same guarded, serial policy.
+After a runtime generator change, refresh its committed fixture through
+`npm --prefix gostdlib run runtime:generate` and review that generated diff.
+A failed provider build may have removed `dist`; restore the dependency build
+before running consumers rather than interpreting missing files as compiler
+semantic failures.
+
 Heavy jobs run one at a time in `.temp/`, with explicit timeout,
 `GOMEMLIMIT`, low `GOMAXPROCS`, disk-backed logs, and breadcrumbs. Failure
 artifacts remain available so timeout, OOM, type error, and semantic mismatch
@@ -469,7 +478,15 @@ keys and fail before product runtime certification. The same fixture under
 Host-boundary string proof writes valid multibyte UTF-8, NUL, and invalid UTF-8
 through the selected `os.File.WriteString` provider and exact-compares the raw
 file bytes and reported byte count with Go. A direct codec round trip proves
-the one-code-unit-per-byte representation. Passing the canonical Go string to
+the one-code-unit-per-byte representation. Pointer-backed materialization must
+prove numeric iteration over safe intervals, exact beyond-safe callback
+positions, read-free empty views, live backing updates, holes and fractional
+offset rejection. Restoring an unconditional BigInt loop must fail its AST
+shape gate; neither descriptor identity nor byte behavior may change. Character
+materialization uses bounded batches, with exact tests across complete and
+partial batch boundaries, all 256 byte values and missing elements in later
+batches. No mutable backing cache or host text decoder may replace byte reads.
+Passing the canonical Go string to
 Node's string-writing overload must fail this gate by double-encoding the
 multibyte bytes; conversion by decoded host text must fail the invalid-UTF-8
 case.

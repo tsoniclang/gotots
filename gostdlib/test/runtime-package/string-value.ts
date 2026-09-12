@@ -33,7 +33,21 @@ export class GoStringPointerBacking {
     }
     text(offset: number | bigint, length: number | bigint): string {
         const start = BigInt(offset);
+        const numericStart = Number(start);
+        const numericLength = Number(length);
         let text: string = "";
+        if (Number.isSafeInteger(numericStart) && (Number.isSafeInteger(numericLength) && Number.isSafeInteger(numericStart + numericLength))) {
+            const chunk: uint8[] = [];
+            for (let index = 0; index < numericLength; index++) {
+                chunk.push(goRegionRead<uint8>(this.region, numericStart + index));
+                if (chunk.length === 4096) {
+                    text += globalThis.String.fromCharCode(...chunk);
+                    chunk.length = 0;
+                }
+            }
+            text += globalThis.String.fromCharCode(...chunk);
+            return text;
+        }
         for (let index = 0n; index < length; index++) {
             text += globalThis.String.fromCharCode(goRegionRead<uint8>(this.region, start + index));
         }

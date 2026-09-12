@@ -931,6 +931,15 @@ commits the updated descriptor through the owning slot. Copies made before
 that replacement retain their original backing and bounds. This is not a
 requirement for the JavaScript target to implement every aggregate codec.
 
+String materialization retains those live backing reads. Its iteration may
+use number integers only when the complete start/length interval is proven
+exactly representable; larger offsets retain BigInt arithmetic. Both paths use
+the same region-read owner and preserve byte order, holes, validation and view
+aliasing. Do not cache pointer-backed text or discard its canonical descriptor
+to avoid materialization cost. Materialize numeric intervals with a reusable
+4,096-byte character batch rather than one string concatenation per byte;
+spread arity stays bounded and the final partial batch is emitted exactly.
+
 Complex storage uses the same value-record contract, not the logical arithmetic
 class. A `complex64` storage schema has `real: float32` and `imag: float32`
 fields at offsets 0 and 4; `complex128` uses `float64` at offsets 0 and 8.
