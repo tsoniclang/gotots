@@ -225,7 +225,7 @@ export function readDirectory(
       right.name,
     ));
     return [
-      RuntimeSlice.literal(entries.map(
+      RuntimeSlice.literal<DirEntry | undefined>(entries.map(
         (entry): DirEntry => new NodeDirectoryEntry(path, entry),
       )),
       undefined,

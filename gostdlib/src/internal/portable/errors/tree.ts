@@ -72,7 +72,7 @@ export class MessageWrappedErrors extends ProviderInterfaceValue implements GoEr
   }
 
   Unwrap(): RuntimeSlice<GoError | undefined> {
-    return RuntimeSlice.literal(this.causes.slice());
+    return RuntimeSlice.literal<GoError | undefined>(this.causes.slice());
   }
 
   override $go$format(verb: string, _flags: string, _precision: number | undefined): string {
