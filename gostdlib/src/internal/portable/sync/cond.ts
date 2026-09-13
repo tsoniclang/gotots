@@ -14,13 +14,21 @@ export interface Locker extends GoInterfaceValue {
 export class Cond {
   readonly #identity = nextConditionIdentity++;
   #checkerIdentity = 0;
+  L: Locker | undefined;
 
-  constructor(readonly L: Locker | undefined = undefined) {}
+  constructor(locker: Locker | undefined = undefined) {
+    this.L = locker;
+  }
 
   static $copy(source: Cond): Cond {
-    const result = new Cond(source.L);
-    result.#checkerIdentity = source.#checkerIdentity;
+    const result = new Cond();
+    Cond.$assign(result, source);
     return result;
+  }
+
+  static $assign(target: Cond, source: Cond): void {
+    target.L = source.L;
+    target.#checkerIdentity = source.#checkerIdentity;
   }
 
   static $equal(left: Cond, right: Cond): boolean {

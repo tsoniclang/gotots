@@ -18,12 +18,12 @@ export function PprofStartCPUProfileDirect(
   writer: ProviderWriterInterface<ProviderErrorInterface> | undefined,
 ): ProviderErrorInterface | undefined {
   if (writer === undefined) {
-    return new ProviderError("pprof: nil writer");
+    return ProviderError.fromText("pprof: nil writer");
   }
   if (!beginCpuProfile((content): void => {
     writer.Write(byteSlice(content));
   })) {
-    return new ProviderError("cpu profiling already in use");
+    return ProviderError.fromText("cpu profiling already in use");
   }
   return undefined;
 }
@@ -35,14 +35,14 @@ export function PprofProfileWriteToDirect(
 ): ProviderErrorInterface | undefined {
   void debug;
   if (receiver === undefined || writer === undefined) {
-    return new ProviderError("pprof: nil profile or writer");
+    return ProviderError.fromText("pprof: nil profile or writer");
   }
-  const content = profileSnapshot(receiver[ProfileNameKey]);
+  const content = profileSnapshot(receiver[ProfileNameKey].text());
   const [count, failure] = writer.Write(byteSlice(content));
   if (failure !== undefined) {
     return failure;
   }
   return count === BigInt(content.length)
     ? undefined
-    : new ProviderError("pprof: short write");
+    : ProviderError.fromText("pprof: short write");
 }

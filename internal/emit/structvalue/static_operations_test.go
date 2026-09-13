@@ -11,8 +11,8 @@ import (
 func TestNamedStructValueOperationsAreStaticClassMembers(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
 	expected := map[string][]string{
-		"Point": {"$zero", "$copy", "$equal"},
-		"Box":   {"$zero", "$copy", "$equal"},
+		"Point": {"$zero", "$copy", "$equal", "$assign"},
+		"Box":   {"$zero", "$copy", "$equal", "$assign"},
 		"Empty": {"$zero", "$equal"},
 	}
 	for owner, want := range expected {
@@ -47,7 +47,7 @@ func TestNamedStructValueOperationsAreStaticClassMembers(t *testing.T) {
 		if !ok {
 			continue
 		}
-		for _, suffix := range []string{"$zero", "$copy", "$equal"} {
+		for _, suffix := range []string{"$zero", "$copy", "$equal", "$assign"} {
 			if strings.HasSuffix(function.Name().Text(), suffix) {
 				t.Fatalf(
 					"legacy top-level operation %s was emitted",

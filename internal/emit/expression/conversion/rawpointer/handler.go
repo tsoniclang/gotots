@@ -76,7 +76,7 @@ func Convert(
 			return api.ExpressionEmission{}, true, err
 		}
 		if sourceRaw {
-			target, err = context.Values().ProjectStoragePointer(context, source, pointer.Elem(), target)
+			target, err = context.Values().ProjectMemoryPointer(context, source, pointer.Elem(), target)
 			if err != nil {
 				return api.ExpressionEmission{}, true, err
 			}

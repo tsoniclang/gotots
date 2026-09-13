@@ -186,39 +186,41 @@ func (b builder) copyMethod() tsgo.MethodDeclaration {
 		tsgo.BinaryOperatorEqualsEqualsEqualsToken,
 		b.id("sourceBacking"),
 	)
-	copyWithin := b.call(
-		b.id("targetBacking"),
-		"copyWithin",
-		b.property(b.id("target"), "offset"),
-		b.property(b.id("source"), "offset"),
-		b.add(b.property(b.id("source"), "offset"), b.id("count")),
-	)
-	distinctCopy := b.loop(
-		b.id("count"),
-		b.factory.ExpressionStatement(
-			b.assign(
-				b.index(
-					b.id("targetBacking"),
-					b.add(
-						b.property(b.id("target"), "offset"),
-						b.id("index"),
-					),
+	copyElement := b.factory.ExpressionStatement(
+		b.assign(
+			b.index(
+				b.id("targetBacking"),
+				b.add(
+					b.property(b.id("target"), "offset"),
+					b.id("index"),
 				),
-				b.indexedValue(
-					b.id("sourceBacking"),
-					b.add(
-						b.property(b.id("source"), "offset"),
-						b.id("index"),
-					),
+			),
+			b.indexedValue(
+				b.id("sourceBacking"),
+				b.add(
+					b.property(b.id("source"), "offset"),
+					b.id("index"),
 				),
 			),
 		),
 	)
+	forwardCopy := b.loop(b.id("count"), copyElement)
+	reverseCopy := b.factory.ForStatement(
+		b.factory.VariableDeclarationList([]tsgo.VariableDeclaration{
+			b.factory.VariableDeclaration(b.id("index"), nil, nil, b.subtract(b.id("count"), b.number("1"))),
+		}, tsgo.NodeFlagsLet),
+		b.binary(b.id("index"), tsgo.BinaryOperatorGreaterThanEqualsToken, b.number("0")),
+		b.factory.PostfixUnaryExpression(b.id("index"), tsgo.PostfixUnaryExpressionOperatorKindMinusMinusToken),
+		b.factory.Block([]tsgo.Statement{copyElement}, true),
+	)
+	reverseOverlap := b.binary(sameBacking, tsgo.BinaryOperatorAmpersandAmpersandToken,
+		b.binary(b.property(b.id("target"), "offset"), tsgo.BinaryOperatorGreaterThanToken,
+			b.property(b.id("source"), "offset")))
 	directCopy := b.factory.Block([]tsgo.Statement{
 		b.factory.IfStatement(
-			sameBacking,
-			b.factory.ExpressionStatement(copyWithin),
-			distinctCopy,
+			reverseOverlap,
+			reverseCopy,
+			forwardCopy,
 		),
 		b.returnStatement(b.id("count")),
 	}, true)

@@ -1,8 +1,16 @@
 package reflectvalue_test
 
 import (
+	"encoding/binary"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/tsoniclang/gotots/internal/output"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestReflectionMetadataAndValueOperationsAreDeferred(t *testing.T) {
@@ -386,4 +394,195 @@ func main() {
 			}
 		},
 	)
+}
+
+type reflectionRegistrationMeasurement struct {
+	count       int
+	bytes       int
+	nodes       int
+	runtimeSize int
+}
+
+func TestReflectionRegistrationsShareBoundedCommonMachinery(t *testing.T) {
+	const (
+		maxAddressableRegistrationBytesPerType = 4_100
+		maxAddressableRegistrationNodesPerType = 600
+	)
+	small := measureReflectionRegistrations(t, 8)
+	large := measureReflectionRegistrations(t, 32)
+	countDelta := large.count - small.count
+	byteDelta := large.bytes - small.bytes
+	nodeDelta := large.nodes - small.nodes
+	if small.runtimeSize != large.runtimeSize {
+		t.Fatalf(
+			"common reflection owner changed with type count: %d -> %d",
+			small.runtimeSize,
+			large.runtimeSize,
+		)
+	}
+	if countDelta != 24 || byteDelta/countDelta > maxAddressableRegistrationBytesPerType ||
+		nodeDelta/countDelta > maxAddressableRegistrationNodesPerType {
+		t.Fatalf(
+			"reflection registration growth is not bounded: counts=%d/%d bytes=%d/%d nodes=%d/%d",
+			small.count,
+			large.count,
+			small.bytes,
+			large.bytes,
+			small.nodes,
+			large.nodes,
+		)
+	}
+	t.Logf(
+		"reflection registrations counts=%d/%d bytes=%d/%d nodes=%d/%d runtime=%d",
+		small.count,
+		large.count,
+		small.bytes,
+		large.bytes,
+		small.nodes,
+		large.nodes,
+		large.runtimeSize,
+	)
+}
+
+func measureReflectionRegistrations(
+	t *testing.T,
+	count int,
+) reflectionRegistrationMeasurement {
+	t.Helper()
+	project := t.TempDir()
+	var source strings.Builder
+	source.WriteString("package reflectvalue\n\nimport \"reflect\"\n\n")
+	for index := range count {
+		fmt.Fprintf(
+			&source,
+			"type Record%d struct { Count int; Name string; Ready bool }\n",
+			index,
+		)
+	}
+	source.WriteString("\nfunc Audit(index int) int {\n\tvalues := []any{")
+	for index := range count {
+		fmt.Fprintf(&source, "&Record%d{},", index)
+	}
+	source.WriteString(`}
+	total := 0
+	for _, value := range values {
+		reflected := reflect.ValueOf(value).Elem()
+		total += reflected.NumField()
+		if index >= 0 && index < reflected.NumField() && reflected.Field(index).CanSet() {
+			total++
+		}
+	}
+	return total
+}
+`)
+	emission := compileReflectFixture(
+		t,
+		project,
+		source.String(),
+		[]string{"Audit"},
+	)
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+	measurement := reflectionRegistrationMeasurement{count: count}
+	for _, file := range emission.Files() {
+		if file.OutputPath() != output.ReflectionTypeSupportPath {
+			continue
+		}
+		encoded, err := tsgo.EncodeSourceFile(file.SourceFile())
+		if err != nil {
+			t.Fatal(err)
+		}
+		measurement.nodes = encodedReflectionNodes(t, encoded)
+		for _, path := range artifacts.paths {
+			if !strings.HasSuffix(
+				filepath.ToSlash(path),
+				output.ReflectionTypeSupportPath,
+			) {
+				continue
+			}
+			printed, readErr := os.ReadFile(path)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			measurement.bytes = len(printed)
+			text := string(printed)
+			if structs := strings.Count(text, ".$registerStruct("); structs != count {
+				t.Fatalf("struct registrations = %d, want %d", structs, count)
+			}
+			if pointers := strings.Count(text, ".$registerPointer("); pointers < count {
+				t.Fatalf("pointer registrations = %d, want at least %d", pointers, count)
+			}
+			lazyStructs := regexp.MustCompile(
+				`(?s)\.\$registerStruct\(\s*[^,]+,\s*\(\)\s*=>`,
+			).FindAllString(text, -1)
+			if len(lazyStructs) != count {
+				t.Fatalf("lazy struct registrations = %d, want %d", len(lazyStructs), count)
+			}
+			lazyStructFields := regexp.MustCompile(
+				`(?s)\.\$registerStruct\([^;]+,\s*fields\s*=>`,
+			).FindAllString(text, -1)
+			if len(lazyStructFields) != count {
+				t.Fatalf("lazy struct field factories = %d, want %d", len(lazyStructFields), count)
+			}
+			lazyPointers := regexp.MustCompile(
+				`(?s)\.\$registerPointer\(\s*[^,]+,\s*\(\)\s*=>`,
+			).FindAllString(text, -1)
+			if len(lazyPointers) < count {
+				t.Fatalf("lazy pointer registrations = %d, want at least %d", len(lazyPointers), count)
+			}
+			lazyPointerElements := regexp.MustCompile(
+				`(?s)\.\$registerPointer\([^;]+,\s*elements\s*=>`,
+			).FindAllString(text, -1)
+			if len(lazyPointerElements) < count {
+				t.Fatalf("lazy pointer element factories = %d, want at least %d", len(lazyPointerElements), count)
+			}
+			for _, forbidden := range []string{
+				"switch (index)",
+				".$registerValue($goReflectType$Named_reflectvalue$Record",
+				".$registerValue($goReflectType$PointerTo_Named_reflectvalue$Record",
+			} {
+				if strings.Contains(text, forbidden) {
+					t.Fatalf("reflection registrations retain %q", forbidden)
+				}
+			}
+		}
+	}
+	runtimeSource, err := os.ReadFile(filepath.Join(
+		repositoryRoot(),
+		"gostdlib",
+		"src",
+		"internal",
+		"portable",
+		"reflect",
+		"runtime-value.ts",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	measurement.runtimeSize = len(runtimeSource)
+	if measurement.bytes == 0 || measurement.nodes == 0 {
+		t.Fatalf("reflection registration artifact is absent: %#v", measurement)
+	}
+	return measurement
+}
+
+func encodedReflectionNodes(t *testing.T, encoded []byte) int {
+	t.Helper()
+	const (
+		headerSize       = 44
+		nodesOffsetField = 40
+		nodeWidth        = 28
+	)
+	if len(encoded) < headerSize {
+		t.Fatalf("encoded target is %d bytes, want protocol header", len(encoded))
+	}
+	nodesOffset := int(binary.LittleEndian.Uint32(
+		encoded[nodesOffsetField:headerSize],
+	))
+	if nodesOffset < headerSize || nodesOffset > len(encoded) ||
+		(len(encoded)-nodesOffset)%nodeWidth != 0 {
+		t.Fatalf("encoded target has invalid node offset %d", nodesOffset)
+	}
+	return (len(encoded) - nodesOffset) / nodeWidth
 }

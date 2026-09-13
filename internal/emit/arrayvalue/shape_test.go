@@ -233,21 +233,35 @@ func assertCheckedAccess(
 	if len(statements) == 0 {
 		t.Fatalf("RuntimeArray.%s has no body", methodName(method))
 	}
-	variable, ok := statements[0].(tsgo.VariableStatement)
+	var operation tsgo.Expression
+	wantOperation := "goRegionRead"
+	switch statement := statements[0].(type) {
+	case tsgo.ReturnStatement:
+		operation = statement.Expression()
+	case tsgo.ExpressionStatement:
+		operation = statement.Expression()
+		wantOperation = "goRegionWrite"
+	default:
+		t.Fatalf("RuntimeArray.%s first statement = %T", methodName(method), statement)
+	}
+	call, ok := operation.(tsgo.CallExpression)
+	if !ok || len(call.Arguments()) < 2 {
+		t.Fatalf("RuntimeArray.%s does not use a region operation", methodName(method))
+	}
+	operationName, ok := call.Expression().(tsgo.Identifier)
+	if !ok || operationName.Text() != wantOperation {
+		t.Fatalf("RuntimeArray.%s region operation = %T", methodName(method), call.Expression())
+	}
+	checked, ok := call.Arguments()[1].(tsgo.CallExpression)
+	if !ok || len(checked.Arguments()) != 1 {
+		t.Fatalf("RuntimeArray.%s region index is unchecked", methodName(method))
+	}
+	property, ok := checked.Expression().(tsgo.PropertyAccessExpression)
 	if !ok {
-		t.Fatalf("RuntimeArray.%s first statement = %T", methodName(method), statements[0])
+		t.Fatalf("RuntimeArray.%s check is not a member call", methodName(method))
 	}
-	declarations := variable.DeclarationList().Declarations()
-	if len(declarations) != 1 {
-		t.Fatalf("RuntimeArray.%s check locals = %d", methodName(method), len(declarations))
-	}
-	call, ok := declarations[0].Initializer().(tsgo.CallExpression)
-	if !ok {
-		t.Fatalf("RuntimeArray.%s check = %T", methodName(method), declarations[0].Initializer())
-	}
-	property, ok := call.Expression().(tsgo.PropertyAccessExpression)
 	name, nameOK := property.Name().(tsgo.Identifier)
-	if !ok || !nameOK || name.Text() != "$check" {
+	if !nameOK || name.Text() != "$check" || property.Expression().Kind() != tsgo.SyntaxKindThisKeyword {
 		t.Fatalf("RuntimeArray.%s does not call $check", methodName(method))
 	}
 }
@@ -261,22 +275,25 @@ func assertBoundsFailure(
 	if len(statements) < 2 {
 		t.Fatal("RuntimeArray.$check has no bounds branch")
 	}
-	branch, ok := statements[1].(tsgo.IfStatement)
+	branch, ok := statements[0].(tsgo.IfStatement)
 	if !ok {
-		t.Fatalf("RuntimeArray.$check bounds statement = %T", statements[1])
+		t.Fatalf("RuntimeArray.$check bounds statement = %T", statements[0])
 	}
-	body, ok := branch.ThenStatement().(tsgo.Block)
-	if !ok || len(body.Statements()) != 1 {
+	consequent := []tsgo.Statement{branch.ThenStatement()}
+	if body, block := branch.ThenStatement().(tsgo.Block); block {
+		consequent = body.Statements()
+	}
+	if len(consequent) != 1 {
 		t.Fatal("RuntimeArray.$check bounds branch is not a single failure")
 	}
-	call, ok := body.Statements()[0].(tsgo.ExpressionStatement).
+	call, ok := consequent[0].(tsgo.ExpressionStatement).
 		Expression().(tsgo.CallExpression)
 	if !ok ||
 		call.Expression().(tsgo.PropertyAccessExpression).
 			Name().(tsgo.Identifier).Text() != "raiseRuntime" {
 		t.Fatalf(
 			"RuntimeArray.$check failure = %T, want shared panic call",
-			body.Statements()[0],
+			consequent[0],
 		)
 	}
 }

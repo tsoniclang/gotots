@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type {
@@ -19,11 +20,29 @@ export const KindFloat64Histogram = new ValueKind(3n);
 const kindBad = new ValueKind(0n);
 
 export class Value {
+  private kind: ValueKind;
+  private floatValue: float64;
+  private uintValue: uint64;
+
   constructor(
-    private readonly kind: ValueKind = kindBad,
-    private readonly floatValue: float64 = 0,
-    private readonly uintValue: uint64 = 0n,
-  ) {}
+    kind: ValueKind = kindBad,
+    floatValue: float64 = 0,
+    uintValue: uint64 = 0n,
+  ) {
+    this.kind = kind;
+    this.floatValue = floatValue;
+    this.uintValue = uintValue;
+  }
+
+  static $copy(source: Value): Value {
+    return new Value(source.kind, source.floatValue, source.uintValue);
+  }
+
+  static $assign(target: Value, source: Value): void {
+    target.kind = source.kind;
+    target.floatValue = source.floatValue;
+    target.uintValue = source.uintValue;
+  }
 
   static FromFloat64(value: float64): Value {
     return new Value(KindFloat64, value, 0n);
@@ -54,8 +73,8 @@ export class Value {
 
 export class Description {
   constructor(
-    public Name: gostring = "",
-    public Description: gostring = "",
+    public Name: gostring = GoString.empty,
+    public Description: gostring = GoString.empty,
     public Kind: ValueKind = kindBad,
     public Cumulative: bool = false,
   ) {}
@@ -66,11 +85,11 @@ export class Sample {
   Value: Value;
 
   constructor(
-    name: gostring = "",
+    name: gostring = GoString.empty,
     value: Value = new Value(),
   ) {
     this.Name = name;
-    this.Value = value;
+    this.Value = Value.$copy(value);
   }
 }
 
@@ -106,16 +125,16 @@ export function All(): RuntimeSlice<Description> {
 export function Read(m: RuntimeSlice<Sample>): void {
   for (let index = 0; index < m.length; index += 1) {
     const sample = m.get(index);
-    const reading = readMetric(sample.Name);
+    const reading = readMetric(sample.Name.text());
     switch (reading.kind) {
       case "uint64":
-        sample.Value = Value.FromUint64(reading.value);
+        Value.$assign(sample.Value, Value.FromUint64(reading.value));
         break;
       case "float64":
-        sample.Value = Value.FromFloat64(reading.value);
+        Value.$assign(sample.Value, Value.FromFloat64(reading.value));
         break;
       case "missing":
-        sample.Value = new Value();
+        Value.$assign(sample.Value, new Value());
         break;
     }
   }
@@ -126,9 +145,9 @@ function uintMetric(
   description: string,
   cumulative: boolean,
 ): Description {
-  return new Description(name, description, KindUint64, cumulative);
+  return new Description(GoString.fromText(name), GoString.fromText(description), KindUint64, cumulative);
 }
 
 function floatMetric(name: string, description: string): Description {
-  return new Description(name, description, KindFloat64, true);
+  return new Description(GoString.fromText(name), GoString.fromText(description), KindFloat64, true);
 }

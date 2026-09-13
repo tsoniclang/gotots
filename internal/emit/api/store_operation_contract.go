@@ -19,6 +19,19 @@ type StableAssignmentValues interface {
 	) (ExpressionEmission, error)
 }
 
+func (e StoreTargetEmission) WithStableIdentity() (StoreTargetEmission, error) {
+	if e.sourceType == nil || e.copiesValue {
+		return StoreTargetEmission{}, &ResultError{Result: "stable-identity store target", Reason: "an addressable aggregate location is required"}
+	}
+	switch e.sourceType.Underlying().(type) {
+	case *types.Array, *types.Struct:
+	default:
+		return StoreTargetEmission{}, &ResultError{Result: "stable-identity store target", Reason: "source type is not an aggregate"}
+	}
+	e.stableIdentity = true
+	return e, nil
+}
+
 type ContainerStorageValues interface {
 	ContainerStorageType(
 		Context,
@@ -42,25 +55,6 @@ type ContainerStorageValues interface {
 		types.Type,
 		ExpressionEmission,
 	) (ExpressionEmission, error)
-}
-
-func NewStableIdentityStoreTargetEmission(
-	location ExpressionEmission,
-	sourceType types.Type,
-) (StoreTargetEmission, error) {
-	if location.Value() == nil || sourceType == nil {
-		return StoreTargetEmission{}, &ResultError{
-			Result: "stable-identity store target",
-			Reason: "location or source type is invalid",
-		}
-	}
-	return StoreTargetEmission{
-		before:         location.Before(),
-		value:          location.Value(),
-		stableIdentity: true,
-		sourceType:     sourceType,
-		requests:       location.Requests(),
-	}, nil
 }
 
 func NewCanonicalStorageAccessorStoreTargetEmission(
@@ -321,11 +315,67 @@ func (e StoreTargetEmission) MutableValue(
 	}
 }
 
+func (e StoreTargetEmission) storeGenericValue(context Context, source ast.Node, value ExpressionEmission) (ExpressionEmission, error) {
+	values := context.StableAssignments()
+	if values == nil {
+		return ExpressionEmission{}, &ResultError{Result: "generic store", Reason: "stable-assignment service is unavailable"}
+	}
+	captured := e
+	before := e.Before()
+	requests := e.Requests()
+	captured.before = nil
+	captured.requests = nil
+	if !e.locationCaptured {
+		var err error
+		captured, before, requests, err = e.PrepareLocation(context)
+		if err != nil {
+			return ExpressionEmission{}, err
+		}
+	}
+	current, err := captured.MutableValue(context, source)
+	if err != nil {
+		return ExpressionEmission{}, err
+	}
+	updated, err := values.AssignStable(context, source, e.sourceType, current.Value(), value)
+	if err != nil {
+		return ExpressionEmission{}, err
+	}
+	stored, err := captured.storeConcreteValue(context, source, updated)
+	if err != nil {
+		return ExpressionEmission{}, err
+	}
+	before = append(before, current.Before()...)
+	before = append(before, stored.Before()...)
+	return NewExpressionEmission(before, stored.Value(), CombineRequests(requests, current.Requests(), stored.Requests()))
+}
+
 func (e StoreTargetEmission) StoreValue(
 	context Context,
 	source ast.Node,
 	value ExpressionEmission,
 ) (ExpressionEmission, error) {
+	if _, generic := GenericTypeParameter(e.sourceType); generic && !e.copiesValue {
+		return e.storeGenericValue(context, source, value)
+	}
+	return e.storeConcreteValue(context, source, value)
+}
+
+func (e StoreTargetEmission) storeConcreteValue(context Context, source ast.Node, value ExpressionEmission) (ExpressionEmission, error) {
+	if e.stableIdentity {
+		values := context.StableAssignments()
+		if values == nil {
+			return ExpressionEmission{}, &ResultError{Result: "stable-identity store", Reason: "stable-assignment service is unavailable"}
+		}
+		location, err := e.MutableValue(context, source)
+		if err != nil {
+			return ExpressionEmission{}, err
+		}
+		assigned, err := values.AssignStable(context, source, e.sourceType, location.Value(), value)
+		if err != nil {
+			return ExpressionEmission{}, err
+		}
+		return NewExpressionEmission(append(location.Before(), assigned.Before()...), assigned.Value(), CombineRequests(location.Requests(), assigned.Requests()))
+	}
 	switch e.storage {
 	case StoreTargetStorageCanonical:
 		var err error
@@ -352,30 +402,6 @@ func (e StoreTargetEmission) StoreValue(
 	}
 	if e.accessor {
 		return e.AccessorStore(context, value)
-	}
-	if e.stableIdentity {
-		values := context.StableAssignments()
-		if values == nil {
-			return ExpressionEmission{}, &ResultError{
-				Result: "stable-identity store",
-				Reason: "stable-assignment service is unavailable",
-			}
-		}
-		assigned, err := values.AssignStable(
-			context,
-			source,
-			e.sourceType,
-			e.value,
-			value,
-		)
-		if err != nil {
-			return ExpressionEmission{}, err
-		}
-		return NewExpressionEmission(
-			append(e.Before(), assigned.Before()...),
-			assigned.Value(),
-			CombineRequests(e.Requests(), assigned.Requests()),
-		)
 	}
 	if e.storage != StoreTargetStorageLogical {
 		return NewExpressionEmission(
@@ -463,6 +489,7 @@ const (
 	GenericOperationAppendSpread             = genericoperation.GenericOperationAppendSpread
 	GenericOperationReflectionType           = genericoperation.GenericOperationReflectionType
 	GenericOperationReflectionValue          = genericoperation.GenericOperationReflectionValue
+	GenericOperationAssign                   = genericoperation.GenericOperationAssign
 )
 
 type GenericOperationSelection = genericoperation.GenericOperationSelection

@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { bool, gostring, int, int32 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { hostInteger, integerFromHost } from "../../host-integer.js";
@@ -7,11 +8,11 @@ export const RuneSelf = 0x80;
 export const MaxRune = 0x10ffff;
 
 export function decodeRuneAt(value: gostring, index: number): [int32, int] {
-  if (index >= value.length) {
+  if (index >= Number(value.sourceLength())) {
     return [RuneError, 0n];
   }
 
-  const first = value.charCodeAt(index);
+  const first = value.read(index);
   if (first < RuneSelf) {
     return [first, 1n];
   }
@@ -20,11 +21,11 @@ export function decodeRuneAt(value: gostring, index: number): [int32, int] {
   }
 
   const width = first < 0xe0 ? 2 : first < 0xf0 ? 3 : 4;
-  if (index + width > value.length) {
+  if (index + width > Number(value.sourceLength())) {
     return [RuneError, 1n];
   }
 
-  const second = value.charCodeAt(index + 1);
+  const second = value.read(index + 1);
   if (
     second < 0x80 ||
     second > 0xbf ||
@@ -42,7 +43,7 @@ export function decodeRuneAt(value: gostring, index: number): [int32, int] {
     return [rune, integerFromHost(width)];
   }
 
-  const third = value.charCodeAt(index + 2);
+  const third = value.read(index + 2);
   if (third < 0x80 || third > 0xbf) {
     return [RuneError, 1n];
   }
@@ -51,7 +52,7 @@ export function decodeRuneAt(value: gostring, index: number): [int32, int] {
     return [rune, integerFromHost(width)];
   }
 
-  const fourth = value.charCodeAt(index + 3);
+  const fourth = value.read(index + 3);
   if (fourth < 0x80 || fourth > 0xbf) {
     return [RuneError, 1n];
   }
@@ -59,19 +60,19 @@ export function decodeRuneAt(value: gostring, index: number): [int32, int] {
 }
 
 export function decodeLastRune(value: gostring): [int32, int] {
-  if (value.length === 0) {
+  if (Number(value.sourceLength()) === 0) {
     return [RuneError, 0n];
   }
 
-  const end = value.length;
-  const last = value.charCodeAt(end - 1);
+  const end = Number(value.sourceLength());
+  const last = value.read(end - 1);
   if (last < RuneSelf) {
     return [last, 1n];
   }
 
   const startLimit = Math.max(0, end - 4);
   let start = end - 1;
-  while (start > startLimit && isContinuation(value.charCodeAt(start))) {
+  while (start > startLimit && isContinuation(value.read(start))) {
     start -= 1;
   }
   const [rune, width] = decodeRuneAt(value, start);
@@ -81,7 +82,7 @@ export function decodeLastRune(value: gostring): [int32, int] {
   return [rune, width];
 }
 
-export function encodeRune(rune: int32): gostring {
+export function encodeRune(rune: int32): string {
   const scalar = validRune(rune) ? rune : RuneError;
   if (scalar < RuneSelf) {
     return String.fromCharCode(scalar);
@@ -106,7 +107,7 @@ export function encodeRune(rune: int32): gostring {
 
 export function runeCount(value: gostring): number {
   let count = 0;
-  for (let index = 0; index < value.length; count += 1) {
+  for (let index = 0; index < Number(value.sourceLength()); count += 1) {
     const [, width] = decodeRuneAt(value, index);
     index += Math.max(1, hostInteger(width));
   }
@@ -115,7 +116,7 @@ export function runeCount(value: gostring): number {
 
 export function runeBoundaries(value: gostring): number[] {
   const boundaries = [0];
-  for (let index = 0; index < value.length; ) {
+  for (let index = 0; index < Number(value.sourceLength()); ) {
     const [, width] = decodeRuneAt(value, index);
     index += Math.max(1, hostInteger(width));
     boundaries.push(index);
@@ -125,7 +126,7 @@ export function runeBoundaries(value: gostring): number[] {
 
 export function toHostString(value: gostring): string {
   let result = "";
-  for (let index = 0; index < value.length; ) {
+  for (let index = 0; index < Number(value.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(value, index);
     result += String.fromCodePoint(rune);
     index += Math.max(1, hostInteger(width));
@@ -138,13 +139,13 @@ export function fromHostString(value: string): gostring {
   for (const scalar of value) {
     result += encodeRune(scalar.codePointAt(0) ?? RuneError);
   }
-  return result;
+  return GoString.fromText(result);
 }
 
 export function toHostBytes(value: gostring): Uint8Array {
-  const result = new Uint8Array(value.length);
-  for (let index = 0; index < value.length; index += 1) {
-    const byte = value.charCodeAt(index);
+  const result = new Uint8Array(Number(value.sourceLength()));
+  for (let index = 0; index < Number(value.sourceLength()); index += 1) {
+    const byte = value.read(index);
     if (byte > 0xff) {
       throw new RangeError("non-canonical Go string byte");
     }
@@ -158,7 +159,7 @@ export function fromHostBytes(value: Uint8Array): gostring {
   for (const byte of value) {
     result += String.fromCharCode(byte);
   }
-  return result;
+  return GoString.fromText(result);
 }
 
 export function validRune(rune: int32): bool {

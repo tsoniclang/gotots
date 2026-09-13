@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
@@ -7,7 +8,7 @@ import { IsPrint } from "../unicode/properties.js";
 import { ProviderError } from "../../runtime/error.js";
 
 const digits = "0123456789abcdef";
-const errLength = new ProviderError("encoding/hex: odd length hex string");
+const errLength = ProviderError.fromText("encoding/hex: odd length hex string");
 
 export function EncodedLen(length: int): int {
   return length * 2n;
@@ -64,7 +65,7 @@ export function EncodeToString(source: RuntimeSlice<uint8>): gostring {
     const byte = source.get(index);
     result += digits.charAt(Math.floor(byte / 16)) + digits.charAt(byte % 16);
   }
-  return result;
+  return GoString.fromText(result);
 }
 
 function decodeDigit(value: uint8): number | undefined {
@@ -82,6 +83,6 @@ function decodeDigit(value: uint8): number | undefined {
 
 function invalidByte(value: uint8): ProviderError {
   const codePoint = `U+${value.toString(16).toUpperCase().padStart(4, "0")}`;
-  const suffix = IsPrint(value) ? ` ${QuoteRune(value)}` : "";
-  return new ProviderError(`encoding/hex: invalid byte: ${codePoint}${suffix}`);
+  const suffix = IsPrint(value) ? ` ${QuoteRune(value).text()}` : "";
+  return ProviderError.fromText(`encoding/hex: invalid byte: ${codePoint}${suffix}`);
 }

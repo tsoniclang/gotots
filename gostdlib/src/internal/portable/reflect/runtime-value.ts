@@ -238,7 +238,7 @@ export function registerRuntimeStructValueOperations<T, S>(
 export function registerRuntimeOpaqueStructValueOperations<T>(
   type: Type,
   resolveAdapter: RuntimeValueAdapterResolver<T>,
-  unavailableFields: readonly gostring[],
+  unavailableFields: readonly string[],
 ): void {
   registerRuntimeValueOperations(type, () => {
     const adapter = resolveAdapter();

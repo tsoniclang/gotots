@@ -22,7 +22,7 @@ export function signalProcess(
   if (receiver === undefined || signal === undefined) {
     return nodeError("invalid", "signal");
   }
-  const name = signal.String();
+  const name = signal.String().text();
   const selected = nodeSignal(name);
   if (selected === undefined) {
     return nodeError("invalid", "signal");

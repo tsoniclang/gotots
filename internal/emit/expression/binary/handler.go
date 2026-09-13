@@ -19,7 +19,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func Emit(
+func emitBinary(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
@@ -105,6 +105,14 @@ func Emit(
 		return api.ExpressionEmission{}, err
 	}
 	if isLogicalOperator(source.Op) {
+		left, err = expressionoperands.BooleanMutationSnapshot(context, source.X, left)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		right, err = expressionoperands.BooleanMutationSnapshot(context, source.Y, right)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		return emitLogical(context, source.Op, operator, left, right)
 	}
 	operands, err := expressionoperands.PreservePair(
@@ -116,22 +124,14 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return expressionoperands.Finish(
-		operands,
-		api.DirectExpression(
-			context.Factory().BinaryExpression(
-				nil,
-				operands.Left().Value(),
-				nil,
-				operator,
-				operands.Right().Value(),
-			),
-			api.CombineRequests(
-				operands.Left().Requests(),
-				operands.Right().Requests(),
-			)...,
-		),
-	)
+	result, handled, err := basicbinary.Apply(context, operandType, source.Op, operands.Left(), operands.Right())
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if !handled {
+		return api.ExpressionEmission{}, api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return expressionoperands.Finish(operands, result)
 }
 
 func emitGeneric(
@@ -335,6 +335,7 @@ func emitLogical(
 			tsgo.NodeFlagsLet,
 			resultName,
 			left.Value(),
+			context.Factory().KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
 		),
 		context.Factory().IfStatement(
 			condition,
@@ -477,7 +478,7 @@ func equalityOperandStatement(
 	name string,
 	value tsgo.Expression,
 ) tsgo.VariableStatement {
-	return binaryVariable(context, tsgo.NodeFlagsConst, name, value)
+	return binaryVariable(context, tsgo.NodeFlagsConst, name, value, nil)
 }
 
 func binaryVariable(
@@ -485,6 +486,7 @@ func binaryVariable(
 	flags tsgo.NodeFlags,
 	name string,
 	value tsgo.Expression,
+	valueType tsgo.TypeNode,
 ) tsgo.VariableStatement {
 	return context.Factory().VariableStatement(
 		nil,
@@ -493,7 +495,7 @@ func binaryVariable(
 				context.Factory().VariableDeclaration(
 					context.Factory().Identifier(name),
 					nil,
-					nil,
+					valueType,
 					value,
 				),
 			},

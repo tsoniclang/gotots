@@ -1,5 +1,5 @@
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import type { uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 export function sliceValues<T>(source: RuntimeSlice<T>): T[] {
   const values: T[] = [];
@@ -7,10 +7,6 @@ export function sliceValues<T>(source: RuntimeSlice<T>): T[] {
     values.push(source.get(index));
   }
   return values;
-}
-
-export function stringSlice(values: readonly string[]): RuntimeSlice<gostring> {
-  return RuntimeSlice.literal([...values]);
 }
 
 export function byteSlice(values: Uint8Array | readonly number[]): RuntimeSlice<uint8> {

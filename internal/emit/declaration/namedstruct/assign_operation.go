@@ -1,6 +1,8 @@
 package namedstruct
 
 import (
+	"go/types"
+
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -10,6 +12,7 @@ func assignMethod(
 	memberName string,
 	classType tsgo.TypeNode,
 	fields []field,
+	capabilities []tsgo.ParameterDeclaration,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	canonicalStorage bool,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
@@ -50,7 +53,7 @@ func assignMethod(
 			tsgo.KeywordTypeSyntaxKindVoidKeyword,
 		),
 		body,
-		nil,
+		capabilities,
 		typeParameters,
 	), requests, nil
 }
@@ -80,6 +83,43 @@ func assignFields(
 			context.Factory().Identifier(field.name),
 			tsgo.NodeFlagsNone,
 		))
+		_, generic := api.GenericTypeParameter(field.object.Type())
+		_, nestedArray := field.object.Type().Underlying().(*types.Array)
+		_, structure := field.object.Type().Underlying().(*types.Struct)
+		if generic || nestedArray || structure {
+			left := api.DirectExpression(targetField)
+			right := api.DirectExpression(valueField)
+			var err error
+			if canonicalStorage {
+				left, err = context.Values().FromStorage(context, field.source, field.object.Type(), left)
+				if err != nil {
+					return nil, nil, err
+				}
+				right, err = context.Values().FromStorage(context, field.source, field.object.Type(), right)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+			assigned, err := context.StableAssignments().AssignStable(context, field.source, field.object.Type(), left.Value(), right)
+			if err != nil {
+				return nil, nil, err
+			}
+			if generic && canonicalStorage {
+				assigned, err = context.Values().ToStorage(context, field.source, field.object.Type(), assigned)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+			body = append(body, left.Before()...)
+			body = append(body, assigned.Before()...)
+			if generic {
+				body = append(body, assignmentStatement(context, targetField, assigned.Value()))
+			} else {
+				body = append(body, context.Factory().ExpressionStatement(assigned.Value()))
+			}
+			requests = api.CombineRequests(requests, left.Requests(), assigned.Requests())
+			continue
+		}
 		body = append(body, assignmentStatement(
 			context,
 			targetField,

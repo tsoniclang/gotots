@@ -412,25 +412,26 @@ func buildRepresentationArtifact(
 
 // reflectionRepresentationRequirements admits the closed facet set of one
 // canonical reflection descriptor: the definition requirement plus at most
-// one value-operation facet requirement, both bound to the same artifact.
+// one value-operation and one raw-pointer facet, all bound to the same artifact.
 func reflectionRepresentationRequirements(
 	requirements []api.DeclarationRequirement,
 	artifact *api.GeneratedArtifact,
 ) error {
-	if len(requirements) == 0 || len(requirements) > 2 {
+	if len(requirements) == 0 || len(requirements) > 3 {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
 			Reason: fmt.Sprintf(
-				"reflection artifact requires one definition and at most one value facet, received %d",
+				"reflection artifact requires one definition and at most two operation facets, received %d",
 				len(requirements),
 			),
 		}
 	}
-	seen := make(map[api.DeclarationRequirementKind]struct{}, 2)
+	seen := make(map[api.DeclarationRequirementKind]struct{}, 3)
 	for _, requirement := range requirements {
 		kind := requirement.Kind()
 		if kind != api.DeclarationRequirementReflectionType &&
-			kind != api.DeclarationRequirementReflectionValueOperations {
+			kind != api.DeclarationRequirementReflectionValueOperations &&
+			kind != api.DeclarationRequirementReflectionRawPointer {
 			return &ScheduleError{
 				Object: artifact.TargetName(),
 				Reason: "reflection artifact received a foreign requirement kind",

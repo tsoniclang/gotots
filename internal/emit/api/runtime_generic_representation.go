@@ -20,8 +20,11 @@ const (
 	RuntimeStringDecodeRune           = runtimecontract.RuntimeStringDecodeRune
 	RuntimeArray                      = runtimecontract.RuntimeArray
 	RuntimeArrayAllocate              = runtimecontract.RuntimeArrayAllocate
-	RuntimeArrayView                  = runtimecontract.RuntimeArrayView
 	RuntimeArrayLocation              = runtimecontract.RuntimeArrayLocation
+	RuntimeStringTextBacking          = runtimecontract.RuntimeStringTextBacking
+	RuntimeStringPointerBacking       = runtimecontract.RuntimeStringPointerBacking
+	RuntimeStringValue                = runtimecontract.RuntimeStringValue
+	RuntimeArrayFromRegion            = runtimecontract.RuntimeArrayFromRegion
 	RuntimeArrayPacked                = runtimecontract.RuntimeArrayPacked
 	RuntimeStorageTypeToken           = runtimecontract.RuntimeStorageTypeToken
 	RuntimeStoredValue                = runtimecontract.RuntimeStoredValue
@@ -31,6 +34,9 @@ const (
 	RuntimeContainerStorageType       = runtimecontract.RuntimeContainerStorageType
 	RuntimeSlice                      = runtimecontract.RuntimeSlice
 	RuntimeSliceAddress               = runtimecontract.RuntimeSliceAddress
+	RuntimeSliceData                  = runtimecontract.RuntimeSliceData
+	RuntimeSliceFromRegion            = runtimecontract.RuntimeSliceFromRegion
+	RuntimeSlicePointer               = runtimecontract.RuntimeSlicePointer
 	RuntimeSliceStorage               = runtimecontract.RuntimeSliceStorage
 	RuntimeSliceProjection            = runtimecontract.RuntimeSliceProjection
 	RuntimeSliceArrayPointer          = runtimecontract.RuntimeSliceArrayPointer
@@ -38,6 +44,7 @@ const (
 	RuntimeSliceAppendSlice           = runtimecontract.RuntimeSliceAppendSlice
 	RuntimeSliceClear                 = runtimecontract.RuntimeSliceClear
 	RuntimeSliceRegion                = runtimecontract.RuntimeSliceRegion
+	RuntimeSliceElementRegion         = runtimecontract.RuntimeSliceElementRegion
 	RuntimeMap                        = runtimecontract.RuntimeMap
 	RuntimeMapHash                    = runtimecontract.RuntimeMapHash
 	RuntimeMapClear                   = runtimecontract.RuntimeMapClear
@@ -74,6 +81,12 @@ const (
 	RuntimeComplex128Div              = runtimecontract.RuntimeComplex128Div
 	RuntimeComplex128Neg              = runtimecontract.RuntimeComplex128Neg
 	RuntimeComplex128Equal            = runtimecontract.RuntimeComplex128Equal
+	RuntimeComplex64Storage           = runtimecontract.RuntimeComplex64Storage
+	RuntimeComplex128Storage          = runtimecontract.RuntimeComplex128Storage
+	RuntimeComplex64ToStorage         = runtimecontract.RuntimeComplex64ToStorage
+	RuntimeComplex128ToStorage        = runtimecontract.RuntimeComplex128ToStorage
+	RuntimeComplex64FromStorage       = runtimecontract.RuntimeComplex64FromStorage
+	RuntimeComplex128FromStorage      = runtimecontract.RuntimeComplex128FromStorage
 	RuntimeNumberToBigInt             = runtimecontract.RuntimeNumberToBigInt
 	RuntimeInterfaceValue             = runtimecontract.RuntimeInterfaceValue
 	RuntimeInterfaceNonNil            = runtimecontract.RuntimeInterfaceNonNil
@@ -98,8 +111,16 @@ const (
 	RuntimeGoSpawn                    = runtimecontract.RuntimeGoSpawn
 	RuntimeSelectReady                = runtimecontract.RuntimeSelectReady
 	RuntimeSelectAttempt              = runtimecontract.RuntimeSelectAttempt
-	RuntimeUnsafeString               = runtimecontract.RuntimeUnsafeString
 	RuntimeKeepAlive                  = runtimecontract.RuntimeKeepAlive
+	RuntimeSliceHeader32              = runtimecontract.RuntimeSliceHeader32
+	RuntimeSliceHeader64              = runtimecontract.RuntimeSliceHeader64
+	RuntimeStringHeader32             = runtimecontract.RuntimeStringHeader32
+	RuntimeStringHeader64             = runtimecontract.RuntimeStringHeader64
+	RuntimeStorageRegion              = runtimecontract.RuntimeStorageRegion
+	RuntimeRegionAddress              = runtimecontract.RuntimeRegionAddress
+	RuntimeRegionRead                 = runtimecontract.RuntimeRegionRead
+	RuntimeRegionWrite                = runtimecontract.RuntimeRegionWrite
+	RuntimeRegionView                 = runtimecontract.RuntimeRegionView
 )
 
 type RuntimeModule = runtimecontract.RuntimeModule
@@ -119,12 +140,14 @@ const (
 	RuntimeModuleInterfaceValue   = runtimecontract.RuntimeModuleInterfaceValue
 	RuntimeModulePanicNil         = runtimecontract.RuntimeModulePanicNil
 	RuntimeModuleChannel          = runtimecontract.RuntimeModuleChannel
-	RuntimeModuleUnsafe           = runtimecontract.RuntimeModuleUnsafe
 	RuntimeModuleStruct           = runtimecontract.RuntimeModuleStruct
 	RuntimeModuleStorage          = runtimecontract.RuntimeModuleStorage
 	RuntimeModuleDeferredRegistry = runtimecontract.RuntimeModuleDeferredRegistry
 	RuntimeModuleScalar           = runtimecontract.RuntimeModuleScalar
 	RuntimeModuleLifetime         = runtimecontract.RuntimeModuleLifetime
+	RuntimeModuleMemoryDescriptor = runtimecontract.RuntimeModuleMemoryDescriptor
+	RuntimeModuleMemoryView       = runtimecontract.RuntimeModuleMemoryView
+	RuntimeModuleStringValue      = runtimecontract.RuntimeModuleStringValue
 )
 
 type RuntimeSymbolContract = runtimecontract.RuntimeSymbolContract

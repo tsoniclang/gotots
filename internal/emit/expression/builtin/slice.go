@@ -134,24 +134,19 @@ func emitMeasure(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	value, err = projectDefinedSlice(context, sourceType, value)
+	operation := api.GenericOperationLength
+	if member == runtimeslice.MemberCapacity {
+		operation = api.GenericOperationCapacity
+	}
+	target, handled, err := ApplyMeasure(context, children, source, operation,
+		sourceType, context.TypesInfo().TypeOf(source), value)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	target := tsgo.Expression(context.Factory().PropertyAccessExpression(
-		value.Value(),
-		nil,
-		context.Factory().Identifier(runtimeslice.MemberName(member)),
-		tsgo.NodeFlagsNone,
-	))
-	if context.ScalarABI().UsesBigInt(types.Typ[types.Int]) {
-		target = bigInt(context, target)
+	if !handled {
+		return api.ExpressionEmission{}, api.Unsupported(context, api.CategoryExpression, source)
 	}
-	return api.NewExpressionEmission(
-		value.Before(),
-		target,
-		value.Requests(),
-	)
+	return target, nil
 }
 
 func emitAppend(

@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { gostring, uint8 } from "@gotots/gostdlib/internal/scalars.js";
@@ -12,14 +13,13 @@ import {
 import { commandOutput } from "../internal/node/os/exec/command.js";
 import {
   sliceValues,
-  stringSlice,
 } from "../internal/runtime/slice.js";
 
 export class Cmd {
-  Path: gostring = "";
+  Path: gostring = GoString.empty;
   Args: RuntimeSlice<gostring> = RuntimeSlice.nil<gostring>();
   Env: RuntimeSlice<gostring> = RuntimeSlice.nil<gostring>();
-  Dir: gostring = "";
+  Dir: gostring = GoString.empty;
   Stdin: Reader | undefined = undefined;
   Stdout: Writer | undefined = undefined;
   Stderr: Writer | undefined = undefined;
@@ -44,6 +44,6 @@ export function Command(
 ): Cmd | undefined {
   const command = new Cmd();
   command.Path = name;
-  command.Args = stringSlice([name, ...sliceValues(arg)]);
+  command.Args = RuntimeSlice.literal([name, ...sliceValues(arg)]);
   return command;
 }

@@ -2,11 +2,13 @@ import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 
 import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import { state as ioState } from "../../../io.js";
 import { bytes } from "../../runtime/slice.js";
+import { fromHostBytes } from "../utf8/codec.js";
 
 let createBuffer: (source: RuntimeSlice<uint8>) => Buffer;
 let assignBufferRepresentation: (target: Buffer, source: Buffer) => void;
@@ -18,9 +20,9 @@ export class Buffer {
 
   static String(receiver: Buffer | undefined): gostring {
     if (receiver === undefined) {
-      return "<nil>";
+      return GoString.fromText("<nil>");
     }
-    return new TextDecoder().decode(bytes(
+    return fromHostBytes(bytes(
       receiver.#source.slice(
         receiver.#offset,
         receiver.#source.length,

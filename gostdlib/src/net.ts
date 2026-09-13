@@ -36,6 +36,6 @@ export function Listen(
 ): [Listener | undefined, GoError | undefined] {
   return [
     undefined,
-    new ProviderError(`net.Listen ${network} is not implemented by this backend`),
+    ProviderError.fromText(`net.Listen ${network.text()} is not implemented by this backend`),
   ];
 }

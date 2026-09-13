@@ -186,6 +186,7 @@ func runDefinedTypeScript(
 ) string {
 	t.Helper()
 	runner := `import * as values from "` + artifacts.sourceModule + `";
+import { GoString } from "./runtime/string-value.js";
 const count = values.CountFromInt(7);
 const other = values.OtherFromCount(count);
 console.log(String(values.IntFromCount(values.CountFromOther(other))));
@@ -198,10 +199,10 @@ console.log(values.CountOrder(count, values.CountFromInt(3)).join(" "));
 console.log(String(values.CountIsZero(values.CountZero())), String(values.CountIsZero(count)));
 console.log(String(values.ConvertedCountIsZero(values.CountZero())), String(values.ConvertedCountIsZero(count)));
 console.log(String(values.DeclaredConvertedCountIsZero(values.CountZero())), String(values.DeclaredConvertedCountIsZero(count)));
-const left = values.LabelFromString("a");
-const right = values.LabelFromString("z");
-console.log(values.StringFromLabel(values.LabelJoin(left, right)));
-console.log(String(values.LabelIndex(values.LabelFromString("path"), 2` + nativeSuffix + `)));
+const left = values.LabelFromString(GoString.fromText("a"));
+const right = values.LabelFromString(GoString.fromText("z"));
+console.log(values.StringFromLabel(values.LabelJoin(left, right)).text());
+console.log(String(values.LabelIndex(values.LabelFromString(GoString.fromText("path")), 2` + nativeSuffix + `)));
 console.log(values.LabelOrder(left, right).join(" "));
 console.log(String(values.BoolFromSwitch(values.SwitchNot(values.SwitchFromBool(true)))));
 const ratio = values.RatioFromFloat(7.5);
@@ -225,7 +226,7 @@ console.log(String(values.IntFromCount(values.CountUpdate(values.CountFromInt(4)
 const [minimum, maximum, length] = values.DefinedBuiltins(
   values.CountFromInt(9),
   values.CountFromInt(4),
-  values.LabelFromString("hello"),
+  values.LabelFromString(GoString.fromText("hello")),
 );
 console.log(String(values.IntFromCount(minimum)), String(values.IntFromCount(maximum)), String(length));
 console.log(String(values.CountSwitch(values.CountFromInt(1))));
@@ -244,7 +245,7 @@ console.log(
   String(values.IntFromCount(slice.get(2` + nativeSuffix + `))),
 );
 const [found, missing, ok] = values.CountMapValues();
-console.log(values.StringFromLabel(found), values.StringFromLabel(missing), String(ok));
+console.log(values.StringFromLabel(found).text(), values.StringFromLabel(missing).text(), String(ok));
 const [roundTrip, roundTripOK] = values.CountAnyRoundTrip(count);
 console.log(String(values.IntFromCount(roundTrip)), String(roundTripOK), String(values.CountAnyRejectsOther(count)));
 `

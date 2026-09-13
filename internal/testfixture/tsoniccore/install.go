@@ -2,8 +2,6 @@ package tsoniccore
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	corecontract "github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
@@ -13,18 +11,12 @@ func InstallResolutionOnly(root string) error {
 	if root == "" {
 		return fmt.Errorf("install Tsonic core resolution fixture: root is absent")
 	}
-	module := filepath.Join(root, "node_modules", "@tsonic", "core")
-	if err := os.MkdirAll(module, 0o755); err != nil {
-		return fmt.Errorf("install Tsonic core resolution fixture: %w", err)
-	}
 	files, err := fixtureFiles()
 	if err != nil {
 		return err
 	}
-	for name, content := range files {
-		if err := os.WriteFile(filepath.Join(module, name), []byte(content), 0o600); err != nil {
-			return fmt.Errorf("install Tsonic core resolution fixture %s: %w", name, err)
-		}
+	if err := installPackage(root, "@tsonic", "core", files); err != nil {
+		return err
 	}
 	return installABIResolution(root)
 }
@@ -80,7 +72,11 @@ func fixtureFiles() (map[string]string, error) {
 	}
 	return map[string]string{
 		"package.json": `{
+  "name": "@tsonic/core",
+  "version": "0.0.0",
+  "private": true,
   "type": "module",
+  "files": ["lang.d.ts", "lang.js", "types.d.ts", "types.js"],
   "exports": {
     "./lang.js": "./lang.js",
     "./types.js": "./types.js"
@@ -142,6 +138,7 @@ func primitiveTypeDeclarations() (string, error) {
 		{corecontract.SymbolInt32, "number"},
 		{corecontract.SymbolUint32, "number"},
 		{corecontract.SymbolInt64, "bigint"},
+		{corecontract.SymbolInt128, "bigint"},
 		{corecontract.SymbolUint64, "bigint"},
 		{corecontract.SymbolFloat32, "number"},
 		{corecontract.SymbolFloat64, "number"},

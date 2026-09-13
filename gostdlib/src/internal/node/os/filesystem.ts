@@ -1,3 +1,6 @@
+import { Buffer } from "node:buffer";
+import { GoString } from "@gotots/runtime/string-value.js";
+import { fromHostBytes, fromHostString, toHostBytes } from "../../portable/utf8/codec.js";
 import {
   mkdirSync,
   lstatSync,
@@ -72,16 +75,18 @@ export function create<T extends object>(
 }
 
 export function open<T extends object>(
-  path: gostring,
+  sourcePath: gostring,
   flags: int,
   permissions: FileMode,
   factory: FileFactory<T>,
 ): [T | undefined, GoError | undefined] {
+  const path = sourcePath.text();
+  const rawPath = Buffer.from(toHostBytes(sourcePath));
   try {
-    const descriptor = openSync(path, hostInteger(flags), permissions.value);
+    const descriptor = openSync(rawPath, hostInteger(flags), permissions.value);
     return [factory(descriptor, path), undefined];
   } catch {
-    if (statSync(path, { throwIfNoEntry: false }) === undefined) {
+    if (statSync(rawPath, { throwIfNoEntry: false }) === undefined) {
       return [undefined, nodeError("not-exist", "open", path)];
     }
     return [undefined, nodeError("operation", "open", path)];
@@ -89,14 +94,16 @@ export function open<T extends object>(
 }
 
 export function makeDirectories(
-  path: gostring,
+  sourcePath: gostring,
   permissions: FileMode,
 ): GoError | undefined {
+  const path = sourcePath.text();
+  const rawPath = Buffer.from(toHostBytes(sourcePath));
   if (path.length === 0) {
     return nodeError("not-exist", "mkdir", path);
   }
   try {
-    mkdirSync(path, {
+    mkdirSync(rawPath, {
       recursive: true,
       mode: permissions.value,
     });
@@ -106,16 +113,18 @@ export function makeDirectories(
   }
 }
 
-export function remove(path: gostring): GoError | undefined {
-  const information = lstatSync(path, { throwIfNoEntry: false });
+export function remove(sourcePath: gostring): GoError | undefined {
+  const path = sourcePath.text();
+  const rawPath = Buffer.from(toHostBytes(sourcePath));
+  const information = lstatSync(rawPath, { throwIfNoEntry: false });
   if (information === undefined) {
     return nodeError("not-exist", "remove", path);
   }
   try {
     if (information.isDirectory()) {
-      rmdirSync(path);
+      rmdirSync(rawPath);
     } else {
-      rmSync(path);
+      rmSync(rawPath);
     }
     return undefined;
   } catch {
@@ -123,9 +132,11 @@ export function remove(path: gostring): GoError | undefined {
   }
 }
 
-export function removeAll(path: gostring): GoError | undefined {
+export function removeAll(sourcePath: gostring): GoError | undefined {
+  const path = sourcePath.text();
+  const rawPath = Buffer.from(toHostBytes(sourcePath));
   try {
-    rmSync(path, {
+    rmSync(rawPath, {
       force: true,
       recursive: true,
     });
@@ -136,19 +147,21 @@ export function removeAll(path: gostring): GoError | undefined {
 }
 
 export function changeTimes(
-  path: gostring,
+  sourcePath: gostring,
   accessTime: Time,
   modificationTime: Time,
 ): GoError | undefined {
+  const path = sourcePath.text();
+  const rawPath = Buffer.from(toHostBytes(sourcePath));
   try {
     utimesSync(
-      path,
+      rawPath,
       hostInteger(accessTime.UnixMilli()) / 1000,
       hostInteger(modificationTime.UnixMilli()) / 1000,
     );
     return undefined;
   } catch {
-    if (statSync(path, { throwIfNoEntry: false }) === undefined) {
+    if (statSync(rawPath, { throwIfNoEntry: false }) === undefined) {
       return nodeError("not-exist", "chtimes", path);
     }
     return nodeError("operation", "chtimes", path);
@@ -156,10 +169,12 @@ export function changeTimes(
 }
 
 export function stat(
-  path: gostring,
+  sourcePath: gostring,
 ): [FileInfo | undefined, GoError | undefined] {
+  const path = sourcePath.text();
+  const rawPath = Buffer.from(toHostBytes(sourcePath));
   try {
-    const information = statSync(path, { throwIfNoEntry: false });
+    const information = statSync(rawPath, { throwIfNoEntry: false });
     if (information === undefined) {
       return [undefined, nodeError("not-exist", "stat", path)];
     }
@@ -170,10 +185,12 @@ export function stat(
 }
 
 export function lstat(
-  path: gostring,
+  sourcePath: gostring,
 ): [FileInfo | undefined, GoError | undefined] {
+  const path = sourcePath.text();
+  const rawPath = Buffer.from(toHostBytes(sourcePath));
   try {
-    const information = lstatSync(path, { throwIfNoEntry: false });
+    const information = lstatSync(rawPath, { throwIfNoEntry: false });
     if (information === undefined) {
       return [undefined, nodeError("not-exist", "lstat", path)];
     }
@@ -184,10 +201,12 @@ export function lstat(
 }
 
 export function readDirectory(
-  path: gostring,
+  sourcePath: gostring,
 ): [RuntimeSlice<DirEntry | undefined>, GoError | undefined] {
+  const path = sourcePath.text();
+  const rawPath = Buffer.from(toHostBytes(sourcePath));
   try {
-    const information = statSync(path, { throwIfNoEntry: false });
+    const information = statSync(rawPath, { throwIfNoEntry: false });
     if (information === undefined) {
       return [
         RuntimeSlice.nil<DirEntry | undefined>(),
@@ -200,10 +219,10 @@ export function readDirectory(
         nodeError("not-directory", "readdir", path),
       ];
     }
-    const entries = readdirSync(path, { withFileTypes: true });
+    const entries = readdirSync(rawPath, { withFileTypes: true, encoding: "buffer" });
     entries.sort((left, right): number => Buffer.compare(
-      Buffer.from(left.name),
-      Buffer.from(right.name),
+      left.name,
+      right.name,
     ));
     return [
       RuntimeSlice.literal(entries.map(
@@ -220,7 +239,7 @@ export function readDirectory(
 }
 
 export function directoryFileSystem(root: gostring): FS {
-  return new NodeDirectoryFS(root);
+  return new NodeDirectoryFS(root.text());
 }
 
 const directoryFileSystemType = Object.freeze({ comparable: true });
@@ -231,12 +250,12 @@ class NodeDirectoryFS extends ProviderInterfaceValue implements FS {
   }
 
   Open(name: gostring): [FsFile | undefined, GoError | undefined] {
-    const path = resolveFileSystemPath(this.root, name);
+    const path = resolveFileSystemPath(this.root, name.text());
     if (path === undefined) {
-      return [undefined, nodeError("invalid", "open", name)];
+      return [undefined, nodeError("invalid", "open", name.text())];
     }
     const [file, error] = open(
-      path,
+      GoString.fromText(path),
       0n,
       new FileMode(0),
       (descriptor: number, openedPath: string): object => {
@@ -275,14 +294,14 @@ class NodeFileSystemFile extends DirectoryFile implements FsFile {
   }
 
   Stat(): [FileInfo | undefined, GoError | undefined] {
-    return stat(this.path);
+    return stat(GoString.fromText(this.path));
   }
 
   ReadDir(count: int): [
     RuntimeSlice<DirEntry | undefined>,
     GoError | undefined,
   ] {
-    const [entries, failure] = readDirectory(this.path);
+    const [entries, failure] = readDirectory(GoString.fromText(this.path));
     if (failure !== undefined) {
       return [RuntimeSlice.nil<DirEntry | undefined>(), failure];
     }
@@ -330,7 +349,7 @@ class NodeFileInfo extends ProviderInterfaceValue implements FileInfo {
   }
 
   Name(): gostring {
-    return basename(this.path);
+    return GoString.fromText(basename(this.path));
   }
 
   Size(): int64 {
@@ -347,13 +366,13 @@ const directoryEntryType = Object.freeze({ comparable: true });
 class NodeDirectoryEntry extends ProviderInterfaceValue implements DirEntry {
   constructor(
     private readonly directory: string,
-    private readonly entry: Dirent,
+    private readonly entry: Dirent<Buffer>,
   ) {
     super(directoryEntryType);
   }
 
   Info(): [FileInfo | undefined, GoError | undefined] {
-    return lstat(join(this.directory, this.entry.name));
+    return lstat(GoString.fromText(join(this.directory, fromHostBytes(this.entry.name).text())));
   }
 
   IsDir(): boolean {
@@ -361,7 +380,7 @@ class NodeDirectoryEntry extends ProviderInterfaceValue implements DirEntry {
   }
 
   Name(): gostring {
-    return this.entry.name;
+    return fromHostBytes(this.entry.name);
   }
 
   Type(): FileMode {
@@ -369,7 +388,7 @@ class NodeDirectoryEntry extends ProviderInterfaceValue implements DirEntry {
   }
 }
 
-function directoryEntryMode(entry: Dirent): FileMode {
+function directoryEntryMode(entry: Dirent<Buffer>): FileMode {
   if (entry.isDirectory()) {
     return new FileMode(modeDirectory);
   }
@@ -399,7 +418,7 @@ function resolveFileSystemPath(
   name: string,
 ): string | undefined {
   if (name === ".") {
-    return resolve(root);
+    return resolve(fromHostString(process.cwd()).text(), root);
   }
   if (
     name.length === 0
@@ -416,7 +435,7 @@ function resolveFileSystemPath(
   ) {
     return undefined;
   }
-  const resolvedRoot = resolve(root);
+  const resolvedRoot = resolve(fromHostString(process.cwd()).text(), root);
   const path = resolve(resolvedRoot, name);
   const descendantPrefix = resolvedRoot.endsWith(sep)
     ? resolvedRoot

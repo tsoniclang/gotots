@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic, type GoRecovery } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
@@ -9,7 +10,7 @@ import type {
   uint8,
 } from "@gotots/gostdlib/internal/scalars.js";
 
-import { New } from "../../errors.js";
+import { ProviderError } from "../runtime/error.js";
 import { PathError, type FileMode } from "../../io/fs.js";
 import { Join as JoinPath } from "../../path.js";
 import type { Time } from "../../time.js";
@@ -225,7 +226,7 @@ export function IoFsReadDirDirect(
     if (readDirFile === undefined) {
       return [
         RuntimeSlice.nil<ProviderDirEntry | undefined>(),
-        new PathError("readdir", name, New("not implemented")),
+        new PathError(GoString.fromText("readdir"), name, ProviderError.fromText("not implemented")),
       ];
     }
     const [entries, readFailure] = readDirFile.ReadDir(-1n);
@@ -358,7 +359,7 @@ function sortDirectoryEntries(
 ): (ProviderDirEntry | undefined)[] {
   const named = entries.map((entry) => ({
     entry,
-    name: entry === undefined ? "" : entry.Name(),
+    name: entry === undefined ? "" : entry.Name().text(),
   }));
   named.sort((left, right) =>
     left.name < right.name ? -1 : left.name > right.name ? 1 : 0);

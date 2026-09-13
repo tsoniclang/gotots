@@ -3,6 +3,7 @@ import {
   type GoError,
 } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderInterfaceValue } from "../io/value.js";
@@ -33,12 +34,12 @@ export class ParseError extends ProviderInterfaceValue implements GoError {
   }
 
   Error(): gostring {
-    if (this.Message !== "") {
-      return `parsing time ${timeQuote(this.Value)}${this.Message}`;
+    if (this.Message.text() !== "") {
+      return GoString.fromText(`parsing time ${timeQuote(this.Value.text())}${this.Message.text()}`);
     }
-    return `parsing time ${timeQuote(this.Value)} as ${timeQuote(this.Layout)}`
-      + `: cannot parse ${timeQuote(this.ValueElem)}`
-      + ` as ${timeQuote(this.LayoutElem)}`;
+    return GoString.fromText(`parsing time ${timeQuote(this.Value.text())} as ${timeQuote(this.Layout.text())}`
+      + `: cannot parse ${timeQuote(this.ValueElem.text())}`
+      + ` as ${timeQuote(this.LayoutElem.text())}`);
   }
 
   override $go$format(
@@ -49,7 +50,7 @@ export class ParseError extends ProviderInterfaceValue implements GoError {
     if (verb === "T") {
       return "*time.ParseError";
     }
-    const message = this.Error();
+    const message = this.Error().text();
     return verb === "q" ? JSON.stringify(message) : message;
   }
 }

@@ -13,6 +13,13 @@ func (a RuntimeArray) Zero(
 	children api.ChildEmitter,
 	source ast.Node,
 ) (api.ExpressionEmission, error) {
+	if a.Length() > 9007199254740991 {
+		zero, err := a.PhysicalZero(context, source)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return context.Values().FromMemoryStorage(context, source, a.SourceType(), zero)
+	}
 	if a.aggregate {
 		if a.Length() == 0 {
 			target, requests, err := a.runtimeOperation(
@@ -144,6 +151,13 @@ func (a RuntimeArray) Copy(
 			value.Value(),
 			value.Requests(),
 		)
+	}
+	if a.Length() > 9007199254740991 {
+		stored, err := context.Values().ToMemoryStorage(context, source, a.SourceType(), value)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return context.Values().FromMemoryStorage(context, source, a.SourceType(), stored)
 	}
 	if a.aggregate {
 		sourceName, err := context.Names().Temporary(

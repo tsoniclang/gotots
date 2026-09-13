@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoString } from "@gotots/runtime/string-value.js";
+import { fromHostString } from "../src/internal/portable/utf8/codec.js";
 import type { GoEmptyStruct } from "@gotots/runtime/struct.js";
 import { ProviderError } from "../src/internal/runtime/error.js";
 import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
@@ -77,7 +79,7 @@ test("ParseDuration preserves Go units, fractions, and diagnostics", (): void =>
     ["1μs", 1_000n],
   ];
   for (const [source, want] of valid) {
-    const [duration, failure] = ParseDuration(source);
+    const [duration, failure] = ParseDuration(fromHostString(source));
     assert.equal(failure, undefined, source);
     assert.equal(duration.Nanoseconds(), want, source);
   }
@@ -87,20 +89,23 @@ test("ParseDuration preserves Go units, fractions, and diagnostics", (): void =>
     ["1", 'time: missing unit in duration "1"'],
     [".s", 'time: invalid duration ".s"'],
     ["1x", 'time: unknown unit "x" in duration "1x"'],
+    ["1µx", 'time: unknown unit "\\xc2\\xb5x" in duration "1\\xc2\\xb5x"'],
     ["2562047h47m16.854775808s", 'time: invalid duration "2562047h47m16.854775808s"'],
   ];
   for (const [source, want] of invalid) {
-    const [duration, failure] = ParseDuration(source);
+    const [duration, failure] = ParseDuration(fromHostString(source));
     assert.equal(duration.Nanoseconds(), 0n, source);
-    assert.equal(failure?.Error(), want, source);
+    assert.equal(failure?.Error().text(), want, source);
   }
+  const [, byteFailure] = ParseDuration(GoString.fromText("\xff"));
+  assert.equal(byteFailure?.Error().text(), 'time: invalid duration "\\xff"');
 });
 
 test("Duration and Time preserve arithmetic, ordering, formatting, and zero", () => {
   const duration = new Duration(1_250_000_000n);
   assert.equal(duration.Nanoseconds(), 1_250_000_000n);
   assert.equal(duration.Seconds(), 1.25);
-  assert.equal(duration.String(), "1.25s");
+  assert.equal(duration.String().text(), "1.25s");
 
   const epoch = UnixMilli(0n);
   const later = epoch.Add(duration);
@@ -114,13 +119,13 @@ test("Duration and Time preserve arithmetic, ordering, formatting, and zero", ()
     + `${String(localEpoch.getMinutes()).padStart(2, "0")}:`
     + `${String(localEpoch.getSeconds()).padStart(2, "0")} `
     + `${localEpoch.getHours() < 12 ? "AM" : "PM"}`;
-  assert.equal(UnixMilli(0n).Format("03:04:05 PM"), expectedTime);
+  assert.equal(UnixMilli(0n).Format(GoString.fromText("03:04:05 PM")).text(), expectedTime);
   assert.equal(new Time().IsZero(), true);
   assert.equal(UnixMilli(0n).UnixMilli(), 0n);
   assert.equal(UnixMilli(0n).UnixNano(), 0n);
-  assert.match(UnixMilli(0n).String(), /1970/u);
+  assert.match(UnixMilli(0n).String().text(), /1970/u);
   const prefix = RuntimeSlice.literal([0x61, 0x74, 0x3d]);
-  const appended = UnixMilli(0n).AppendFormat(prefix, "2006");
+  const appended = UnixMilli(0n).AppendFormat(prefix, GoString.fromText("2006"));
   const bytes = Array.from(
     { length: appended.length },
     (_, index): number => appended.get(index),
@@ -146,7 +151,7 @@ test("Time.UnmarshalText preserves the parsed instant and fixed offset", (): voi
     undefined,
   );
   assert.equal(
-    parsed.Format("2006-01-02T15:04:05.000000000Z07:00"),
+    parsed.Format(GoString.fromText("2006-01-02T15:04:05.000000000Z07:00")).text(),
     "2024-01-02T03:04:05.123456789+02:30",
   );
 
@@ -163,7 +168,7 @@ test("Time.UnmarshalText preserves the parsed instant and fixed offset", (): voi
   const failure = invalid.UnmarshalText(RuntimeSlice.literal(Array.from(
     new TextEncoder().encode("not-a-time"),
   )));
-  assert.match(failure?.Error() ?? "", /^parsing time /u);
+  assert.match(failure?.Error().text() ?? "", /^parsing time /u);
   assert.equal(invalid.IsZero(), true);
 });
 
@@ -186,17 +191,17 @@ test("time.Parse consumes Go reference layouts", (): void => {
     ],
   ];
   for (const [layout, source, want] of cases) {
-    const [parsed, failure] = Parse(layout, source);
+    const [parsed, failure] = Parse(GoString.fromText(layout), GoString.fromText(source));
     assert.equal(failure, undefined, `${layout} / ${source}`);
     assert.equal(
-      parsed.Format("2006-01-02T15:04:05.000000000Z07:00"),
+      parsed.Format(GoString.fromText("2006-01-02T15:04:05.000000000Z07:00")).text(),
       want,
     );
   }
 
-  const [invalid, failure] = Parse("2006-01-02", "2024-02-30");
+  const [invalid, failure] = Parse(GoString.fromText("2006-01-02"), GoString.fromText("2024-02-30"));
   assert.equal(invalid.IsZero(), true);
-  assert.match(failure?.Error() ?? "", /^parsing time /u);
+  assert.match(failure?.Error().text() ?? "", /^parsing time /u);
 });
 
 test("Timer delivers once, supports reset, and reports stop state", async () => {
@@ -251,7 +256,7 @@ test("Context cancellation, causes, values, and deadlines propagate", async () =
   } = root;
   assert.equal(canonicalDoneOwner.Done(), undefined);
   assert.notEqual(TODO(), root);
-  const ignoredFailure = new ProviderError("ignored without Done");
+  const ignoredFailure = ProviderError.fromText("ignored without Done");
   const [neverCanceled, cancelNever] = WithCancel(
     new NilDoneFailedContext(ignoredFailure),
   );
@@ -268,8 +273,8 @@ test("Context cancellation, causes, values, and deadlines propagate", async () =
   const [futureChild] = WithCancel(futureParent);
   closeFutureParent();
   assert.equal(futureChild.Err(), state.Canceled);
-  const key = new ProviderError("key");
-  const value = new ProviderError("value");
+  const key = ProviderError.fromText("key");
+  const value = ProviderError.fromText("value");
   const valued = WithValue(root, key, value);
   assert.equal(valued.Value(key), value);
 
@@ -285,7 +290,7 @@ test("Context cancellation, causes, values, and deadlines propagate", async () =
   assert.equal(callbackCount, 1);
   assert.equal(stopCallback(), false);
 
-  const cause = new ProviderError("cause");
+  const cause = ProviderError.fromText("cause");
   const [caused, cancelCause] = WithCancelCause(root);
   cancelCause(cause);
   assert.equal(caused.Err(), state.Canceled);
@@ -295,7 +300,7 @@ test("Context cancellation, causes, values, and deadlines propagate", async () =
   await new Promise<void>((resolve) => setTimeout(resolve, 5));
   const [, deadlineOpen] = timed.Done()!.receive();
   assert.equal(deadlineOpen, false);
-  assert.match(timed.Err()!.Error(), /deadline exceeded/u);
+  assert.match(timed.Err()!.Error().text(), /deadline exceeded/u);
   assert.equal(Cause(timed), state.DeadlineExceeded);
   stop();
 });

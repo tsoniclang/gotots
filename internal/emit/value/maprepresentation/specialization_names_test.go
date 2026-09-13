@@ -63,6 +63,10 @@ func (staticSpecializationNames) NamedStructConstructor(
 	panic("unused")
 }
 
+func (staticSpecializationNames) ProviderNamedStructOperationSelected(*types.TypeName, api.NamedStructOperation) (bool, error) {
+	return false, nil
+}
+
 func (staticSpecializationNames) NamedStructOperation(
 	*types.TypeName,
 	api.NamedStructOperation,

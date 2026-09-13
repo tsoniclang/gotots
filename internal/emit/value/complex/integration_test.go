@@ -247,7 +247,7 @@ console.log(values.Equal128(a128, a128), values.NotEqual128(a128, b128));
 console.log(scalar(values.Real64(a64)), scalar(values.Imag64(a64)));
 console.log(scalar(values.Real128(a128)), scalar(values.Imag128(a128)));
 console.log(scalar(values.ConstantReal()), scalar(values.ConstantImag()));
-console.log(show(values.ConstructInOrder()), values.ObservedOrder());
+console.log(show(values.ConstructInOrder()), values.ObservedOrder().text());
 console.log(show(values.Construct64(0.1, -0.1)));
 const zero128 = values.Construct128(0, 0);
 console.log(show(values.Divide128(a128, zero128)));
@@ -261,6 +261,11 @@ console.log(show(values.Divide128(a128, inf128)));
 const nan128 = values.Construct128(NaN, 1);
 console.log(show(values.Divide128(nan128, b128)));
 `
+	return runComplexScript(t, workingDirectory, targetPaths, runner)
+}
+
+func runComplexScript(t *testing.T, workingDirectory string, targetPaths []string, runner string) string {
+	t.Helper()
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, runner)
 	writeFile(

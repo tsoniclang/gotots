@@ -181,7 +181,7 @@ func (p *ProjectInspection) projectComputedMemberKey(
 	if err != nil {
 		return projectComputedMemberKey{}, false, err
 	}
-	owners, err := projectOwnerKeys(declarations, filepath.Dir(p.config))
+	owners, err := projectComputedKeyOwnerKeys(declarations, filepath.Dir(p.config))
 	if err != nil {
 		return projectComputedMemberKey{}, false, err
 	}
@@ -223,7 +223,7 @@ func projectOwnerKeys(paths []string, root string) ([]string, error) {
 		relative, err := filepath.Rel(root, filepath.FromSlash(sourcePath))
 		if err != nil || relative == ".." ||
 			strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			return nil, fmt.Errorf("declaration owner is outside the project")
+			return nil, fmt.Errorf("declaration owner %q is outside the project", sourcePath)
 		}
 		result[index] = filepath.ToSlash(relative)
 	}
@@ -233,4 +233,27 @@ func projectOwnerKeys(paths []string, root string) ([]string, error) {
 		return nil, fmt.Errorf("declaration owner is absent")
 	}
 	return result, nil
+}
+
+func projectComputedKeyOwnerKeys(paths []string, root string) ([]string, error) {
+	var result []string
+	for _, sourcePath := range paths {
+		if library, selected := strings.CutPrefix(sourcePath, "bundled:///libs/"); selected {
+			if library == "" || library == "." || library == ".." || strings.ContainsAny(library, "/\\") {
+				return nil, fmt.Errorf("computed key has an invalid bundled-library identity %q", sourcePath)
+			}
+			result = append(result, "tsgo:"+pinnedSchemaRevision+":"+sourcePath)
+			continue
+		}
+		owners, err := projectOwnerKeys([]string{sourcePath}, root)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, owners...)
+	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("computed key declaration owner is absent")
+	}
+	slices.Sort(result)
+	return slices.Compact(result), nil
 }

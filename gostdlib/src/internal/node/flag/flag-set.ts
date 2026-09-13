@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
@@ -72,7 +73,7 @@ export function booleanFlag(
 ): ProviderPointer<bool> {
   const state = requireFlagSet(receiver);
   const pointer = providerPointer(value);
-  add(state, name, {
+  add(state, name.text(), {
     kind: "boolean",
     pointer,
   });
@@ -86,7 +87,7 @@ export function stringFlag(
 ): ProviderPointer<gostring> {
   const state = requireFlagSet(receiver);
   const pointer = providerPointer(value);
-  add(state, name, {
+  add(state, name.text(), {
     kind: "string",
     pointer,
   });
@@ -100,41 +101,43 @@ export function parseFlags(
   const state = requireFlagSet(receiver);
   const values = sliceValues(arguments_);
   for (let index = 0; index < values.length; index += 1) {
-    const argument = values[index] ?? "";
-    if (argument === "--") {
+    const argument = values[index];
+    if (argument === undefined) throw new RangeError("flag argument is missing");
+    const argumentText = argument.text();
+    if (argumentText === "--") {
       return undefined;
     }
-    if (!argument.startsWith("-") || argument === "-") {
+    if (!argumentText.startsWith("-") || argumentText === "-") {
       return undefined;
     }
-    const spelling = argument.startsWith("--")
+    const spelling = argumentText.startsWith("--")
       ? argument.slice(2)
       : argument.slice(1);
-    const separator = spelling.indexOf("=");
+    const separator = spelling.text().indexOf("=");
     const name = separator < 0 ? spelling : spelling.slice(0, separator);
     const inlineValue = separator < 0
       ? undefined
       : spelling.slice(separator + 1);
-    const binding = state.bindings.get(name);
+    const binding = state.bindings.get(name.text());
     if (binding === undefined) {
-      if (name === "h" || name === "help") {
+      if (name.text() === "h" || name.text() === "help") {
         receiver?.Usage?.();
         return failure(state, "flag: help requested");
       }
-      return failure(state, `flag provided but not defined: -${name}`);
+      return failure(state, `flag provided but not defined: -${name.text()}`);
     }
     if (binding.kind === "boolean") {
-      const text = inlineValue ?? "true";
+      const text = inlineValue?.text() ?? "true";
       const parsed = parseBoolean(text);
       if (parsed === undefined) {
-        return failure(state, `invalid value ${text} for flag -${name}`);
+        return failure(state, `invalid value ${text} for flag -${name.text()}`);
       }
       binding.pointer.value = parsed;
       continue;
     }
     const next = inlineValue ?? values[index + 1];
     if (next === undefined) {
-      return failure(state, `flag needs an argument: -${name}`);
+      return failure(state, `flag needs an argument: -${name.text()}`);
     }
     if (inlineValue === undefined) {
       index += 1;
@@ -172,7 +175,7 @@ function requireFlagSet(receiver: FlagSetValue | undefined): FlagSetState {
   let state = states.get(receiver);
   if (state === undefined) {
     state = {
-      name: "",
+      name: GoString.empty,
       errorHandling: continueOnError,
       bindings: new Map(),
     };
@@ -199,7 +202,7 @@ function failure(state: FlagSetState, message: string): GoError {
   if (state.errorHandling.value === 1n) {
     process.exit(2);
   }
-  return new ProviderError(
-    state.name.length === 0 ? message : `${state.name}: ${message}`,
+  return ProviderError.fromText(
+    state.name.text().length === 0 ? message : `${state.name.text()}: ${message}`,
   );
 }

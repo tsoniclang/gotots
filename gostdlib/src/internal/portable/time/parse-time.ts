@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
@@ -72,9 +73,11 @@ const longWeekdays = [
 ] as const;
 
 export function Parse(
-  layout: gostring,
-  source: gostring,
+  layoutValue: gostring,
+  sourceValue: gostring,
 ): [Time, GoError | undefined] {
+  const layout = layoutValue.text();
+  const source = sourceValue.text();
   const parts = tokenizeLayout(layout);
   const expression = new RegExp(
     `^${parts.map((part, index) => patternFor(part, parts[index + 1])).join("")}$`,
@@ -82,7 +85,7 @@ export function Parse(
   );
   const captures = expression.exec(source);
   if (captures === null) {
-    return rejected(layout, source, layout, source);
+    return rejected(layoutValue, sourceValue, layout, source);
   }
 
   const fields: ParsedFields = {
@@ -113,7 +116,7 @@ export function Parse(
       continue;
     }
     if (!consume(fields, part, captured)) {
-      return rejected(layout, source, part.text, captured);
+      return rejected(layoutValue, sourceValue, part.text, captured);
     }
   }
 
@@ -128,7 +131,7 @@ export function Parse(
     || fields.hour < 0 || fields.hour > 23
     || fields.minute < 0 || fields.minute > 59
     || fields.second < 0 || fields.second > 59) {
-    return rejected(layout, source, "", source);
+    return rejected(layoutValue, sourceValue, "", source);
   }
 
   const milliseconds = Math.floor(fields.nanosecond / 1_000_000);
@@ -445,14 +448,14 @@ function isDigit(value: string | undefined): boolean {
 }
 
 function rejected(
-  layout: string,
-  source: string,
+  layout: gostring,
+  source: gostring,
   layoutElement: string,
   valueElement: string,
 ): [Time, GoError] {
   return [
     new Time(),
-    new ParseError(layout, source, layoutElement, valueElement, ""),
+    new ParseError(layout, source, GoString.fromText(layoutElement), GoString.fromText(valueElement), GoString.empty),
   ];
 }
 

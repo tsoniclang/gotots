@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { bool, gostring, int, int32 } from "@gotots/gostdlib/internal/scalars.js";
 
@@ -16,11 +17,11 @@ export function Map(
   mapping: ((rune: int32) => int32) | undefined,
   text: gostring,
 ): gostring {
-  if (mapping === undefined && text.length > 0) {
+  if (mapping === undefined && Number(text.sourceLength()) > 0) {
     GoPanic.raiseRuntime("call of nil mapping function");
   }
   let result = "";
-  for (let index = 0; index < text.length; ) {
+  for (let index = 0; index < Number(text.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(text, index);
     const mapped = mapping?.(rune) ?? rune;
     if (mapped >= 0) {
@@ -28,7 +29,7 @@ export function Map(
     }
     index += Math.max(1, hostInteger(width));
   }
-  return result;
+  return GoString.fromText(result);
 }
 
 export function Repeat(text: gostring, count: int): gostring {
@@ -36,10 +37,11 @@ export function Repeat(text: gostring, count: int): gostring {
     GoPanic.raiseRuntime("strings: negative Repeat count");
   }
   const hostCount = hostInteger(count);
-  if (text.length !== 0 && hostCount > Math.floor(0x1fffffff / text.length)) {
+  if (Number(text.sourceLength()) !== 0 && hostCount > Math.floor(0x1fffffff / Number(text.sourceLength()))) {
     GoPanic.raiseRuntime("strings: Repeat output length overflow");
   }
-  return text.repeat(hostCount);
+  if (count === 1n) return text;
+  return GoString.fromText(text.text().repeat(hostCount));
 }
 
 export function Replace(
@@ -52,37 +54,37 @@ export function Replace(
     return text;
   }
   const limit = count < 0n ? Number.POSITIVE_INFINITY : hostInteger(count);
-  if (oldText.length === 0) {
+  if (Number(oldText.sourceLength()) === 0) {
     const boundaries = runeBoundaries(text);
     let result = "";
     let replacements = 0;
     for (let index = 0; index < boundaries.length; index += 1) {
-      const boundary = boundaries[index] ?? text.length;
+      const boundary = boundaries[index] ?? Number(text.sourceLength());
       if (replacements < limit) {
-        result += newText;
+        result += newText.text();
         replacements += 1;
       }
       const next = boundaries[index + 1];
       if (next !== undefined) {
-        result += text.slice(boundary, next);
+        result += text.text().slice(boundary, next);
       }
     }
-    return result;
+    return GoString.fromText(result);
   }
 
   let result = "";
   let start = 0;
   let replacements = 0;
   while (replacements < limit) {
-    const index = text.indexOf(oldText, start);
+    const index = text.text().indexOf(oldText.text(), start);
     if (index < 0) {
       break;
     }
-    result += text.slice(start, index) + newText;
-    start = index + oldText.length;
+    result += text.text().slice(start, index) + newText.text();
+    start = index + Number(oldText.sourceLength());
     replacements += 1;
   }
-  return replacements === 0 ? text : result + text.slice(start);
+  return replacements === 0 ? text : GoString.fromText(result + text.text().slice(start));
 }
 
 export function ReplaceAll(text: gostring, oldText: gostring, newText: gostring): gostring {
@@ -100,21 +102,21 @@ export function ToUpper(text: gostring): gostring {
 export function ToValidUTF8(text: gostring, replacement: gostring): gostring {
   let result = "";
   let invalid = false;
-  for (let index = 0; index < text.length; ) {
+  for (let index = 0; index < Number(text.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(text, index);
-    if (rune === 0xfffd && width === 1n && text.charCodeAt(index) >= 0x80) {
+    if (rune === 0xfffd && width === 1n && text.read(index) >= 0x80) {
       if (!invalid) {
-        result += replacement;
+        result += replacement.text();
         invalid = true;
       }
       index += 1;
       continue;
     }
     invalid = false;
-    result += text.slice(index, index + Math.max(1, hostInteger(width)));
+    result += text.text().slice(index, index + Math.max(1, hostInteger(width)));
     index += Math.max(1, hostInteger(width));
   }
-  return result;
+  return GoString.fromText(result);
 }
 
 export function Trim(text: gostring, cutset: gostring): gostring {
@@ -142,7 +144,7 @@ export function TrimLeftFunc(
   predicate: ((rune: int32) => bool) | undefined,
 ): gostring {
   const index = findByPredicate(text, predicate, false, false);
-  return index < 0n ? "" : text.slice(hostInteger(index));
+  return index < 0n ? GoString.empty : text.slice(hostInteger(index));
 }
 
 export function TrimRightFunc(
@@ -151,7 +153,7 @@ export function TrimRightFunc(
 ): gostring {
   const index = findByPredicate(text, predicate, false, true);
   if (index < 0n) {
-    return "";
+    return GoString.empty;
   }
   const hostIndex = hostInteger(index);
   const [, width] = decodeRuneAt(text, hostIndex);
@@ -163,16 +165,16 @@ export function TrimSpace(text: gostring): gostring {
 }
 
 export function TrimPrefix(text: gostring, prefix: gostring): gostring {
-  return text.startsWith(prefix) ? text.slice(prefix.length) : text;
+  return text.text().startsWith(prefix.text()) ? text.slice(Number(prefix.sourceLength())) : text;
 }
 
 export function TrimSuffix(text: gostring, suffix: gostring): gostring {
-  return text.endsWith(suffix) ? text.slice(0, text.length - suffix.length) : text;
+  return text.text().endsWith(suffix.text()) ? text.slice(0, Number(text.sourceLength()) - Number(suffix.sourceLength())) : text;
 }
 
 function cutsetPredicate(cutset: gostring): (rune: int32) => bool {
   const runes = new Set<int32>();
-  for (let index = 0; index < cutset.length; ) {
+  for (let index = 0; index < Number(cutset.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(cutset, index);
     runes.add(rune);
     index += Math.max(1, hostInteger(width));

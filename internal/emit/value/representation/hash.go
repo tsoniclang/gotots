@@ -12,6 +12,7 @@ import (
 	runtimecomplex "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
+	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
@@ -238,6 +239,13 @@ func (owner Owner) Hash(
 		if !valid {
 			return api.ExpressionEmission{},
 				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		if basic.Info()&types.IsString != 0 {
+			text, err := stringvalue.Text(context, api.DirectExpression(value))
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			value = text.Value()
 		}
 		reference, err := context.Names().Runtime(
 			api.RuntimeMapHash,

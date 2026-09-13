@@ -72,7 +72,7 @@ console.log([
     values.InitializedChannelCallback(),
     values.IndependentPackageInitializer(),
     values.IndependentPlain(),
-    values.PlainSequence(),
+    values.PlainSequence().text(),
 	values.ChannelGenericProfileWithNamedCallback(),
 	values.ChannelNestedGenericMethod(),
 ].map(String).join(" "));

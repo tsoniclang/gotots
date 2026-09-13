@@ -161,22 +161,34 @@ func main() {
 	fmt.Println(fixture.PropertyFacts())
 }
 `
-	verifyReflectCanonicalInspect(
-		t,
-		source,
-		"PropertyFacts",
-		"reflectvalue",
-		typescriptRunner,
-		goRunner,
-		func(artifacts renderedArtifacts) {
-			setter := regexp.MustCompile(`\(instance, value\) => \{\s*Outer__from_reflectvalue\.\$storageOf\(instance\)\.Child = Child__from_reflectvalue\.\$storageOf\(Child__from_reflectvalue\.\$copy\(value\)\);\s*\}`)
-			if !setter.MatchString(artifacts.printed) {
-				t.Fatal("projected reflected Child setter does not copy before storing")
-			}
-			withoutCopy := strings.ReplaceAll(artifacts.printed, "Child__from_reflectvalue.$copy(value)", "value")
-			if setter.MatchString(withoutCopy) {
-				t.Fatal("copy proof does not distinguish an aliasing reflected setter")
-			}
-		},
-	)
+	for _, rawLocation := range []bool{false, true} {
+		name := "ordinary"
+		selectedSource := source
+		pattern := `fields\.copyingValueProperty\([^;]+, "Child", value => \(Child__from_reflectvalue\.\$copy\(value\)\),`
+		if rawLocation {
+			name = "raw-location"
+			selectedSource = strings.Replace(source, "target := &Outer{}", "target := &Outer{}\n\t_ = reflect.ValueOf(target).UnsafePointer()", 1)
+			pattern = `\(instance, value\) => \{\s*Outer__from_reflectvalue\.\$storageOf\(instance\)\.Child = Child__from_reflectvalue\.\$storageOf\(Child__from_reflectvalue\.\$copy\(value\)\);\s*\}`
+		}
+		t.Run(name, func(t *testing.T) {
+			verifyReflectCanonicalInspect(
+				t,
+				selectedSource,
+				"PropertyFacts",
+				"reflectvalue",
+				typescriptRunner,
+				goRunner,
+				func(artifacts renderedArtifacts) {
+					setter := regexp.MustCompile(pattern)
+					if !setter.MatchString(artifacts.printed) {
+						t.Fatal("reflected Child setter does not copy before storing")
+					}
+					withoutCopy := strings.ReplaceAll(artifacts.printed, "Child__from_reflectvalue.$copy(value)", "value")
+					if setter.MatchString(withoutCopy) {
+						t.Fatal("copy proof does not distinguish an aliasing reflected setter")
+					}
+				},
+			)
+		})
+	}
 }

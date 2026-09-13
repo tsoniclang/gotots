@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { gunzipSync } from "node:zlib";
@@ -67,8 +68,8 @@ class BufferWriter extends GoInterfaceValue {
 }
 
 test("runtime process observations are populated", () => {
-  assert.notEqual(GOARCH, "");
-  assert.notEqual(GOOS, "");
+  assert.notEqual((GOARCH)?.text(), "");
+  assert.notEqual((GOOS)?.text(), "");
   assert.equal(GOMAXPROCS(0n), 1n);
   GC();
 
@@ -78,7 +79,7 @@ test("runtime process observations are populated", () => {
 
   const [, file, line, ok] = Caller(0n);
   assert.equal(ok, true);
-  assert.match(file, /runtime-observation/u);
+  assert.match((file)?.text(), /runtime-observation/u);
   assert.ok(line > 0n);
 
   const stack = Stack();
@@ -92,16 +93,16 @@ test("runtime profiles write concrete provider observations", async () => {
   assert.equal(StartCPUProfile(writer), undefined);
   const duplicate = StartCPUProfile(writer);
   assert.notEqual(duplicate, undefined);
-  assert.match(duplicate?.Error() ?? "", /already in use/u);
+  assert.match(duplicate?.Error().text() ?? "", /already in use/u);
   StopCPUProfile();
   assert.ok(writer.bytes.length > 0);
   assert.deepEqual(writer.bytes.slice(0, 2), [0x1f, 0x8b]);
   assert.ok(gunzipSync(Uint8Array.from(writer.bytes)).length > 0);
 
-  const heap = Lookup("heap");
+  const heap = Lookup(GoString.fromText("heap"));
   assert.ok(heap instanceof Profile);
   assert.equal(Profile.WriteTo(heap, writer, 0n), undefined);
-  assert.equal(Lookup("missing"), undefined);
+  assert.equal(Lookup(GoString.fromText("missing")), undefined);
 });
 
 test("runtime metrics publish typed descriptions and selected values", () => {
@@ -109,8 +110,8 @@ test("runtime metrics publish typed descriptions and selected values", () => {
   assert.ok(descriptions.length > 0);
 
   const samples = RuntimeSlice.literal([
-    new Sample("/memory/classes/total:bytes"),
-    new Sample("/cpu/classes/user:cpu-seconds"),
+    new Sample(GoString.fromText("/memory/classes/total:bytes")),
+    new Sample(GoString.fromText("/cpu/classes/user:cpu-seconds")),
   ]);
   Read(samples);
 

@@ -1,3 +1,5 @@
+import { GoString } from "@gotots/runtime/string-value.js";
+import { toHostBytes } from "../portable/utf8/codec.js";
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
@@ -29,7 +31,7 @@ export function FprintfDirect<
   format: gostring,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
 ): [int, Failure | undefined] {
-  return write(writer, formatText(format, arguments_).text);
+  return write(writer, formatText(format.text(), arguments_).text);
 }
 
 export function FprintlnDirect<
@@ -50,7 +52,7 @@ function write<
   text: string,
 ): [int, Failure | undefined] {
   return requireWriter(writer).Write(
-    byteSlice(new TextEncoder().encode(text)),
+    byteSlice(toHostBytes(GoString.fromText(text))),
   );
 }
 

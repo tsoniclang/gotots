@@ -1,3 +1,5 @@
+import { GoString } from "@gotots/runtime/string-value.js";
+import { fromHostString } from "./internal/portable/utf8/codec.js";
 import type { GoComplex128 } from "@gotots/runtime/complex.js";
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
@@ -41,7 +43,7 @@ export class Kind {
   constructor(readonly value: uint) {}
 
   String(): gostring {
-    return kindNames[hostInteger(this.value)] ?? `Kind(${this.value})`;
+    return GoString.fromText(kindNames[hostInteger(this.value)] ?? `Kind(${this.value})`);
   }
 }
 
@@ -74,13 +76,24 @@ export const String = new Kind(24n);
 export const Struct = new Kind(25n);
 export const UnsafePointer = new Kind(26n);
 
-export abstract class Value {
+export class Value {
   protected constructor(
-    private readonly stored?: GoInterfaceValue,
-    private readonly location?: RuntimeValueLocation,
-    private readonly addressable: bool = false,
-    private readonly staticType?: Type,
+    private stored?: GoInterfaceValue,
+    private location?: RuntimeValueLocation,
+    private addressable: bool = false,
+    private staticType?: Type,
   ) {}
+
+  static $copy(source: Value): Value {
+    return new Value(source.stored, source.location, source.addressable, source.staticType);
+  }
+
+  static $assign(target: Value, source: Value): void {
+    target.stored = source.stored;
+    target.location = source.location;
+    target.addressable = source.addressable;
+    target.staticType = source.staticType;
+  }
 
   // $unbox exposes the canonical interface box to generated support
   // code (type assertions select exact adapters emitter-side).
@@ -106,7 +119,7 @@ export abstract class Value {
     const operation = target.operations()?.append;
     if (operation === undefined || target.source === undefined) {
       return GoPanic.raise(
-        new ProviderError(
+        ProviderError.fromText(
           `reflect: call of reflect.Append on ${target.kindText()} Value`,
         ),
       );
@@ -117,7 +130,7 @@ export abstract class Value {
       const box = element.source;
       if (!element.IsValid()) {
         return GoPanic.raise(
-          new ProviderError(
+          ProviderError.fromText(
             "reflect: call of reflect.Append on zero Value",
           ),
         );
@@ -145,12 +158,12 @@ export abstract class Value {
 
   private kindText(): string {
     const type = this.resolvedType();
-    return type === undefined ? "zero" : `${type.Kind().String()}`;
+    return type === undefined ? "zero" : `${type.Kind().String().text()}`;
   }
 
   private operationPanic(operation: string): never {
     return GoPanic.raise(
-      new ProviderError(
+      ProviderError.fromText(
         `reflect: call of reflect.Value.${operation} on ${this.kindText()} Value`,
       ),
     );
@@ -159,7 +172,7 @@ export abstract class Value {
   Addr(): Value {
     if (!this.addressable || this.location === undefined) {
       return GoPanic.raise(
-        new ProviderError(
+        ProviderError.fromText(
           "reflect.Value.Addr of unaddressable value",
         ),
       );
@@ -168,8 +181,8 @@ export abstract class Value {
     const address = this.location.address;
     if (pointerType === undefined || address === undefined) {
       return GoPanic.raise(
-        new ProviderError(
-          `reflect.Value.Addr requires a generated address facet for ${this.location.type().String()}`,
+        ProviderError.fromText(
+          `reflect.Value.Addr requires a generated address facet for ${this.location.type().String().text()}`,
         ),
       );
     }
@@ -196,12 +209,15 @@ export abstract class Value {
       const type = this.resolvedType();
       if (type !== undefined && type.Kind().value === Slice.value) {
         return GoPanic.raise(
-          new ProviderError("reflect.Value.Bytes of non-byte slice"),
+          ProviderError.fromText("reflect.Value.Bytes of non-byte slice"),
         );
       }
       return this.operationPanic("Bytes");
     }
     return bytes(box);
+  }
+  CanAddr(): bool {
+    return this.addressable;
   }
   CanInt(): bool {
     return this.operations()?.int !== undefined;
@@ -226,7 +242,7 @@ export abstract class Value {
     }
     if (target === undefined) {
       return GoPanic.raise(
-        new ProviderError("reflect: Value.Convert(nil)"),
+        ProviderError.fromText("reflect: Value.Convert(nil)"),
       );
     }
     const targetOperations = runtimeValueOperations(target);
@@ -236,8 +252,8 @@ export abstract class Value {
         : this.convertedBox(operations, targetOperations);
     if (converted === undefined) {
       return GoPanic.raise(
-        new ProviderError(
-          `reflect.Value.Convert: value of type ${type.String()} cannot be converted to type ${target.String()}`,
+        ProviderError.fromText(
+          `reflect.Value.Convert: value of type ${type.String().text()} cannot be converted to type ${target.String().text()}`,
         ),
       );
     }
@@ -322,7 +338,7 @@ export abstract class Value {
     }
     if (index < 0n || index >= count) {
       return GoPanic.raise(
-        new ProviderError("reflect: Field index out of range"),
+        ProviderError.fromText("reflect: Field index out of range"),
       );
     }
     const location = field(this.source, index);
@@ -344,7 +360,7 @@ export abstract class Value {
     }
     if (count < 0n) {
       return GoPanic.raise(
-        new ProviderError("reflect.Value.Grow: negative len"),
+        ProviderError.fromText("reflect.Value.Grow: negative len"),
       );
     }
     target.set(grown(box, count));
@@ -356,7 +372,7 @@ export abstract class Value {
     }
     if (index < 0n || index >= this.Len()) {
       return GoPanic.raise(
-        new ProviderError("reflect: slice index out of range"),
+        ProviderError.fromText("reflect: slice index out of range"),
       );
     }
     const location = operation(this.source, index);
@@ -374,7 +390,7 @@ export abstract class Value {
     const box = this.source;
     if (!this.IsValid()) {
       return GoPanic.raise(
-        new ProviderError(
+        ProviderError.fromText(
           "reflect: call of reflect.Value.Interface on zero Value",
         ),
       );
@@ -391,8 +407,8 @@ export abstract class Value {
     ) {
       // An aliasing view must never masquerade as the Go copy.
       return GoPanic.raise(
-        new ProviderError(
-          `reflect: Value.Interface of ${type.String()} requires a generated clone facet`,
+        ProviderError.fromText(
+          `reflect: Value.Interface of ${type.String().text()} requires a generated clone facet`,
         ),
       );
     }
@@ -517,7 +533,7 @@ export abstract class Value {
     const target = this.settableLocation("Set");
     if (!value.IsValid()) {
       return GoPanic.raise(
-        new ProviderError("reflect: Set using zero Value argument"),
+        ProviderError.fromText("reflect: Set using zero Value argument"),
       );
     }
     const payload = target.type().Kind().value === Interface.value
@@ -532,7 +548,7 @@ export abstract class Value {
     }
     if (!this.addressable || !this.location.settable) {
       return GoPanic.raise(
-        new ProviderError(
+        ProviderError.fromText(
           `reflect: reflect.Value.${operation} using unaddressable value`,
         ),
       );
@@ -559,7 +575,7 @@ export abstract class Value {
       const type = this.resolvedType();
       if (type !== undefined && type.Kind().value === Slice.value) {
         return GoPanic.raise(
-          new ProviderError(
+          ProviderError.fromText(
             "reflect.Value.SetBytes of non-byte slice",
           ),
         );
@@ -595,7 +611,7 @@ export abstract class Value {
     const [value, present] = state.currentValue();
     if (!present) {
       return GoPanic.raise(
-        new ProviderError(
+        ProviderError.fromText(
           "reflect: map entry deleted during iteration",
         ),
       );
@@ -617,7 +633,7 @@ export abstract class Value {
     }
     if (length < 0n || length > capacity(box)) {
       return GoPanic.raise(
-        new ProviderError(
+        ProviderError.fromText(
           "reflect: slice length out of range in SetLen",
         ),
       );
@@ -663,7 +679,7 @@ export abstract class Value {
 
   String(): gostring {
     if (!this.IsValid()) {
-      return "<invalid Value>";
+      return GoString.fromText("<invalid Value>");
     }
     const source = this.source;
     const operation = this.operations()?.string;
@@ -671,15 +687,15 @@ export abstract class Value {
       return operation(source);
     }
     const type = this.resolvedType();
-    return type === undefined
+    return GoString.fromText(type === undefined
       ? "<invalid Value>"
-      : `<${type.String()} Value>`;
+      : `<${type.String().text()} Value>`);
   }
 
   Type(): Type | undefined {
     if (!this.IsValid()) {
       return GoPanic.raise(
-        new ProviderError(
+        ProviderError.fromText(
           "reflect: call of reflect.Value.Type on zero Value",
         ),
       );
@@ -773,12 +789,12 @@ function mapIteratorState(
   }
   if (receiver.position < 0) {
     return GoPanic.raise(
-      new ProviderError(`MapIter.${operation} called before Next`),
+      ProviderError.fromText(`MapIter.${operation} called before Next`),
     );
   }
   if (receiver.position >= receiver.keys.length) {
     return GoPanic.raise(
-      new ProviderError(
+      ProviderError.fromText(
         `MapIter.${operation} called on exhausted iterator`,
       ),
     );
@@ -801,7 +817,7 @@ export const MapIter = Object.freeze({
     }
     if (receiver.position >= receiver.keys.length) {
       return GoPanic.raise(
-        new ProviderError("MapIter.Next called on exhausted iterator"),
+        ProviderError.fromText("MapIter.Next called on exhausted iterator"),
       );
     }
     receiver.position++;
@@ -818,7 +834,7 @@ export const MapIter = Object.freeze({
     const [value, present] = state.currentValue();
     if (!present) {
       return GoPanic.raise(
-        new ProviderError(
+        ProviderError.fromText(
           "reflect: map entry deleted during iteration",
         ),
       );
@@ -877,7 +893,7 @@ export class StructField {
   }
 
   IsExported(): bool {
-    return this.PkgPath === "";
+    return this.PkgPath.text() === "";
   }
 }
 
@@ -960,7 +976,7 @@ function deepValueEqual(
   const rightType = resolveRuntimeType(right);
   if (leftType === undefined || rightType === undefined) {
     return GoPanic.raise(
-      new ProviderError(
+      ProviderError.fromText(
         "reflect: DeepEqual requires generated reflection metadata for both operands",
       ),
     );
@@ -981,8 +997,8 @@ function deepValueEqual(
   const operations = runtimeValueOperations(leftType);
   if (operations === undefined) {
     return GoPanic.raise(
-      new ProviderError(
-        `reflect: DeepEqual requires a generated value facet for ${leftType.String()}`,
+      ProviderError.fromText(
+        `reflect: DeepEqual requires a generated value facet for ${leftType.String().text()}`,
       ),
     );
   }
@@ -999,7 +1015,7 @@ function deepValueEqual(
     return operations.bool(left) === operations.bool(right);
   }
   if (operations.string !== undefined) {
-    return operations.string(left) === operations.string(right);
+    return operations.string(left).text() === operations.string(right).text();
   }
   if (kind === Pointer.value) {
     if (leftValue.IsNil() && rightValue.IsNil()) {
@@ -1084,8 +1100,8 @@ function deepValueEqual(
     return true;
   }
   return GoPanic.raise(
-    new ProviderError(
-      `reflect: DeepEqual is not supported for kind ${leftType.Kind().String()}`,
+    ProviderError.fromText(
+      `reflect: DeepEqual is not supported for kind ${leftType.Kind().String().text()}`,
     ),
   );
 }
@@ -1100,14 +1116,14 @@ export function Indirect(value: Value): Value {
 export function MakeMap(type: Type | undefined): Value {
   if (type === undefined || type.Kind().value !== Map.value) {
     return GoPanic.raise(
-      new ProviderError("reflect: MakeMap of non-map type"),
+      ProviderError.fromText("reflect: MakeMap of non-map type"),
     );
   }
   const operation = runtimeValueOperations(type)?.makeMap;
   if (operation === undefined) {
     return GoPanic.raise(
-      new ProviderError(
-        `reflect: MakeMap requires a generated value facet for ${type.String()}`,
+      ProviderError.fromText(
+        `reflect: MakeMap requires a generated value facet for ${type.String().text()}`,
       ),
     );
   }
@@ -1121,26 +1137,26 @@ export function MakeSlice(
 ): Value {
   if (type === undefined || type.Kind().value !== Slice.value) {
     return GoPanic.raise(
-      new ProviderError("reflect: MakeSlice of non-slice type"),
+      ProviderError.fromText("reflect: MakeSlice of non-slice type"),
     );
   }
   if (length < 0n) {
     return GoPanic.raise(
-      new ProviderError(
+      ProviderError.fromText(
         "reflect: negative len argument in call to reflect.MakeSlice",
       ),
     );
   }
   if (capacity < 0n) {
     return GoPanic.raise(
-      new ProviderError(
+      ProviderError.fromText(
         "reflect: negative cap argument in call to reflect.MakeSlice",
       ),
     );
   }
   if (length > capacity) {
     return GoPanic.raise(
-      new ProviderError(
+      ProviderError.fromText(
         "reflect: len > cap in call to reflect.MakeSlice",
       ),
     );
@@ -1148,8 +1164,8 @@ export function MakeSlice(
   const operation = runtimeValueOperations(type)?.makeSlice;
   if (operation === undefined) {
     return GoPanic.raise(
-      new ProviderError(
-        `reflect: MakeSlice requires a generated value facet for ${type.String()}`,
+      ProviderError.fromText(
+        `reflect: MakeSlice requires a generated value facet for ${type.String().text()}`,
       ),
     );
   }
@@ -1161,15 +1177,15 @@ export function MapOf(
   element: Type | undefined,
 ): Type | undefined {
   return GoPanic.raise(
-    new ProviderError(
-      `reflect: MapOf requires a generated descriptor for map[${key === undefined ? "?" : key.String()}]${element === undefined ? "?" : element.String()}`,
+    ProviderError.fromText(
+      `reflect: MapOf requires a generated descriptor for map[${key === undefined ? "?" : key.String().text()}]${element === undefined ? "?" : element.String().text()}`,
     ),
   );
 }
 
 export function New(type: Type | undefined): Value {
   if (type === undefined) {
-    return GoPanic.raise(new ProviderError("reflect: New(nil)"));
+    return GoPanic.raise(ProviderError.fromText("reflect: New(nil)"));
   }
   const pointerType = pointerDescriptorFor(type);
   const operation =
@@ -1178,8 +1194,8 @@ export function New(type: Type | undefined): Value {
       : runtimeValueOperations(pointerType)?.newPointer;
   if (operation === undefined) {
     return GoPanic.raise(
-      new ProviderError(
-        `reflect: New requires a generated pointer facet for ${type.String()}`,
+      ProviderError.fromText(
+        `reflect: New requires a generated pointer facet for ${type.String().text()}`,
       ),
     );
   }
@@ -1188,13 +1204,13 @@ export function New(type: Type | undefined): Value {
 
 export function PointerTo(type: Type | undefined): Type | undefined {
   if (type === undefined) {
-    return GoPanic.raise(new ProviderError("reflect: PointerTo(nil)"));
+    return GoPanic.raise(ProviderError.fromText("reflect: PointerTo(nil)"));
   }
   const pointerType = pointerDescriptorFor(type);
   if (pointerType === undefined) {
     return GoPanic.raise(
-      new ProviderError(
-        `reflect: PointerTo requires a generated descriptor for *${type.String()}`,
+      ProviderError.fromText(
+        `reflect: PointerTo requires a generated descriptor for *${type.String().text()}`,
       ),
     );
   }
@@ -1203,8 +1219,8 @@ export function PointerTo(type: Type | undefined): Type | undefined {
 
 export function SliceOf(type: Type | undefined): Type | undefined {
   return GoPanic.raise(
-    new ProviderError(
-      `reflect: SliceOf requires a generated descriptor for []${type === undefined ? "?" : type.String()}`,
+    ProviderError.fromText(
+      `reflect: SliceOf requires a generated descriptor for []${type === undefined ? "?" : type.String().text()}`,
     ),
   );
 }
@@ -1223,13 +1239,13 @@ export function TypeOf(_value: GoInterfaceValue | undefined): Type | undefined {
 
 export function Zero(type: Type | undefined): Value {
   if (type === undefined) {
-    return GoPanic.raise(new ProviderError("reflect: Zero(nil)"));
+    return GoPanic.raise(ProviderError.fromText("reflect: Zero(nil)"));
   }
   const operation = runtimeValueOperations(type)?.zero;
   if (operation === undefined) {
     return GoPanic.raise(
-      new ProviderError(
-        `reflect: Zero requires a generated value facet for ${type.String()}`,
+      ProviderError.fromText(
+        `reflect: Zero requires a generated value facet for ${type.String().text()}`,
       ),
     );
   }
@@ -1247,9 +1263,9 @@ function stringFromRune(value: int64 | uint64): gostring {
     code > 0x10ffff ||
     (code >= 0xd800 && code <= 0xdfff)
   ) {
-    return "\uFFFD";
+    return fromHostString("\uFFFD");
   }
-  return globalThis.String.fromCodePoint(code);
+  return fromHostString(globalThis.String.fromCodePoint(code));
 }
 
 const kindNames: readonly string[] = [

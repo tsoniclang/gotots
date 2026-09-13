@@ -27,14 +27,14 @@ func RangeLength(
 	context api.Context,
 	receiver tsgo.Expression,
 ) tsgo.Expression {
-	return context.Factory().PropertyAccessExpression(
+	return context.Factory().CallExpression(context.Factory().PropertyAccessExpression(
 		receiver,
 		nil,
 		context.Factory().Identifier(
-			runtimeslice.MemberName(runtimeslice.MemberLength),
+			runtimeslice.MemberName(runtimeslice.MemberSourceLength),
 		),
 		tsgo.NodeFlagsNone,
-	)
+	), nil, nil, nil, tsgo.NodeFlagsNone)
 }
 
 func RangeElement(

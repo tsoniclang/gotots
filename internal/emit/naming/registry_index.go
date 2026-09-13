@@ -513,3 +513,71 @@ func (r *Registry) indexPackageQualifiers(
 	}
 	return nil
 }
+
+func (r *Registry) internReflectionType(
+	artifactKey string,
+	sourceType types.Type,
+	reflectionType *types.TypeName,
+	name string,
+) (reflectionTypeBinding, error) {
+	if r == nil || artifactKey == "" || sourceType == nil ||
+		reflectionType == nil || name == "" {
+		return reflectionTypeBinding{}, &api.NameError{
+			Reason: "reflection-type canonicalization input is invalid",
+		}
+	}
+	if existing, ok := r.reflectionTypes[artifactKey]; ok {
+		bound, contract, valid := existing.owner.ReflectionType()
+		if !valid || !types.Identical(bound, sourceType) ||
+			contract != reflectionType {
+			return reflectionTypeBinding{}, &api.NameError{
+				Name:   existing.name,
+				Reason: "reflection-type key joined non-identical Go types",
+			}
+		}
+		return existing, nil
+	}
+	if err := reserveGeneratedName(
+		r.reflectionTypeNames,
+		name,
+		artifactKey,
+		"reflection type",
+	); err != nil {
+		return reflectionTypeBinding{}, err
+	}
+	owner, err := api.NewCompilationReflectionTypeArtifact(
+		sourceType,
+		reflectionType,
+		artifactKey,
+		name,
+		output.ReflectionTypeSupportPath,
+	)
+	if err != nil {
+		return reflectionTypeBinding{}, err
+	}
+	binding := reflectionTypeBinding{owner: owner, name: name}
+	r.reflectionTypes[artifactKey] = binding
+	return binding, nil
+}
+
+// EnvironmentOwnedDeclaration reports whether a declaration is represented
+// by the bounded environment contract rather than generated package syntax.
+func (n *File) EnvironmentOwnedDeclaration(
+	object types.Object,
+) (bool, error) {
+	if object == nil || n == nil || n.owner == nil || n.owner.registry == nil {
+		return false, &api.NameError{
+			Reason: "environment declaration ownership query is invalid",
+		}
+	}
+	binding, ok := n.owner.registry.byObject[object]
+	if !ok {
+		return false, &api.NameError{
+			Name:   object.Name(),
+			Reason: "environment declaration has no target binding",
+		}
+	}
+	return binding.kind == targetBindingEnvironment ||
+		binding.kind == targetBindingProvider ||
+		binding.kind == targetBindingMissingProvider, nil
+}

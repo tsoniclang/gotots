@@ -5,6 +5,8 @@ export class GoEmptyStruct {
     static $zero(): GoEmptyStruct {
         return new GoEmptyStruct;
     }
+    static $assign($target: GoEmptyStruct, $source: GoEmptyStruct): void {
+    }
     static $copy($source: GoEmptyStruct): GoEmptyStruct {
         return $source;
     }

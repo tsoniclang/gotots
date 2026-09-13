@@ -1,18 +1,16 @@
 export function timeQuote(source: string): string {
   let result = '"';
-  const encoder = new TextEncoder();
-  for (const rune of source) {
-    const codePoint = rune.codePointAt(0) ?? 0;
-    if (codePoint >= 0x20 && codePoint < 0x80) {
-      if (rune === '"' || rune === "\\") {
+  for (let index = 0; index < source.length; index++) {
+    const byte = source.charCodeAt(index);
+    const character = source.charAt(index);
+    if (byte >= 0x20 && byte < 0x80) {
+      if (character === '"' || character === "\\") {
         result += "\\";
       }
-      result += rune;
+      result += character;
       continue;
     }
-    for (const byte of encoder.encode(rune)) {
-      result += `\\x${byte.toString(16).padStart(2, "0")}`;
-    }
+    result += `\\x${byte.toString(16).padStart(2, "0")}`;
   }
   return `${result}"`;
 }

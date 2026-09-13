@@ -47,8 +47,8 @@ test("gzip reader decodes bytes and reports EOF", () => {
   if (reader === undefined) {
     assert.fail("NewReader returned no reader");
   }
-  assert.equal(reader.Header.Name, "");
-  assert.equal(reader.Header.Comment, "");
+  assert.equal(reader.Header.Name.text(), "");
+  assert.equal(reader.Header.Comment.text(), "");
   assert.equal(reader.Header.ModTime.IsZero(), true);
 
   const decoded = RuntimeSlice.make<uint8>(32, 32, 0);
@@ -78,5 +78,5 @@ test("gzip reader reports a corrupt checksum while reading", () => {
     reader,
     RuntimeSlice.make<uint8>(32, 32, 0),
   );
-  assert.equal(readFailure?.Error(), "gzip: invalid checksum");
+  assert.equal((readFailure?.Error())?.text(), "gzip: invalid checksum");
 });

@@ -1,3 +1,5 @@
+import { GoString } from "@gotots/runtime/string-value.js";
+import { toHostBytes } from "../utf8/codec.js";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
@@ -113,7 +115,7 @@ export class Time {
     target: RuntimeSlice<uint8>,
     layout: gostring,
   ): RuntimeSlice<uint8> {
-    return target.append(0, Array.from(new TextEncoder().encode(this.Format(layout))));
+    return target.append(0, Array.from(toHostBytes(this.Format(layout))));
   }
 
   AppendText(
@@ -142,7 +144,7 @@ export class Time {
   }
 
   Format(layout: gostring): gostring {
-    return Time.#format(this, layout);
+    return GoString.fromText(Time.#format(this, layout.text()));
   }
 
   Sub(u: Time): Duration {
@@ -189,9 +191,9 @@ export class Time {
 
   String(): gostring {
     if (this.epochMilliseconds === undefined) {
-      return "0001-01-01 00:00:00 +0000 UTC";
+      return GoString.fromText("0001-01-01 00:00:00 +0000 UTC");
     }
-    return Time.#format(this, "2006-01-02 15:04:05.000000000 -0700 MST");
+    return GoString.fromText(Time.#format(this, "2006-01-02 15:04:05.000000000 -0700 MST"));
   }
 
   Nanosecond(): int {
@@ -249,7 +251,7 @@ export class Time {
     if (source.length < 2 ||
       source.get(0) !== 0x22 ||
       source.get(source.length - 1) !== 0x22) {
-      return new ProviderError("Time.UnmarshalJSON: input is not a JSON string");
+      return ProviderError.fromText("Time.UnmarshalJSON: input is not a JSON string");
     }
     return this.UnmarshalText(source.slice(1, source.length - 1, null));
   }
@@ -269,12 +271,12 @@ export class Time {
 
   #rfc3339Text(
     method: "AppendText" | "MarshalJSON" | "MarshalText",
-  ): [gostring, GoError | undefined] {
+  ): [string, GoError | undefined] {
     const text = Time.#format(this, rfc3339Nano);
     if (!/^\d{4}-/u.test(text)) {
       return [
         "",
-        new ProviderError(`Time.${method}: year outside of range [0,9999]`),
+        ProviderError.fromText(`Time.${method}: year outside of range [0,9999]`),
       ];
     }
     return [text, undefined];

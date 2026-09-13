@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	stringrepresentation "github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -23,6 +24,11 @@ func stringToSlice(
 		(kind != sliceBytes && kind != sliceRunes) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	var err error
+	operand, err = stringrepresentation.Text(context, operand)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	element, err := children.RepresentedType(
 		context.WithRole(api.RoleSliceElementType),

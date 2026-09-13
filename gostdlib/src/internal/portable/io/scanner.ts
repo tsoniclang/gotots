@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
@@ -18,7 +19,7 @@ export class ScannerState<Failure extends GoInterfaceValue> {
   #failure: Failure | undefined;
   #pendingFailure: Failure | undefined;
   #start = 0;
-  #token: gostring = "";
+  #token: gostring = GoString.empty;
 
   constructor(
     private readonly badReadCount: Failure,
@@ -171,7 +172,7 @@ function scanLine(source: readonly uint8[], terminated: boolean): gostring {
   for (let index = 0; index < end; index += 1) {
     result += String.fromCharCode(source[index] ?? 0);
   }
-  return result;
+  return GoString.fromText(result);
 }
 
 function requireSource<Source>(source: Source | undefined): Source {

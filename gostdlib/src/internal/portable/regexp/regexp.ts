@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type {
   GoError,
 } from "@gotots/runtime/interface-value.js";
@@ -14,7 +15,6 @@ import { hostInteger, integerFromHost } from "../../host-integer.js";
 import { ProviderError } from "../../runtime/error.js";
 import {
   decodeRuneAt,
-  fromHostString,
 } from "../utf8/codec.js";
 import {
   type CompiledPattern,
@@ -66,7 +66,7 @@ export class Regexp {
       return RuntimeSlice.nil<gostring>();
     }
     return RuntimeSlice.literal(
-      match.ranges.map((range) => range === undefined ? "" : text.slice(range[0], range[1])),
+      match.ranges.map((range) => range === undefined ? GoString.empty : text.slice(range[0], range[1])),
     );
   }
 
@@ -95,9 +95,9 @@ export class Regexp {
       if (replacement === undefined) {
         GoPanic.raiseRuntime("call of nil replacement function");
       }
-      result += part.prefix + replacement(part.match);
+      result += part.prefix.text() + replacement(part.match).text();
     }
-    return result + plan.suffix;
+    return plan.parts.length === 0 ? source : GoString.fromText(result + plan.suffix.text());
   }
 
   static Split(
@@ -109,8 +109,8 @@ export class Regexp {
       return RuntimeSlice.nil<gostring>();
     }
     const regexp = requireRegexp(receiver);
-    if (regexp.#pattern.expression.length > 0 && source.length === 0) {
-      return RuntimeSlice.literal([""]);
+    if (Number(regexp.#pattern.expression.sourceLength()) > 0 && Number(source.sourceLength()) === 0) {
+      return RuntimeSlice.literal([GoString.empty]);
     }
     const matches = regexp.#matches(source, count);
     const output: gostring[] = [];
@@ -130,7 +130,7 @@ export class Regexp {
       }
       begin = whole[1];
     }
-    if (end !== source.length) {
+    if (end !== Number(source.sourceLength())) {
       output.push(source.slice(begin));
     }
     return RuntimeSlice.literal(output);
@@ -177,13 +177,13 @@ export class Regexp {
       if (whole === undefined) {
         continue;
       }
-      result += source.slice(lastEnd, whole[0]);
+      result += source.slice(lastEnd, whole[0]).text();
       if (whole[1] > lastEnd || whole[0] === 0) {
-        result += replacement(match);
+        result += replacement(match).text();
       }
       lastEnd = whole[1];
     }
-    return result + source.slice(lastEnd);
+    return lastEnd === 0 && result === "" ? source : GoString.fromText(result + source.slice(lastEnd).text());
   }
 
   #replacementPlan(source: gostring): ReplacementPlan {
@@ -209,19 +209,20 @@ export class Regexp {
   }
 
   #expand(template: gostring, source: gostring, match: MatchRecord): gostring {
+    const text = template.text();
     let result = "";
-    for (let index = 0; index < template.length; ) {
-      const dollar = template.indexOf("$", index);
+    for (let index = 0; index < text.length; ) {
+      const dollar = text.indexOf("$", index);
       if (dollar < 0) {
-        return result + template.slice(index);
+        return GoString.fromText(result + text.slice(index));
       }
-      result += template.slice(index, dollar);
-      if (template[dollar + 1] === "$") {
+      result += text.slice(index, dollar);
+      if (text[dollar + 1] === "$") {
         result += "$";
         index = dollar + 2;
         continue;
       }
-      const variable = extractVariable(template, dollar + 1);
+      const variable = extractVariable(text, dollar + 1);
       if (variable === undefined) {
         result += "$";
         index = dollar + 1;
@@ -232,11 +233,11 @@ export class Regexp {
         : this.#pattern.names.get(variable.name);
       const range = captureIndex === undefined ? undefined : match.ranges[captureIndex];
       if (range !== undefined) {
-        result += source.slice(range[0], range[1]);
+        result += source.slice(range[0], range[1]).text();
       }
       index = variable.end;
     }
-    return result;
+    return GoString.fromText(result);
   }
 }
 
@@ -254,7 +255,7 @@ export function Compile(expression: gostring): [Regexp | undefined, GoError | un
     void new globalThis.RegExp(pattern.source, pattern.flags);
     return [createRegexp(pattern), undefined];
   } catch {
-    return [undefined, new ProviderError(regexpErrorMessage(expression))];
+    return [undefined, ProviderError.fromText(regexpErrorMessage(expression))];
   }
 }
 
@@ -284,7 +285,7 @@ type DecodedText = {
 function decodeText(source: gostring): DecodedText {
   let host = "";
   const byteAtHost: number[] = [0];
-  for (let index = 0; index < source.length; ) {
+  for (let index = 0; index < Number(source.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(source, index);
     const scalar = String.fromCodePoint(rune);
     host += scalar;
@@ -298,7 +299,7 @@ function decodeText(source: gostring): DecodedText {
 }
 
 function extractVariable(
-  template: gostring,
+  template: string,
   start: number,
 ): { readonly name: string; readonly end: number } | undefined {
   if (template[start] === "{") {
@@ -324,5 +325,5 @@ function advanceHostIndex(text: string, index: number): number {
 }
 
 function regexpErrorMessage(expression: gostring): string {
-  return `error parsing regexp: invalid syntax: ${fromHostString(JSON.stringify(expression))}`;
+  return `error parsing regexp: invalid syntax: ${JSON.stringify(expression.text())}`;
 }

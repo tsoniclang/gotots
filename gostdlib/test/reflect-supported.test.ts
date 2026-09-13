@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -36,19 +37,19 @@ test("reflect kind values retain the selected Go numbering", () => {
 
 test("reflect StructField.IsExported uses package-path evidence", () => {
   const exported = new StructField({
-    Name: "Name",
-    PkgPath: "",
+    Name: GoString.fromText("Name"),
+    PkgPath: GoString.empty,
     Type: undefined,
-    Tag: new StructTag(""),
+    Tag: new StructTag(GoString.fromText("")),
     Offset: 0n,
     Index: RuntimeSlice.literal([0n]),
     Anonymous: false,
   });
   const privateField = new StructField({
-    Name: "name",
-    PkgPath: "example.com/project/model",
+    Name: GoString.fromText("name"),
+    PkgPath: GoString.fromText("example.com/project/model"),
     Type: undefined,
-    Tag: new StructTag(""),
+    Tag: new StructTag(GoString.fromText("")),
     Offset: 0n,
     Index: RuntimeSlice.literal([0n]),
     Anonymous: false,
@@ -58,25 +59,25 @@ test("reflect StructField.IsExported uses package-path evidence", () => {
 });
 
 test("reflect StructTag.Get decodes Go quoted values", () => {
-  const tag = new StructTag('json:"name,omitempty" xml:"line\\nvalue" octal:"\\141"');
-  assert.equal(tag.Get("json"), "name,omitempty");
-  assert.equal(tag.Get("xml"), "line\nvalue");
-  assert.equal(tag.Get("octal"), "a");
-  assert.equal(tag.Get("missing"), "");
+  const tag = new StructTag(GoString.fromText('json:"name,omitempty" xml:"line\\nvalue" octal:"\\141"'));
+  assert.equal((tag.Get(GoString.fromText("json")))?.text(), "name,omitempty");
+  assert.equal((tag.Get(GoString.fromText("xml")))?.text(), "line\nvalue");
+  assert.equal((tag.Get(GoString.fromText("octal")))?.text(), "a");
+  assert.equal((tag.Get(GoString.fromText("missing")))?.text(), "");
 });
 
 test("reflect.ValueOf retains a typed interface descriptor", () => {
-  assert.ok(ValueOf(new ProviderError("failure")) instanceof Value);
+  assert.ok(ValueOf(new ProviderError(GoString.fromText("failure"))) instanceof Value);
   const invalid = ValueOf(undefined);
   assert.ok(invalid instanceof Value);
   assert.equal(invalid.IsValid(), false);
   assert.equal(invalid.Kind(), Invalid);
-  assert.equal(invalid.String(), "<invalid Value>");
+  assert.equal((invalid.String())?.text(), "<invalid Value>");
 });
 
 test("reflect rejects nonzero values without canonical type metadata", () => {
   assert.throws(
-    () => ValueOf(new ProviderError("failure")).Kind(),
+    () => ValueOf(new ProviderError(GoString.fromText("failure"))).Kind(),
     (failure): boolean => {
       assert.ok(failure instanceof GoPanic);
       assert.match(

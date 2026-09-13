@@ -140,6 +140,29 @@ func providerNamedStructCapability(
 	}
 }
 
+func (n *File) ProviderNamedStructOperationSelected(
+	typeName *types.TypeName,
+	operation api.NamedStructOperation,
+) (bool, error) {
+	if typeName == nil {
+		return false, &api.NameError{Reason: "provider named-struct operation owner is nil"}
+	}
+	capability, err := providerNamedStructCapability(operation)
+	if err != nil {
+		return false, err
+	}
+	contract, providerOwned, err := n.providerFacetOwner(typeName)
+	if err != nil || !providerOwned {
+		return false, err
+	}
+	_, selected := n.owner.registry.provider.Facet(
+		contract.Identity(),
+		gostdlib.FacetNamedStructOperations,
+		capability,
+	)
+	return selected, nil
+}
+
 func (n *File) providerFacetOwner(
 	object types.Object,
 ) (environmentcontract.ObjectContract, bool, error) {

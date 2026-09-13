@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { gostring, int32, uint8 } from "@gotots/gostdlib/internal/scalars.js";
@@ -15,80 +16,91 @@ export function AppendQuote(
 
 export function Quote(value: gostring): gostring {
   let result = '"';
-  for (let index = 0; index < value.length; ) {
+  for (let index = 0; index < Number(value.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(value, index);
     if (rune === RuneError && width === 1n) {
-      result += `\\x${hex(value.charCodeAt(index), 2)}`;
+      result += `\\x${hex(value.read(index), 2)}`;
       index += 1;
       continue;
     }
     result += quoteRuneBody(rune, '"');
     index += hostInteger(width);
   }
-  return `${result}"`;
+  return GoString.fromText(`${result}"`);
 }
 
 export function QuoteRune(rune: int32): gostring {
   const selected = validRune(rune) ? rune : RuneError;
-  return `'${quoteRuneBody(selected, "'")}'`;
+  return GoString.fromText(`'${quoteRuneBody(selected, "'")}'`);
 }
 
 export function Unquote(value: gostring): [gostring, GoError | undefined] {
-  if (value.length < 2) {
-    return ["", ErrSyntax];
+  const text = value.text();
+  if (Number(value.sourceLength()) < 2) {
+    return [GoString.empty, ErrSyntax];
   }
-  const quote = value[0];
-  if (quote === "`" && value.at(-1) === "`") {
-    const body = value.slice(1, -1);
-    return body.includes("`") ? ["", ErrSyntax] : [body.replaceAll("\r", ""), undefined];
+  const quote = text[0];
+  if (quote === "`" && text.at(-1) === "`") {
+    const body = text.slice(1, -1);
+    if (body.includes("`")) {
+      return [GoString.empty, ErrSyntax];
+    }
+    return [
+      body.includes("\r")
+        ? GoString.fromText(body.replaceAll("\r", ""))
+        : value.slice(1, text.length - 1),
+      undefined,
+    ];
   }
-  if ((quote !== '"' && quote !== "'") || value.at(-1) !== quote) {
-    return ["", ErrSyntax];
+  if ((quote !== '"' && quote !== "'") || text.at(-1) !== quote) {
+    return [GoString.empty, ErrSyntax];
   }
 
-  const end = value.length - 1;
+  const end = Number(value.sourceLength()) - 1;
   let index = 1;
   let result = "";
   let runes = 0;
+  let hasEscape = false;
   while (index < end) {
-    const byte = value.charCodeAt(index);
+    const byte = value.read(index);
     if (byte === 0x0a || byte === 0x0d) {
-      return ["", ErrSyntax];
+      return [GoString.empty, ErrSyntax];
     }
     if (byte === 0x5c) {
-      const escaped = unquoteEscape(value, index + 1, quote);
+      const escaped = unquoteEscape(text, index + 1, quote);
       if (escaped === undefined || escaped.next > end) {
-        return ["", ErrSyntax];
+        return [GoString.empty, ErrSyntax];
       }
+      hasEscape = true;
       result += escaped.value;
       index = escaped.next;
       runes += 1;
       continue;
     }
-    if (value[index] === quote) {
-      return ["", ErrSyntax];
+    if (text[index] === quote) {
+      return [GoString.empty, ErrSyntax];
     }
     const [rune, width] = decodeRuneAt(value, index);
     if (rune === RuneError && width === 1n) {
-      return ["", ErrSyntax];
+      return [GoString.empty, ErrSyntax];
     }
-    result += value.slice(index, index + hostInteger(width));
+    result += text.slice(index, index + hostInteger(width));
     index += hostInteger(width);
     runes += 1;
   }
   if (quote === "'" && runes !== 1) {
-    return ["", ErrSyntax];
+    return [GoString.empty, ErrSyntax];
   }
-  return [result, undefined];
+  return [hasEscape ? GoString.fromText(result) : value.slice(1, end), undefined];
 }
 
 type UnquotedEscape = {
-  readonly value: gostring;
+  readonly value: string;
   readonly next: number;
 };
 
 function unquoteEscape(
-  source: gostring,
+  source: string,
   index: number,
   quote: string,
 ): UnquotedEscape | undefined {
@@ -128,7 +140,7 @@ function unquoteEscape(
 }
 
 function numericEscape(
-  source: gostring,
+  source: string,
   index: number,
   width: number,
   base: number,
@@ -148,7 +160,7 @@ function numericEscape(
   };
 }
 
-function quoteRuneBody(rune: int32, quote: string): gostring {
+function quoteRuneBody(rune: int32, quote: string): string {
   switch (rune) {
   case 0x07: return "\\a";
   case 0x08: return "\\b";
@@ -191,5 +203,5 @@ function hex(value: number, width: number): string {
 }
 
 function bytes(value: gostring): uint8[] {
-  return [...value].map((character) => character.charCodeAt(0));
+  return [...value.text()].map((character) => character.charCodeAt(0));
 }

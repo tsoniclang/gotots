@@ -105,10 +105,10 @@ export const state: {
   ErrBadReadCount: GoError;
   ErrTooLong: GoError;
 } = {
-  ErrBadReadCount: new ProviderError(
+  ErrBadReadCount: ProviderError.fromText(
     "bufio.Scanner: Read returned impossible count",
   ),
-  ErrTooLong: new ProviderError("bufio.Scanner: token too long"),
+  ErrTooLong: ProviderError.fromText("bufio.Scanner: token too long"),
 };
 
 class BufferedWriter {

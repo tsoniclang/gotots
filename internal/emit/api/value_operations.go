@@ -10,6 +10,10 @@ import (
 )
 
 type Values interface {
+	MemoryStorageType(Context, ast.Node, types.Type) (TypeEmission, error)
+	ToMemoryStorage(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
+	FromMemoryStorage(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
+	ProjectMemoryPointer(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
 	Pointee(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
 	RequiresCustomEquality(Context, types.Type) bool
 	RequiresExplicitType(Context, types.Type) bool
@@ -194,6 +198,7 @@ func (e StoreTargetEmission) preparePropertyLocation(
 		return StoreTargetEmission{}, nil, nil, err
 	}
 	captured.copiesValue = e.copiesValue
+	captured.stableIdentity = e.stableIdentity
 	captured.storage = e.storage
 	captured.locationCaptured = true
 	return captured,
@@ -265,6 +270,7 @@ func (e StoreTargetEmission) prepareAccessorLocation(
 		return StoreTargetEmission{}, nil, nil, err
 	}
 	captured.copiesValue = e.copiesValue
+	captured.stableIdentity = e.stableIdentity
 	captured.storage = e.storage
 	captured.locationCaptured = true
 	return captured,

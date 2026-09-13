@@ -259,11 +259,12 @@ func (p *ProjectInspection) projectExport(
 		}
 	}
 	declarationHandles := symbol.Declarations
+	variable := symbol.Flags&(1<<0|1<<1) != 0
 	targetDeclarations, found, err := p.projectTypeDeclarations(targetType)
 	if err != nil {
 		return ProjectExport{}, err
 	}
-	if found {
+	if found && !variable {
 		declarationHandles = targetDeclarations
 	}
 	var declaredType *typeResponse
@@ -299,7 +300,7 @@ func (p *ProjectInspection) projectExport(
 	if err != nil {
 		return ProjectExport{}, err
 	}
-	if found {
+	if found && !variable {
 		declarationHandles = declaredDeclarations
 	}
 	typeParameters, err := p.projectTypeParameterCount(declarationHandles)

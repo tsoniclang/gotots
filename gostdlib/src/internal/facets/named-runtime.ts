@@ -1,7 +1,4 @@
-import { GoArray } from "@gotots/runtime/array.js";
-
 import { MemStats } from "../../runtime.js";
-import type { MemStatsBySize } from "../portable/runtime/mem-stats.js";
 
 export type RuntimeMemStatsStorage = MemStats;
 
@@ -12,6 +9,11 @@ export class RuntimeMemStatsOperations {
 
   static $copy(source: MemStats): MemStats {
     const target = new MemStats();
+    RuntimeMemStatsOperations.$assign(target, source);
+    return target;
+  }
+
+  static $assign(target: MemStats, source: MemStats): void {
     target.Alloc = source.Alloc;
     target.TotalAlloc = source.TotalAlloc;
     target.Sys = source.Sys;
@@ -36,27 +38,22 @@ export class RuntimeMemStatsOperations {
     target.NextGC = source.NextGC;
     target.LastGC = source.LastGC;
     target.PauseTotalNs = source.PauseTotalNs;
-    target.PauseNs = source.PauseNs.copy();
-    target.PauseEnd = source.PauseEnd.copy();
+    for (let index = 0; index < 256; index++) {
+      target.PauseNs.set(index, source.PauseNs.get(index));
+      target.PauseEnd.set(index, source.PauseEnd.get(index));
+    }
     target.NumGC = source.NumGC;
     target.NumForcedGC = source.NumForcedGC;
     target.GCCPUFraction = source.GCCPUFraction;
     target.EnableGC = source.EnableGC;
     target.DebugGC = source.DebugGC;
-    const bySize = GoArray.zero<MemStatsBySize, 61>(
-      61,
-      { Size: 0, Mallocs: 0n, Frees: 0n },
-    );
     for (let index = 0; index < 61; index += 1) {
       const entry = source.BySize.get(index);
-      bySize.set(index, {
-        Size: entry.Size,
-        Mallocs: entry.Mallocs,
-        Frees: entry.Frees,
-      });
+      const destination = target.BySize.get(index);
+      destination.Size = entry.Size;
+      destination.Mallocs = entry.Mallocs;
+      destination.Frees = entry.Frees;
     }
-    target.BySize = bySize;
-    return target;
   }
 
   static $storageOf(source: MemStats): RuntimeMemStatsStorage {

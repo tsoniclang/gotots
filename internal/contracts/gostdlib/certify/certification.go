@@ -269,6 +269,7 @@ func (c *Certificate) ProviderModules() []string {
 	}
 	seen[c.ProviderScalarModule()] = struct{}{}
 	seen[c.ProviderPointerModule()] = struct{}{}
+	seen[c.ProviderStringModule()] = struct{}{}
 	modules := make([]string, 0, len(seen))
 	for module := range seen {
 		modules = append(modules, module)
@@ -291,6 +292,14 @@ func (c *Certificate) ProviderPointerModule() string {
 	}
 	return strings.TrimSuffix(c.manifest.PackageName(), "/") +
 		strings.TrimPrefix(c.runtime.ProviderPointerModule(), ".")
+}
+
+func (c *Certificate) ProviderStringModule() string {
+	if !c.Valid() {
+		return ""
+	}
+	return strings.TrimSuffix(c.manifest.PackageName(), "/") +
+		strings.TrimPrefix(c.runtime.ProviderStringModule(), ".")
 }
 
 func (c *Certificate) RuntimeRequirements() (

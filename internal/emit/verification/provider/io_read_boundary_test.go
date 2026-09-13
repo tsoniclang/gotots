@@ -106,12 +106,13 @@ func Result(text string, custom bool) (int, string) {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Result"},
-		`for (const [count, result] of [
-  Result("four", false),
-  Result("abc", false),
-  Result("abc", true),
+		`import { GoString } from "./runtime/string-value.js";
+for (const [count, result] of [
+  Result(GoString.fromText("four"), false),
+  Result(GoString.fromText("abc"), false),
+  Result(GoString.fromText("abc"), true),
 ]) {
-  console.log(count + " " + JSON.stringify(result));
+  console.log(count + " " + JSON.stringify(result.text()));
 }
 `,
 	)

@@ -77,6 +77,7 @@ func testWaveEightDeferAndPanic(t *testing.T, options emit.Options) {
 	}
 	runner := filepath.Join(workingDirectory, "runner.ts")
 	writeProgramFile(t, runner, `import "./program.js";
+import { GoString } from "./runtime/string-value.js";
 import {
     DeferEvaluationAndCopy,
     DeferBuiltins,
@@ -101,7 +102,7 @@ import {
     RuntimeFaultIdentity,
 } from "`+artifacts.sourceModule+`";
 
-const output: string[] = [];
+const output: (string | GoString)[] = [];
 const deferred = DeferOrder();
 output.push(deferred[0], String(deferred[1]));
 output.push(RecoverPanic());
@@ -147,7 +148,7 @@ const nilInterface = NilInterfaceDeferredTiming();
 output.push(String(nilInterface[0]), String(nilInterface[1]));
 const nilReceiver = NilValueReceiverTiming();
 output.push(String(nilReceiver[0]), String(nilReceiver[1]));
-console.log(output.join(" "));
+console.log(output.map(value => value instanceof GoString ? value.text() : value).join(" "));
 `)
 	writeProgramFile(
 		t,

@@ -49,7 +49,7 @@ func TestRuntimeSliceBuilderConsumesInjectedContractName(t *testing.T) {
 			class.Name().Text(),
 		)
 	}
-	nilMethod := class.Members()[1].(tsgo.MethodDeclaration)
+	nilMethod := class.Members()[3].(tsgo.MethodDeclaration)
 	assertTypeReferenceName(t, nilMethod.Type(), changedContractName)
 	constructor := nilMethod.Body().(tsgo.Block).
 		Statements()[0].(tsgo.ReturnStatement).
@@ -76,8 +76,8 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 		t.Fatalf("runtime slice declaration = %#v", class)
 	}
 	members := class.Members()
-	if len(members) != 11 {
-		t.Fatalf("runtime slice members = %d, want constructor, nine core operations, and Promise exclusion", len(members))
+	if len(members) != 13 {
+		t.Fatalf("runtime slice members = %d, want constructor, two source counts, nine core operations, and Promise exclusion", len(members))
 	}
 	constructor, ok := members[0].(tsgo.ConstructorDeclaration)
 	if !ok {
@@ -89,17 +89,26 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 	}
 	backing, ok := parameters[0].Type().(tsgo.UnionTypeNode)
 	if !ok || len(backing.Types()) != 2 {
-		t.Fatalf("runtime slice backing = %T, want T[] | null", parameters[0].Type())
+		t.Fatalf("runtime slice backing = %T, want indexed storage | null", parameters[0].Type())
 	}
-	if _, ok := backing.Types()[0].(tsgo.ArrayTypeNode); !ok {
-		t.Fatalf("runtime slice internal backing = %T, want typed array", backing.Types()[0])
+	array, ok := backing.Types()[0].(tsgo.ArrayTypeNode)
+	if !ok {
+		t.Fatalf("runtime slice internal backing = %T, want exact indexed storage", backing.Types()[0])
+	}
+	element, ok := array.ElementType().(tsgo.TypeReferenceNode)
+	if !ok || len(element.TypeArguments()) != 0 {
+		t.Fatalf("runtime slice backing element = %T, want uninstantiated T", array.ElementType())
+	}
+	name, ok := element.TypeName().(tsgo.Identifier)
+	if !ok || name.Text() != "T" {
+		t.Fatalf("runtime slice backing element name = %#v, want T", element.TypeName())
 	}
 	if len(constructor.Modifiers()) != 1 ||
 		constructor.Modifiers()[0].Kind() != tsgo.SyntaxKindProtectedKeyword {
 		t.Fatal("runtime slice constructor does not admit only typed runtime subclasses")
 	}
 	var methods []string
-	for _, member := range members[1:10] {
+	for _, member := range members[1:12] {
 		method, ok := member.(tsgo.MethodDeclaration)
 		if !ok {
 			t.Fatalf("runtime slice member = %T, want method", member)
@@ -107,6 +116,8 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 		methods = append(methods, method.Name().(tsgo.Identifier).Text())
 	}
 	want := []string{
+		"sourceLength",
+		"sourceCapacity",
 		"nil",
 		"make",
 		"literal",

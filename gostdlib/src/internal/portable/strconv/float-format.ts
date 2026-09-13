@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type {
   float64,
@@ -30,6 +31,15 @@ export function FormatFloat(
   requestedPrecision: int64,
   bitSize: int64,
 ): gostring {
+  return GoString.fromText(formatFloatText(input, formatCode, requestedPrecision, bitSize));
+}
+
+function formatFloatText(
+  input: float64,
+  formatCode: uint8,
+  requestedPrecision: int64,
+  bitSize: int64,
+): string {
   const parts = decompose(input, bitSize);
   const value = parts.value;
   if (Number.isNaN(value)) {

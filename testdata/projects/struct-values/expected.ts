@@ -15,6 +15,10 @@ export class Point {
     static $equal($left: Point, $right: Point): bool {
         return $left.X === $right.X && $left.Visible === $right.Visible;
     }
+    static $assign($target: Point, $value: Point): void {
+        $target.X = $value.X;
+        $target.Visible = $value.Visible;
+    }
     declare private readonly then?: never;
 }
 export class Box {
@@ -29,6 +33,10 @@ export class Box {
     }
     static $equal($left: Box, $right: Box): bool {
         return Point.$equal($left.Point, $right.Point) && $left.Active === $right.Active;
+    }
+    static $assign($target: Box, $value: Box): void {
+        Point.$assign($target.Point, $value.Point);
+        $target.Active = $value.Active;
     }
     declare private readonly then?: never;
     WithX(value: int32): Box {
@@ -87,7 +95,8 @@ export function ZeroIsFresh(): bool {
     let left = Box.$zero();
     let right = Box.$zero();
     left.Point.X = 7;
-    return right.Point.X === 0;
+    let logicalResult: boolean = right.Point.X === 0;
+    return logicalResult;
 }
 export function CopyIsolated(value: Box): int32 {
     let copy = Box.$copy(value);
@@ -96,7 +105,7 @@ export function CopyIsolated(value: Box): int32 {
 }
 export function AssignIsolated(value: Box): int32 {
     let target = Box.$zero();
-    target = Box.$copy(value);
+    Box.$assign(target, Box.$copy(value));
     target.Point.X = target.Point.X + 2 | 0;
     return globalThis.Math.imul(value.Point.X, 10) + target.Point.X | 0;
 }
@@ -204,7 +213,13 @@ export function PositionalComposite(): int32 {
 }
 export function OmittedComposite(): bool {
     let value = new Point(5, false);
-    return value.X === 5 && !value.Visible;
+    let logicalResult2: boolean = value.X === 5;
+    let logicalResult4: boolean = logicalResult2;
+    if (logicalResult4) {
+        let logicalResult3: boolean = !value.Visible;
+        logicalResult4 = logicalResult3;
+    }
+    return logicalResult4;
 }
 export function NotEqual(): bool {
     return !Box.$equal(NewBox(4), NewBox(5));
@@ -220,10 +235,12 @@ export function ExplicitVarCopyResult(): int32 {
 export function ParallelAssignment(): int32 {
     let left = NewBox(4);
     let right = NewBox(9);
+    const storeTarget = left;
+    const storeTarget2 = right;
     const assignmentValue = Box.$copy(right);
     const assignmentValue2 = Box.$copy(left);
-    left = assignmentValue;
-    right = assignmentValue2;
+    Box.$assign(storeTarget, assignmentValue);
+    Box.$assign(storeTarget2, assignmentValue2);
     left.Point.X = 8;
     return globalThis.Math.imul(left.Point.X, 10) + right.Point.X | 0;
 }

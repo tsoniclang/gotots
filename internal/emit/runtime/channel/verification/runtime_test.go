@@ -13,6 +13,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
 func TestChannelRuntimePrintsStrictSynchronousSurface(t *testing.T) {
@@ -59,7 +60,7 @@ func TestChannelRuntimePrintsStrictSynchronousSurface(t *testing.T) {
 	runner := writeRunner(t, directory, "ordinary.ts", `import {
     GoChannel,
     goSelect,
-} from "./runtime.js";
+} from "./runtime/channel.js";
 
 const output: string[] = [];
 const buffered = GoChannel.make<number>(1, () => 0, value => value);
@@ -121,11 +122,10 @@ func TestChannelLifecycleAndBlockingBoundaries(t *testing.T) {
 	runtimePath, _ := materializeRuntime(t, directory)
 	runner := writeRunner(t, directory, "runner.ts", `import {
     GoChannel,
-    GoPanic,
-    GoRuntimePanicValue,
     goSelect,
     goSelectReady,
-} from "./runtime.js";
+} from "./runtime/channel.js";
+import { GoPanic, GoRuntimePanicValue } from "./runtime/panic.js";
 
 function panicValue(operation: () => void): string {
     try {
@@ -237,80 +237,44 @@ console.log(output.join(","));
 func materializeRuntime(t *testing.T, directory string) (string, string) {
 	t.Helper()
 	factory := tsgo.NewFactory()
-	interfaceDefinitions, err := runtimeemission.Build(
-		factory,
-		api.RuntimeModuleInterfaceValue,
-		[]api.RuntimeSymbol{
-			api.RuntimeInterfaceValue,
-			api.RuntimeErrorMethodToken,
-			api.RuntimeRuntimeErrorToken,
+	abi, err := api.NewScalarABI(api.IntegerRepresentationNumber, api.NativeIntegerWidth64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assembled, err := runtimeemission.AssemblePackage(
+		factory, abi,
+		map[api.RuntimeSymbol]struct{}{
+			api.RuntimeChannel: {},
+			api.RuntimeSelect:  {},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	panicDefinitions, err := runtimeemission.Build(
-		factory,
-		api.RuntimeModulePanic,
-		[]api.RuntimeSymbol{
-			api.RuntimePanicValue,
-			api.RuntimePanic,
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	channelDefinitions, err := runtimeemission.Build(
-		factory,
-		api.RuntimeModuleChannel,
-		[]api.RuntimeSymbol{
-			api.RuntimeReceiveChannel,
-			api.RuntimeSendChannel,
-			api.RuntimeSelectCase,
-			api.RuntimeChannel,
-			api.RuntimeSelectAttempt,
-			api.RuntimeSelectReady,
-			api.RuntimeSelect,
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var statements []tsgo.Statement
-	for _, definitions := range [][]runtimeemission.Definition{
-		interfaceDefinitions,
-		panicDefinitions,
-		channelDefinitions,
-	} {
-		for _, definition := range definitions {
-			statements = append(statements, definition.Statement())
-		}
-	}
-	sourcePath, err := tsgo.NewPath("runtime.ts")
-	if err != nil {
-		t.Fatal(err)
-	}
-	source := factory.SourceFile(
-		statements,
-		factory.EndOfFile(),
-		tsgo.SourceFileData{
-			FileName:        sourcePath,
-			Path:            sourcePath,
-			LanguageVariant: tsgo.LanguageVariantStandard,
-			ScriptKind:      tsgo.ScriptKindTS,
-		},
-	)
 	client, err := tsgo.StartClient(repositoryRoot(), directory)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = client.Close() })
-	printed, err := client.PrintNode(source, tsgo.PrintOptions{})
-	if err != nil {
+	var runtimePath, printed string
+	for _, file := range assembled.Files() {
+		text, printErr := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if printErr != nil {
+			t.Fatal(printErr)
+		}
+		path := filepath.Join(directory, filepath.FromSlash(file.OutputPath()))
+		writeFile(t, path, text)
+		if file.OutputPath() == "runtime/channel.ts" {
+			runtimePath, printed = path, text
+		}
+	}
+	if runtimePath == "" {
+		t.Fatal("assembled channel runtime is absent")
+	}
+	if err := runtimefixture.InstallResolution(directory, filepath.Join(directory, "out")); err != nil {
 		t.Fatal(err)
 	}
-	runtimePath := filepath.Join(directory, "runtime.ts")
-	writeFile(t, runtimePath, printed)
 	writeFile(t, filepath.Join(directory, "package.json"), "{\"type\":\"module\"}\n")
 	return runtimePath, printed
 }
@@ -369,6 +333,9 @@ func execute(t *testing.T, directory, runner string) string {
 
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}

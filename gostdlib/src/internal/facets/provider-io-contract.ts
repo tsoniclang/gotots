@@ -1,6 +1,7 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderInterfaceValue } from "../portable/io/value.js";
@@ -14,12 +15,14 @@ const canonicalBoundaryErrorType = Object.freeze({ comparable: true });
 export class CanonicalBoundaryError extends ProviderInterfaceValue
   implements CanonicalError {
   override readonly $go$methods: ReadonlySet<object>;
+  readonly #message: GoString;
 
   constructor(
-    private readonly message: string,
+    message: string,
     contract: readonly object[],
   ) {
     super(canonicalBoundaryErrorType);
+    this.#message = GoString.fromText(message);
     this.$go$methods = new Set(contract);
   }
 
@@ -28,11 +31,12 @@ export class CanonicalBoundaryError extends ProviderInterfaceValue
     _flags: string,
     _precision: number | undefined,
   ): string {
-    return verb === "q" ? JSON.stringify(this.message) : this.message;
+    const message = this.#message.text();
+    return verb === "q" ? JSON.stringify(message) : message;
   }
 
   Error(): gostring {
-    return this.message;
+    return this.#message;
   }
 }
 

@@ -252,8 +252,8 @@ function encodeScalar(
 
 function codecKindPanic(value: reflect.Value): never {
   return GoPanic.raise(
-    new ProviderError(
-      `binary: unsupported codec kind ${value.Kind().String()}`,
+    ProviderError.fromText(
+      `binary: unsupported codec kind ${value.Kind().String().text()}`,
     ),
   );
 }

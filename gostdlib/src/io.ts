@@ -3,7 +3,7 @@ import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
-import { New } from "./errors.js";
+import { ProviderError } from "./internal/runtime/error.js";
 import {
   noProgress,
   readFullSync,
@@ -54,7 +54,7 @@ export const state: {
   ErrNoProgress: GoError;
 } = {
   Discard: new DiscardWriter(),
-  EOF: New("EOF"),
+  EOF: ProviderError.fromText("EOF"),
   ErrShortWrite: shortWrite,
   ErrShortBuffer: shortBuffer,
   ErrUnexpectedEOF: unexpectedEOF,

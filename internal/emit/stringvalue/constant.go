@@ -25,12 +25,12 @@ func EmitConstant(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	return api.DirectExpression(
+	return FromText(context, api.DirectExpression(
 		context.Factory().StringLiteral(
 			byteCodeUnits(constant.StringVal(value)),
 			tsgo.TokenFlagsNone,
 		),
-	), nil
+	))
 }
 
 func byteCodeUnits(value string) string {

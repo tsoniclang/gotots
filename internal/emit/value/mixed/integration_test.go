@@ -68,6 +68,7 @@ func TestMixedValueFamiliesTypecheckAndExecuteThroughOneRuntimeGraph(
     StringWindow,
 } from "`+artifacts.apiModule+`";
 import { GoPanic } from "./runtime/panic.js";
+import { GoString } from "./runtime/string-value.js";
 
 const panics = (operation: () => void): boolean => {
     try {
@@ -79,8 +80,8 @@ const panics = (operation: () => void): boolean => {
 };
 
 console.log(NumberValue(17n, 5n).toString());
-console.log(StringByte("abc").toString());
-console.log(StringWindow("abcd"));
+console.log(StringByte(GoString.fromText("abc")).toString());
+console.log(StringWindow(GoString.fromText("abcd")).text());
 console.log(ArrayValue(3).toString());
 console.log(SliceValue(4).toString());
 console.log(MapValue(5).toString());
@@ -88,7 +89,7 @@ console.log(SliceStoreOrder().toString());
 console.log(MapStoreOrder().toString());
 console.log(panics(() => { ArrayPanic(1n); }));
 console.log(panics(() => { SlicePanic(1n); }));
-console.log(panics(() => { StringPanic("a", 1n); }));
+console.log(panics(() => { StringPanic(GoString.fromText("a"), 1n); }));
 console.log(panics(() => { MapPanic(); }));
 console.log(panics(() => { DividePanic(0n); }));
 `)
@@ -317,6 +318,18 @@ func assertRuntimeGraph(
 	}
 	for _, path := range familyPaths {
 		source := artifacts.printed[path]
+		if path == "runtime/map.ts" {
+			if !strings.Contains(source, "export abstract class GoMapValue<K, V>") || strings.Contains(source, "GoPanic") {
+				t.Fatal("map protocol contains implementation or lacks its exact declaration")
+			}
+			continue
+		}
+		if path == "runtime/string.ts" {
+			if strings.Count(source, `import { GoString } from "./string-value.js";`) != 1 {
+				t.Fatal("string operations do not exact-join their canonical value owner")
+			}
+			source = artifacts.printed["runtime/string-value.ts"]
+		}
 		if strings.Count(
 			source,
 			`import { GoPanic } from "./panic.js";`,

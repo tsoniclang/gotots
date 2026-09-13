@@ -62,6 +62,16 @@ func (a RuntimeArray) EmitLiteral(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if a.Length() > 9007199254740991 {
+		zero, zeroErr := a.Zero(context, children, source)
+		if zeroErr != nil {
+			return api.ExpressionEmission{}, zeroErr
+		}
+		for _, value := range values {
+			before = append(before, context.Factory().ExpressionStatement(value))
+		}
+		return api.NewExpressionEmission(append(before, zero.Before()...), zero.Value(), api.CombineRequests(requests, zero.Requests()))
+	}
 	var elementZero api.ExpressionEmission
 	var target tsgo.Expression
 	var typeRequests []api.RootRequest

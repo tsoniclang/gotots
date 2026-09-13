@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -48,7 +49,7 @@ test("bytes search, clone, join, and trim preserve byte boundaries", () => {
   clone.set(0, 0x78);
   assert.equal(source.get(0), 0x61);
   assert.equal(Compare(source, RuntimeSlice.literal([0x61, 0xc3, 0xa9, 0x63])), -1n);
-  assert.equal(IndexAny(source, "Ã©"), 1n);
+  assert.equal(IndexAny(source, GoString.fromText("Ã©")), 1n);
   assert.equal(IndexByte(source, 0x62), 3n);
   assert.equal(LastIndexByte(source, 0x61), 4n);
   assert.deepEqual(
@@ -58,7 +59,7 @@ test("bytes search, clone, join, and trim preserve byte boundaries", () => {
     ]), RuntimeSlice.literal([9]))),
     [1, 9, 2, 3],
   );
-  assert.deepEqual(sliceValues(Trim(RuntimeSlice.literal([1, 2, 3, 2]), "\x01\x02")), [3]);
-  assert.deepEqual(sliceValues(TrimLeft(RuntimeSlice.literal([1, 2, 3]), "\x01\x02")), [3]);
-  assert.deepEqual(sliceValues(TrimRight(RuntimeSlice.literal([3, 1, 2]), "\x01\x02")), [3]);
+  assert.deepEqual(sliceValues(Trim(RuntimeSlice.literal([1, 2, 3, 2]), GoString.fromText("\x01\x02"))), [3]);
+  assert.deepEqual(sliceValues(TrimLeft(RuntimeSlice.literal([1, 2, 3]), GoString.fromText("\x01\x02"))), [3]);
+  assert.deepEqual(sliceValues(TrimRight(RuntimeSlice.literal([3, 1, 2]), GoString.fromText("\x01\x02"))), [3]);
 });

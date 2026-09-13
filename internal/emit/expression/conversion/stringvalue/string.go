@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	stringrepresentation "github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -20,7 +21,7 @@ func integerToString(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
+	text, err := api.NewExpressionEmission(
 		operand.Before(),
 		context.Factory().CallExpression(
 			context.Factory().Identifier(encoder.Name()),
@@ -31,6 +32,10 @@ func integerToString(
 		),
 		api.CombineRequests(operand.Requests(), encoder.Requests()),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return stringrepresentation.FromText(context, text)
 }
 
 func sliceToString(
@@ -110,10 +115,10 @@ func sliceToString(
 		forLoop(
 			context,
 			index,
-			property(
+			callMember(
 				context,
 				sourceValue,
-				runtimeslice.MemberName(runtimeslice.MemberLength),
+				runtimeslice.MemberName(runtimeslice.MemberSourceLength),
 			),
 			[]tsgo.Statement{
 				context.Factory().ExpressionStatement(binary(
@@ -125,9 +130,13 @@ func sliceToString(
 			},
 		),
 	)
-	return api.NewExpressionEmission(
+	text, err := api.NewExpressionEmission(
 		before,
 		result,
 		api.CombineRequests(operand.Requests(), operationRequests),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return stringrepresentation.FromText(context, text)
 }

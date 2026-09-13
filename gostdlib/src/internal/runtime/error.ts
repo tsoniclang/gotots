@@ -4,6 +4,9 @@ import {
   GoInterfaceValue,
   GoRuntimeErrorMethodToken,
 } from "@gotots/runtime/interface-value.js";
+import { GoString } from "@gotots/runtime/string-value.js";
+
+import { fromHostString } from "../portable/utf8/codec.js";
 
 export class ProviderError extends GoInterfaceValue {
   static readonly comparable = true;
@@ -11,11 +14,18 @@ export class ProviderError extends GoInterfaceValue {
   readonly $go$methods: ReadonlySet<object>;
   readonly $go$formatString = false;
 
-  constructor(private readonly message: string, runtime = false) {
+  readonly #message: GoString;
+
+  constructor(message: GoString, runtime = false) {
     super();
+    this.#message = message;
     this.$go$methods = runtime
       ? new Set<object>([GoErrorMethodToken, GoRuntimeErrorMethodToken])
       : new Set<object>([GoErrorMethodToken]);
+  }
+
+  static fromText(message: string, runtime = false): ProviderError {
+    return new ProviderError(GoString.fromText(message), runtime);
   }
 
   $go$implements(contract: readonly object[]): boolean {
@@ -35,18 +45,18 @@ export class ProviderError extends GoInterfaceValue {
       return "*errors.errorString";
     }
     if (verb === "q") {
-      return JSON.stringify(this.message);
+      return JSON.stringify(this.#message.text());
     }
-    return this.message;
+    return this.#message.text();
   }
 
-  Error(): string {
-    return this.message;
+  Error(): GoString {
+    return this.#message;
   }
 }
 
 export function providerError(failure: object): ProviderError {
-  return new ProviderError(failure instanceof Error ? failure.message : String(failure));
+  return new ProviderError(fromHostString(failure instanceof Error ? failure.message : String(failure)));
 }
 
 export function isGoError(value: GoInterfaceValue): value is GoError {

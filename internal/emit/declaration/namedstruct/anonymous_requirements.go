@@ -61,6 +61,8 @@ func anonymousOperation(
 		return api.NamedStructOperationConvert, true, nil
 	case api.AnonymousStructDemandStorage:
 		return api.NamedStructOperationStorage, true, nil
+	case api.AnonymousStructDemandAssign:
+		return api.NamedStructOperationAssign, true, nil
 	default:
 		return api.NamedStructOperationInvalid, false, &api.InvariantError{
 			Reason: "anonymous struct demand is invalid",

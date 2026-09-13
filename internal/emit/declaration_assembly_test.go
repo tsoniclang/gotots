@@ -63,12 +63,29 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 		"Item": {declaration: itemDeclaration, reconstructions: 1},
 	} {
 		declaration := expected.declaration
-		if len(session.requirements.AppliedFor(declaration.owner)) != 3 {
+		applied := session.requirements.AppliedFor(declaration.owner)
+		if len(applied) != 4 {
 			t.Fatalf(
-				"%s requirements = %d, want zero/copy/equal",
+				"%s requirements = %d, want zero/copy/equal/assign",
 				name,
-				len(session.requirements.AppliedFor(declaration.owner)),
+				len(applied),
 			)
+		}
+		operations := make(map[api.NamedStructOperation]bool)
+		for _, requirement := range applied {
+			_, operation, valid := requirement.NamedStructOperation()
+			if !valid || operations[operation] {
+				t.Fatalf("%s has a non-operation or duplicate requirement", name)
+			}
+			operations[operation] = true
+		}
+		for _, operation := range []api.NamedStructOperation{
+			api.NamedStructOperationZero, api.NamedStructOperationCopy,
+			api.NamedStructOperationEqual, api.NamedStructOperationAssign,
+		} {
+			if !operations[operation] {
+				t.Fatalf("%s lacks operation %v", name, operation)
+			}
 		}
 		if declaration.reconstructions != expected.reconstructions {
 			t.Fatalf(
@@ -288,11 +305,11 @@ func TestDeclarationAssemblyCostDoesNotGrowPerUseSite(t *testing.T) {
 			measurements[index].assemblyBytes,
 			measurements[index].fileBytes,
 		)
-		if measurements[index].requirements != 3 ||
+		if measurements[index].requirements != 4 ||
 			measurements[index].reconstructions != 1 ||
 			measurements[index].definitionRoots != 1 {
 			t.Fatalf(
-				"use sites %d metrics = %#v, want 3 requirements, 1 reconstruction, 1 definition root",
+				"use sites %d metrics = %#v, want 4 requirements, 1 reconstruction, 1 definition root",
 				useCount,
 				measurements[index],
 			)

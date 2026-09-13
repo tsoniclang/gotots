@@ -171,9 +171,16 @@ type ReflectionNames interface {
 	// ReflectionValueOperationsDemanded reports whether the value-operation
 	// facet was demanded for one canonical reflection artifact.
 	ReflectionValueOperationsDemanded(string) bool
+	ReflectionRawPointerDemanded() bool
 	// ReflectionValueType returns the canonical descriptor reference for
 	// one type while joining its value-operation facet demand.
 	ReflectionValueType(types.Type, *types.TypeName) (NameReference, error)
+}
+
+func NewReflectionRawPointerRequest(artifact *GeneratedArtifact) (RootRequest, error) {
+	requirement, err := newGeneratedDefinitionRequirement(artifact, GeneratedArtifactReflectionType,
+		DeclarationRequirementReflectionRawPointer, "reflection raw pointer")
+	return generatedDefinitionRequest(requirement, err)
 }
 
 func NewProviderStatefulProfileCandidate(

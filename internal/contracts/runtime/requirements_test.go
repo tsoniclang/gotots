@@ -7,11 +7,12 @@ import (
 )
 
 const validRuntimeRequirements = `{
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "integerRepresentations": ["number", "fixed64-bigint", "bigint"],
   "providerIntegerRepresentation": "bigint",
   "providerScalarModule": "./internal/scalars.js",
   "providerPointerModule": "./internal/runtime/pointer.js",
+  "providerStringModule": "./internal/portable/utf8/codec.js",
   "nativeIntegerBits": 64,
   "primitiveAliases": [{"id": 4, "export": "int32", "providerCarrier": "number"}],
   "runtimeSymbols": [{"id": 300, "export": "RuntimeSlice"}]
@@ -29,6 +30,7 @@ func TestDecodeRetainsImmutableRuntimeRequirements(t *testing.T) {
 		requirements.ProviderProfile() != ProfileBigInt ||
 		requirements.ProviderScalarModule() != "./internal/scalars.js" ||
 		requirements.ProviderPointerModule() != "./internal/runtime/pointer.js" ||
+		requirements.ProviderStringModule() != "./internal/portable/utf8/codec.js" ||
 		requirements.NativeIntegerBits() != 64 {
 		t.Fatal("runtime profile admission is invalid")
 	}
@@ -54,7 +56,7 @@ func TestDecodeRetainsImmutableRuntimeRequirements(t *testing.T) {
 func TestDecodeRejectsRuntimeRequirementMutations(t *testing.T) {
 	tests := map[string]string{
 		"old schema": strings.Replace(
-			validRuntimeRequirements, `"schemaVersion": 3`, `"schemaVersion": 2`, 1,
+			validRuntimeRequirements, `"schemaVersion": 4`, `"schemaVersion": 2`, 1,
 		),
 		"missing provider profile": strings.Replace(
 			validRuntimeRequirements,
@@ -86,6 +88,14 @@ func TestDecodeRejectsRuntimeRequirementMutations(t *testing.T) {
 			"",
 			1,
 		),
+		"missing provider string module": strings.Replace(validRuntimeRequirements,
+			`  "providerStringModule": "./internal/portable/utf8/codec.js",`+"\n", "", 1),
+		"duplicate string support module": strings.Replace(validRuntimeRequirements,
+			`"./internal/portable/utf8/codec.js"`, `"./internal/scalars.js"`, 1),
+		"foreign string support module": strings.Replace(validRuntimeRequirements,
+			`"./internal/portable/utf8/codec.js"`, `"../foreign.js"`, 1),
+		"primitive string carrier": strings.Replace(validRuntimeRequirements,
+			`"providerCarrier": "number"`, `"providerCarrier": "string"`, 1),
 		"duplicate provider support module": strings.Replace(
 			validRuntimeRequirements,
 			`"./internal/runtime/pointer.js"`,

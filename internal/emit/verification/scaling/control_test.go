@@ -425,8 +425,10 @@ func measureWaveEightScale(
 		}
 		result.targetBytes += len(target)
 		result.targetNodes += waveFourEncodedNodes(t, encoded)
-		printed.WriteString(target)
-		printed.WriteByte('\n')
+		if file.Kind() == emit.TargetFileSource {
+			printed.WriteString(target)
+			printed.WriteByte('\n')
+		}
 		if strings.HasPrefix(file.OutputPath(), "runtime/") {
 			runtime.WriteString(file.OutputPath())
 			runtime.WriteByte('\n')

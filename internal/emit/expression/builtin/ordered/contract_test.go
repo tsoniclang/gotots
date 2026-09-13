@@ -55,11 +55,15 @@ func TestOrderedBuiltinASTAndDemandDefinitionsAreExact(t *testing.T) {
 	).(tsgo.NumericLiteral); !ok {
 		t.Fatal("constant max was not checker-folded")
 	}
-	if _, ok := returnExpression(
-		t,
-		number,
-		"ConstantString",
-	).(tsgo.StringLiteral); !ok {
+	folded, ok := returnExpression(t, number, "ConstantString").(tsgo.CallExpression)
+	if !ok || len(folded.Arguments()) != 1 {
+		t.Fatal("constant string max has no canonical literal construction")
+	}
+	constructor, ok := folded.Expression().(tsgo.PropertyAccessExpression)
+	if !ok || constructor.Name().(tsgo.Identifier).Text() != "fromText" {
+		t.Fatal("constant string max does not construct a canonical byte string")
+	}
+	if _, ok := folded.Arguments()[0].(tsgo.StringLiteral); !ok {
 		t.Fatal("constant string max was not checker-folded")
 	}
 	assertRuntimeDefinitionCount(t, number, "runtime/string.ts", 2)

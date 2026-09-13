@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
@@ -12,17 +13,17 @@ import { byteSlice, sliceValues } from "../../runtime/slice.js";
 const standardAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 const urlAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-let createEncoding: (alphabet: gostring, padding: number) => Encoding;
+let createEncoding: (alphabet: string, padding: number) => Encoding;
 let copyEncoding: (source: Encoding) => Encoding;
 let assignEncoding: (target: Encoding, source: Encoding) => void;
 
 export class Encoding {
-  #alphabet: gostring;
+  #alphabet: string;
   #padding: number;
   readonly #decode = new Map<number, number>();
 
   private constructor(
-    alphabet: gostring,
+    alphabet: string,
     padding: number,
   ) {
     this.#alphabet = alphabet;
@@ -33,7 +34,7 @@ export class Encoding {
   }
 
   static {
-    createEncoding = (alphabet: gostring, padding: number): Encoding =>
+    createEncoding = (alphabet: string, padding: number): Encoding =>
       new Encoding(alphabet, padding);
     copyEncoding = (source: Encoding): Encoding =>
       new Encoding(source.#alphabet, source.#padding);
@@ -54,7 +55,7 @@ export class Encoding {
     receiver: Encoding | undefined,
     source: gostring,
   ): [RuntimeSlice<uint8>, GoError | undefined] {
-    return requireEncoding(receiver).#decodeString(source);
+    return requireEncoding(receiver).#decodeString(source.text());
   }
 
   static AppendDecode(
@@ -82,7 +83,7 @@ export class Encoding {
     receiver: Encoding | undefined,
     source: RuntimeSlice<uint8>,
   ): gostring {
-    return requireEncoding(receiver).#encodeBytes(sliceValues(source));
+    return GoString.fromText(requireEncoding(receiver).#encodeBytes(sliceValues(source)));
   }
 
   static EncodedLen(receiver: Encoding | undefined, length: int): int {
@@ -90,7 +91,7 @@ export class Encoding {
     return ((length + 2n) / 3n) * 4n;
   }
 
-  #encodeBytes(source: readonly uint8[]): gostring {
+  #encodeBytes(source: readonly uint8[]): string {
     let result = "";
     for (let index = 0; index < source.length; index += 3) {
       const first = source[index] ?? 0;
@@ -110,7 +111,7 @@ export class Encoding {
     return result;
   }
 
-  #decodeString(source: gostring): [RuntimeSlice<uint8>, GoError | undefined] {
+  #decodeString(source: string): [RuntimeSlice<uint8>, GoError | undefined] {
     const output: uint8[] = [];
     let sourceIndex = 0;
     while (sourceIndex < source.length) {
@@ -124,7 +125,7 @@ export class Encoding {
     return [byteSlice(output), undefined];
   }
 
-  #decodeQuantum(source: gostring, start: number): DecodedQuantum {
+  #decodeQuantum(source: string, start: number): DecodedQuantum {
     const decoded = [0, 0, 0, 0];
     let decodedLength = 4;
     let sourceIndex = start;
@@ -344,7 +345,7 @@ export class Base64EncoderState<Failure> {
     return byteSlice(byteCodes(Encoding.EncodeToString(
       this.encoding,
       byteSlice(source),
-    )));
+    ).text()));
   }
 }
 
@@ -419,10 +420,10 @@ function requireWriter(writer: Writer | undefined): Writer {
 }
 
 function corruptInput(offset: number): ProviderError {
-  return new ProviderError(`illegal base64 data at input byte ${offset}`);
+  return ProviderError.fromText(`illegal base64 data at input byte ${offset}`);
 }
 
-function byteCodes(value: gostring): uint8[] {
+function byteCodes(value: string): uint8[] {
   const result: uint8[] = [];
   for (let index = 0; index < value.length; index += 1) {
     result.push(value.charCodeAt(index));
@@ -430,7 +431,7 @@ function byteCodes(value: gostring): uint8[] {
   return result;
 }
 
-function skipNewlines(source: gostring, start: number): number {
+function skipNewlines(source: string, start: number): number {
   let index = start;
   while (
     index < source.length &&

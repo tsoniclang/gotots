@@ -13,9 +13,11 @@
     "./complex.js": "./complex.js",
     "./interface-value.js": "./interface-value.js",
     "./map.js": "./map.js",
+    "./memory-view.js": "./memory-view.js",
     "./panic.js": "./panic.js",
     "./scalars.js": "./scalars.js",
     "./slice.js": "./slice.js",
+    "./string-value.js": "./string-value.js",
     "./struct.js": "./struct.js"
   }
 }

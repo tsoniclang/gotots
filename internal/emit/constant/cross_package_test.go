@@ -92,15 +92,16 @@ func executeCrossPackageTS(
 	t.Helper()
 	runner := `import { Widths, Enum, Flags } from "` + artifacts.module(t, "api.ts") + `";
 import { DotWidth, DotLabel } from "` + artifacts.module(t, "dotuse.ts") + `";
+import { GoString } from "./runtime/string-value.js";
 
 const row = (value: readonly unknown[]): string =>
-	value.map((entry) => String(entry)).join(" ");
+	value.map((entry) => entry instanceof GoString ? entry.text() : String(entry)).join(" ");
 
 console.log(row(Widths()));
 console.log(row(Enum()));
 console.log(row(Flags()));
 console.log(String(DotWidth()));
-console.log(String(DotLabel()));
+console.log(DotLabel().text());
 `
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, runner)

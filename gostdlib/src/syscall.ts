@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { ProviderPointer } from "./internal/runtime/pointer.js";
 import {
   type GoError,
@@ -60,7 +61,7 @@ export class Errno {
   constructor(public readonly value: uint64) {}
 
   Error(): gostring {
-    return errnoMessage(hostInteger(this.value));
+    return GoString.fromText(errnoMessage(hostInteger(this.value)));
   }
 
   Is(target: GoError | undefined): bool {
@@ -85,7 +86,7 @@ export class Signal extends SignalInterfaceValue {
   Signal(): void {}
 
   String(): gostring {
-    return signalName(hostInteger(this.value));
+    return GoString.fromText(signalName(hostInteger(this.value)));
   }
 }
 
@@ -117,7 +118,7 @@ export class SysProcIDMap {
 
 export class SysProcAttr {
   constructor(
-    public Chroot: gostring = "",
+    public Chroot: gostring = GoString.empty,
     public Credential: Credential | undefined = undefined,
     public Ptrace: bool = false,
     public Setsid: bool = false,

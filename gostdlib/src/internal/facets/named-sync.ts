@@ -11,6 +11,10 @@ export class SyncCondOperations {
     return Cond.$copy(source);
   }
 
+  static $assign(target: Cond, source: Cond): void {
+    Cond.$assign(target, source);
+  }
+
   static $equal(left: Cond, right: Cond): boolean {
     return Cond.$equal(left, right);
   }
@@ -35,8 +39,12 @@ export class SyncMapOperations {
     return new Map();
   }
 
-  static $copy(_source: Map): Map {
-    return new Map();
+  static $copy(source: Map): Map {
+    return Map.$copy(source);
+  }
+
+  static $assign(target: Map, source: Map): void {
+    Map.$assign(target, source);
   }
 
   static $storageOf(source: Map): SyncMapStorage {
@@ -91,6 +99,10 @@ export class SyncOnceOperations {
     return Once.$copy(source);
   }
 
+  static $assign(target: Once, source: Once): void {
+    Once.$assign(target, source);
+  }
+
   static $equal(left: Once, right: Once): boolean {
     return Once.$equal(left, right);
   }
@@ -116,7 +128,11 @@ export class SyncPoolOperations {
   }
 
   static $copy(source: Pool): Pool {
-    return new Pool(source.New);
+    return Pool.$copy(source);
+  }
+
+  static $assign(target: Pool, source: Pool): void {
+    Pool.$assign(target, source);
   }
 
   static $storageOf(source: Pool): SyncPoolStorage {
@@ -137,6 +153,10 @@ export class SyncRWMutexOperations {
 
   static $copy(source: RWMutex): RWMutex {
     return RWMutex.$copy(source);
+  }
+
+  static $assign(target: RWMutex, source: RWMutex): void {
+    RWMutex.$assign(target, source);
   }
 
   static $equal(left: RWMutex, right: RWMutex): boolean {
@@ -165,6 +185,10 @@ export class SyncWaitGroupOperations {
 
   static $copy(source: WaitGroup): WaitGroup {
     return WaitGroup.$copy(source);
+  }
+
+  static $assign(target: WaitGroup, source: WaitGroup): void {
+    WaitGroup.$assign(target, source);
   }
 
   static $equal(left: WaitGroup, right: WaitGroup): boolean {

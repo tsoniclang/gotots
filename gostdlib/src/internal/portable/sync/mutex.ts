@@ -55,9 +55,13 @@ export class RWMutex {
 
   static $copy(source: RWMutex): RWMutex {
     const result = new RWMutex();
-    result.#readers = source.#readers;
-    result.#writer = source.#writer;
+    RWMutex.$assign(result, source);
     return result;
+  }
+
+  static $assign(target: RWMutex, source: RWMutex): void {
+    target.#readers = source.#readers;
+    target.#writer = source.#writer;
   }
 
   static $equal(left: RWMutex, right: RWMutex): boolean {

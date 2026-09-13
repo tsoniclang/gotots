@@ -1,15 +1,17 @@
+import type { GoStorageRegion } from "./memory-view.js";
+import { goRegionRead, goRegionWrite } from "./memory-view.js";
 import { GoPanic } from "./panic.js";
-export class GoArray<T, N extends number> {
-    private constructor(private readonly $values: T[], private readonly $offset: number, public readonly length: N) {
+export class GoArray<T, N extends number | bigint> {
+    private constructor(private readonly $region: GoStorageRegion<T>, public readonly length: N) {
     }
-    public static zero<T, N extends number>(length: N, zero: T): GoArray<T, N> {
+    public static zero<T, N extends number | bigint>(length: N, zero: T): GoArray<T, N> {
         const values: T[] = [];
         for (let index = 0; index < length; index++) {
             values.push(zero);
         }
-        return new GoArray<T, N>(values, 0, length);
+        return new GoArray<T, N>({ kind: "indexed", values: values, offset: 0 }, length);
     }
-    public static literal<T, N extends number>(length: N, zero: T, indexes: number[], values: T[]): GoArray<T, N> {
+    public static literal<T, N extends number | bigint>(length: N, zero: T, indexes: number[], values: T[]): GoArray<T, N> {
         if (indexes.length !== values.length) {
             GoPanic.raiseRuntime("array literal index/value length mismatch");
         }
@@ -20,22 +22,26 @@ export class GoArray<T, N extends number> {
         return result;
     }
     public copy(): GoArray<T, N> {
-        return new GoArray<T, N>(this.$values.slice(this.$offset, this.$offset + globalThis.Number(this.length)), 0, this.length);
+        if (this.$region.kind === "indexed" && (this.$region.offset === 0 && BigInt(this.$region.values.length) === BigInt(this.length))) {
+            return new GoArray<T, N>({ kind: "indexed", values: Array.from(this.$region.values), offset: 0 }, this.length);
+        }
+        const values: T[] = [];
+        for (let index = 0; index < this.length; index++) {
+            values.push(this.get(index));
+        }
+        return new GoArray<T, N>({ kind: "indexed", values: values, offset: 0 }, this.length);
     }
     public get(index: number | bigint): T {
-        const offset: number = this.$check(index);
-        return (this.$offset + offset in this.$values ? this.$values[this.$offset + offset] : GoPanic.raiseRuntime("dense storage index is absent")) as T;
+        return goRegionRead<T>(this.$region, this.$check(index));
     }
     public set(index: number | bigint, value: T): void {
-        const offset: number = this.$check(index);
-        this.$values[this.$offset + offset] = value;
+        goRegionWrite<T>(this.$region, this.$check(index), value);
     }
-    private $check(index: number | bigint): number {
-        const offset: number = globalThis.Number(index);
-        if (!globalThis.Number.isInteger(offset) || offset < 0 || offset >= this.length) {
+    private $check(index: number | bigint): number | bigint {
+        if (typeof index === "number" && !Number.isInteger(index) || (index < 0 || index >= this.length)) {
             GoPanic.raiseRuntime("array index out of bounds");
         }
-        return offset;
+        return index;
     }
     declare private readonly then?: never;
 }

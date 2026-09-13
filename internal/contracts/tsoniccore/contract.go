@@ -45,6 +45,14 @@ const (
 	SymbolNativeUint
 	SymbolStruct
 	SymbolField
+	SymbolFixedArray
+	SymbolMemoryArrayLayout
+	SymbolDefaultValue
+	SymbolViewPointer
+	SymbolBindMemoryField
+	SymbolBindMemoryRecord
+	SymbolMemoryFieldBinding
+	SymbolInt128
 )
 
 type Phase uint8
@@ -81,6 +89,12 @@ func Resolve(symbol Symbol) (Declaration, error) {
 			export: "Pointer",
 			phase:  PhaseType,
 		}, nil
+	case SymbolFixedArray:
+		return typeDeclaration("FixedArray"), nil
+	case SymbolMemoryArrayLayout:
+		return value("memoryArrayLayout"), nil
+	case SymbolDefaultValue:
+		return value("defaultValue"), nil
 	case SymbolAddressOf:
 		return value("addressOf"), nil
 	case SymbolAllocatePointer:
@@ -95,6 +109,14 @@ func Resolve(symbol Symbol) (Declaration, error) {
 		return value("hashPointer"), nil
 	case SymbolProjectPointer:
 		return value("projectPointer"), nil
+	case SymbolViewPointer:
+		return value("viewPointer"), nil
+	case SymbolBindMemoryField:
+		return value("bindMemoryField"), nil
+	case SymbolBindMemoryRecord:
+		return value("bindMemoryRecord"), nil
+	case SymbolMemoryFieldBinding:
+		return typeDeclaration("MemoryFieldBinding"), nil
 	case SymbolBindPointer:
 		return value("bindPointer"), nil
 	case SymbolRawPointer:
@@ -125,6 +147,8 @@ func Resolve(symbol Symbol) (Declaration, error) {
 		return typeDeclaration("uint32"), nil
 	case SymbolInt64:
 		return typeDeclaration("int64"), nil
+	case SymbolInt128:
+		return typeDeclaration("int128"), nil
 	case SymbolUint64:
 		return typeDeclaration("uint64"), nil
 	case SymbolFloat32:

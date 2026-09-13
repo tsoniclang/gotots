@@ -124,6 +124,10 @@ export class Uint64 extends Cell<uint64> {
     super(value);
   }
 
+  static $assign(target: Uint64, source: Uint64): void {
+    target.value = source.value;
+  }
+
   static Add(receiver: Uint64 | undefined, delta: uint64): uint64 {
     const cell = requireCell(receiver, "Uint64.Add");
     cell.value += delta;

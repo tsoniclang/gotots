@@ -137,8 +137,9 @@ func NilConstructed() bool { return bufio.NewWriter(nil) != nil }
 		artifacts.paths,
 		assemblyPath,
 		[]string{"NilConstructed", "Run", "ShortWrite", "StickyFailure"},
-		`const [text, failure] = Run("alpha");
-console.log(JSON.stringify(text) + " " + JSON.stringify(failure));
+		`import { GoString } from "./runtime/string-value.js";
+const [text, failure] = Run(GoString.fromText("alpha"));
+console.log(JSON.stringify(text.text()) + " " + JSON.stringify(failure.text()));
 console.log(ShortWrite());
 console.log(StickyFailure());
 console.log(NilConstructed());

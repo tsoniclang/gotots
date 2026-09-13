@@ -2,6 +2,12 @@ import { GoPanic } from "./panic.js";
 export class RuntimeSlice<T> {
     protected constructor(private readonly backing: T[] | null, private readonly offset: number, readonly length: number, readonly capacity: number) {
     }
+    sourceLength(): number | bigint {
+        return this.length;
+    }
+    sourceCapacity(): number | bigint {
+        return this.capacity;
+    }
     static nil<T>(): RuntimeSlice<T> {
         return new RuntimeSlice<T>(null, 0, 0, 0);
     }
@@ -77,8 +83,10 @@ export class RuntimeSlice<T> {
         if (count === 0)
             return 0;
         if (targetBacking !== null && sourceBacking !== null) {
-            if (targetBacking === sourceBacking)
-                targetBacking.copyWithin(target.offset, source.offset, source.offset + count);
+            if (targetBacking === sourceBacking && target.offset > source.offset)
+                for (let index = count - 1; index >= 0; index--) {
+                    targetBacking[target.offset + index] = (source.offset + index in sourceBacking ? sourceBacking[source.offset + index] : GoPanic.raiseRuntime("dense storage index is absent")) as T;
+                }
             else
                 for (let index = 0; index < count; index++) {
                     targetBacking[target.offset + index] = (source.offset + index in sourceBacking ? sourceBacking[source.offset + index] : GoPanic.raiseRuntime("dense storage index is absent")) as T;

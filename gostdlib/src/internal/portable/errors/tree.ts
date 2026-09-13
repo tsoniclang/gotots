@@ -3,6 +3,7 @@ import {
   type GoError,
 } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 
 import { ProviderInterfaceValue } from "../io/value.js";
 
@@ -15,7 +16,7 @@ export abstract class WrappedProviderError extends ProviderInterfaceValue implem
     super(typeIdentity);
   }
 
-  abstract Error(): string;
+  abstract Error(): GoString;
 
   abstract Unwrap(): GoError | undefined;
 
@@ -23,7 +24,7 @@ export abstract class WrappedProviderError extends ProviderInterfaceValue implem
     if (verb === "T") {
       return "*fmt.wrapError";
     }
-    const message = this.Error();
+    const message = this.Error().text();
     return verb === "q" ? JSON.stringify(message) : message;
   }
 }
@@ -31,15 +32,18 @@ export abstract class WrappedProviderError extends ProviderInterfaceValue implem
 const messageWrappedErrorType = Object.freeze({ comparable: true });
 
 export class MessageWrappedError extends WrappedProviderError {
+  readonly #message: GoString;
+
   constructor(
-    private readonly message: string,
+    message: string,
     private readonly cause: GoError,
   ) {
     super(messageWrappedErrorType);
+    this.#message = GoString.fromText(message);
   }
 
-  Error(): string {
-    return this.message;
+  Error(): GoString {
+    return this.#message;
   }
 
   Unwrap(): GoError {
@@ -50,19 +54,21 @@ export class MessageWrappedError extends WrappedProviderError {
 const messageWrappedErrorsType = Object.freeze({ comparable: true });
 
 export class MessageWrappedErrors extends ProviderInterfaceValue implements GoError {
+  readonly #message: GoString;
   override readonly $go$methods: ReadonlySet<object> = new Set<object>([
     GoErrorMethodToken,
   ]);
 
   constructor(
-    private readonly message: string,
+    message: string,
     private readonly causes: readonly GoError[],
   ) {
     super(messageWrappedErrorsType);
+    this.#message = GoString.fromText(message);
   }
 
-  Error(): string {
-    return this.message;
+  Error(): GoString {
+    return this.#message;
   }
 
   Unwrap(): RuntimeSlice<GoError | undefined> {
@@ -73,6 +79,7 @@ export class MessageWrappedErrors extends ProviderInterfaceValue implements GoEr
     if (verb === "T") {
       return "*fmt.wrapErrors";
     }
-    return verb === "q" ? JSON.stringify(this.message) : this.message;
+    const message = this.#message.text();
+    return verb === "q" ? JSON.stringify(message) : message;
   }
 }

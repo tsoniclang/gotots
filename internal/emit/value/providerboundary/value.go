@@ -73,6 +73,9 @@ func fromProviderValueWithPolicy(
 			"provider boundary leaf policy is invalid",
 		)
 	}
+	if err := validateAggregateScalarABI(context, sourceType); err != nil {
+		return api.ExpressionEmission{}, false, err
+	}
 	converted, pointer, changed, err := fromProviderPointer(
 		context,
 		children,
@@ -245,6 +248,9 @@ func toProviderValueWithPolicy(
 			context,
 			"provider boundary leaf policy is invalid",
 		)
+	}
+	if err := validateAggregateScalarABI(context, sourceType); err != nil {
+		return api.ExpressionEmission{}, false, err
 	}
 	converted, pointer, changed, err := toProviderPointer(
 		context,

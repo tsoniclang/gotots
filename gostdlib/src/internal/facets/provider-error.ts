@@ -1,7 +1,7 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { bool } from "@gotots/gostdlib/internal/scalars.js";
+import type { bool, gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   MessageWrappedErrors,
@@ -12,7 +12,7 @@ import { sliceValues } from "../runtime/slice.js";
 import type { InterfaceGuard } from "./provider-support.js";
 
 export interface ProviderErrorInterface extends GoInterfaceValue {
-  Error(): string;
+  Error(): gostring;
 }
 
 export interface ProviderErrorIsDirect extends GoInterfaceValue {

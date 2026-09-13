@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 )
 
 func allocate(
@@ -16,6 +17,9 @@ func allocate(
 	element types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if array, ok := arrayvalue.Resolve(context, element); ok {
+		return array.PointerToValue(context, children, source, value)
+	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleCallArgument),
 		source,

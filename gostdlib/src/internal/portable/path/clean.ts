@@ -1,13 +1,15 @@
 import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 
 export function cleanSlashPath(path: gostring): gostring {
-  if (path.length === 0) {
-    return ".";
+  const text = path.text();
+  if (text.length === 0) {
+    return GoString.fromText(".");
   }
 
-  const rooted = path.startsWith("/");
-  const output: gostring[] = [];
-  for (const element of path.split("/")) {
+  const rooted = text.startsWith("/");
+  const output: string[] = [];
+  for (const element of text.split("/")) {
     if (element.length === 0 || element === ".") {
       continue;
     }
@@ -22,27 +24,27 @@ export function cleanSlashPath(path: gostring): gostring {
     output.push(element);
   }
 
-  if (rooted) {
-    return output.length === 0 ? "/" : `/${output.join("/")}`;
-  }
-  return output.length === 0 ? "." : output.join("/");
+  const result = rooted
+    ? output.length === 0 ? "/" : `/${output.join("/")}`
+    : output.length === 0 ? "." : output.join("/");
+  return result === text ? path : GoString.fromText(result);
 }
 
 export function joinSlashPath(elements: readonly gostring[]): gostring {
-  if (elements.every((element) => element.length === 0)) {
-    return "";
+  if (elements.every((element) => element.text().length === 0)) {
+    return GoString.empty;
   }
   let combined = "";
   for (const element of elements) {
     if (combined.length > 0) {
       combined += "/";
     }
-    combined += element;
+    combined += element.text();
   }
-  return cleanSlashPath(combined);
+  return cleanSlashPath(GoString.fromText(combined));
 }
 
 export function slashDir(path: gostring): gostring {
-  const slash = path.lastIndexOf("/");
-  return cleanSlashPath(slash < 0 ? "." : path.slice(0, slash + 1));
+  const slash = path.text().lastIndexOf("/");
+  return cleanSlashPath(slash < 0 ? GoString.fromText(".") : path.slice(0, slash + 1));
 }

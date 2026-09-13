@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "integerRepresentations": [
     "number",
     "fixed64-bigint",
@@ -8,6 +8,7 @@
   "providerIntegerRepresentation": "bigint",
   "providerScalarModule": "./internal/scalars.js",
   "providerPointerModule": "./internal/runtime/pointer.js",
+  "providerStringModule": "./internal/portable/utf8/codec.js",
   "nativeIntegerBits": 64,
   "primitiveAliases": [
     {
@@ -58,7 +59,7 @@
     {
       "id": 10,
       "export": "gostring",
-      "providerCarrier": "string"
+      "providerCarrier": "GoString"
     },
     {
       "id": 11,

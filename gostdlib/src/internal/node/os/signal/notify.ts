@@ -7,6 +7,7 @@ import type {
   Context,
 } from "../../../../context.js";
 import type { Signal } from "../../../../os.js";
+import type { gostring } from "../../../scalars.js";
 import { sliceValues } from "../../../runtime/slice.js";
 import { nodeSignal } from "../signal.js";
 
@@ -99,7 +100,7 @@ function startNotificationWithDone<Value>(
   return [context, stop];
 }
 
-export function selectedSignals<Value extends { String(): string }>(
+export function selectedSignals<Value extends { String(): gostring }>(
   signals: RuntimeSlice<Value | undefined>,
 ): NodeJS.Signals[] {
   const selected: NodeJS.Signals[] = [];
@@ -111,7 +112,7 @@ export function selectedSignals<Value extends { String(): string }>(
     if (signal === undefined) {
       continue;
     }
-    const name = nodeSignal(signal.String());
+    const name = nodeSignal(signal.String().text());
     if (name !== undefined && !selected.includes(name)) {
       selected.push(name);
     }

@@ -12,6 +12,8 @@ export interface BinaryEndianRepresentation
 export type BinaryBigEndianStorage = BinaryEndianRepresentation;
 
 export class BinaryBigEndianOperations {
+  static $assign(_target: BinaryEndianRepresentation, _source: BinaryEndianRepresentation): void {}
+
   static $copy(
     source: BinaryEndianRepresentation,
   ): BinaryEndianRepresentation {
@@ -45,6 +47,8 @@ export class BinaryBigEndianOperations {
 export type BinaryLittleEndianStorage = BinaryEndianRepresentation;
 
 export class BinaryLittleEndianOperations {
+  static $assign(_target: BinaryEndianRepresentation, _source: BinaryEndianRepresentation): void {}
+
   static $copy(
     source: BinaryEndianRepresentation,
   ): BinaryEndianRepresentation {
@@ -78,6 +82,8 @@ export class BinaryLittleEndianOperations {
 export type BinaryNativeEndianStorage = BinaryEndianRepresentation;
 
 export class BinaryNativeEndianOperations {
+  static $assign(_target: BinaryEndianRepresentation, _source: BinaryEndianRepresentation): void {}
+
   static $copy(
     source: BinaryEndianRepresentation,
   ): BinaryEndianRepresentation {

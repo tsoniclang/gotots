@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -96,6 +97,7 @@ func BuildSpecialization(
 		projectKey:     operations.projectKey,
 		reifyKey:       operations.reifyKey,
 		keyProjection:  operations.keyProjection,
+		stringKey:      operations.stringKey,
 		members:        memberNames,
 	}
 	var members []tsgo.ClassElement
@@ -193,6 +195,7 @@ type specializationOperationSet struct {
 	projectKey    operationBody
 	reifyKey      operationBody
 	keyProjection bool
+	stringKey     bool
 }
 
 func specializationOperations(
@@ -241,24 +244,23 @@ func specializationOperations(
 	}
 	key := context.Factory().Identifier("$key")
 	keyProjection := !types.Identical(mapType.Key(), keyType)
+	basicKey, isBasicKey := keyType.Underlying().(*types.Basic)
+	operations.stringKey = isBasicKey && basicKey.Info()&types.IsString != 0
 	var projectKey api.ExpressionEmission
 	var reifyKey api.ExpressionEmission
 	var projectKeyBody operationBody
 	var reifyKeyBody operationBody
 	if keyProjection {
-		projectKey, err = context.Values().ToStorage(
-			context.WithRole(api.RoleMapKey),
-			source,
-			mapType.Key(),
-			api.DirectExpression(key),
-		)
+		model, defined := definedtype.ResolveBasic(mapType.Key())
+		if !defined {
+			return specializationOperationSet{}, nil, &api.InvariantError{Role: context.Role(), Reason: "map key projection has no defined value owner"}
+		}
+		projectKey, err = model.Project(context.WithRole(api.RoleMapKey), api.DirectExpression(key))
 		if err != nil {
 			return specializationOperationSet{}, nil, err
 		}
-		reifyKey, err = context.Values().FromStorage(
+		reifyKey, err = model.Wrap(
 			context.WithRole(api.RoleMapKey),
-			source,
-			mapType.Key(),
 			api.DirectExpression(
 				context.Factory().Identifier("$storageKey"),
 			),

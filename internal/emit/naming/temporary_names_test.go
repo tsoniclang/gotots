@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"maps"
+	"reflect"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -153,6 +155,62 @@ func TestTemporaryReplayRollsBackFailedReconstruction(t *testing.T) {
 	}
 	if _, retained := file.generatedNames[partial]; retained {
 		t.Fatalf("failed replay temporary %q remains reserved", partial)
+	}
+}
+
+func TestTemporarySnapshotRetainsOnlyIndependentCounters(t *testing.T) {
+	onlyCounters := func(shape reflect.Type) bool {
+		return shape.NumField() == 1 && shape.Field(0).Type == reflect.TypeFor[map[api.TemporaryKind]uint64]()
+	}
+	if !onlyCounters(reflect.TypeFor[TemporarySnapshot]()) {
+		t.Fatal("artifact checkpoint retains file-wide state instead of only temporary counters")
+	}
+	control := reflect.TypeFor[struct {
+		counters map[api.TemporaryKind]uint64
+		names    map[string]struct{}
+	}]()
+	if onlyCounters(control) {
+		t.Fatal("retention control failed to detect a copied file-wide name registry")
+	}
+	file := &File{temporaries: map[api.TemporaryKind]uint64{api.TemporaryCompositeField: 7}}
+	snapshot := file.SnapshotTemporaries()
+	file.temporaries[api.TemporaryCompositeField] = 9
+	file.temporaries[api.TemporaryAssignmentValue] = 3
+	if len(snapshot.counters) != 1 || snapshot.counters[api.TemporaryCompositeField] != 7 {
+		t.Fatal("later allocations mutate the retained counter checkpoint")
+	}
+}
+
+func TestTemporaryReplayEmptyCheckpointPreservesRollbackState(t *testing.T) {
+	owner := temporaryTestOwner("Owner")
+	other := temporaryTestOwner("Other")
+	file := &File{
+		owner:           newNameOwner(nil, nil),
+		temporaries:     map[api.TemporaryKind]uint64{api.TemporaryCompositeField: 2},
+		generatedNames:  map[string]struct{}{"fieldValue": {}, "fieldValue2": {}},
+		temporaryOwners: map[string]api.ArtifactOwner{"fieldValue": owner, "fieldValue2": other},
+		importNames:     map[string]struct{}{"fieldValue3": {}},
+	}
+	originalCounters := maps.Clone(file.temporaries)
+	originalNames := maps.Clone(file.generatedNames)
+	originalOwners := maps.Clone(file.temporaryOwners)
+	finish, err := file.BeginTemporaryReplay(owner, TemporarySnapshot{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	file.artifactOwner = owner
+	first, err := file.Temporary(api.TemporaryCompositeField)
+	if err != nil || first != "fieldValue" {
+		t.Fatalf("empty checkpoint replay = %q, %v", first, err)
+	}
+	second, err := file.Temporary(api.TemporaryCompositeField)
+	if err != nil || second != "fieldValue4" {
+		t.Fatalf("replay did not reserve other-owner and import bindings: %q, %v", second, err)
+	}
+	finish(false)
+	if !maps.Equal(file.temporaries, originalCounters) || !maps.Equal(file.generatedNames, originalNames) ||
+		!maps.Equal(file.temporaryOwners, originalOwners) {
+		t.Fatal("rollback changed counters or another artifact's reservations")
 	}
 }
 

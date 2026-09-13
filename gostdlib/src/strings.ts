@@ -1,4 +1,5 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { Seq } from "./iter.js";
@@ -56,10 +57,10 @@ export function Lines(text: gostring): Seq<gostring> {
         GoPanic.raiseRuntime("call of nil yield function");
       }
       let remaining = text;
-      while (remaining.length > 0) {
-        const newline = remaining.indexOf("\n");
+      while (remaining.sourceLength() > 0) {
+        const newline = remaining.text().indexOf("\n");
         const line = newline < 0 ? remaining : remaining.slice(0, newline + 1);
-        remaining = newline < 0 ? "" : remaining.slice(newline + 1);
+        remaining = newline < 0 ? GoString.empty : remaining.slice(newline + 1);
         if (!yieldValue(line)) {
           return;
         }

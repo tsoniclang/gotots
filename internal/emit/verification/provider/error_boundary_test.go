@@ -376,7 +376,7 @@ func Message(failure error) string { return failure.Error() }
 	}
 	for _, required := range []string{
 		"Error(",
-		"const argument = \"provider\";",
+		"const argument = GoString.fromText(\"provider\");",
 		"errors__from_gostdlib.New(argument)",
 		"extends GoProviderInterfaceBridge<GoError> implements GoInterface",
 	} {

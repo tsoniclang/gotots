@@ -421,7 +421,7 @@ func TestGenericReceiverMethodWithoutRecoverDefersThroughOrdinaryEntry(t *testin
 				"export class Box<T>",
 				"static store$kernel<T>(",
 				"export function Box$store$int32",
-				"$kernel<int32>($argument0, ($argument0: int32): int32 =>",
+				"$kernel<int32>($argument0, ($argument0: int32, $argument1: int32): int32 =>",
 				"deferredCall",
 				"$go$recovery",
 			} {

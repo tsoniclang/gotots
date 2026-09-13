@@ -1,4 +1,5 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { bool, gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { escapePathSegment, escapeQuery } from "../internal/portable/url/escape.js";
@@ -24,15 +25,15 @@ class ParsedUserinfoValue extends Userinfo {
 }
 
 export class URL {
-  Scheme: gostring = "";
-  Opaque: gostring = "";
+  Scheme: gostring = GoString.empty;
+  Opaque: gostring = GoString.empty;
   User: Userinfo | undefined;
-  Host: gostring = "";
-  Path: gostring = "";
-  Fragment: gostring = "";
-  RawQuery: gostring = "";
-  RawPath: gostring = "";
-  RawFragment: gostring = "";
+  Host: gostring = GoString.empty;
+  Path: gostring = GoString.empty;
+  Fragment: gostring = GoString.empty;
+  RawQuery: gostring = GoString.empty;
+  RawPath: gostring = GoString.empty;
+  RawFragment: gostring = GoString.empty;
   ForceQuery: bool = false;
   OmitHost: bool = false;
 }
@@ -64,7 +65,7 @@ export function Parse(rawURL: gostring): [URL | undefined, GoError | undefined] 
     return [materializeURL(parseURL(rawURL)), undefined];
   } catch (failure) {
     if (failure instanceof URIError) {
-      return [undefined, new ProviderError(`parse ${JSON.stringify(rawURL)}: ${failure.message}`)];
+      return [undefined, ProviderError.fromText(`parse ${JSON.stringify(rawURL.text())}: ${failure.message}`)];
     }
     throw failure;
   }

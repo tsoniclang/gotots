@@ -377,6 +377,11 @@ func (s *programSession) scheduleReflectionInterfaceDemands() (
 	if err != nil {
 		return false, err
 	}
+	raw, err := s.registry.FlushReflectionRawPointerDemands()
+	if err != nil {
+		return false, err
+	}
+	requests = api.CombineRequests(requests, raw)
 	if len(requests) == 0 {
 		return false, nil
 	}
@@ -444,6 +449,10 @@ func compareCallableControlRequirements(
 		return -1
 	case leftControl > rightControl:
 		return 1
+	case leftControl == api.CallableControlIndirectMutation:
+		leftVariable, _ := left.IndirectMutationControl()
+		rightVariable, _ := right.IndirectMutationControl()
+		return emitordering.CompareObjects(leftVariable, rightVariable)
 	case leftControl == api.CallableControlIteratorReturn:
 		leftRange, leftOK := left.IteratorReturnControl()
 		rightRange, rightOK := right.IteratorReturnControl()
@@ -512,7 +521,8 @@ func artifactKinds(kind api.DeclarationRequirementKind) bool {
 		kind == api.DeclarationRequirementGenericCapability ||
 		kind == api.DeclarationRequirementCallableABI ||
 		kind == api.DeclarationRequirementReflectionType ||
-		kind == api.DeclarationRequirementReflectionValueOperations
+		kind == api.DeclarationRequirementReflectionValueOperations ||
+		kind == api.DeclarationRequirementReflectionRawPointer
 }
 
 func compareGeneratedArtifacts(

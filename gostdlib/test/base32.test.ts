@@ -68,9 +68,9 @@ function providerResult(): string {
   );
   return [
     text(encoded),
-    `${text(decoded)}:${decodedFailure?.Error() ?? ""}`,
-    `${text(partial)}:${partialFailure?.Error() ?? ""}`,
-    `${text(short)}:${shortFailure?.Error() ?? ""}`,
+    `${text(decoded)}:${decodedFailure?.Error().text() ?? ""}`,
+    `${text(partial)}:${partialFailure?.Error().text() ?? ""}`,
+    `${text(short)}:${shortFailure?.Error().text() ?? ""}`,
   ].join("|");
 }
 

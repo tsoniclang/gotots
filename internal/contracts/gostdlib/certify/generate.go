@@ -47,6 +47,7 @@ func Generate(config Config) ([]byte, error) {
 		providerPackage,
 		runtimeRequirements.ProviderScalarModule(),
 		runtimeRequirements.ProviderPointerModule(),
+		runtimeRequirements.ProviderStringModule(),
 		ordered,
 		seeds.facets,
 		seeds.callableProfiles,
@@ -86,6 +87,10 @@ func Generate(config Config) ([]byte, error) {
 		project,
 		runtimeRequirements,
 	); err != nil {
+		client.Close()
+		return nil, err
+	}
+	if err := verifyProviderStringContract(resolved, project, runtimeRequirements); err != nil {
 		client.Close()
 		return nil, err
 	}

@@ -67,6 +67,9 @@ func buildSymbol(
 	roundName string,
 	divideName string,
 ) (tsgo.Statement, bool) {
+	if storage, ok := storageDefinition(factory, symbol, name); ok {
+		return storage, true
+	}
 	switch symbol {
 	case api.RuntimeComplex64:
 		return buildClass(

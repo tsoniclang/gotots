@@ -17,6 +17,7 @@ type builder struct {
 }
 
 type Capabilities struct {
+	Data         bool
 	Address      bool
 	Storage      bool
 	AppendSlice  bool
@@ -59,6 +60,8 @@ func BuildWithCapabilities(
 	members := []tsgo.ClassElement{target.constructor()}
 	members = append(
 		members,
+		target.sourceCountMethod(MemberSourceLength, MemberLength),
+		target.sourceCountMethod(MemberSourceCapacity, MemberCapacity),
 		target.nilMethod(),
 		target.makeMethod(),
 		target.literalMethod(),
@@ -75,7 +78,7 @@ func BuildWithCapabilities(
 	if capabilities.AppendSlice {
 		members = append(
 			members,
-			target.appendSliceMethod(capabilities.Storage),
+			target.appendSliceMethod(),
 		)
 	}
 	if capabilities.Clear {
@@ -83,6 +86,9 @@ func BuildWithCapabilities(
 	}
 	if capabilities.Address {
 		members = append(members, target.addressMethod())
+	}
+	if capabilities.Data {
+		members = append(members, target.dataMethod())
 	}
 	if capabilities.Address || capabilities.ArrayPointer || capabilities.Region {
 		members = append(members, target.arrayLocationMethod())

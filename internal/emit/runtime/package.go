@@ -141,7 +141,14 @@ func assemblePackage(
 			}
 		}
 	}
-	closed, err := dependencyClosure(requested)
+	selectedRuntime := make(map[api.RuntimeSymbol]struct{}, len(requested)+1)
+	for symbol := range requested {
+		selectedRuntime[symbol] = struct{}{}
+	}
+	if slices.Contains(aliases, api.PrimitiveString) {
+		selectedRuntime[api.RuntimeStringValue] = struct{}{}
+	}
+	closed, err := dependencyClosure(selectedRuntime)
 	if err != nil {
 		return Package{}, err
 	}
@@ -183,6 +190,22 @@ func assemblePackage(
 			return Package{}, err
 		}
 		underlying := tsgo.TypeNode(factory.KeywordTypeNode(keyword))
+		if alias == api.PrimitiveString {
+			contract, contractErr := api.RuntimeContract(api.RuntimeStringValue)
+			if contractErr != nil {
+				return Package{}, contractErr
+			}
+			modulePath, pathErr := targetoutput.ModuleSpecifier(targetoutput.ScalarSupportPath, contract.OutputPath())
+			if pathErr != nil {
+				return Package{}, pathErr
+			}
+			request, requestErr := api.NewImportRequest(factory, api.ImportPhaseType, modulePath, contract.ExportedName(), contract.ExportedName())
+			if requestErr != nil {
+				return Package{}, requestErr
+			}
+			scalarImports = append(scalarImports, request)
+			underlying = factory.TypeReferenceNode(factory.Identifier(contract.ExportedName()), nil)
+		}
 		shared, selected, err := scalarcontract.SharedDeclaration(alias, scalar)
 		if err != nil {
 			return Package{}, err

@@ -373,7 +373,7 @@ func typeContainsCallableValue(
 	return false
 }
 
-const coreResolutionPath = "test/core-resolution/types.d.ts"
+const coreResolutionPath = "node_modules/@tsonic/core/types.d.ts"
 
 func verifyExportSourceRawPointers(config resolvedConfig, project *tsgo.ProjectInspection, evidence goObject, target tsgo.ProjectExport) error {
 	signature, ok := evidence.object.Type().(*types.Signature)

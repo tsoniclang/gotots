@@ -70,7 +70,7 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 			sliceRuntime := target.printed["runtime/slice.ts"]
 			for artifact, fragments := range map[string][]string{
 				"runtime/array.ts": {
-					"public $location():",
+					"$location():",
 					"function goArrayLocation",
 				},
 				"runtime/slice.ts": {

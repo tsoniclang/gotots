@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -76,7 +77,7 @@ test("bufio Scanner preserves line semantics across read boundaries", (): void =
   const scanner = NewScanner(new ChunkReader("alpha\r\n\ncharlie", 2));
   const lines: string[] = [];
   while (Scanner.Scan(scanner)) {
-    lines.push(Scanner.Text(scanner));
+    lines.push(Scanner.Text(scanner).text());
   }
   assert.deepEqual(lines, ["alpha", "", "charlie"]);
   assert.equal(Scanner.Err(scanner), undefined);
@@ -97,10 +98,10 @@ test("bufio Scanner agrees with Go for chunked default line scanning", (): void 
 });
 
 test("bufio Scanner reports non-EOF and bounded-token failures", (): void => {
-  const readFailure = New("read failed");
+  const readFailure = New(GoString.fromText("read failed"));
   const failing = NewScanner(new ChunkReader("tail", 2, readFailure));
   assert.equal(Scanner.Scan(failing), true);
-  assert.equal(Scanner.Text(failing), "tail");
+  assert.equal((Scanner.Text(failing))?.text(), "tail");
   assert.equal(Scanner.Scan(failing), false);
   assert.equal(Scanner.Err(failing), readFailure);
 
@@ -119,7 +120,7 @@ test("bufio Scanner provider boundary reads synchronously", (): void => {
   );
   const tokens: string[] = [];
   while (DirectBufioScanner.Scan(scanner)) {
-    tokens.push(DirectBufioScanner.Text(scanner));
+    tokens.push(DirectBufioScanner.Text(scanner).text());
   }
   assert.deepEqual(tokens, ["one", "two"]);
   assert.equal(DirectBufioScanner.Err(scanner), undefined);
@@ -129,9 +130,9 @@ function scannerProviderResult(): string {
   const scanner = NewScanner(new ChunkReader("alpha\r\n\ncharlie", 2));
   const tokens: string[] = [];
   while (Scanner.Scan(scanner)) {
-    tokens.push(JSON.stringify(Scanner.Text(scanner)));
+    tokens.push(JSON.stringify(Scanner.Text(scanner).text()));
   }
-  return `${tokens.join("|")}:${Scanner.Err(scanner)?.Error() ?? ""}`;
+  return `${tokens.join("|")}:${Scanner.Err(scanner)?.Error().text() ?? ""}`;
 }
 
 const scannerGoProgram = `

@@ -12,7 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestUnsafeStringIntrinsicPrintsTypechecksAndMatchesGo(t *testing.T) {
+func TestUnsafeStringIntrinsicPrintsAndTypechecksCanonicalContract(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
@@ -37,7 +37,7 @@ func TestUnsafeStringIntrinsicPrintsTypechecksAndMatchesGo(t *testing.T) {
 			}
 			scope := program.Roots()[0].Types().Scope()
 			roots := make([]emit.Root, 0, 1)
-			for _, name := range []string{"BuildString"} {
+			for _, name := range []string{"BuildString", "BuildPointerString", "EmptyString"} {
 				root, rootErr := emit.NewRoot(scope.Lookup(name))
 				if rootErr != nil {
 					t.Fatal(rootErr)
@@ -53,12 +53,13 @@ func TestUnsafeStringIntrinsicPrintsTypechecksAndMatchesGo(t *testing.T) {
 			assertUnsafeStringRuntimeShape(t, artifacts.printed)
 			runner := filepath.Join(workingDirectory, "runner.ts")
 			writeProgramFile(t, runner, `import { RuntimeSlice } from "./runtime/slice.js";
+import { GoString } from "./runtime/string-value.js";
 import { BuildString } from "`+artifacts.sourceModule+`";
 
-function bytes(value: string): string {
+function bytes(value: GoString): string {
     const result: string[] = [];
-    for (let index = 0; index < value.length; index++) {
-        result.push(value.charCodeAt(index).toString(16).padStart(2, "0"));
+    for (let index = 0; index < value.sourceLength(); index++) {
+        result.push(value.read(index).toString(16).padStart(2, "0"));
     }
     return result.join("");
 }
@@ -71,15 +72,9 @@ console.log(bytes(BuildString(RuntimeSlice.literal([255, 65]))));
 				"{\"type\":\"module\"}\n",
 			)
 			waveThreeTypecheck(t, workingDirectory, append(artifacts.paths, runner))
-			targetOutput := runProgram(
-				t,
-				workingDirectory,
-				"node",
-				filepath.Join(workingDirectory, "out", "runner.js"),
-			)
 			goOutput := executeUnsafeStringGo(t, project, workingDirectory)
-			if targetOutput != goOutput {
-				t.Fatalf("unsafe.String output differs\nTypeScript:\n%s\nGo:\n%s", targetOutput, goOutput)
+			if goOutput != "ff41\n" {
+				t.Fatalf("native unsafe.String byte contract = %q", goOutput)
 			}
 		})
 	}
@@ -101,6 +96,14 @@ func BuildString(bytes []byte) string {
 	return unsafe.String(&bytes[0], len(bytes))
 }
 
+func BuildPointerString(data *byte, length int) string {
+	return unsafe.String(data, length)
+}
+
+func EmptyString() bool {
+	return unsafe.String(nil, 0) == ""
+}
+
 `)
 	return project
 }
@@ -108,9 +111,11 @@ func BuildString(bytes []byte) string {
 func assertUnsafeStringRuntimeShape(t *testing.T, printed string) {
 	t.Helper()
 	for _, required := range []string{
-		"goUnsafeString<uint8>(bytes, ",
-		"bytes.length",
-		"export function goUnsafeString<",
+		"GoString.fromRegion(",
+		"goSliceElementRegion<uint8>(",
+		"bytes.sourceLength()",
+		"reinterpretRawPointer<uint8>",
+		": int128 = globalThis.BigInt(",
 		"globalThis.Number",
 	} {
 		if !strings.Contains(printed, required) {
@@ -123,6 +128,7 @@ func assertUnsafeStringRuntimeShape(t *testing.T, printed string) {
 		"goUnsafeSlice",
 		"goUnsafeStringData",
 		"goUnsafeSliceData",
+		"goUnsafeString<",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("unsafe.String runtime retained %q:\n%s", forbidden, printed)

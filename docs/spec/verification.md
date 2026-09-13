@@ -97,6 +97,15 @@ Every checkpoint runs, in dependency order:
 11. selected-target AST transform and strict output checks;
 12. applicable differential/runtime and artifact-size gates.
 
+Provider-linked Go tests require built provider declarations and runtime files.
+Before the full Go suite, complete `npm --prefix gostdlib run check`, then
+`npm --prefix externals run check`, under the same guarded, serial policy.
+After a runtime generator change, refresh its committed fixture through
+`npm --prefix gostdlib run runtime:generate` and review that generated diff.
+A failed provider build may have removed `dist`; restore the dependency build
+before running consumers rather than interpreting missing files as compiler
+semantic failures.
+
 Heavy jobs run one at a time in `.temp/`, with explicit timeout,
 `GOMEMLIMIT`, low `GOMAXPROCS`, disk-backed logs, and breadcrumbs. Failure
 artifacts remain available so timeout, OOM, type error, and semantic mismatch
@@ -469,7 +478,15 @@ keys and fail before product runtime certification. The same fixture under
 Host-boundary string proof writes valid multibyte UTF-8, NUL, and invalid UTF-8
 through the selected `os.File.WriteString` provider and exact-compares the raw
 file bytes and reported byte count with Go. A direct codec round trip proves
-the one-code-unit-per-byte representation. Passing the canonical Go string to
+the one-code-unit-per-byte representation. Pointer-backed materialization must
+prove numeric iteration over safe intervals, exact beyond-safe callback
+positions, read-free empty views, live backing updates, holes and fractional
+offset rejection. Restoring an unconditional BigInt loop must fail its AST
+shape gate; neither descriptor identity nor byte behavior may change. Character
+materialization uses bounded batches, with exact tests across complete and
+partial batch boundaries, all 256 byte values and missing elements in later
+batches. No mutable backing cache or host text decoder may replace byte reads.
+Passing the canonical Go string to
 Node's string-writing overload must fail this gate by double-encoding the
 multibyte bytes; conversion by decoded host text must fail the invalid-UTF-8
 case.
@@ -541,6 +558,18 @@ lower in one AST pass; a same-spelled local function remains ordinary code.
 Mutations that restore object-only binding, fabricate native addresses, drop
 layout operands, select markers by spelling, or fabricate facts must fail.
 Declaration-only resolution fixtures never count as semantic certification.
+
+Read-free pointer-view fixtures must include nil and non-nil empty slices,
+one-past slice windows, pointer-backed regions, callback read/write counters,
+and nonempty copy/store controls. The emitted slice-array converter must not
+load or store its base element. Field-binding fixtures must cover ordinary and
+physical record round trips, descriptor replacement, array/nested fields,
+and an unchanged scalar field whose address was taken before conversion.
+Exact field descriptors are reused, not regenerated for the binding call.
+Ordinary getter/setter forwarding is a negative identity control. The target
+must reject missing or changed binding/view facts before printing and must
+not demand byte codecs for binding-only layouts. Native preservation does
+not count as JavaScript execution proof.
 
 ## Struct, Receiver, And Embedding Proof
 
@@ -1576,6 +1605,60 @@ Every material checkpoint reports absolute values and parent deltas for:
 Aggregate improvement cannot hide a worsening tail. A material increase
 without typed necessity reopens the owner; thresholds are not raised to absorb
 it.
+
+### Canonical Memory Source-Size Calibration
+
+The maintainer approved the following bounded recalibration on 2026-09-12 for
+the canonical string, backing-region and pointer-view contracts. It supersedes
+the earlier two-total request; it is not permission to raise other limits.
+The baseline is GoToTS `9cf7f865`, using the existing fixtures, root selections,
+profiles and pinned TS-Go printer. Bytes are printed TypeScript source bytes;
+nodes are encoded TS-Go AST nodes, not JavaScript size or runtime allocation.
+
+| Existing gate | Measured baseline | Previous limit | Approved limit |
+| --- | ---: | ---: | ---: |
+| Wave 3 expression matrix, each integer profile | 62,823 bytes / 13,520 nodes | 55,000 / 11,250 | 64,000 / 14,000 |
+| Wave 7 `runtime/slice.ts:RuntimeSlice` declaration | 7,738 bytes / 1,582 nodes | 7,500 / 1,525 | 8,000 / 1,650 |
+| Wave 9 serial-execution fixture | 137,239 bytes | 133,000 | 140,000 |
+
+The previously quoted Wave 3 62,792/13,514 and Wave 9 137,208 totals precede
+the baseline above. Fresh accounting and the completed pre-recalibration suite
+agree on the current totals. Remaining headroom is 1,177 bytes/480 nodes for
+Wave 3, 262 bytes/68 nodes for RuntimeSlice, and 2,761 bytes for Wave 9.
+
+Per-file accounting separates the affected support families from the rest of
+each complete fixture. Wave 3 has 20 files; Wave 9 has 34. The two Wave 3
+integer profiles have identical totals here; that is measured, not assumed.
+
+| Emitted source | Wave 3 bytes / nodes | Wave 9 bytes / nodes |
+| --- | ---: | ---: |
+| `runtime/string-value.ts` | 3,909 / 826 | 3,909 / 826 |
+| `runtime/string.ts` | 188 / 45 | Not selected |
+| `runtime/memory-view.ts` | 1,893 / 467 | 1,532 / 358 |
+| `runtime/slice.ts` | 14,559 / 3,146 | 5,794 / 1,196 |
+| All remaining fixture files | 42,274 / 9,036 | 126,004 / 21,213 |
+| Total | 62,823 / 13,520 | 137,239 / 23,593 |
+
+These rows account for current artifacts, not a claim that every listed byte
+was newly added. The separately measured RuntimeSlice declaration is already
+inside its fixture's slice module and must not be added to module totals.
+String support retains backing and descriptor identity. Region and slice
+support retain aliasing, exact view boundaries and non-nil zero-length views;
+for example, `unsafe.Slice(&window[0], n)` must use the selected backing rather
+than copy the currently visible values. Removing that evidence to recover an
+old total would weaken the canonical contract. This recalibration changes no
+emitted source or runtime behavior.
+
+Only the exact RuntimeSlice declaration receives its new class limit. Every
+other generic class retains 7,500 bytes/1,525 nodes; generic aliases, functions
+and capability limits are unchanged. Wave 3 still permits only one
+concretization, at most 850 concretization bytes, and zero capabilities. Its
+largest-file cap remains 25,000 bytes (measured 24,904). Wave 9 retains 30,000
+bytes (measured 25,668), all synchronous-only checks, strict typechecking and
+the unchanged exact Go/TypeScript execution comparison. Runtime/performance,
+timeout, memory and concurrency limits are unchanged. Run the owning tests
+and the complete Go gate after this batch; a passing size gate is not evidence
+of full-product target validation, runtime parity or performance certification.
 
 The declaration-order gate places declarations from two source files into one
 target module, deliberately reverses their raw `token.Pos` allocation order,

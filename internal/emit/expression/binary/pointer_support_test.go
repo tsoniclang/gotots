@@ -24,3 +24,19 @@ func (unusedValues) ProjectStoragePointer(
 ) (api.ExpressionEmission, error) {
 	panic("unused")
 }
+
+func (unusedValues) MemoryStorageType(api.Context, ast.Node, types.Type) (api.TypeEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) ToMemoryStorage(api.Context, ast.Node, types.Type, api.ExpressionEmission) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) FromMemoryStorage(api.Context, ast.Node, types.Type, api.ExpressionEmission) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) ProjectMemoryPointer(api.Context, ast.Node, types.Type, api.ExpressionEmission) (api.ExpressionEmission, error) {
+	panic("unused")
+}

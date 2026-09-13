@@ -56,6 +56,28 @@ ancestor. Imports and preferred-static declarations request file scope.
 
 ## Declarations And Names
 
+Addressable aggregate storage has stable identity. Assigning an array or
+struct copies values into its existing slots recursively; it must not detach
+previously captured element pointers, field pointers or slice views. Map
+entries remain non-addressable copying accessors and replace their values.
+For example, after `p := &a[0]; a = [2]int{3, 4}`, `*p` is 3. After
+`s := record.Values[:]; record = replacement`, `s` still views that same
+array field's storage. The store-location owner preserves this distinction
+through capture and canonical/container representation projection; nested
+aggregate assignment uses the existing demand-owned assignment operations.
+Unknown type parameters request one private assignment capability whose exact
+concrete selection preserves aggregate storage or replaces a scalar/reference
+value. It must not default to slot replacement merely because the enclosing
+source is generic; its source-facing signature remains unchanged.
+
+An array's address and its slice-to-array-pointer view share one backing
+location identity: `&a == (*[2]int)(a[:])` is true. This applies to local,
+package, field, indexed and allocated arrays, including zero-length views of
+the same array. It does not require distinct zero-sized allocations to have
+distinct addresses. `&*p` retains p's identity but still panics if p is nil,
+as required by the selected Go address-operator contract. These storage rules
+do not by themselves establish byte-addressability or a native array ABI.
+
 The exact selected `runtime.KeepAlive` declaration maps to one generated
 one-argument, void-returning callable. Its body invokes the public neutral
 `keepAlive` marker on the ordinary Go interface carrier. Name resolution owns
@@ -653,6 +675,16 @@ zero owner. A
 certified provider may expose a positional `$make` operation; ordinary
 generated structs never gain that compatibility factory.
 
+Stable assignment to a provider-owned struct requires its certified assignment
+operation, just as copying requires its certified copy operation. Absence of
+an assignment facet never authorizes rebinding or inference of immutability.
+For reflection values, copying duplicates the descriptor payload and assignment
+updates the destination descriptor. A copied addressable descriptor still
+refers to the same reflected location; it does not copy the reflected value.
+Thus assigning a copy of `reflect.ValueOf(1)` to `reflect.ValueOf(2)` cannot
+change the first descriptor, while `SetInt` through a copy of
+`reflect.ValueOf(&number).Elem()` must still update `number`.
+
 ### Arrays And Slices
 
 Arrays have fixed length and Go value-copy semantics. Slices have descriptor
@@ -825,6 +857,13 @@ a private same-shaped brand fails. A reflected supported typed pointer uses a
 generated `toRawPointer(pointer, exactLayout)` callback; reflection forwards
 that value after the exact box guard. Reflecting an already-raw value preserves
 it. Nil remains nil. No address is synthesized by casting a provider object.
+Physical pointer callbacks are demanded only when the exact certified
+`reflect.Value.UnsafePointer` declaration is selected. Its distinct declaration
+requirement requeues already-emitted value descriptors and covers later
+descriptors through the same root scheduler. Ordinary reflective field access
+does not acquire physical layouts or conversion codecs. Header layout support
+alone does not establish a transport for its backing elements; unsupported
+transports keep the provider's explicit operation boundary.
 The callback parameter retains its explicit logical `Pointer<T> | undefined`
 annotation from the normal Go type owner. Contextual callable inference alone
 is not evidence for a neutral pointee marker domain. Storage projections keep
@@ -864,8 +903,14 @@ The marker imports resolve to the canonical `@tsonic/core/lang.js`
 declarations. A target consumes the finalized schema; neither the `$Storage`
 name nor an object-shaped type alias establishes value semantics. The schema
 is compile-time representation evidence, not a second runtime instance.
-Generic physical memory remains an explicit unsupported boundary; generic
-logical storage aliases do not claim an executable memory layout.
+Closed generic physical records use their concretely substituted storage
+schemas. Open generic physical memory remains unsupported; a generic logical
+storage alias alone does not establish an executable memory layout.
+Blank Go fields retain their exact selected-ABI slots under the same closed
+physical-field name owner used by storage construction. They do not become
+source-visible properties. Pointer-bearing blank slots are not erased into
+untyped padding, and trailing zero-sized fields retain the Go-selected record
+size and stride rather than a sum of child sizes.
 The emitter constructs
 `memoryLayout<Pair$Storage>(abi, 8, 4, 8, ...)` with selectors of `First` at
 offset 0 and `Second` at offset 4. `projectPointer` uses `Pair.$storageOf` and
@@ -873,6 +918,70 @@ offset 0 and `Second` at offset 4. `projectPointer` uses `Pair.$storageOf` and
 in both directions. Layout metadata must never attach to logical accessors.
 This preserves the source contract; an executable target still needs an exact
 aggregate codec or must reject it. It is not a claim of Node aggregate support.
+
+Records containing strings, slices or arrays distinguish ordinary field
+storage from their raw-memory projection. For example, `type Holder struct {
+Text string; Values []uint32 }` keeps a `GoString` and a `RuntimeSlice<uint32>`
+in ordinary storage. Assigning `holder.Text = text` does not produce a raw
+address. A selected `unsafe.Pointer(&holder)` instead requests physical fields
+containing the string's data/length and the slice's data/length/capacity under
+the selected ABI. The value owner supplies typed inverse field projections;
+native targets consume their exact layouts, not wrapper names. A raw write
+commits the updated descriptor through the owning slot. Copies made before
+that replacement retain their original backing and bounds. This is not a
+requirement for the JavaScript target to implement every aggregate codec.
+
+String materialization retains those live backing reads. Its iteration may
+use number integers only when the complete start/length interval is proven
+exactly representable; larger offsets retain BigInt arithmetic. Both paths use
+the same region-read owner and preserve byte order, holes, validation and view
+aliasing. Do not cache pointer-backed text or discard its canonical descriptor
+to avoid materialization cost. Materialize numeric intervals with a reusable
+4,096-byte character batch rather than one string concatenation per byte;
+spread arity stays bounded and the final partial batch is emitted exactly.
+
+Complex storage uses the same value-record contract, not the logical arithmetic
+class. A `complex64` storage schema has `real: float32` and `imag: float32`
+fields at offsets 0 and 4; `complex128` uses `float64` at offsets 0 and 8.
+Each child has its selected-source scalar layout. Whole size, alignment and
+stride come from the selected Go ABI, including architectures where component
+alignment differs from its width. The value-representation owner supplies both
+inverse conversions; named complex types reuse their existing nominal owner.
+Record fields and container elements use that same storage selection, while
+ordinary complex arithmetic keeps its existing immutable logical carrier.
+Schemas and conversions are emitted once per requested complex width. Merely
+performing arithmetic does not request raw-memory descriptors or codecs.
+
+Physical array fields use `FixedArray<ElementStorage, Extent>`. For example,
+`[2][3]uint32` stores two arrays of three uint32 elements, not one flattened
+array and not two logical window objects. Ordinary array value copies retain
+the existing element-copy policy. A raw view instead retains the selected
+backing element address, including a slice-derived array pointer's offset;
+converting that view never invokes a copying value projection. Empty and
+zero-sized shapes retain their exact source extents, including bigint literal
+extents, without synthesizing a record field for each element. The source
+array owner and the storage owner share one extent selection.
+
+`unsafe.SliceData` reuses the selected slice's retained data location. Nil
+slices produce nil pointers. A non-nil view with positive capacity addresses
+its first backing element, even when its length is zero; a non-nil view with
+zero capacity selects a non-nil unspecified typed location. Element storage
+and inverse pointer projections remain owned by the ordinary slice/value
+representation path. The slice expression is evaluated once. This operation
+does not infer a physical slice-header layout or require raw-byte emulation.
+Element zero construction is deferred until the non-nil, zero-capacity branch;
+nil and retained-data queries must not construct an unused aggregate value.
+
+For `unsafe.String(&slice[index], length)` and
+`unsafe.Slice(&slice[index], length)`, the unsafe-view owner retains the
+selected slice's existing typed backing region and shifts its offset. It
+checks the original address index against the original slice length after
+the argument calls execute in source order. The backing is not reduced to one
+element or to the original slice length. Both operands are evaluated once;
+later descriptor replacement cannot retarget the captured backing. Named
+slices use their existing projection. Pointer-only arguments retain the
+canonical raw-pointer contract; this direct source case does not authorize
+guessing pointer origins or implementing a JavaScript byte-memory emulator.
 
 ### Interfaces
 
@@ -1718,6 +1827,21 @@ certifies those bindings; retaining an import of its generated source file is
 not an admissible private dependency.
 
 ## Failure
+
+Go comparisons do not permanently refine mutable storage. A source variable
+whose address is exposed, a captured write, or an indirectly accessed scalar
+may change after a call even when the TypeScript checker cannot observe that
+write. Preserve such comparison and control-selection results in mutable local
+snapshots so TypeScript cannot propagate a stale literal refinement to the
+original storage. Address-taking and captured stores request exact checked
+variable identities through the existing callable-control reconstruction
+owner. Implicit pointer receivers use the same address owner; range assignments
+use the same store owner. Re-emission applies discovered requirements to the
+whole callable, including earlier comparisons. There is no preparatory AST
+walk, copied source graph or call/effect analysis. Keep
+isolated local comparisons direct. Preserve short-circuit and switch evaluation
+order. Do not repair stale refinement with casts, suppressions, changed source
+fixtures or additional runtime dispatch.
 
 Translation fails at the owning occurrence when:
 

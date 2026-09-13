@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -33,23 +34,23 @@ import type { Writer } from "../src/io.js";
 test("base64 standard encoding round-trips bytes and rejects corrupt input", () => {
   const encoding = requireEncoding(state.StdEncoding);
   const source = RuntimeSlice.literal([0x66, 0x6f, 0x6f]);
-  assert.equal(Encoding.EncodeToString(encoding, source), "Zm9v");
+  assert.equal((Encoding.EncodeToString(encoding, source))?.text(), "Zm9v");
   assert.equal(Encoding.EncodedLen(encoding, 4n), 8n);
-  const [decoded, failure] = Encoding.DecodeString(encoding, "Zm9v");
+  const [decoded, failure] = Encoding.DecodeString(encoding, GoString.fromText("Zm9v"));
   assert.equal(failure, undefined);
   assert.deepEqual(sliceValues(decoded), sliceValues(source));
 
-  const [partial, corrupt] = Encoding.DecodeString(encoding, "Zm8=");
+  const [partial, corrupt] = Encoding.DecodeString(encoding, GoString.fromText("Zm8="));
   assert.equal(corrupt, undefined);
   assert.deepEqual(sliceValues(partial), [0x66, 0x6f]);
-  const [, missingPadding] = Encoding.DecodeString(encoding, "Zg=");
+  const [, missingPadding] = Encoding.DecodeString(encoding, GoString.fromText("Zg="));
   assert.notEqual(missingPadding, undefined);
-  assert.equal(missingPadding?.Error(), "illegal base64 data at input byte 3");
-  const [trailing, trailingFailure] = Encoding.DecodeString(encoding, "Zg===");
+  assert.equal((missingPadding?.Error())?.text(), "illegal base64 data at input byte 3");
+  const [trailing, trailingFailure] = Encoding.DecodeString(encoding, GoString.fromText("Zg==="));
   assert.deepEqual(sliceValues(trailing), [0x66]);
-  assert.equal(trailingFailure?.Error(), "illegal base64 data at input byte 4");
-  const [, shortFailure] = Encoding.DecodeString(encoding, "Zg");
-  assert.equal(shortFailure?.Error(), "illegal base64 data at input byte 0");
+  assert.equal((trailingFailure?.Error())?.text(), "illegal base64 data at input byte 4");
+  const [, shortFailure] = Encoding.DecodeString(encoding, GoString.fromText("Zg"));
+  assert.equal((shortFailure?.Error())?.text(), "illegal base64 data at input byte 0");
 });
 
 test("base64 representation assignment preserves identity and copies state", () => {
@@ -60,8 +61,8 @@ test("base64 representation assignment preserves identity and copies state", () 
   Base64EncodingOperations.$assign(target, url);
 
   const source = RuntimeSlice.literal([0xff, 0xef]);
-  assert.equal(Encoding.EncodeToString(target, source), "_-8=");
-  assert.equal(Encoding.EncodeToString(standard, source), "/+8=");
+  assert.equal((Encoding.EncodeToString(target, source))?.text(), "_-8=");
+  assert.equal((Encoding.EncodeToString(standard, source))?.text(), "/+8=");
 });
 
 test("base32 representation assignment preserves identity and copies state", () => {
@@ -98,7 +99,7 @@ test("base64 stream encoder preserves Go write chunk boundaries", () => {
   assert.deepEqual(writer.lengths(), [1024, 1024, 4, 4]);
   assert.equal(
     writer.text(),
-    Encoding.EncodeToString(requireEncoding(state.StdEncoding), source),
+    Encoding.EncodeToString(requireEncoding(state.StdEncoding), source).text(),
   );
 });
 
@@ -136,7 +137,7 @@ test("base64 append operations agree with Go on corrupt input", (): void => {
 });
 
 test("hex encodes every byte with lower-case digits", () => {
-  assert.equal(EncodeHex(RuntimeSlice.literal([0x00, 0x0f, 0x10, 0xff])), "000f10ff");
+  assert.equal((EncodeHex(RuntimeSlice.literal([0x00, 0x0f, 0x10, 0xff])))?.text(), "000f10ff");
 });
 
 class CapturingWriter extends GoInterfaceValue implements Writer {
@@ -216,8 +217,8 @@ function base64AppendProviderResult(): string {
   );
   return [
     byteText(encoded),
-    `${byteText(decoded)}:${decodedFailure?.Error() ?? ""}`,
-    `${byteText(partial)}:${partialFailure?.Error() ?? ""}`,
+    `${byteText(decoded)}:${decodedFailure?.Error().text() ?? ""}`,
+    `${byteText(partial)}:${partialFailure?.Error().text() ?? ""}`,
   ].join("|");
 }
 

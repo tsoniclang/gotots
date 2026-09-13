@@ -19,7 +19,7 @@ func typeParameters(factory tsgo.Factory) []tsgo.TypeParameterDeclaration {
 		factory.TypeParameterDeclaration(
 			nil,
 			factory.Identifier("N"),
-			factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
+			indexType(factory),
 			nil,
 			nil,
 		),

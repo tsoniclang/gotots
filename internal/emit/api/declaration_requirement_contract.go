@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+
+	controlcontract "github.com/tsoniclang/gotots/internal/emit/api/control"
 )
 
 type DeclarationRequirement struct {
@@ -41,6 +43,7 @@ type DeclarationRequirement struct {
 	controlPosition        token.Pos
 	controlRange           *ast.RangeStmt
 	controlDefer           *ast.DeferStmt
+	controlVariable        *types.Var
 }
 
 func NewNamedStructOperationRequirement(
@@ -504,4 +507,35 @@ func (r DeclarationRequirement) ValueReceiverCopy() (
 	method, ok := r.owner.Source()
 	selected, methodOK := method.(*types.Func)
 	return selected, ok && methodOK
+}
+
+func NewDirectCallableControlRequirement(
+	owner *types.Func,
+	control CallableControlFacet,
+) (DeclarationRequirement, error) {
+	if owner == nil ||
+		owner.Origin() != owner ||
+		!control.Valid() ||
+		control == CallableControlGoto ||
+		control == CallableControlIteratorReturn ||
+		control == CallableControlIndirectMutation {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "direct callable-control requirement is invalid",
+		}
+	}
+	return DeclarationRequirement{
+		owner:   MustSourceArtifactOwner(owner),
+		kind:    DeclarationRequirementCallableControl,
+		control: control,
+	}, nil
+}
+
+func NewIndirectMutationRequirement(owner ArtifactOwner, enclosing ast.Node, callable ast.Node, variable *types.Var) (DeclarationRequirement, error) {
+	if !controlcontract.ValidAnchor(owner, enclosing, callable) || !controlcontract.ValidIndirectVariable(owner, enclosing, variable) {
+		return DeclarationRequirement{}, &RootRequestError{Reason: "indirect mutation requires an exact contained local variable"}
+	}
+	return DeclarationRequirement{
+		owner: owner, kind: DeclarationRequirementCallableControl, enclosing: enclosing,
+		callable: callable, control: CallableControlIndirectMutation, controlVariable: variable,
+	}, nil
 }

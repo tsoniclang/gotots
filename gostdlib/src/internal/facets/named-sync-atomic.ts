@@ -13,6 +13,10 @@ export class SyncAtomicBoolOperations {
     return new Bool(Bool.Load(source));
   }
 
+  static $assign(target: Bool, source: Bool): void {
+    Bool.Store(target, Bool.Load(source));
+  }
+
   static $equal(left: Bool, right: Bool): boolean {
     return Bool.Load(left) === Bool.Load(right);
   }
@@ -39,6 +43,10 @@ export class SyncAtomicInt32Operations {
 
   static $copy(source: Int32): Int32 {
     return new Int32(Int32.Load(source));
+  }
+
+  static $assign(target: Int32, source: Int32): void {
+    Int32.Store(target, Int32.Load(source));
   }
 
   static $equal(left: Int32, right: Int32): boolean {
@@ -69,6 +77,10 @@ export class SyncAtomicInt64Operations {
     return new Int64(Int64.Load(source));
   }
 
+  static $assign(target: Int64, source: Int64): void {
+    Int64.Store(target, Int64.Load(source));
+  }
+
   static $equal(left: Int64, right: Int64): boolean {
     return Int64.Load(left) === Int64.Load(right);
   }
@@ -97,6 +109,10 @@ export class SyncAtomicUint32Operations {
     return new Uint32(Uint32.Load(source));
   }
 
+  static $assign(target: Uint32, source: Uint32): void {
+    Uint32.Store(target, Uint32.Load(source));
+  }
+
   static $equal(left: Uint32, right: Uint32): boolean {
     return Uint32.Load(left) === Uint32.Load(right);
   }
@@ -123,6 +139,10 @@ export class SyncAtomicUint64Operations {
 
   static $copy(source: Uint64): Uint64 {
     return new Uint64(Uint64.Load(source));
+  }
+
+  static $assign(target: Uint64, source: Uint64): void {
+    Uint64.$assign(target, source);
   }
 
   static $equal(left: Uint64, right: Uint64): boolean {

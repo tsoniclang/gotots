@@ -316,7 +316,8 @@ print(...ArrayKeyLifecycle());
 print(...StructKeyLifecycle());
 print(...AnonymousShapeLifecycle());
 print(...CollisionEquality());
-print(...NamedKeyLifecycle());
+const [found, present, key, deleted] = NamedKeyLifecycle();
+print(found, present, key.text(), deleted);
 print(LiteralOrder());
 `)
 	writeFile(
@@ -352,16 +353,16 @@ func assertProjectedPrimitiveMap(t *testing.T, artifacts materialized) {
 		t.Fatalf("defined-string key map specialization is absent; classes=%v", names)
 	}
 	for _, required := range []string{
-		"private readonly values: Map<gostring, int32>",
+		"private readonly values: Map<string, [gostring, int32]>",
 		"private static $projectKey($key: Label__from_aggregatemap): gostring",
 		"private static $reifyKey($storageKey: gostring): Label__from_aggregatemap",
-		"values.get(storageKey)",
-		"values.set(storageKey, ",
-		"values.has(storageKey)",
-		"values.delete(storageKey)",
-		"result.push(",
+		"values.get(storageKey.text())",
+		"values.set(storageKey.text(), [storageKey, ",
+		"values.has(storageKey.text())",
+		"values.delete(storageKey.text())",
+		"Array.from(values.values()",
 	} {
-		if !strings.Contains(selected, required) {
+		if !strings.Contains(strings.Join(strings.Fields(selected), ""), strings.Join(strings.Fields(required), "")) {
 			t.Fatalf("defined-string native map lacks %q:\n%s", required, selected)
 		}
 	}
@@ -370,8 +371,7 @@ func assertProjectedPrimitiveMap(t *testing.T, artifacts materialized) {
 		"$equal(",
 		"$find(",
 		"buckets",
-		"Map<gostring, [",
-		"values.set(storageKey, [",
+		"values.set(storageKey, ",
 	} {
 		if strings.Contains(selected, forbidden) {
 			t.Fatalf("defined-string native map contains %q:\n%s", forbidden, selected)

@@ -38,12 +38,12 @@ export class Reader {
       return target;
     };
     equalReaderRepresentation = (left: Reader, right: Reader): boolean => (
-      left.#source === right.#source &&
+      left.#source.text() === right.#source.text() &&
       left.#offset === right.#offset &&
       left.#previousRune === right.#previousRune
     );
     hashReaderRepresentation = (source: Reader): number => {
-      let hash = GoMapHash.string(source.#source);
+      let hash = GoMapHash.string(source.#source.text());
       hash = GoMapHash.mix(hash, GoMapHash.number(source.#offset));
       return GoMapHash.mix(hash, GoMapHash.number(source.#previousRune));
     };
@@ -57,12 +57,12 @@ export class Reader {
       GoPanic.raiseRuntime("nil *strings.Reader");
     }
     receiver.#previousRune = -1;
-    if (receiver.#offset >= receiver.#source.length) {
+    if (receiver.#offset >= receiver.#source.sourceLength()) {
       return [0n, ioState.EOF];
     }
-    const count = Math.min(target.length, receiver.#source.length - receiver.#offset);
+    const count = Math.min(target.length, Number(receiver.#source.sourceLength()) - receiver.#offset);
     for (let index = 0; index < count; index += 1) {
-      target.set(index, receiver.#source.charCodeAt(receiver.#offset + index));
+      target.set(index, receiver.#source.read(receiver.#offset + index));
     }
     receiver.#offset += count;
     return [integerFromHost(count), undefined];

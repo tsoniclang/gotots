@@ -7,8 +7,12 @@ export class WaitGroup {
 
   static $copy(source: WaitGroup): WaitGroup {
     const result = new WaitGroup();
-    result.#count = source.#count;
+    WaitGroup.$assign(result, source);
     return result;
+  }
+
+  static $assign(target: WaitGroup, source: WaitGroup): void {
+    target.#count = source.#count;
   }
 
   static $equal(left: WaitGroup, right: WaitGroup): boolean {

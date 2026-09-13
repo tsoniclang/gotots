@@ -70,7 +70,7 @@ export class ReflectTypeMetadataOperations {
   static $registerOpaqueStruct<T>(
     type: Type,
     resolveAdapter: RuntimeValueAdapterResolver<T>,
-    unavailableFields: readonly gostring[],
+    unavailableFields: readonly string[],
   ): void {
     registerRuntimeOpaqueStructValueOperations(
       type,
@@ -136,6 +136,16 @@ export class ReflectStructFieldOperations {
       Anonymous: source.Anonymous,
     });
   }
+
+  static $assign(target: StructField, source: StructField): void {
+    target.Name = source.Name;
+    target.PkgPath = source.PkgPath;
+    target.Type = source.Type;
+    target.Tag = source.Tag;
+    target.Offset = source.Offset;
+    target.Index = source.Index;
+    target.Anonymous = source.Anonymous;
+  }
 }
 
 export class ReflectMapIterOperations {
@@ -165,6 +175,10 @@ export class ReflectValueOperations {
   }
 
   static $copy(source: Value): Value {
-    return source;
+    return Value.$copy(source);
+  }
+
+  static $assign(target: Value, source: Value): void {
+    Value.$assign(target, source);
   }
 }

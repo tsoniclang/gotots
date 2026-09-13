@@ -54,7 +54,6 @@ import {
   signalProcess,
 } from "./internal/node/os/process.js";
 import { isNotExistError } from "./internal/node/os/error.js";
-import { stringSlice } from "./internal/runtime/slice.js";
 import { SIGINT } from "./syscall.js";
 import { constants as nodeFileConstants } from "node:fs";
 
@@ -220,7 +219,7 @@ export const state: {
   Stdin: File | undefined;
   Stdout: File | undefined;
 } = {
-  Args: stringSlice(processArguments()),
+  Args: RuntimeSlice.literal(Array.from(processArguments())),
   Interrupt: SIGINT,
   Stderr: newStandardFile(2, "/dev/stderr"),
   Stdin: newStandardFile(0, "/dev/stdin"),

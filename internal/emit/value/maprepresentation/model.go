@@ -66,6 +66,9 @@ func nativeMapKey(context api.Context, sourceType types.Type) bool {
 }
 
 func nativeIdentityMapKey(context api.Context, sourceType types.Type) bool {
+	if basic, direct := directKey(context, sourceType); direct && basic.Info()&types.IsString != 0 {
+		return false
+	}
 	storageType, err := storageKeyType(context, sourceType)
 	return err == nil && types.Identical(sourceType, storageType)
 }

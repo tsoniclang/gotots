@@ -61,11 +61,11 @@ const (
 	PrimitiveCarrierBoolean
 	PrimitiveCarrierNumber
 	PrimitiveCarrierBigInt
-	PrimitiveCarrierString
+	PrimitiveCarrierGoString
 )
 
 func (c PrimitiveCarrier) Valid() bool {
-	return c >= PrimitiveCarrierBoolean && c <= PrimitiveCarrierString
+	return c >= PrimitiveCarrierBoolean && c <= PrimitiveCarrierGoString
 }
 
 func (c PrimitiveCarrier) String() string {
@@ -76,8 +76,8 @@ func (c PrimitiveCarrier) String() string {
 		return "number"
 	case PrimitiveCarrierBigInt:
 		return "bigint"
-	case PrimitiveCarrierString:
-		return "string"
+	case PrimitiveCarrierGoString:
+		return "GoString"
 	default:
 		return fmt.Sprintf("primitive-carrier(%d)", c)
 	}
@@ -88,6 +88,7 @@ type Requirements struct {
 	providerProfile   Profile
 	providerModule    string
 	pointerModule     string
+	stringModule      string
 	nativeIntegerBits uint8
 	aliases           []Entry
 	symbols           []Entry
@@ -127,6 +128,13 @@ func (r Requirements) ProviderPointerModule() string {
 	return r.pointerModule
 }
 
+func (r Requirements) ProviderStringModule() string {
+	if !r.valid {
+		return ""
+	}
+	return r.stringModule
+}
+
 func (r Requirements) NativeIntegerBits() uint8 {
 	if !r.valid {
 		return 0
@@ -154,6 +162,7 @@ type document struct {
 	ProviderIntegerRepresentation string          `json:"providerIntegerRepresentation"`
 	ProviderScalarModule          string          `json:"providerScalarModule"`
 	ProviderPointerModule         string          `json:"providerPointerModule"`
+	ProviderStringModule          string          `json:"providerStringModule"`
 	NativeIntegerBits             uint8           `json:"nativeIntegerBits"`
 	PrimitiveAliases              []entryDocument `json:"primitiveAliases"`
 	RuntimeSymbols                []entryDocument `json:"runtimeSymbols"`
@@ -173,9 +182,9 @@ func Decode(data []byte) (Requirements, error) {
 		}
 		return Requirements{}, contractError("decode: " + err.Error())
 	}
-	if source.SchemaVersion != 3 {
+	if source.SchemaVersion != 4 {
 		return Requirements{}, contractError(fmt.Sprintf(
-			"schema version %d is not 3",
+			"schema version %d is not 4",
 			source.SchemaVersion,
 		))
 	}
@@ -205,6 +214,12 @@ func Decode(data []byte) (Requirements, error) {
 			source.ProviderPointerModule,
 		))
 	}
+	if !validProviderSupportModule(source.ProviderStringModule) ||
+		source.ProviderStringModule == source.ProviderScalarModule ||
+		source.ProviderStringModule == source.ProviderPointerModule {
+		return Requirements{}, contractError(fmt.Sprintf(
+			"provider string module %q is invalid", source.ProviderStringModule))
+	}
 	if source.NativeIntegerBits != 32 && source.NativeIntegerBits != 64 {
 		return Requirements{}, contractError(fmt.Sprintf(
 			"native integer width %d is invalid",
@@ -227,6 +242,7 @@ func Decode(data []byte) (Requirements, error) {
 		providerProfile:   providerProfile,
 		providerModule:    source.ProviderScalarModule,
 		pointerModule:     source.ProviderPointerModule,
+		stringModule:      source.ProviderStringModule,
 		nativeIntegerBits: source.NativeIntegerBits,
 		aliases:           aliases,
 		symbols:           symbols,
@@ -331,7 +347,7 @@ func decodePrimitiveCarrier(spelling string) (PrimitiveCarrier, error) {
 		PrimitiveCarrierBoolean,
 		PrimitiveCarrierNumber,
 		PrimitiveCarrierBigInt,
-		PrimitiveCarrierString,
+		PrimitiveCarrierGoString,
 	} {
 		if carrier.String() == spelling {
 			return carrier, nil

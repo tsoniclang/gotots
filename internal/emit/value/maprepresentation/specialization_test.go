@@ -284,9 +284,12 @@ func printSpecialization(
 	return printed
 }
 
-func compileAndRunSpecialization(t *testing.T, source string) string {
+func compileAndRunSpecialization(t *testing.T, source string, symbols ...api.RuntimeSymbol) string {
 	t.Helper()
 	directory := t.TempDir()
+	if len(symbols) != 0 {
+		materializeSpecializationRuntime(t, directory, symbols)
+	}
 	sourcePath := filepath.Join(directory, "specialization.ts")
 	if err := os.WriteFile(sourcePath, []byte(source), 0o600); err != nil {
 		t.Fatal(err)

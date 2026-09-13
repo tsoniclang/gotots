@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -64,8 +65,8 @@ class TestInfo extends ProviderInterfaceValue implements FileInfo {
     return this.mode;
   }
 
-  Name(): string {
-    return this.name;
+  Name(): GoString {
+    return GoString.fromText(this.name);
   }
 
   Size(): int64 {
@@ -90,7 +91,7 @@ class TestEntry extends ProviderInterfaceValue implements DirEntry {
     return this.information.IsDir();
   }
 
-  Name(): string {
+  Name(): GoString {
     return this.information.Name();
   }
 
@@ -163,12 +164,12 @@ class TestFS extends ProviderInterfaceValue implements FS {
     super(fileSystemType);
   }
 
-  Open(name: string): [File | undefined, GoError | undefined] {
+  Open(name: GoString): [File | undefined, GoError | undefined] {
     const root = new TestInfo(".", 0n, ModeDir);
     const directory = new TestInfo("dir", 0n, ModeDir);
     const first = new TestInfo("a.txt", 5n, new FileMode(0));
     const nested = new TestInfo("z.txt", 1n, new FileMode(0));
-    switch (name) {
+    switch (name.text()) {
       case ".":
         return [
           new TestDirectory(root, [new TestEntry(directory), new TestEntry(first)]),
@@ -181,32 +182,32 @@ class TestFS extends ProviderInterfaceValue implements FS {
       case "dir/z.txt":
         return [new TestFile(nested, Uint8Array.of(90)), undefined];
       default:
-        return [undefined, new PathError("open", name, ioState.EOF)];
+        return [undefined, new PathError(GoString.fromText("open"), name, ioState.EOF)];
     }
   }
 }
 
 test("filesystem functions read, stat, sort, and walk", () => {
   const fileSystem = new TestFS();
-  const [content, readFailure] = ReadFile(fileSystem, "a.txt");
+  const [content, readFailure] = ReadFile(fileSystem, GoString.fromText("a.txt"));
   assert.equal(readFailure, undefined);
   assert.equal(new TextDecoder().decode(bytes(content)), "hello");
 
-  const [information, statFailure] = Stat(fileSystem, "a.txt");
+  const [information, statFailure] = Stat(fileSystem, GoString.fromText("a.txt"));
   assert.equal(statFailure, undefined);
   assert.equal(information?.Size(), 5n);
-  assert.equal(FileInfoToDirEntry(information)?.Name(), "a.txt");
+  assert.equal((FileInfoToDirEntry(information)?.Name())?.text(), "a.txt");
 
-  const [entries, directoryFailure] = ReadDir(fileSystem, ".");
+  const [entries, directoryFailure] = ReadDir(fileSystem, GoString.fromText("."));
   assert.equal(directoryFailure, undefined);
   assert.deepEqual(
-    sliceValues(entries).map((entry) => entry?.Name()),
+    sliceValues(entries).map((entry) => entry?.Name().text()),
     ["a.txt", "dir"],
   );
 
   const visited: string[] = [];
-  const walkFailure = WalkDir(fileSystem, ".", (path) => {
-    visited.push(path);
+  const walkFailure = WalkDir(fileSystem, GoString.fromText("."), (path) => {
+    visited.push(path.text());
     return undefined;
   });
   assert.equal(walkFailure, undefined);
@@ -216,7 +217,7 @@ test("filesystem functions read, stat, sort, and walk", () => {
 test("FileMode and PathError preserve selected behavior", () => {
   assert.equal(ModeDir.IsDir(), true);
   assert.equal(new FileMode(0o644).IsRegular(), true);
-  const pathFailure = new PathError("open", "missing", ioState.EOF);
-  assert.equal(pathFailure.Error(), "open missing: EOF");
+  const pathFailure = new PathError(GoString.fromText("open"), GoString.fromText("missing"), ioState.EOF);
+  assert.equal((pathFailure.Error())?.text(), "open missing: EOF");
   assert.equal(Is(pathFailure, ioState.EOF), true);
 });

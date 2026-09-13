@@ -2,10 +2,12 @@ package representation
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	basicbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/basic"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	rawpointermarker "github.com/tsoniclang/gotots/internal/emit/marker/rawpointer"
@@ -24,6 +26,10 @@ func (owner Owner) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok && basic.Info()&types.IsString != 0 {
+		result, _, err := basicbinary.Apply(context, basic, token.EQL, api.DirectExpression(left), api.DirectExpression(right))
+		return result, err
+	}
 	if api.ContainsGenericTypeParameter(sourceType) {
 		return genericoperation.Call(
 			context,

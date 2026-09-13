@@ -6,6 +6,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	complexruntime "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
+	descriptorruntime "github.com/tsoniclang/gotots/internal/emit/runtime/memorydescriptor"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -19,10 +21,7 @@ func dependencyClosure(
 	visit = func(symbol api.RuntimeSymbol) error {
 		switch state[symbol] {
 		case 1:
-			return &AssemblyError{
-				Symbol: symbol,
-				Reason: "runtime dependency graph contains a cycle",
-			}
+			return nil
 		case 2:
 			return nil
 		}
@@ -136,9 +135,13 @@ func moduleImports(
 			if err != nil {
 				return nil, err
 			}
+			phase := api.ImportPhaseValue
+			if contract.TypeOnly() || dependencyContract.TypeOnly() {
+				phase = api.ImportPhaseType
+			}
 			request, err := api.NewRuntimeImportRequest(
 				factory,
-				api.ImportPhaseValue,
+				phase,
 				modulePath,
 				dependency,
 				dependencyContract.ExportedName(),
@@ -151,6 +154,115 @@ func moduleImports(
 			}
 		}
 	}
+	if module == api.RuntimeModuleMemoryDescriptor {
+		for _, requested := range symbols {
+			markers, err := descriptorruntime.Markers(requested)
+			if err != nil {
+				return nil, err
+			}
+			for _, symbol := range markers {
+				declaration, err := tsoniccore.Resolve(symbol)
+				if err != nil {
+					return nil, err
+				}
+				phase := api.ImportPhaseValue
+				if declaration.Phase() == tsoniccore.PhaseType {
+					phase = api.ImportPhaseType
+				}
+				request, err := api.NewImportRequest(factory, phase, declaration.Module(), declaration.Export(), declaration.Export())
+				if err != nil {
+					return nil, err
+				}
+				if err := placement.Apply([]api.RootRequest{request}); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	if module == api.RuntimeModuleStringValue {
+		for _, symbol := range []tsoniccore.Symbol{tsoniccore.SymbolUint8, tsoniccore.SymbolPointer, tsoniccore.SymbolAddressOf} {
+			declaration, err := tsoniccore.Resolve(symbol)
+			if err != nil {
+				return nil, err
+			}
+			phase := api.ImportPhaseValue
+			if declaration.Phase() == tsoniccore.PhaseType {
+				phase = api.ImportPhaseType
+			}
+			request, err := api.NewImportRequest(factory, phase, declaration.Module(), declaration.Export(), declaration.Export())
+			if err != nil {
+				return nil, err
+			}
+			if err := placement.Apply([]api.RootRequest{request}); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if module == api.RuntimeModuleMemoryView {
+		markers := []tsoniccore.Symbol{tsoniccore.SymbolPointer}
+		for _, symbol := range symbols {
+			switch symbol {
+			case api.RuntimeRegionAddress:
+				markers = append(markers, tsoniccore.SymbolAddressOf)
+			case api.RuntimeRegionRead:
+				markers = append(markers, tsoniccore.SymbolLoadPointer)
+			case api.RuntimeRegionWrite:
+				markers = append(markers, tsoniccore.SymbolStorePointer)
+			}
+		}
+		for _, symbol := range markers {
+			declaration, err := tsoniccore.Resolve(symbol)
+			if err != nil {
+				return nil, err
+			}
+			phase := api.ImportPhaseValue
+			if declaration.Phase() == tsoniccore.PhaseType {
+				phase = api.ImportPhaseType
+			}
+			request, err := api.NewImportRequest(factory, phase, declaration.Module(), declaration.Export(), declaration.Export())
+			if err != nil {
+				return nil, err
+			}
+			if err := placement.Apply([]api.RootRequest{request}); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if module == api.RuntimeModuleComplex {
+		for _, requested := range symbols {
+			for _, symbol := range complexruntime.StorageMarkers(requested) {
+				declaration, err := tsoniccore.Resolve(symbol)
+				if err != nil {
+					return nil, err
+				}
+				phase := api.ImportPhaseValue
+				if declaration.Phase() == tsoniccore.PhaseType {
+					phase = api.ImportPhaseType
+				}
+				request, err := api.NewImportRequest(factory, phase, declaration.Module(), declaration.Export(), declaration.Export())
+				if err != nil {
+					return nil, err
+				}
+				if err := placement.Apply([]api.RootRequest{request}); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	if module == api.RuntimeModuleSlice &&
+		slices.Contains(symbols, api.RuntimeSliceData) {
+		declaration, err := tsoniccore.Resolve(tsoniccore.SymbolAllocatePointer)
+		if err != nil {
+			return nil, err
+		}
+		request, err := api.NewImportRequest(factory, api.ImportPhaseValue, declaration.Module(), declaration.Export(), declaration.Export())
+		if err != nil {
+			return nil, err
+		}
+		if err := placement.Apply([]api.RootRequest{request}); err != nil {
+			return nil, err
+		}
+	}
 	if module == api.RuntimeModuleSlice &&
 		(slices.Contains(symbols, api.RuntimeSliceAddress) ||
 			slices.Contains(symbols, api.RuntimeSliceArrayPointer)) {
@@ -158,6 +270,7 @@ func moduleImports(
 			tsoniccore.SymbolPointer,
 			tsoniccore.SymbolAddressOf,
 			tsoniccore.SymbolProjectPointer,
+			tsoniccore.SymbolViewPointer,
 		} {
 			declaration, err := tsoniccore.Resolve(symbol)
 			if err != nil {

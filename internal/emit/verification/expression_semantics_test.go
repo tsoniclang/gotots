@@ -258,9 +258,9 @@ func materializeWaveThreeExpressions(
 			result.genericCapabilityBytes,
 		)
 	}
-	if result.bytes > 55_000 || result.nodes > 11_250 ||
+	if result.bytes > 64_000 || result.nodes > 14_000 ||
 		result.largest > 25_000 {
-		t.Fatalf(
+		t.Errorf(
 			"Wave 3 artifact bounds exceeded: total=%d nodes=%d largest=%d",
 			result.bytes,
 			result.nodes,

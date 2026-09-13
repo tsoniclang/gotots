@@ -1,3 +1,5 @@
+import { GoString } from "@gotots/runtime/string-value.js";
+
 const upperHex = "0123456789ABCDEF";
 
 export const enum EscapeMode {
@@ -75,19 +77,23 @@ function shouldEscape(byte: number, mode: EscapeMode): boolean {
   }
 }
 
-function encode(source: string, mode: EscapeMode): string {
-  const bytes = new TextEncoder().encode(source);
+function encode(source: GoString, mode: EscapeMode): GoString {
+  const text = source.text();
   let result = "";
-  for (const byte of bytes) {
+  let changed = false;
+  for (let index = 0; index < text.length; index++) {
+    const byte = text.charCodeAt(index);
     if (byte === 0x20 && mode === EscapeMode.QueryComponent) {
+      changed = true;
       result += "+";
     } else if (shouldEscape(byte, mode)) {
+      changed = true;
       result += `%${upperHex[byte >> 4]}${upperHex[byte & 0x0f]}`;
     } else {
       result += String.fromCharCode(byte);
     }
   }
-  return result;
+  return changed ? GoString.fromText(result) : source;
 }
 
 function hexValue(character: string): number {
@@ -104,61 +110,58 @@ function hexValue(character: string): number {
   return -1;
 }
 
-export function decode(source: string, mode: EscapeMode): string {
-  const bytes: number[] = [];
-  for (let index = 0; index < source.length; index += 1) {
-    const character = source[index] ?? "";
+export function decode(source: GoString, mode: EscapeMode): GoString {
+  const text = source.text();
+  let decoded = "";
+  let changed = false;
+  for (let index = 0; index < text.length; index++) {
+    const character = text[index];
     if (character === "%") {
-      const high = source[index + 1];
-      const low = source[index + 2];
+      const high = text[index + 1];
+      const low = text[index + 2];
       if (high === undefined || low === undefined || hexValue(high) < 0 || hexValue(low) < 0) {
-        throw new URIError(`invalid URL escape ${JSON.stringify(source.slice(index, index + 3))}`);
+        throw new URIError(`invalid URL escape ${JSON.stringify(text.slice(index, index + 3))}`);
       }
       const value = (hexValue(high) << 4) | hexValue(low);
       if (mode === EscapeMode.Host && value < 0x80 && value !== 0x25) {
-        throw new URIError(`invalid URL escape ${JSON.stringify(source.slice(index, index + 3))}`);
+        throw new URIError(`invalid URL escape ${JSON.stringify(text.slice(index, index + 3))}`);
       }
-      bytes.push(value);
+      decoded += String.fromCharCode(value);
+      changed = true;
       index += 2;
     } else if (character === "+" && mode === EscapeMode.QueryComponent) {
-      bytes.push(0x20);
+      decoded += " ";
+      changed = true;
     } else {
-      const codePoint = source.codePointAt(index);
-      if (codePoint === undefined) {
-        break;
-      }
-      bytes.push(...new TextEncoder().encode(String.fromCodePoint(codePoint)));
-      if (codePoint > 0xffff) {
-        index += 1;
-      }
+      decoded += text.charAt(index);
     }
   }
-  return new TextDecoder().decode(Uint8Array.from(bytes));
+  return changed ? GoString.fromText(decoded) : source;
 }
 
-export function escapePath(source: string): string {
+export function escapePath(source: GoString): GoString {
   return encode(source, EscapeMode.Path);
 }
 
-export function escapePathSegment(source: string): string {
+export function escapePathSegment(source: GoString): GoString {
   return encode(source, EscapeMode.PathSegment);
 }
 
-export function escapeQuery(source: string): string {
+export function escapeQuery(source: GoString): GoString {
   return encode(source, EscapeMode.QueryComponent);
 }
 
-export function escapeFragment(source: string): string {
+export function escapeFragment(source: GoString): GoString {
   return encode(source, EscapeMode.Fragment);
 }
 
-export function escapeUserPassword(source: string): string {
+export function escapeUserPassword(source: GoString): GoString {
   return encode(source, EscapeMode.UserPassword);
 }
 
-export function decodedPathMatches(rawPath: string, path: string): boolean {
+export function decodedPathMatches(rawPath: GoString, path: GoString): boolean {
   try {
-    return decode(rawPath, EscapeMode.Path) === path;
+    return decode(rawPath, EscapeMode.Path).text() === path.text();
   } catch {
     return false;
   }

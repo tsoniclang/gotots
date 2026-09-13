@@ -1,4 +1,5 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderError } from "../../runtime/error.js";
@@ -21,7 +22,7 @@ class ParseDurationError extends ProviderError {
   override readonly $go$type = parseDurationErrorType;
 
   constructor(message: string, value: string) {
-    super(`time: ${message} ${timeQuote(value)}`);
+    super(GoString.fromText(`time: ${message} ${timeQuote(value)}`));
   }
 
   override $go$format(
@@ -49,8 +50,9 @@ type LeadingFraction = {
 };
 
 export function ParseDuration(
-  source: gostring,
+  value: gostring,
 ): [Duration, GoError | undefined] {
+  const source = value.text();
   const original = source;
   let index = 0;
   let negative = false;
@@ -178,8 +180,8 @@ function durationUnit(unit: string): bigint | undefined {
   switch (unit) {
     case "ns": return nanosecond;
     case "us":
-    case "µs":
-    case "μs": return microsecond;
+    case "\xc2\xb5s":
+    case "\xce\xbcs": return microsecond;
     case "ms": return millisecond;
     case "s": return second;
     case "m": return minute;

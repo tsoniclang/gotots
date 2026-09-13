@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"sort"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
@@ -482,28 +483,6 @@ func (n *File) ProviderOwnedDeclaration(
 	return owned, err
 }
 
-// EnvironmentOwnedDeclaration reports whether a declaration is represented
-// by the bounded environment contract rather than generated package syntax.
-func (n *File) EnvironmentOwnedDeclaration(
-	object types.Object,
-) (bool, error) {
-	if object == nil || n == nil || n.owner == nil || n.owner.registry == nil {
-		return false, &api.NameError{
-			Reason: "environment declaration ownership query is invalid",
-		}
-	}
-	binding, ok := n.owner.registry.byObject[object]
-	if !ok {
-		return false, &api.NameError{
-			Name:   object.Name(),
-			Reason: "environment declaration has no target binding",
-		}
-	}
-	return binding.kind == targetBindingEnvironment ||
-		binding.kind == targetBindingProvider ||
-		binding.kind == targetBindingMissingProvider, nil
-}
-
 // reflectionValueOperationsRequest builds the value-operation facet
 // requirement of one interned canonical descriptor.
 func (r *Registry) reflectionValueOperationsRequest(
@@ -516,52 +495,6 @@ func (r *Registry) reflectionValueOperationsRequest(
 		}
 	}
 	return api.NewReflectionValueOperationsRequest(binding.owner)
-}
-
-func (r *Registry) internReflectionType(
-	artifactKey string,
-	sourceType types.Type,
-	reflectionType *types.TypeName,
-	name string,
-) (reflectionTypeBinding, error) {
-	if r == nil || artifactKey == "" || sourceType == nil ||
-		reflectionType == nil || name == "" {
-		return reflectionTypeBinding{}, &api.NameError{
-			Reason: "reflection-type canonicalization input is invalid",
-		}
-	}
-	if existing, ok := r.reflectionTypes[artifactKey]; ok {
-		bound, contract, valid := existing.owner.ReflectionType()
-		if !valid || !types.Identical(bound, sourceType) ||
-			contract != reflectionType {
-			return reflectionTypeBinding{}, &api.NameError{
-				Name:   existing.name,
-				Reason: "reflection-type key joined non-identical Go types",
-			}
-		}
-		return existing, nil
-	}
-	if err := reserveGeneratedName(
-		r.reflectionTypeNames,
-		name,
-		artifactKey,
-		"reflection type",
-	); err != nil {
-		return reflectionTypeBinding{}, err
-	}
-	owner, err := api.NewCompilationReflectionTypeArtifact(
-		sourceType,
-		reflectionType,
-		artifactKey,
-		name,
-		output.ReflectionTypeSupportPath,
-	)
-	if err != nil {
-		return reflectionTypeBinding{}, err
-	}
-	binding := reflectionTypeBinding{owner: owner, name: name}
-	r.reflectionTypes[artifactKey] = binding
-	return binding, nil
 }
 
 func (n *File) ReflectionInterfaceAdapter(sourceType types.Type) (api.NameReference, error) {
@@ -588,4 +521,59 @@ func (n *File) ReflectionInterfaceAdapter(sourceType types.Type) (api.NameRefere
 		return api.NameReference{}, err
 	}
 	return reference, nil
+}
+
+func (registry *Registry) observeReflectionRawPointerUse(object types.Object) error {
+	method, callable := object.(*types.Func)
+	if !callable || method.Pkg() == nil || method.Type().(*types.Signature).Recv() == nil {
+		return nil
+	}
+	contract, err := environmentcontract.Describe(method.Origin())
+	if err != nil {
+		return err
+	}
+	if contract.Identity() == "reflect|kind=4|receiver=reflect.Value|name=UnsafePointer" {
+		registry.reflectionRawPointerSelected = true
+	}
+	return nil
+}
+
+func (names *File) ReflectionRawPointerDemanded() bool {
+	return names.owner.registry.reflectionRawPointerSelected
+}
+
+func (registry *Registry) FlushReflectionRawPointerDemands() ([]api.RootRequest, error) {
+	if !registry.reflectionRawPointerSelected {
+		return nil, nil
+	}
+	if registry.reflectionRawPointerDelivered == nil {
+		registry.reflectionRawPointerDelivered = make(map[string]struct{})
+	}
+	keys := make([]string, 0, len(registry.reflectionValueDemands))
+	for key := range registry.reflectionValueDemands {
+		if _, delivered := registry.reflectionRawPointerDelivered[key]; !delivered {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	var requests []api.RootRequest
+	for _, key := range keys {
+		binding, exists := registry.reflectionTypes[key]
+		if !exists || binding.owner == nil {
+			return nil, &api.NameError{Reason: "reflection raw-pointer demand has no descriptor"}
+		}
+		source, _, valid := binding.owner.ReflectionType()
+		if !valid {
+			return nil, &api.NameError{Reason: "reflection raw-pointer descriptor has no source type"}
+		}
+		if _, pointer := source.Underlying().(*types.Pointer); pointer {
+			request, err := api.NewReflectionRawPointerRequest(binding.owner)
+			if err != nil {
+				return nil, err
+			}
+			requests = append(requests, request)
+		}
+		registry.reflectionRawPointerDelivered[key] = struct{}{}
+	}
+	return requests, nil
 }

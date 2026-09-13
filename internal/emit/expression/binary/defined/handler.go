@@ -298,14 +298,13 @@ func apply(
 			right,
 		)
 	}
-	target, handled := basicbinary.Apply(
+	return basicbinary.Apply(
 		context,
 		underlying,
 		operator,
 		left,
 		right,
 	)
-	return target, handled, nil
 }
 
 func ApplyUnderlying(

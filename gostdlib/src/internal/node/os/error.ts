@@ -1,4 +1,5 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import { Is } from "../../../errors.js";
 import { state as fsState } from "../../../io/fs.js";
 import { ENOENT, ENOTDIR } from "../../../syscall.js";
@@ -24,11 +25,11 @@ export class NodeProviderError extends WrappedProviderError {
     super(nodeProviderErrorType);
   }
 
-  Error(): string {
-    const target = this.Unwrap().Error();
-    return this.path === undefined
+  Error(): GoString {
+    const target = this.Unwrap().Error().text();
+    return GoString.fromText(this.path === undefined
       ? `${this.operation}: ${target}`
-      : `${this.operation} ${this.path}: ${target}`;
+      : `${this.operation} ${this.path}: ${target}`);
   }
 
   Unwrap(): GoError {

@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type {
   bool,
@@ -18,7 +19,7 @@ import {
 import { SimpleFold } from "../unicode/case.js";
 
 export function Contains(text: gostring, substring: gostring): bool {
-  return text.includes(substring);
+  return text.text().includes(substring.text());
 }
 
 export function ContainsFunc(
@@ -29,23 +30,25 @@ export function ContainsFunc(
 }
 
 export function HasPrefix(text: gostring, prefix: gostring): bool {
-  return text.startsWith(prefix);
+  return text.text().startsWith(prefix.text());
 }
 
 export function HasSuffix(text: gostring, suffix: gostring): bool {
-  return text.endsWith(suffix);
+  return text.text().endsWith(suffix.text());
 }
 
 export function Index(text: gostring, substring: gostring): int {
-  return integerFromHost(text.indexOf(substring));
+  return integerFromHost(text.text().indexOf(substring.text()));
 }
 
 export function Clone(text: gostring): gostring {
-  return text;
+  return GoString.fromText(text.text());
 }
 
 export function Compare(left: gostring, right: gostring): int {
-  return left === right ? 0n : left < right ? -1n : 1n;
+  const leftText = left.text();
+  const rightText = right.text();
+  return leftText === rightText ? 0n : leftText < rightText ? -1n : 1n;
 }
 
 export function ContainsAny(text: gostring, characters: gostring): bool {
@@ -61,7 +64,7 @@ export function IndexRune(text: gostring, rune: int32): int {
     return -1n;
   }
   if (rune === 0xfffd) {
-    for (let index = 0; index < text.length; ) {
+    for (let index = 0; index < Number(text.sourceLength()); ) {
       const [decoded, width] = decodeRuneAt(text, index);
       if (decoded === rune) {
         return integerFromHost(index);
@@ -70,43 +73,43 @@ export function IndexRune(text: gostring, rune: int32): int {
     }
     return -1n;
   }
-  return integerFromHost(text.indexOf(encodeRune(rune)));
+  return integerFromHost(text.text().indexOf(encodeRune(rune)));
 }
 
 export function Count(text: gostring, substring: gostring): int {
-  if (substring.length === 0) {
+  if (Number(substring.sourceLength()) === 0) {
     return integerFromHost(runeCount(text) + 1);
   }
   let count = 0;
   for (let start = 0; ; ) {
-    const index = text.indexOf(substring, start);
+    const index = text.text().indexOf(substring.text(), start);
     if (index < 0) {
       return integerFromHost(count);
     }
     count += 1;
-    start = index + substring.length;
+    start = index + Number(substring.sourceLength());
   }
 }
 
 export function Cut(text: gostring, separator: gostring): [gostring, gostring, bool] {
-  const index = text.indexOf(separator);
+  const index = text.text().indexOf(separator.text());
   return index < 0
-    ? [text, "", false]
-    : [text.slice(0, index), text.slice(index + separator.length), true];
+    ? [text, GoString.empty, false]
+    : [text.slice(0, index), text.slice(index + Number(separator.sourceLength())), true];
 }
 
 export function CutPrefix(text: gostring, prefix: gostring): [gostring, bool] {
-  return text.startsWith(prefix) ? [text.slice(prefix.length), true] : [text, false];
+  return text.text().startsWith(prefix.text()) ? [text.slice(Number(prefix.sourceLength())), true] : [text, false];
 }
 
 export function CutSuffix(text: gostring, suffix: gostring): [gostring, bool] {
-  return text.endsWith(suffix) ? [text.slice(0, text.length - suffix.length), true] : [text, false];
+  return text.text().endsWith(suffix.text()) ? [text.slice(0, Number(text.sourceLength()) - Number(suffix.sourceLength())), true] : [text, false];
 }
 
 export function EqualFold(left: gostring, right: gostring): bool {
   let leftIndex = 0;
   let rightIndex = 0;
-  while (leftIndex < left.length && rightIndex < right.length) {
+  while (leftIndex < Number(left.sourceLength()) && rightIndex < Number(right.sourceLength())) {
     const [leftRune, leftWidth] = decodeRuneAt(left, leftIndex);
     const [rightRune, rightWidth] = decodeRuneAt(right, rightIndex);
     if (!runesEqualFold(leftRune, rightRune)) {
@@ -115,12 +118,12 @@ export function EqualFold(left: gostring, right: gostring): bool {
     leftIndex += Math.max(1, hostInteger(leftWidth));
     rightIndex += Math.max(1, hostInteger(rightWidth));
   }
-  return leftIndex === left.length && rightIndex === right.length;
+  return leftIndex === Number(left.sourceLength()) && rightIndex === Number(right.sourceLength());
 }
 
 export function IndexAny(text: gostring, characters: gostring): int {
   const set = runeSet(characters);
-  for (let index = 0; index < text.length; ) {
+  for (let index = 0; index < Number(text.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(text, index);
     if (set.has(rune)) {
       return integerFromHost(index);
@@ -131,7 +134,7 @@ export function IndexAny(text: gostring, characters: gostring): int {
 }
 
 export function IndexByte(text: gostring, value: uint8): int {
-  return integerFromHost(text.indexOf(String.fromCharCode(value)));
+  return integerFromHost(text.text().indexOf(String.fromCharCode(value)));
 }
 
 export function IndexFunc(
@@ -142,11 +145,11 @@ export function IndexFunc(
 }
 
 export function LastIndex(text: gostring, substring: gostring): int {
-  return integerFromHost(text.lastIndexOf(substring));
+  return integerFromHost(text.text().lastIndexOf(substring.text()));
 }
 
 export function LastIndexByte(text: gostring, value: uint8): int {
-  return integerFromHost(text.lastIndexOf(String.fromCharCode(value)));
+  return integerFromHost(text.text().lastIndexOf(String.fromCharCode(value)));
 }
 
 export function LastIndexFunc(
@@ -162,11 +165,11 @@ export function findByPredicate(
   expected: boolean,
   last: boolean,
 ): int {
-  if (predicate === undefined && text.length > 0) {
+  if (predicate === undefined && Number(text.sourceLength()) > 0) {
     GoPanic.raiseRuntime("call of nil predicate function");
   }
   let found = -1;
-  for (let index = 0; index < text.length; ) {
+  for (let index = 0; index < Number(text.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(text, index);
     if (predicate?.(rune) === expected) {
       found = index;
@@ -181,7 +184,7 @@ export function findByPredicate(
 
 function runeSet(text: gostring): Set<int32> {
   const result = new Set<int32>();
-  for (let index = 0; index < text.length; ) {
+  for (let index = 0; index < Number(text.sourceLength()); ) {
     const [rune, width] = decodeRuneAt(text, index);
     result.add(rune);
     index += Math.max(1, hostInteger(width));

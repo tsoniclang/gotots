@@ -135,9 +135,16 @@ func (a RuntimeArray) wrap(
 	return a.defined.Wrap(context, value)
 }
 
-func (a RuntimeArray) lengthLiteral(context api.Context) tsgo.NumericLiteral {
-	return context.Factory().NumericLiteral(
-		strconv.FormatInt(a.source.Len(), 10),
+func (a RuntimeArray) lengthLiteral(context api.Context) tsgo.Expression {
+	return ExtentLiteral(context.Factory(), a.source)
+}
+
+func ExtentLiteral(factory tsgo.Factory, source *types.Array) tsgo.Expression {
+	if source.Len() > 9007199254740991 {
+		return factory.BigIntLiteral(strconv.FormatInt(source.Len(), 10)+"n", tsgo.TokenFlagsNone)
+	}
+	return factory.NumericLiteral(
+		strconv.FormatInt(source.Len(), 10),
 		tsgo.TokenFlagsNone,
 	)
 }

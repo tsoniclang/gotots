@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -65,7 +66,7 @@ function providerResult(): string {
   ];
   const instants = values.map((value) => (
     `${value.Unix()}:${value.UnixMilli()}:${value.UnixNano()}:${value.Nanosecond()}`
-      + `:${value.UTC().Format("2006-01-02T15:04:05.000000000Z07:00")}`
+      + `:${value.UTC().Format(GoString.fromText("2006-01-02T15:04:05.000000000Z07:00")).text()}`
   )).join("|");
   return [
     instants,
@@ -97,12 +98,12 @@ function providerParseResult(): string {
     Array.from(new TextEncoder().encode("2024-01-02T03:04:05.123456789+02:30")),
   ));
   const [calendar, calendarFailure] = Parse(
-    "2006-01-02 15:04:05",
-    "2024-02-29 23:07:08",
+    GoString.fromText("2006-01-02 15:04:05"),
+    GoString.fromText("2024-02-29 23:07:08"),
   );
   const [yearDay, yearDayFailure] = Parse(
-    "2006-002 15:04:05.999999999Z07:00",
-    "2024-060 01:02:03.456789123+02:30",
+    GoString.fromText("2006-002 15:04:05.999999999Z07:00"),
+    GoString.fromText("2024-060 01:02:03.456789123+02:30"),
   );
   const invalid = new Time();
   const invalidFailure = invalid.UnmarshalText(RuntimeSlice.literal(
@@ -118,8 +119,8 @@ function providerParseResult(): string {
 
 function parseLine(value: Time, ok: boolean): string {
   return `ok=${ok};unixmilli=${value.UnixMilli()};format=${value.Format(
-    "2006-01-02T15:04:05.000000000Z07:00",
-  )}`;
+    GoString.fromText("2006-01-02T15:04:05.000000000Z07:00"),
+  ).text()}`;
 }
 
 const goProgram = `

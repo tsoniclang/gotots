@@ -1,5 +1,6 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { runeBoundaries } from "../utf8/codec.js";
@@ -59,16 +60,19 @@ export function replacerRepresentationAssign(
 
 function replacePairs(text: gostring, replacements: readonly Replacement[]): gostring {
   const boundaries = new Set(runeBoundaries(text));
+  const bytes = text.text();
   let result = "";
   let index = 0;
   let emptyMatched = false;
-  while (index <= text.length) {
+  let replaced = false;
+  while (index <= bytes.length) {
     let selected: Replacement | undefined;
     for (const replacement of replacements) {
       const [oldText] = replacement;
+      const oldBytes = oldText.text();
       if (
-        (oldText.length === 0 && boundaries.has(index) && !emptyMatched) ||
-        (oldText.length > 0 && text.startsWith(oldText, index))
+        (oldBytes.length === 0 && boundaries.has(index) && !emptyMatched) ||
+        (oldBytes.length > 0 && bytes.startsWith(oldBytes, index))
       ) {
         selected = replacement;
         break;
@@ -76,21 +80,23 @@ function replacePairs(text: gostring, replacements: readonly Replacement[]): gos
     }
     if (selected !== undefined) {
       const [oldText, newText] = selected;
-      result += newText;
-      if (oldText.length > 0) {
-        index += oldText.length;
+      replaced = true;
+      result += newText.text();
+      const length = Number(oldText.sourceLength());
+      if (length > 0) {
+        index += length;
         emptyMatched = false;
       } else {
         emptyMatched = true;
       }
       continue;
     }
-    if (index === text.length) {
+    if (index === bytes.length) {
       break;
     }
-    result += text[index];
+    result += bytes[index];
     index += 1;
     emptyMatched = false;
   }
-  return result;
+  return replaced ? GoString.fromText(result) : text;
 }

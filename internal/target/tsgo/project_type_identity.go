@@ -2,6 +2,11 @@ package tsgo
 
 type ProjectTypeIdentity struct {
 	symbolID uint64
+	nullable bool
+}
+
+func (identity ProjectTypeIdentity) IncludesNullish() bool {
+	return identity.nullable
 }
 
 func (i ProjectTypeIdentity) Matches(target ProjectExport) bool {
@@ -30,7 +35,7 @@ func (p *ProjectInspection) projectTypeIdentity(
 			Reason:    "parameter type has no symbol",
 		}
 	}
-	return ProjectTypeIdentity{symbolID: symbol.ID}, nil
+	return ProjectTypeIdentity{symbolID: symbol.ID, nullable: nonNullable != typeID}, nil
 }
 
 func (p *ProjectInspection) typeArguments(typeID uint32) ([]typeResponse, error) {

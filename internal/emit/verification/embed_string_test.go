@@ -68,7 +68,7 @@ import { Audit } from "`+sourceModuleForExport(
 		"Audit",
 	)+`";
 
-console.log(Array.from(Audit(), (value) => value.charCodeAt(0).toString(16).padStart(2, "0")).join(""));
+console.log(Array.from(Audit().text(), (value) => value.charCodeAt(0).toString(16).padStart(2, "0")).join(""));
 `)
 	writeProgramFile(
 		t,

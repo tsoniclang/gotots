@@ -182,7 +182,7 @@ const constantComplex = values.ConstantComplex();
 console.log(constantComplex.real, constantComplex.imag);
 console.log(show(values.IntegerStringSummary()));
 console.log(show(values.BytesStringSummary()));
-console.log(values.ShadowedStringIntrinsic());
+console.log(values.ShadowedStringIntrinsic().text());
 console.log(show(values.RunesStringSummary()));
 console.log(show(values.StringBytesSummary()));
 console.log(show(values.StringRunesSummary()));

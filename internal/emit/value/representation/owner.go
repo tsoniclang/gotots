@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
+	stringvalue "github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
@@ -32,6 +33,9 @@ func (Owner) RequiresCustomEquality(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok && basic.Info()&types.IsString != 0 {
+		return true
+	}
 	if _, ok := api.GenericTypeParameter(sourceType); ok {
 		return true
 	}
@@ -197,7 +201,7 @@ func (owner Owner) Zero(
 		case api.PrimitiveBool:
 			literal = context.Factory().FalseLiteral()
 		case api.PrimitiveString:
-			literal = context.Factory().StringLiteral("", tsgo.TokenFlagsNone)
+			return stringvalue.FromText(context, api.DirectExpression(context.Factory().StringLiteral("", tsgo.TokenFlagsNone)))
 		case api.PrimitiveFloat32, api.PrimitiveFloat64:
 			literal = context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone)
 		default:
@@ -543,10 +547,23 @@ func (owner Owner) AssignStable(
 	target tsgo.Expression,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if parameter, generic := api.GenericTypeParameter(sourceType); generic {
+		return genericoperation.Call(context, source, api.GenericOperationAssign, []types.Type{parameter, parameter}, []types.Type{parameter}, []api.ExpressionEmission{api.DirectExpression(target), value})
+	}
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.Assign(context, source, target, value)
+	}
+	if structure, ok := isAnonymousStruct(sourceType); ok {
+		assigned, err := anonymousStructOperation(context, source, structure, api.AnonymousStructDemandAssign, api.NamedStructOperationAssign, []tsgo.Expression{target, value.Value()})
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(append(value.Before(), assigned.Before()...), assigned.Value(), api.CombineRequests(value.Requests(), assigned.Requests()))
+	}
 	if _, _, ok := namedStruct(sourceType); !ok {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
-			Reason: "stable-identity assignment requires a named struct",
+			Reason: "stable-identity assignment requires an array or struct",
 		}
 	}
 	assigned, err := owner.namedStructOperation(

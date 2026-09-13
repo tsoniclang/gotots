@@ -8,6 +8,7 @@ import (
 const (
 	zeroMember        = "$zero"
 	copyMember        = "$copy"
+	assignMember      = "$assign"
 	equalMember       = "$equal"
 	hashMember        = "$hash"
 	convertMember     = "$convert"
@@ -43,6 +44,12 @@ func Build(factory tsgo.Factory, className string) tsgo.ClassDeclaration {
 			target.brand(),
 			target.constructor(),
 			target.method(zeroMember, nil, classType, returnNew()),
+			target.method(
+				assignMember,
+				[]tsgo.ParameterDeclaration{target.parameter("$target", classType), target.parameter("$source", classType)},
+				factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindVoidKeyword),
+				nil,
+			),
 			target.method(
 				copyMember,
 				[]tsgo.ParameterDeclaration{target.parameter("$source", classType)},
@@ -121,6 +128,10 @@ func (b builder) method(
 	result tsgo.TypeNode,
 	value tsgo.Expression,
 ) tsgo.MethodDeclaration {
+	var statements []tsgo.Statement
+	if value != nil {
+		statements = append(statements, b.factory.ReturnStatement(value))
+	}
 	return b.factory.MethodDeclaration(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		nil,
@@ -130,7 +141,7 @@ func (b builder) method(
 		parameters,
 		result,
 		b.factory.Block(
-			[]tsgo.Statement{b.factory.ReturnStatement(value)},
+			statements,
 			true,
 		),
 	)

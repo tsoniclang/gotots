@@ -10,8 +10,8 @@ import (
 func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
 	operations := map[string][]string{
-		"Point": {"$zero", "$copy", "$equal"},
-		"Box":   {"$zero", "$copy", "$equal"},
+		"Point": {"$zero", "$copy", "$equal", "$assign"},
+		"Box":   {"$zero", "$copy", "$equal", "$assign"},
 		"Empty": {"$zero", "$equal"},
 	}
 	fieldCounts := map[string]int{
@@ -82,13 +82,13 @@ func TestNamedStructOperationsAreUniqueAndOwnedByClass(t *testing.T) {
 		t,
 		source,
 		"Point",
-		[]string{"$zero", "$copy", "$equal"},
+		[]string{"$zero", "$copy", "$equal", "$assign"},
 	)
 	assertStaticOperationSequence(
 		t,
 		source,
 		"Box",
-		[]string{"$zero", "$copy", "$equal"},
+		[]string{"$zero", "$copy", "$equal", "$assign"},
 	)
 	assertStaticOperationSequence(
 		t,
@@ -255,12 +255,15 @@ func TestNamedStructValuesUseStaticallySelectedClassOperations(t *testing.T) {
 	}
 
 	assign := targetFunction(t, source, "AssignIsolated")
-	assignExpression := assign.Body().(tsgo.Block).Statements()[1].(tsgo.ExpressionStatement).Expression().(tsgo.BinaryExpression)
-	if assignExpression.OperatorToken().Kind() != tsgo.SyntaxKindEqualsToken ||
-		targetName(assignExpression.Left()) != "target" {
-		t.Fatal("assignment boundary is not a direct rebinding")
+	assignExpression, ok := assign.Body().(tsgo.Block).Statements()[1].(tsgo.ExpressionStatement).Expression().(tsgo.CallExpression)
+	if !ok || len(assignExpression.Arguments()) != 2 {
+		t.Fatal("assignment boundary is not a two-argument stable write")
 	}
-	assignCopy := assignExpression.Right().(tsgo.CallExpression)
+	if receiver, member := targetProperty(assignExpression.Expression()); receiver != "Box" ||
+		member != "$assign" || targetName(assignExpression.Arguments()[0]) != "target" {
+		t.Fatal("assignment boundary does not preserve the target's storage")
+	}
+	assignCopy := assignExpression.Arguments()[1].(tsgo.CallExpression)
 	if receiver, member := targetProperty(assignCopy.Expression()); receiver != "Box" ||
 		member != "$copy" {
 		t.Fatalf("assignment copy = %s.%s, want Box.$copy", receiver, member)

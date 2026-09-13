@@ -11,7 +11,10 @@ import (
 )
 
 func ToStoragePointer(context api.Context, children api.ChildEmitter, source ast.Node, pointee types.Type, pointer api.ExpressionEmission) (api.ExpressionEmission, error) {
-	required, err := context.Values().RequiresStorageProjection(context, pointee)
+	if array, ok := pointee.Underlying().(*types.Array); ok && array.Len() != 0 && context.TypesSizes().Sizeof(pointee) != 0 {
+		return arrayStoragePointer(context, children, source, pointee, pointer)
+	}
+	required, err := RequiresProjection(context, pointee)
 	if err != nil || !required {
 		return pointer, err
 	}
@@ -19,7 +22,7 @@ func ToStoragePointer(context api.Context, children api.ChildEmitter, source ast
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	stored, err := context.Values().StorageType(context.WithRole(api.RoleStorageType), source, pointee)
+	stored, err := context.Values().MemoryStorageType(context.WithRole(api.RoleStorageType), source, pointee)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -31,11 +34,11 @@ func ToStoragePointer(context api.Context, children api.ChildEmitter, source ast
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	toStorage, err := context.Values().ToStorage(context, source, pointee, api.DirectExpression(context.Factory().Identifier(logicalName)))
+	toStorage, err := context.Values().ToMemoryStorage(context, source, pointee, api.DirectExpression(context.Factory().Identifier(logicalName)))
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	fromStorage, err := context.Values().FromStorage(context, source, pointee, api.DirectExpression(context.Factory().Identifier(storedName)))
+	fromStorage, err := context.Values().FromMemoryStorage(context, source, pointee, api.DirectExpression(context.Factory().Identifier(storedName)))
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

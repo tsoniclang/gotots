@@ -5,6 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	runtimestring "github.com/tsoniclang/gotots/internal/emit/runtime/stringvalue"
+	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -57,21 +59,16 @@ func emitStringLength(
 			return api.ExpressionEmission{}, err
 		}
 	}
-	length := tsgo.Expression(context.Factory().PropertyAccessExpression(
-		value.Value(),
-		nil,
-		context.Factory().Identifier("length"),
-		tsgo.NodeFlagsNone,
-	))
-	if context.ScalarABI().UsesBigInt(context.TypesInfo().TypeOf(source)) {
-		length = context.Factory().CallExpression(
-			api.TargetIntrinsicBigInt.Expression(context.Factory()),
-			nil,
-			nil,
-			[]tsgo.Expression{length},
-			tsgo.NodeFlagsNone,
-		)
+	value, err = stringvalue.Member(context, runtimestring.SourceLengthMember, value)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
+	carrier := api.TargetIntrinsicNumber
+	if context.ScalarABI().UsesBigInt(context.TypesInfo().TypeOf(source)) {
+		carrier = api.TargetIntrinsicBigInt
+	}
+	length := context.Factory().CallExpression(carrier.Expression(context.Factory()), nil, nil,
+		[]tsgo.Expression{value.Value()}, tsgo.NodeFlagsNone)
 	return api.NewExpressionEmission(
 		value.Before(),
 		length,

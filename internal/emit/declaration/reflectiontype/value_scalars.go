@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	runtimestring "github.com/tsoniclang/gotots/internal/emit/runtime/stringvalue"
+	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -26,6 +28,14 @@ func basicValueProperties(
 	zero, err := scalarZeroExpression(operationContext, factory, basic)
 	if err != nil || zero == nil {
 		return nil, err
+	}
+	if basic.Info()&types.IsString != 0 {
+		stringZero, stringErr := stringvalue.FromText(operationContext, api.DirectExpression(zero))
+		if stringErr != nil {
+			return nil, stringErr
+		}
+		zero = stringZero.Value()
+		scaffold.requests = append(scaffold.requests, stringZero.Requests()...)
 	}
 	payload, payloadRequests, err := projectedScalarPayload(
 		context,
@@ -57,6 +67,16 @@ func basicValueProperties(
 			comparisonZero = zeroBoxed
 		}
 	}
+	zeroComparison := tsgo.Expression(factory.BinaryExpression(nil, payload, nil,
+		factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsEqualsEqualsToken), comparisonZero))
+	if basic.Info()&types.IsString != 0 {
+		length, lengthErr := stringvalue.Member(context, runtimestring.SourceLengthMember, api.DirectExpression(payload))
+		if lengthErr != nil {
+			return nil, lengthErr
+		}
+		zeroComparison = factory.BinaryExpression(nil, length.Value(), nil,
+			factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsEqualsToken), factory.NumericLiteral("0", tsgo.TokenFlagsNone))
+	}
 	isZero := factory.ArrowFunction(
 		nil,
 		nil,
@@ -66,15 +86,7 @@ func basicValueProperties(
 		factory.ParenthesizedExpression(guardedProjection(
 			scaffold,
 			"Value.IsZero",
-			factory.BinaryExpression(
-				nil,
-				payload,
-				nil,
-				factory.BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-				),
-				comparisonZero,
-			),
+			zeroComparison,
 		)),
 	)
 	properties := []tsgo.ObjectLiteralElementLike{

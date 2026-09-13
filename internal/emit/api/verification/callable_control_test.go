@@ -331,3 +331,51 @@ func callableControlRange(start token.Pos, end token.Pos) *ast.RangeStmt {
 		Body: &ast.BlockStmt{Lbrace: start + 12, Rbrace: end - 1},
 	}
 }
+
+func TestIndirectMutationControlPreservesVariableIdentity(test *testing.T) {
+	checkedPackage := types.NewPackage("example.com/mutation", "mutation")
+	function := callableControlFunction(checkedPackage, "Outer", 12)
+	owner := MustSourceArtifactOwner(function)
+	enclosing := callableControlDeclaration("Outer", 10, 100)
+	closure := callableControlLiteral(50, 80)
+	local := types.NewScope(checkedPackage.Scope(), 15, 95, "outer")
+	first := types.NewVar(20, checkedPackage, "count", types.Typ[types.Int])
+	local.Insert(first)
+	nested := types.NewScope(local, 25, 45, "nested")
+	second := types.NewVar(30, checkedPackage, "count", types.Typ[types.Int])
+	nested.Insert(second)
+	for _, variable := range []*types.Var{first, second} {
+		requirement, err := NewIndirectMutationRequirement(owner, enclosing, closure, variable)
+		if err != nil || !requirement.Valid() {
+			test.Fatalf("valid exposure rejected: %v", err)
+		}
+		selected, ok := requirement.IndirectMutationControl()
+		if !ok || selected != variable {
+			test.Fatal("same-spelled variables collapsed")
+		}
+		if _, err := (Context{}).WithCallableControls(owner, enclosing, []DeclarationRequirement{requirement}); err != nil {
+			test.Fatal(err)
+		}
+	}
+	for _, position := range []token.Pos{0, 105} {
+		foreign := types.NewVar(position, checkedPackage, "count", types.Typ[types.Int])
+		types.NewScope(checkedPackage.Scope(), 0, 120, "foreign").Insert(foreign)
+		if _, err := NewIndirectMutationRequirement(owner, enclosing, closure, foreign); err == nil {
+			test.Fatal("foreign source position admitted")
+		}
+	}
+	otherPackage := types.NewPackage("example.com/foreign", "mutation")
+	foreign := types.NewVar(20, otherPackage, "count", types.Typ[types.Int])
+	types.NewScope(otherPackage.Scope(), 15, 95, "foreign").Insert(foreign)
+	for _, variable := range []*types.Var{nil, foreign} {
+		if _, err := NewIndirectMutationRequirement(owner, enclosing, closure, variable); err == nil {
+			test.Fatal("missing or foreign checked identity admitted")
+		}
+	}
+	if _, err := NewCallableControlRequirement(owner, enclosing, closure, CallableControlIndirectMutation); err == nil {
+		test.Fatal("generic control constructor admitted an absent variable")
+	}
+	if _, err := NewDirectCallableControlRequirement(function, CallableControlIndirectMutation); err == nil {
+		test.Fatal("direct control constructor admitted an absent variable")
+	}
+}

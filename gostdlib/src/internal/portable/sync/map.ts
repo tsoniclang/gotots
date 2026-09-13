@@ -11,6 +11,22 @@ interface Entry {
 
 export class Map {
   readonly #entries: Entry[] = [];
+  #used = false;
+
+  static $copy(source: Map): Map {
+    const target = new Map();
+    Map.$assign(target, source);
+    return target;
+  }
+
+  static $assign(target: Map, source: Map): void {
+    if (target === source) return;
+    if (source.#used) {
+      GoPanic.raiseRuntime("sync.Map must not be copied after first use");
+    }
+    target.#entries.splice(0);
+    target.#used = false;
+  }
 
   static Clear(receiver: Map | undefined): void {
     Map.#require(receiver).#entries.splice(0);
@@ -87,6 +103,7 @@ export class Map {
     if (receiver === undefined) {
       GoPanic.raiseRuntime("sync.Map method called with nil receiver");
     }
+    receiver.#used = true;
     return receiver;
   }
 }

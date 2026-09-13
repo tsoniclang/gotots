@@ -50,6 +50,18 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if named != nil && len(source.Elts) == 0 {
+		zeroSelected, err := context.Names().ProviderNamedStructOperationSelected(
+			named.Origin().Obj(),
+			api.NamedStructOperationZero,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if zeroSelected {
+			return context.Values().Zero(context, source, sourceType)
+		}
+	}
 	elements, err := emitElements(
 		context,
 		children,

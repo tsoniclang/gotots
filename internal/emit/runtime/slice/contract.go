@@ -19,6 +19,9 @@ const (
 	MemberAppendSlice
 	MemberClear
 	MemberArrayLocation
+	MemberSourceLength
+	MemberSourceCapacity
+	MemberData
 )
 
 const (
@@ -60,6 +63,12 @@ func MemberName(member Member) string {
 		return "clear"
 	case MemberArrayLocation:
 		return "$arrayLocation"
+	case MemberSourceLength:
+		return "sourceLength"
+	case MemberSourceCapacity:
+		return "sourceCapacity"
+	case MemberData:
+		return "$data"
 	default:
 		panic("invalid RuntimeSlice member")
 	}

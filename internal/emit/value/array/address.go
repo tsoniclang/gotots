@@ -114,44 +114,13 @@ func (a RuntimeArray) Address(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	locationPart := func(index string) tsgo.ElementAccessExpression {
-		return context.Factory().ElementAccessExpression(
-			location,
-			nil,
-			context.Factory().NumericLiteral(index, tsgo.TokenFlagsNone),
-			tsgo.NodeFlagsNone,
-		)
-	}
-	numericIndex := context.Factory().CallExpression(
-		api.TargetIntrinsicNumber.Expression(context.Factory()),
-		nil,
-		nil,
-		[]tsgo.Expression{indexValue},
-		tsgo.NodeFlagsNone,
-	)
-	storageLocation := context.Factory().ElementAccessExpression(
-		locationPart("0"),
-		nil,
-		context.Factory().BinaryExpression(
-			nil,
-			locationPart("1"),
-			nil,
-			context.Factory().BinaryOperatorToken(
-				tsgo.BinaryOperatorPlusToken,
-			),
-			numericIndex,
-		),
-		tsgo.NodeFlagsNone,
-	)
-	storagePointer, err := pointermarker.Operation(
-		context,
-		tsoniccore.SymbolAddressOf,
-		[]api.TypeEmission{storageType},
-		[]api.ExpressionEmission{api.DirectExpression(storageLocation)},
-	)
+	addressReference, err := context.Names().Runtime(api.RuntimeRegionAddress, api.ImportPhaseValue)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	storagePointer := api.DirectExpression(context.Factory().CallExpression(
+		addressReference.Expression(context.Factory()), nil, []tsgo.TypeNode{storageType.Value()},
+		[]tsgo.Expression{location, indexValue}, tsgo.NodeFlagsNone), addressReference.Requests()...)
 	projected, err := context.Values().ProjectStoragePointer(
 		context,
 		source,

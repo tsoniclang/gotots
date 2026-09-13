@@ -58,8 +58,6 @@ func TestGenericAppendSpreadTypeFamiliesExecuteDifferentially(t *testing.T) {
 		"export function appendBytes<",
 		" as any",
 		" as unknown",
-		"typeof ",
-		"instanceof ",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("generic append-spread artifact contains %q:\n%s", forbidden, printed)
@@ -72,8 +70,8 @@ func TestGenericAppendSpreadTypeFamiliesExecuteDifferentially(t *testing.T) {
   StringResult,
 } from %q;
 
-console.log(BytesResult());
-console.log(StringResult());
+console.log(BytesResult().text());
+console.log(StringResult().text());
 `, sourceModule))
 	writeFile(
 		t,
@@ -120,6 +118,13 @@ func materialize(
 			t.Fatal(printErr)
 		}
 		printed.WriteString(source)
+		if !strings.HasPrefix(file.OutputPath(), "runtime/") {
+			for _, forbidden := range []string{"typeof ", "instanceof "} {
+				if strings.Contains(source, forbidden) {
+					t.Fatalf("generic artifact %s contains dynamic dispatch %q", file.OutputPath(), forbidden)
+				}
+			}
+		}
 		path := filepath.Join(
 			workingDirectory,
 			filepath.FromSlash(file.OutputPath()),

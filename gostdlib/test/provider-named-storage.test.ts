@@ -1,3 +1,5 @@
+import { textValues } from "./text.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -32,11 +34,11 @@ import {
 } from "../src/internal/facets/named-unicode.js";
 
 test("provider named-struct storage capabilities preserve exact values", (): void => {
-  const failure = NewError("denied");
-  const pathError = IoFsPathErrorOperations.$make("open", "/tmp/x", failure);
+  const failure = NewError(GoString.fromText("denied"));
+  const pathError = IoFsPathErrorOperations.$make(GoString.fromText("open"), GoString.fromText("/tmp/x"), failure);
   assert.ok(pathError instanceof PathError);
   assert.deepEqual(
-    [pathError.Op, pathError.Path, pathError.Err],
+    textValues([pathError.Op, pathError.Path, pathError.Err]),
     ["open", "/tmp/x", failure],
   );
   assert.equal(IoFsPathErrorOperations.$fromStorage(
@@ -53,19 +55,19 @@ test("provider named-struct storage capabilities preserve exact values", (): voi
   ), floating);
 
   const url = new URL();
-  url.Scheme = "https";
-  url.Host = "source.example";
-  url.Path = "/path";
+  url.Scheme = GoString.fromText("https");
+  url.Host = GoString.fromText("source.example");
+  url.Path = GoString.fromText("/path");
   const copiedURL = NetUrlURLOperations.$copy(url);
   const assignedURL = new URL();
   NetUrlURLOperations.$assign(assignedURL, url);
   assert.notEqual(copiedURL, url);
   assert.deepEqual(
-    [copiedURL.Scheme, copiedURL.Host, copiedURL.Path],
+    textValues([copiedURL.Scheme, copiedURL.Host, copiedURL.Path]),
     ["https", "source.example", "/path"],
   );
   assert.deepEqual(
-    [assignedURL.Scheme, assignedURL.Host, assignedURL.Path],
+    textValues([assignedURL.Scheme, assignedURL.Host, assignedURL.Path]),
     ["https", "source.example", "/path"],
   );
   assert.equal(NetUrlURLOperations.$fromStorage(

@@ -23,6 +23,20 @@ func Emit(
 	children api.ChildEmitter,
 	source ast.Expr,
 ) (api.StoreTargetEmission, error) {
+	target, err := emitTarget(context, children, source)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	if !target.CopiesValue() {
+		switch target.SourceType().Underlying().(type) {
+		case *types.Array, *types.Struct:
+			return target.WithStableIdentity()
+		}
+	}
+	return target, nil
+}
+
+func emitTarget(context api.Context, children api.ChildEmitter, source ast.Expr) (api.StoreTargetEmission, error) {
 	switch source := source.(type) {
 	case *ast.Ident:
 		return identifier(context, source)
@@ -336,6 +350,10 @@ func identifier(
 		object.Parent() == object.Pkg().Scope() {
 		return packageVariable(context, object)
 	}
+	exposure, err := context.CapturedStoreRequests(source)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
 	if receiver, ok := context.ValueReceiver(object); ok {
 		request, err := receiver.CopyRequest()
 		if err != nil {
@@ -344,7 +362,7 @@ func identifier(
 		return api.NewStoreTargetEmission(
 			context.Factory().Identifier(receiver.CopyName()),
 			sourceType,
-			[]api.RootRequest{request},
+			api.CombineRequests([]api.RootRequest{request}, exposure),
 		)
 	}
 	reference, err := context.Names().Reference(object)
@@ -354,7 +372,7 @@ func identifier(
 	return api.NewStoreTargetEmission(
 		reference.Expression(context.Factory()),
 		sourceType,
-		reference.Requests(),
+		api.CombineRequests(reference.Requests(), exposure),
 	)
 }
 

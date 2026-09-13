@@ -6,8 +6,12 @@ export class Once {
 
   static $copy(source: Once): Once {
     const result = new Once();
-    result.#state = source.#state;
+    Once.$assign(result, source);
     return result;
+  }
+
+  static $assign(target: Once, source: Once): void {
+    target.#state = source.#state;
   }
 
   static $equal(left: Once, right: Once): boolean {

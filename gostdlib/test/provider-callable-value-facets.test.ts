@@ -1,3 +1,4 @@
+import { GoString } from "@gotots/runtime/string-value.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { int64 } from "../src/internal/scalars.js";
@@ -42,7 +43,7 @@ test("provider named callables keep source arity", () => {
   ) => failure;
 
   cancel(undefined);
-  assert.equal(walk(".", undefined, undefined), undefined);
+  assert.equal(walk(GoString.fromText("."), undefined, undefined), undefined);
 });
 
 class Sortable extends ProviderInterfaceValue implements SortInterfaceDirect {
@@ -89,8 +90,8 @@ class FileInfoValue extends ProviderInterfaceValue implements ProviderFileInfo {
     throw new Error("unused test method");
   }
 
-  Name(): string {
-    return "entry";
+  Name(): GoString {
+    return GoString.fromText("entry");
   }
 
   Size(): int64 {
@@ -112,25 +113,25 @@ test("provider callable profiles transport callbacks", () => {
   assert.deepEqual(sortable.values, [1, 2, 3]);
 
   const isLetterA = (rune: number): boolean => rune === 97;
-  assert.equal(StringsContainsFuncCanonical("ba", isLetterA), true);
-  assert.equal(StringsIndexFuncCanonical("ba", isLetterA), 1n);
-  assert.equal(StringsLastIndexFuncCanonical("aba", isLetterA), 2n);
+  assert.equal(StringsContainsFuncCanonical(GoString.fromText("ba"), isLetterA), true);
+  assert.equal(StringsIndexFuncCanonical(GoString.fromText("ba"), isLetterA), 1n);
+  assert.equal(StringsLastIndexFuncCanonical(GoString.fromText("aba"), isLetterA), 2n);
   assert.equal(
-    StringsMapCanonical((rune) => rune === 97 ? 65 : rune, "ab"),
+    (StringsMapCanonical((rune) => rune === 97 ? 65 : rune, GoString.fromText("ab")))?.text(),
     "Ab",
   );
-  assert.equal(StringsTrimFuncCanonical("aabaa", isLetterA), "b");
-  assert.equal(StringsTrimLeftFuncCanonical("aab", isLetterA), "b");
-  assert.equal(StringsTrimRightFuncCanonical("baa", isLetterA), "b");
+  assert.equal((StringsTrimFuncCanonical(GoString.fromText("aabaa"), isLetterA))?.text(), "b");
+  assert.equal((StringsTrimLeftFuncCanonical(GoString.fromText("aab"), isLetterA))?.text(), "b");
+  assert.equal((StringsTrimRightFuncCanonical(GoString.fromText("baa"), isLetterA))?.text(), "b");
   assert.equal(
-    RegexpReplaceAllStringFuncCanonical(
-      MustCompile("[0-9]+"),
-      "a1b22",
-      (match) => `[${match}]`,
-    ),
+    (RegexpReplaceAllStringFuncCanonical(
+      MustCompile(GoString.fromText("[0-9]+")),
+      GoString.fromText("a1b22"),
+      (match) => GoString.fromText(`[${match.text()}]`),
+    ))?.text(),
     "a[1]b[22]",
   );
   const entry = IoFsFileInfoToDirEntryDirect(new FileInfoValue(), []);
-  assert.equal(entry?.Name(), "entry");
+  assert.equal((entry?.Name())?.text(), "entry");
   assert.equal(SyscallErrnoIsCanonical(EPERM, permission), true);
 });

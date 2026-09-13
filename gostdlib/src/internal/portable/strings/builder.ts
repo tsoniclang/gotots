@@ -1,5 +1,6 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoString } from "@gotots/runtime/string-value.js";
 import type {
   GoError,
 } from "@gotots/runtime/interface-value.js";
@@ -25,7 +26,7 @@ export class Builder {
   #owner: Builder | undefined;
 
   constructor() {
-    this.#value = "";
+    this.#value = GoString.empty;
     this.#owner = undefined;
   }
 
@@ -55,12 +56,12 @@ export class Builder {
   }
 
   static Len(receiver: Builder | undefined): int {
-    return integerFromHost(requireBuilder(receiver).#value.length);
+    return BigInt(requireBuilder(receiver).#value.sourceLength());
   }
 
   static Reset(receiver: Builder | undefined): void {
     const builder = requireBuilder(receiver);
-    builder.#value = "";
+    builder.#value = GoString.empty;
     builder.#owner = undefined;
   }
 
@@ -79,14 +80,14 @@ export class Builder {
     for (const byte of bytes) {
       appended += String.fromCharCode(byte);
     }
-    builder.#value += appended;
+    builder.#value = GoString.fromText(builder.#value.text() + appended);
     return [integerFromHost(bytes.length), undefined];
   }
 
   static WriteByte(receiver: Builder | undefined, value: uint8): GoError | undefined {
     const builder = requireBuilder(receiver);
     builder.#copyCheck();
-    builder.#value += String.fromCharCode(value);
+    builder.#value = GoString.fromText(builder.#value.text() + String.fromCharCode(value));
     return undefined;
   }
 
@@ -97,7 +98,7 @@ export class Builder {
     const encoded = encodeRune(rune);
     const builder = requireBuilder(receiver);
     builder.#copyCheck();
-    builder.#value += encoded;
+    builder.#value = GoString.fromText(builder.#value.text() + encoded);
     return [integerFromHost(encoded.length), undefined];
   }
 
@@ -107,8 +108,8 @@ export class Builder {
   ): [int, GoError | undefined] {
     const builder = requireBuilder(receiver);
     builder.#copyCheck();
-    builder.#value += text;
-    return [integerFromHost(text.length), undefined];
+    builder.#value = GoString.fromText(builder.#value.text() + text.text());
+    return [BigInt(text.sourceLength()), undefined];
   }
 
   #copyCheck(): void {
