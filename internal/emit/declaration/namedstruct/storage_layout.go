@@ -73,22 +73,12 @@ func emitLayout(
 	if err != nil {
 		return layoutEmission{}, err
 	}
-	var declarations []tsgo.Statement
-	var schemaRequests []api.RootRequest
-	if len(typeParameters) == 0 {
-		declarations, schemaRequests, err = storageSchema(context, storageName, selected, moduleExport)
-		if err != nil {
-			return layoutEmission{}, err
-		}
-	} else {
-		declarations = []tsgo.Statement{storageAlias(context, storageName, selected, moduleExport, typeParameters)}
-	}
 	return layoutEmission{
-		declarations: declarations,
+		declarations: []tsgo.Statement{storageAlias(context, storageName, selected, moduleExport, typeParameters)},
 		members:      members,
 		fields:       selected,
 		storageType:  storageType,
-		requests:     api.CombineRequests(requests, memberRequests, schemaRequests),
+		requests:     api.CombineRequests(requests, memberRequests),
 	}, nil
 }
 

@@ -27,13 +27,16 @@ func Convert(value *Pair) *Pair { return (*Pair)(unsafe.Pointer(value)) }
 	}
 	strictTypecheckEmission(t, emission)
 	_, _, printed := printConversions(t, t.TempDir(), emission)
-	for _, required := range []string{"const Pair$Storage:", "= struct({", "First: field<uint32>()", "Second: field<uint32>()", "type Pair$Storage = typeof Pair$Storage;", "memoryLayout<Pair$Storage>", "projectPointer<Pair, Pair$Storage>", "projectPointer<Pair$Storage, Pair>", "Pair.$storageOf", "Pair.$fromStorage", ".Second, 4, 4, memoryLayout<uint32>"} {
+	for _, required := range []string{"type Pair$Storage = {", "= struct({", "First: field<uint32>()", "Second: field<uint32>()", "memoryLayout<typeof ", "bindMemoryRecord(", "bindMemoryField(", "projectPointer<Pair, {", "Pair.$storageOf", "Pair.$fromStorage", ".Second, 4, 4, memoryLayout<uint32>"} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("physical memory output lacks %q", required)
 		}
 	}
 	if strings.Contains(printed, "memoryLayout<Pair>(") {
 		t.Fatal("logical wrapper acquired the physical layout")
+	}
+	if strings.Contains(printed, "const Pair$Storage:") || strings.Contains(printed, "typeof Pair$Storage") {
+		t.Fatal("live logical storage acquired value-copy semantics")
 	}
 }
 
@@ -70,7 +73,7 @@ func Convert(value *Outer) *Outer { return (*Outer)(unsafe.Pointer(value)) }
 	}
 	strictTypecheckEmission(test, emission)
 	_, _, printed := printConversions(test, test.TempDir(), emission)
-	for _, required := range []string{"memoryLayout<Outer$Storage>", ".Inner, 4, 4, memoryLayout<Pair$Storage>", ".Second, 4, 4, memoryLayout<uint32>"} {
+	for _, required := range []string{"type Outer$Storage = {", "type Pair$Storage = {", "memoryLayout<typeof ", "Inner: field<{", ".Inner, 4, 4,", ".Second, 4, 4, memoryLayout<uint32>", "viewPointer<", "bindMemoryRecord("} {
 		if !strings.Contains(printed, required) {
 			test.Fatalf("nested physical memory output lacks %q", required)
 		}
@@ -96,8 +99,8 @@ func Convert(value *Box[uint32]) *Box[uint32] { return (*Box[uint32])(unsafe.Poi
 		!strings.Contains(printed, ".Value, 0, 4, memoryLayout<uint32>") {
 		test.Fatal("closed generic memory lacks its concrete neutral value-record and child-layout contracts")
 	}
-	if strings.Contains(printed, "memoryLayout<Box$Storage<uint32>>") {
-		test.Fatal("physical memory depends on an unproven generic storage alias")
+	if !strings.Contains(printed, "memoryLayout<typeof ") || !strings.Contains(printed, "bindMemoryRecord(") {
+		test.Fatal("physical memory lacks its separately declared schema and live field bindings")
 	}
 }
 
@@ -127,9 +130,48 @@ func Convert(value *Outer[uint32]) *Outer[uint32] { return (*Outer[uint32])(unsa
 			test.Fatalf("nested generic storage lost %q", required)
 		}
 	}
-	for _, forbidden := range []string{"memoryLayout<Box$Storage<uint32>>", "memoryLayout<Outer$Storage<uint32>>"} {
+	for _, forbidden := range []string{"const Box$Storage", "const Outer$Storage"} {
 		if strings.Contains(printed, forbidden) {
 			test.Fatalf("closed generic memory retains unproven alias %q", forbidden)
+		}
+	}
+}
+
+func TestLogicalRecordStorageRetainsReferenceSemantics(test *testing.T) {
+	for _, declarations := range []string{
+		`type Box struct { Value uint32 }
+func Update(value *Box) uint32 {
+    saved := &value.Value
+    *value = Box{Value: 9}
+    return *saved
+}
+func Unselected(value *Box) unsafe.Pointer { return unsafe.Pointer(value) }`,
+		`type Box[Element any] struct { Value Element }
+func Update(value *Box[uint32]) uint32 {
+    saved := &value.Value
+    *value = Box[uint32]{Value: 9}
+    return *saved
+}
+func Unselected(value *Box[uint32]) unsafe.Pointer { return unsafe.Pointer(value) }`,
+	} {
+		loaded := loadMemoryStorageCase(test, declarations)
+		root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Update"))
+		if err != nil {
+			test.Fatal(err)
+		}
+		emission, err := emit.Compile(loaded.Program(), []emit.Root{root})
+		if err != nil {
+			test.Fatal(err)
+		}
+		strictTypecheckEmission(test, emission)
+		_, _, printed := printConversions(test, test.TempDir(), emission)
+		if !strings.Contains(printed, "type Box$Storage") || !strings.Contains(printed, "addressOf<uint32>(") {
+			test.Fatal("logical field pointer lacks the ordinary storage alias and selected location")
+		}
+		for _, forbidden := range []string{"= struct({", "memoryLayout", "bindMemoryRecord", "toRawPointer"} {
+			if strings.Contains(printed, forbidden) {
+				test.Fatalf("ordinary field alias unexpectedly requests %q", forbidden)
+			}
 		}
 	}
 }

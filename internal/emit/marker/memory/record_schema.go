@@ -12,6 +12,9 @@ import (
 )
 
 func recordSchema(context api.Context, source ast.Node, structure *types.Struct, represented api.TypeEmission, physical bool) (api.TypeEmission, []tsgo.Statement, error) {
+	if !physical {
+		return represented, nil, nil
+	}
 	if _, literal := represented.Value().(tsgo.TypeLiteralNode); !literal {
 		return represented, nil, nil
 	}

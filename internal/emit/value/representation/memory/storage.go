@@ -18,7 +18,7 @@ func (owner Owner) MemoryStorageType(context api.Context, source ast.Node, sourc
 	if array, selected := arrayvalue.Resolve(context, sourceType); selected {
 		return array.MemoryStorageType(context, source)
 	}
-	if structure, selected := sourceType.Underlying().(*types.Struct); selected && memoryFieldsDiffer(context, structure) {
+	if structure, selected := sourceType.Underlying().(*types.Struct); selected {
 		var members []tsgo.TypeElement
 		var requests []api.RootRequest
 		for index := range structure.NumFields() {
@@ -53,7 +53,7 @@ func (owner Owner) ToMemoryStorage(context api.Context, source ast.Node, sourceT
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if structure, selected := sourceType.Underlying().(*types.Struct); selected && memoryFieldsDiffer(context, structure) {
+	if structure, selected := sourceType.Underlying().(*types.Struct); selected {
 		return owner.memoryRecord(context, source, sourceType, structure, stored, true)
 	}
 	return stored, nil
@@ -70,7 +70,7 @@ func (owner Owner) FromMemoryStorage(context api.Context, source ast.Node, sourc
 		return owner.arrayFromMemory(context, source, array, value)
 	}
 	stored := value
-	if structure, selected := sourceType.Underlying().(*types.Struct); selected && memoryFieldsDiffer(context, structure) {
+	if structure, selected := sourceType.Underlying().(*types.Struct); selected {
 		var err error
 		stored, err = owner.memoryRecord(context, source, sourceType, structure, stored, false)
 		if err != nil {
@@ -80,24 +80,13 @@ func (owner Owner) FromMemoryStorage(context api.Context, source ast.Node, sourc
 	return owner.FromStorage(context, source, sourceType, stored)
 }
 
-func memoryFieldsDiffer(context api.Context, structure *types.Struct) bool {
-	for index := range structure.NumFields() {
-		if memoryStorageDiffers(context, structure.Field(index).Type()) {
-			return true
-		}
-	}
-	return false
-}
-
 func memoryStorageDiffers(context api.Context, sourceType types.Type) bool {
 	if _, selected := descriptorvalue.Resolve(context, sourceType); selected {
 		return true
 	}
-	switch underlying := sourceType.Underlying().(type) {
-	case *types.Array:
+	switch sourceType.Underlying().(type) {
+	case *types.Array, *types.Struct:
 		return true
-	case *types.Struct:
-		return memoryFieldsDiffer(context, underlying)
 	default:
 		return false
 	}

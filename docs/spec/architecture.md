@@ -484,7 +484,11 @@ in `@tsonic/core` are not a menu to attach speculatively:
 - `struct`, `field`, and `defaultValue` describe actual selected storage, not
   annotations attached to arbitrary generated classes. Exact zero-sized arrays
   beyond the number-safe extent use the shared default-value contract instead
-  of an expanded field set or a rounded allocation count; and
+  of an expanded field set or a rounded allocation count. A logical record's
+  live field storage is an ordinary reference type, including non-generic
+  records. Returning that storage preserves aliases. Physical memory projection
+  requests its own value schema and exact field bindings; it never turns a
+  logical storage reference into an implicit value copy; and
 - reference-mode, borrow, and move markers are selected only by a future owner
   that proves their complete target-neutral contract. They are not inferred
   from Go pointer spelling or added as optimization hints.

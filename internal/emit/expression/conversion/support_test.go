@@ -122,6 +122,8 @@ func main() {
 	fmt.Println(values.StructConversionCopies())
 	fmt.Println(values.StructConversionReusesDefinition())
 	fmt.Println(values.AnonymousStructConversion())
+	fmt.Println(values.StructFieldAddressSurvivesReplacement())
+	fmt.Println(values.GenericFieldAddressSurvivesReplacement())
 	fmt.Println(values.SliceToArrayCopies())
 	fmt.Println(values.DefinedSliceToArray())
 	fmt.Println(values.AggregateSliceToArrayCopies())
@@ -194,6 +196,8 @@ console.log(show(values.DefinedStringConversions()));
 console.log(show(values.StructConversionCopies()));
 console.log(show(values.StructConversionReusesDefinition()));
 console.log(show(values.AnonymousStructConversion()));
+console.log(show(values.StructFieldAddressSurvivesReplacement()));
+console.log(show(values.GenericFieldAddressSurvivesReplacement()));
 console.log(show(values.SliceToArrayCopies()));
 console.log(show(values.DefinedSliceToArray()));
 console.log(show(values.AggregateSliceToArrayCopies()));

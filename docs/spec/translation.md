@@ -887,16 +887,24 @@ and target support, not a fabricated JavaScript address. Unsupported layouts
 and operations fail closed; managed TypeScript memory support is not a claim
 of unrestricted native address emulation.
 
-For a flat struct `type Pair struct { First, Second uint32 }`, the selected
-physical carrier is the existing `Pair$Storage` type. Non-generic physical
-records carry the shared value-record contract explicitly:
+For a flat struct `type Pair struct { First, Second uint32 }`, logical storage
+retains reference identity. Both generic and non-generic records use ordinary
+storage aliases:
 
 ```ts
-export const Pair$Storage: { First: uint32; Second: uint32 } = struct({
+export type Pair$Storage = { First: uint32; Second: uint32 };
+```
+
+`Pair.$storageOf(value)` returns that live storage. Taking the address of one
+of its fields must not address a detached value copy. A selected raw-memory
+conversion separately constructs a physical schema with the shared value-record
+contract (the schematic local name below is allocated by the normal name owner):
+
+```ts
+const physical: { First: uint32; Second: uint32 } = struct({
     First: field<uint32>(),
     Second: field<uint32>(),
 });
-export type Pair$Storage = typeof Pair$Storage;
 ```
 
 The marker imports resolve to the canonical `@tsonic/core/lang.js`
@@ -912,10 +920,14 @@ source-visible properties. Pointer-bearing blank slots are not erased into
 untyped padding, and trailing zero-sized fields retain the Go-selected record
 size and stride rather than a sum of child sizes.
 The emitter constructs
-`memoryLayout<Pair$Storage>(abi, 8, 4, 8, ...)` with selectors of `First` at
-offset 0 and `Second` at offset 4. `projectPointer` uses `Pair.$storageOf` and
-`Pair.$fromStorage` to preserve the logical pointer, including nil and writes
-in both directions. Layout metadata must never attach to logical accessors.
+`memoryLayout<typeof physical>(abi, 8, 4, 8, ...)` with selectors of `First` at
+offset 0 and `Second` at offset 4. The existing `bindMemoryRecord` and
+`bindMemoryField` operations connect that physical view to the logical storage
+slots. `projectPointer` uses those conversions together with `Pair.$storageOf`
+and `Pair.$fromStorage` to preserve the logical pointer, including nil and writes
+in both directions. Reverse conversion describes the logical field bindings
+without declaring that reference record to be a native value type. Layout
+metadata must never attach to logical accessors.
 This preserves the source contract; an executable target still needs an exact
 aggregate codec or must reject it. It is not a claim of Node aggregate support.
 
