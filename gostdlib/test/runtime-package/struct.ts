@@ -1,4 +1,7 @@
+import type { $goContainerStorageType, $goStorageType } from "./storage.js";
 export class GoEmptyStruct {
+    declare readonly [$goStorageType]: {};
+    declare readonly [$goContainerStorageType]: {};
     declare private readonly $go$emptyStruct: void;
     public constructor() {
     }

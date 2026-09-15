@@ -100,49 +100,43 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeArray,
 		), nil
 	case RuntimeStorageTypeToken:
-		return runtimeContract(
+		return storageTypeContract(
 			RuntimeModuleStorage,
 			"runtime/storage.ts",
 			"$goStorageType",
-			true,
 		), nil
 	case RuntimeStoredValue:
-		return runtimeContract(
+		return storageTypeContract(
 			RuntimeModuleStorage,
 			"runtime/storage.ts",
 			"GoStoredValue",
-			true,
 			RuntimeStorageTypeToken,
 		), nil
 	case RuntimeStorageType:
-		return runtimeContract(
+		return storageTypeContract(
 			RuntimeModuleStorage,
 			"runtime/storage.ts",
 			"GoStorage",
-			true,
 			RuntimeStoredValue,
 		), nil
 	case RuntimeContainerStorageToken:
-		return runtimeContract(
+		return storageTypeContract(
 			RuntimeModuleStorage,
 			"runtime/storage.ts",
 			"$goContainerStorageType",
-			true,
 		), nil
 	case RuntimeContainerStoredValue:
-		return runtimeContract(
+		return storageTypeContract(
 			RuntimeModuleStorage,
 			"runtime/storage.ts",
 			"GoContainerStoredValue",
-			true,
 			RuntimeContainerStorageToken,
 		), nil
 	case RuntimeContainerStorageType:
-		return runtimeContract(
+		return storageTypeContract(
 			RuntimeModuleStorage,
 			"runtime/storage.ts",
 			"GoContainerStorage",
-			true,
 			RuntimeContainerStoredValue,
 		), nil
 	case RuntimeSlice:
@@ -524,6 +518,8 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/struct.ts",
 			"GoEmptyStruct",
 			true,
+			RuntimeStorageTypeToken,
+			RuntimeContainerStorageToken,
 		), nil
 	default:
 		if contract, ok := interfaceRuntimeContract(symbol); ok {

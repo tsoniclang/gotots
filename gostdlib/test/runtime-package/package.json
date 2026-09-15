@@ -17,6 +17,7 @@
     "./panic.js": "./panic.js",
     "./scalars.js": "./scalars.js",
     "./slice.js": "./slice.js",
+    "./storage.js": "./storage.js",
     "./string-value.js": "./string-value.js",
     "./struct.js": "./struct.js"
   }

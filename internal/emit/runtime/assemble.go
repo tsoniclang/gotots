@@ -399,10 +399,11 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
-		definition, err := NewDefinition(
-			api.RuntimeEmptyStruct,
-			emptystructruntime.Build(factory, contract.ExportedName()),
-		)
+		statement, err := emptystructruntime.Build(factory, contract.ExportedName())
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(api.RuntimeEmptyStruct, statement)
 		if err != nil {
 			return nil, err
 		}

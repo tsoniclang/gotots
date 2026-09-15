@@ -3,11 +3,15 @@ package emptystruct
 import (
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestEmptyStorageKeepsTheValueBrandOutsideItsDataRecord(test *testing.T) {
-	declaration := Build(tsgo.NewFactory(), "GoEmptyStruct")
+	declaration, err := Build(tsgo.NewFactory(), "GoEmptyStruct")
+	if err != nil {
+		test.Fatal(err)
+	}
 	seen := map[string]bool{}
 	for _, member := range declaration.Members() {
 		method, ok := member.(tsgo.MethodDeclaration)
@@ -55,7 +59,10 @@ func TestEmptyStorageKeepsTheValueBrandOutsideItsDataRecord(test *testing.T) {
 }
 
 func TestEmptyAssignmentEvaluatesBothOperandsWithoutReplacingStorage(test *testing.T) {
-	declaration := Build(tsgo.NewFactory(), "GoEmptyStruct")
+	declaration, err := Build(tsgo.NewFactory(), "GoEmptyStruct")
+	if err != nil {
+		test.Fatal(err)
+	}
 	for _, member := range declaration.Members() {
 		method, ok := member.(tsgo.MethodDeclaration)
 		if !ok {
@@ -75,4 +82,46 @@ func TestEmptyAssignmentEvaluatesBothOperandsWithoutReplacingStorage(test *testi
 		return
 	}
 	test.Fatal("empty assignment operation is absent")
+}
+
+func TestEmptyValueDeclaresBothExactStorageFacets(test *testing.T) {
+	declaration, err := Build(tsgo.NewFactory(), "GoEmptyStruct")
+	if err != nil {
+		test.Fatal(err)
+	}
+	remaining := map[string]bool{}
+	for _, symbol := range []api.RuntimeSymbol{api.RuntimeStorageTypeToken, api.RuntimeContainerStorageToken} {
+		contract, contractErr := api.RuntimeContract(symbol)
+		if contractErr != nil {
+			test.Fatal(contractErr)
+		}
+		remaining[contract.ExportedName()] = true
+	}
+	for _, member := range declaration.Members() {
+		property, ok := member.(tsgo.PropertyDeclaration)
+		if !ok {
+			continue
+		}
+		computed, ok := property.Name().(tsgo.ComputedPropertyName)
+		if !ok {
+			continue
+		}
+		name, ok := computed.Expression().(tsgo.Identifier)
+		if !ok || !remaining[name.Text()] {
+			test.Fatal("empty value has an unexpected or duplicated storage token")
+		}
+		delete(remaining, name.Text())
+		storage, ok := property.Type().(tsgo.TypeLiteralNode)
+		if !ok || len(storage.Members()) != 0 || property.Initializer() != nil {
+			test.Fatal("storage facet must describe the empty type without runtime initialization")
+		}
+		modifiers := property.Modifiers()
+		if len(modifiers) != 2 || modifiers[0].Kind() != tsgo.SyntaxKind(tsgo.ModifierSyntaxKindDeclareKeyword) ||
+			modifiers[1].Kind() != tsgo.SyntaxKind(tsgo.ModifierSyntaxKindReadonlyKeyword) {
+			test.Fatal("storage facet must be a declared readonly property")
+		}
+	}
+	if len(remaining) != 0 {
+		test.Fatal("empty value is missing a storage facet")
+	}
 }

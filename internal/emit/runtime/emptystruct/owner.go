@@ -1,6 +1,7 @@
 package emptystruct
 
 import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -16,10 +17,24 @@ const (
 	fromStorageMember = "$fromStorage"
 )
 
-func Build(factory tsgo.Factory, className string) tsgo.ClassDeclaration {
+func Build(factory tsgo.Factory, className string) (tsgo.ClassDeclaration, error) {
 	target := builder{factory: factory, className: className}
 	classType := target.classType()
 	storageType := factory.TypeLiteralNode(nil)
+	var storageMembers []tsgo.ClassElement
+	for _, symbol := range []api.RuntimeSymbol{api.RuntimeStorageTypeToken, api.RuntimeContainerStorageToken} {
+		contract, err := api.RuntimeContract(symbol)
+		if err != nil {
+			return nil, err
+		}
+		storageMembers = append(storageMembers, factory.PropertyDeclaration(
+			[]tsgo.ModifierLike{factory.DeclareKeyword(), factory.ReadonlyKeyword()},
+			factory.ComputedPropertyName(factory.Identifier(contract.ExportedName())),
+			nil,
+			storageType,
+			nil,
+		))
+	}
 	returnSource := func() tsgo.Expression {
 		return target.factory.Identifier("$source")
 	}
@@ -41,7 +56,7 @@ func Build(factory tsgo.Factory, className string) tsgo.ClassDeclaration {
 		factory.Identifier(className),
 		nil,
 		nil,
-		[]tsgo.ClassElement{
+		append(storageMembers, []tsgo.ClassElement{
 			target.brand(),
 			target.constructor(),
 			target.method(zeroMember, nil, classType, returnNew()),
@@ -90,8 +105,8 @@ func Build(factory tsgo.Factory, className string) tsgo.ClassDeclaration {
 				classType,
 				returnNew(),
 			),
-		},
-	)
+		}...),
+	), nil
 }
 
 type builder struct {

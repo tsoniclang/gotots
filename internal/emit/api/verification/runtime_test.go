@@ -92,7 +92,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeInterfaceFormat, 1011, api.RuntimeModuleInterface, "runtime/interface.ts", "GoInterfaceFormat", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeProviderInterfaceBridge, 1012, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "GoProviderInterfaceBridge", true, []api.RuntimeSymbol{api.RuntimeInterfaceValue}},
 		{api.RuntimeInterfaceAdapterFactory, 1013, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "createGoInterfaceAdapter", false, []api.RuntimeSymbol{api.RuntimeInterfaceValue}},
-		{api.RuntimeEmptyStruct, 1050, api.RuntimeModuleStruct, "runtime/struct.ts", "GoEmptyStruct", true, nil},
+		{api.RuntimeEmptyStruct, 1050, api.RuntimeModuleStruct, "runtime/struct.ts", "GoEmptyStruct", true, []api.RuntimeSymbol{api.RuntimeStorageTypeToken, api.RuntimeContainerStorageToken}},
 		{api.RuntimeChannel, 1100, api.RuntimeModuleChannel, "runtime/channel.ts", "GoChannel", true, []api.RuntimeSymbol{api.RuntimeReceiveChannel, api.RuntimeSendChannel, api.RuntimeSelectCase, api.RuntimePanic}},
 		{api.RuntimeReceiveChannel, 1101, api.RuntimeModuleChannel, "runtime/channel.ts", "GoReceiveChannel", true, []api.RuntimeSymbol{api.RuntimeSelectCase}},
 		{api.RuntimeSendChannel, 1102, api.RuntimeModuleChannel, "runtime/channel.ts", "GoSendChannel", true, []api.RuntimeSymbol{api.RuntimeSelectCase}},
@@ -152,6 +152,22 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		if _, err := api.RuntimeContract(retired); err == nil {
 			t.Fatalf("retired runtime symbol %d still has a contract", retired)
 		}
+	}
+}
+
+func TestStorageFacetsDoNotCreateRuntimeImports(test *testing.T) {
+	for _, symbol := range []api.RuntimeSymbol{
+		api.RuntimeStorageTypeToken, api.RuntimeStoredValue, api.RuntimeStorageType,
+		api.RuntimeContainerStorageToken, api.RuntimeContainerStoredValue, api.RuntimeContainerStorageType,
+	} {
+		contract, err := api.RuntimeContract(symbol)
+		if err != nil || !contract.TypeUsable() || !contract.TypeOnly() {
+			test.Fatalf("storage symbol %d must be type-only: %v", symbol, err)
+		}
+	}
+	value, err := api.RuntimeContract(api.RuntimeEmptyStruct)
+	if err != nil || value.TypeOnly() {
+		test.Fatalf("the empty value's constructor must remain a runtime import: %v", err)
 	}
 }
 

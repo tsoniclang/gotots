@@ -61,3 +61,26 @@ func Convert(value *struct{}) *struct{} { return (*struct{})(unsafe.Pointer(valu
 		}
 	}
 }
+
+func TestGenericEmptyArrayStorageMatchesItsConcreteLayout(test *testing.T) {
+	loaded := loadMemoryStorageCase(test, `
+type Generic[T any] struct { _ [0]T; Values [2]T }
+type Record struct { Value Generic[struct{}] }
+func Convert(value *Record) *Record { return (*Record)(unsafe.Pointer(value)) }
+`)
+	root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Convert"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), []emit.Root{root})
+	if err != nil {
+		test.Fatal(err)
+	}
+	strictTypecheckEmission(test, emission)
+	_, _, printed := printConversions(test, test.TempDir(), emission)
+	for _, required := range []string{"GoContainerStorage<T>", "Generic<GoEmptyStruct>", "GoArray<{}, 0>", "GoArray<{}, 2>"} {
+		if !strings.Contains(printed, required) {
+			test.Fatalf("generic empty array storage lacks %q", required)
+		}
+	}
+}
