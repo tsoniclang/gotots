@@ -19,6 +19,7 @@ const (
 func Build(factory tsgo.Factory, className string) tsgo.ClassDeclaration {
 	target := builder{factory: factory, className: className}
 	classType := target.classType()
+	storageType := factory.TypeLiteralNode(nil)
 	returnSource := func() tsgo.Expression {
 		return target.factory.Identifier("$source")
 	}
@@ -80,14 +81,14 @@ func Build(factory tsgo.Factory, className string) tsgo.ClassDeclaration {
 			target.method(
 				storageOfMember,
 				[]tsgo.ParameterDeclaration{target.parameter("$source", classType)},
-				classType,
-				returnSource(),
+				storageType,
+				factory.ObjectLiteralExpression(nil, false),
 			),
 			target.method(
 				fromStorageMember,
-				[]tsgo.ParameterDeclaration{target.parameter("$source", classType)},
+				[]tsgo.ParameterDeclaration{target.parameter("$source", storageType)},
 				classType,
-				returnSource(),
+				returnNew(),
 			),
 		},
 	)

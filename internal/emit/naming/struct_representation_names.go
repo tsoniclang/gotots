@@ -404,7 +404,9 @@ func (n *File) AnonymousStructStorage(
 		}
 	}
 	if structType.NumFields() == 0 {
-		return n.Runtime(api.RuntimeEmptyStruct, api.ImportPhaseType)
+		return api.NameReference{}, &api.NameError{
+			Reason: "anonymous empty storage is an inline fieldless record, not a named value facade",
+		}
 	}
 	binding, err := n.anonymousStructBinding(structType)
 	if err != nil {

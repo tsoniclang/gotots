@@ -113,6 +113,9 @@ func (owner Owner) StorageType(
 		return carrier.StorageType(context)
 	}
 	if structType, ok := isAnonymousStruct(sourceType); ok {
+		if structType.NumFields() == 0 {
+			return api.DirectType(context.Factory().TypeLiteralNode(nil)), nil
+		}
 		reference, err := context.Names().AnonymousStructStorage(structType)
 		if err != nil {
 			return api.TypeEmission{}, err

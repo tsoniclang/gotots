@@ -19,11 +19,11 @@ export class GoEmptyStruct {
     static $convert($source: object): GoEmptyStruct {
         return new GoEmptyStruct;
     }
-    static $storageOf($source: GoEmptyStruct): GoEmptyStruct {
-        return $source;
+    static $storageOf($source: GoEmptyStruct): {} {
+        return {};
     }
-    static $fromStorage($source: GoEmptyStruct): GoEmptyStruct {
-        return $source;
+    static $fromStorage($source: {}): GoEmptyStruct {
+        return new GoEmptyStruct;
     }
     declare private readonly then?: never;
 }

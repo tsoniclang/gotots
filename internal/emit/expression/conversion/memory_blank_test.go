@@ -37,3 +37,27 @@ func Convert(value *Record) *Record { return (*Record)(unsafe.Pointer(value)) }
 		}
 	}
 }
+
+func TestRawEmptyStructStorageExcludesNominalBrands(test *testing.T) {
+	loaded := loadMemoryStorageCase(test, `
+func Convert(value *struct{}) *struct{} { return (*struct{})(unsafe.Pointer(value)) }
+`)
+	root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Convert"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), []emit.Root{root})
+	if err != nil {
+		test.Fatal(err)
+	}
+	strictTypecheckEmission(test, emission)
+	_, _, printed := printConversions(test, test.TempDir(), emission)
+	if strings.Contains(printed, "memoryLayout<GoEmptyStruct>") {
+		test.Fatal("a nominal Go value must not be used as a fieldless data layout")
+	}
+	for _, required := range []string{"memoryLayout<{}>", "$storageOf", "$fromStorage", "bindMemoryRecord"} {
+		if !strings.Contains(printed, required) {
+			test.Fatalf("empty storage conversion lacks %q", required)
+		}
+	}
+}
