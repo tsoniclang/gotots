@@ -1,25 +1,25 @@
-function requireSafeInteger(value: number): void {
-  if (!Number.isSafeInteger(value)) {
-    throw new RangeError("Go integer cannot cross the JavaScript host boundary exactly");
+function requireInteger(value: number): void {
+  if (!Number.isInteger(value)) {
+    throw new RangeError("Go integer conversion requires a finite integer");
   }
 }
 
 export function hostInteger(value: bigint): number {
   const result = Number(value);
-  requireSafeInteger(result);
+  requireInteger(result);
   if (BigInt(result) !== value) {
-    throw new RangeError("Go integer cannot cross the JavaScript host boundary exactly");
+    throw new RangeError("Go integer cannot cross the numeric boundary without loss");
   }
   return result;
 }
 
 export function integerFromHost(value: number): bigint {
-  requireSafeInteger(value);
+  requireInteger(value);
   return BigInt(value);
 }
 
 export function unsignedIntegerFromHost(value: number): bigint {
-  requireSafeInteger(value);
+  requireInteger(value);
   if (value < 0) {
     throw new RangeError("negative host integer cannot become an unsigned Go integer");
   }

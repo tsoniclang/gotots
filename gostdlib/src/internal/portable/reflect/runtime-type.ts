@@ -10,6 +10,8 @@ import type {
   float64,
   gostring,
   int64,
+  int32,
+  uint32,
   uint64,
 } from "@gotots/gostdlib/internal/scalars.js";
 
@@ -133,10 +135,10 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   }
 
   $go$hash(): number {
-    let hash = 2166136261;
+    let hash: uint32 = 2166136261;
     for (let index = 0; index < this.metadata.identity.length; index++) {
-      hash ^= this.metadata.identity.charCodeAt(index);
-      hash = Math.imul(hash, 16777619);
+      hash ^= this.metadata.identity.charCodeAt(index) as uint32;
+      hash = (Math.imul(hash as int32, 16777619) >>> 0) as uint32;
     }
     return hash >>> 0;
   }

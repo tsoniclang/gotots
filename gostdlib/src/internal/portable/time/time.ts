@@ -8,6 +8,8 @@ import type {
   gostring,
   int,
   int64,
+  int32,
+  uint32,
   uint8,
 } from "@gotots/gostdlib/internal/scalars.js";
 import { hostInteger, integerFromHost } from "../../host-integer.js";
@@ -60,7 +62,7 @@ export class Time {
         && left.zoneName === right.zoneName
     );
     hashTimeRepresentation = (source: Time): number => {
-      let hash = 2_166_136_261;
+      let hash: uint32 = 2_166_136_261;
       hash = hashTimeNumber(hash, source.epochMilliseconds);
       hash = hashTimeNumber(hash, source.monotonic);
       hash = hashTimeNumber(hash, source.nanosecondRemainder);
@@ -446,27 +448,27 @@ function pad(value: number): string {
   return String(value).padStart(2, "0");
 }
 
-function hashTimeNumber(hash: number, value: number | undefined): number {
+function hashTimeNumber(hash: uint32, value: number | undefined): uint32 {
   if (value === undefined) {
-    return Math.imul(hash ^ 0x9e37_79b9, 16_777_619) >>> 0;
+    return (Math.imul((hash ^ 0x9e37_79b9) as int32, 16_777_619) >>> 0) as uint32;
   }
   const text = String(value);
-  let result = hash;
+  let result: uint32 = hash;
   for (let index = 0; index < text.length; index += 1) {
-    result = Math.imul(result ^ text.charCodeAt(index), 16_777_619) >>> 0;
+    result = (Math.imul((result ^ (text.charCodeAt(index) as uint32)) as int32, 16_777_619) >>> 0) as uint32;
   }
-  return Math.imul(result ^ 0xff, 16_777_619) >>> 0;
+  return (Math.imul((result ^ 0xff) as int32, 16_777_619) >>> 0) as uint32;
 }
 
-function hashTimeString(hash: number, value: string | undefined): number {
+function hashTimeString(hash: uint32, value: string | undefined): uint32 {
   if (value === undefined) {
-    return Math.imul(hash ^ 0x85eb_ca6b, 16_777_619) >>> 0;
+    return (Math.imul((hash ^ 0x85eb_ca6b) as int32, 16_777_619) >>> 0) as uint32;
   }
-  let result = hash;
+  let result: uint32 = hash;
   for (let index = 0; index < value.length; index += 1) {
-    result = Math.imul(result ^ value.charCodeAt(index), 16_777_619) >>> 0;
+    result = (Math.imul((result ^ (value.charCodeAt(index) as uint32)) as int32, 16_777_619) >>> 0) as uint32;
   }
-  return Math.imul(result ^ 0xff, 16_777_619) >>> 0;
+  return (Math.imul((result ^ 0xff) as int32, 16_777_619) >>> 0) as uint32;
 }
 
 function dayOfYear(year: number, month: number, day: number): number {
