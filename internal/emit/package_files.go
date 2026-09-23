@@ -13,6 +13,7 @@ import (
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/emit/sourcepackage"
 	"github.com/tsoniclang/gotots/internal/load"
+	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -387,6 +388,20 @@ func (s *programSession) packageAssemblyFile(
 			return TargetFile{}, err
 		}
 	}
+	if len(builder.storage) != 0 {
+		module, err := targetoutput.ModuleSpecifier(builder.assemblyPath, builder.statePath)
+		if err != nil {
+			return TargetFile{}, err
+		}
+		request, err := api.NewImportRequest(s.factory, api.ImportPhaseValue, module,
+			packagevariable.StateInitializerName, packagevariable.StateInitializerName)
+		if err != nil {
+			return TargetFile{}, err
+		}
+		if err := placement.Apply([]api.RootRequest{request}); err != nil {
+			return TargetFile{}, err
+		}
+	}
 	requirements.observe(placement)
 	statements := placement.Statements(s.factory)
 	initialization := slices.Clone(builder.constantInitialization)
@@ -395,6 +410,25 @@ func (s *programSession) packageAssemblyFile(
 			initialization,
 			storage.initializationStatements...,
 		)
+	}
+	if len(builder.storage) != 0 {
+		storage := slices.Clone(builder.storage)
+		sort.Slice(storage, func(left, right int) bool {
+			return storage[left].variable.Name() < storage[right].variable.Name()
+		})
+		arguments := make([]tsgo.Expression, 0, len(storage))
+		for _, item := range storage {
+			if item.initialValue == nil {
+				return TargetFile{}, &ScheduleError{
+					Object: item.owner.Name(),
+					Reason: "package storage has no exact initial value",
+				}
+			}
+			arguments = append(arguments, item.initialValue)
+		}
+		initialization = append(initialization, s.factory.ExpressionStatement(s.factory.CallExpression(
+			s.factory.Identifier(packagevariable.StateInitializerName), nil, nil, arguments, tsgo.NodeFlagsNone,
+		)))
 	}
 	for _, artifact := range builder.initialization {
 		if len(artifact.statements) == 0 {

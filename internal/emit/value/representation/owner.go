@@ -74,6 +74,12 @@ func (Owner) RequiresExplicitType(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if _, integer := integervalue.Describe(context.TypesSizes(), sourceType); integer {
+		return true
+	}
+	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok && basic.Kind() == types.Float32 {
+		return true
+	}
 	if _, ok := api.GenericTypeParameter(sourceType); ok {
 		return true
 	}

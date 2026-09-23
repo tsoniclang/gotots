@@ -1,15 +1,17 @@
+import type { Cell$Storage as Cell__from_dep$Storage } from "../../../../modules/example.com/package-state/dep/state.js";
 import type { int32 } from "@gotots/runtime/scalars.js";
 import { Cell, mark } from "../../../../modules/example.com/package-state/dep/state.js";
-import { $state } from "./state.js";
+import { $initializeState, $state } from "./state.js";
 export function $initialize(): void {
-    $state.A = 0;
-    $state.B = 0;
-    $state.Dormant = 0;
-    $state.Empty = Cell.$zeroStorage();
-    $state.Filled = Cell.$zeroStorage();
-    $state.Trace = 0;
-    $state.__go___proto__ = 0;
-    $state.hidden = 0;
+    const assignmentValue: int32 = 0;
+    const assignmentValue2: int32 = 0;
+    const assignmentValue3: int32 = 0;
+    const assignmentValue4: Cell__from_dep$Storage = Cell.$zeroStorage();
+    const assignmentValue5: Cell__from_dep$Storage = Cell.$zeroStorage();
+    const assignmentValue6: int32 = 0;
+    const assignmentValue7: int32 = 0;
+    const assignmentValue8: int32 = 0;
+    $initializeState(assignmentValue, assignmentValue2, assignmentValue3, assignmentValue4, assignmentValue5, assignmentValue6, assignmentValue7, assignmentValue8);
     {
         $state.B = mark(2);
     }

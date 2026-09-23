@@ -17,12 +17,16 @@ import (
 )
 
 type packageStateScale struct {
-	fields              int
-	assemblyAssignments int
-	sourceVariables     int
-	stateConstructors   int
-	wireBytes           int
-	printedBytes        int
+	fields                  int
+	assemblyAssignments     int
+	sourceVariables         int
+	stateConstructors       int
+	constructorAssignments  int
+	initialValueBindings    int
+	initializationCalls     int
+	initializationArguments int
+	wireBytes               int
+	printedBytes            int
 }
 
 func TestPackageStateConstructionScalesWithVariables(t *testing.T) {
@@ -55,11 +59,17 @@ func TestPackageStateConstructionScalesWithVariables(t *testing.T) {
 				measurement.fields,
 			)
 		}
-		if measurement.assemblyAssignments != count*2 {
+		if measurement.assemblyAssignments != count || measurement.constructorAssignments != count ||
+			measurement.initialValueBindings != count || measurement.initializationCalls != 1 ||
+			measurement.initializationArguments != count {
 			t.Fatalf(
-				"%d variables emitted %d zero/initializer assignments",
+				"%d variables emitted assignments=%d constructor=%d zeros=%d calls=%d arguments=%d",
 				count,
 				measurement.assemblyAssignments,
+				measurement.constructorAssignments,
+				measurement.initialValueBindings,
+				measurement.initializationCalls,
+				measurement.initializationArguments,
 			)
 		}
 		if measurement.sourceVariables != 0 {
@@ -239,6 +249,27 @@ func measurePackageStateScale(
 				result.assemblyAssignments += countPackageStateAssignments(
 					function.Body().(tsgo.Block).Statements(),
 				)
+				for _, bodyStatement := range function.Body().(tsgo.Block).Statements() {
+					switch selected := bodyStatement.(type) {
+					case tsgo.VariableStatement:
+						for _, binding := range selected.DeclarationList().Declarations() {
+							if binding.Initializer() == nil {
+								t.Fatal("package zero value binding lacks its initializer")
+							}
+							result.initialValueBindings++
+						}
+					case tsgo.ExpressionStatement:
+						call, ok := selected.Expression().(tsgo.CallExpression)
+						if !ok {
+							continue
+						}
+						name, ok := call.Expression().(tsgo.Identifier)
+						if ok && name.Text() == "$initializeState" {
+							result.initializationCalls++
+							result.initializationArguments += len(call.Arguments())
+						}
+					}
+				}
 			case emit.TargetFilePackageState:
 				inspectPackageStateStatement(t, statement, &result)
 			}
@@ -272,10 +303,14 @@ func inspectPackageStateStatement(
 	switch statement := statement.(type) {
 	case tsgo.ClassDeclaration:
 		for _, member := range statement.Members() {
-			if _, ok := member.(tsgo.PropertyDeclaration); !ok {
-				t.Fatalf("package state member is %T, want property", member)
+			switch selected := member.(type) {
+			case tsgo.PropertyDeclaration:
+				result.fields++
+			case tsgo.ConstructorDeclaration:
+				result.constructorAssignments += countPackageStateAssignments(selected.Body().(tsgo.Block).Statements())
+			default:
+				t.Fatalf("package state member is %T, want property or constructor", member)
 			}
-			result.fields++
 		}
 	case tsgo.VariableStatement:
 		for _, declaration := range statement.DeclarationList().Declarations() {
@@ -283,14 +318,26 @@ func inspectPackageStateStatement(
 			if !ok || name.Text() != "$state" {
 				continue
 			}
-			if _, ok := declaration.Initializer().(tsgo.NewExpression); !ok {
+			if declaration.Initializer() != nil || declaration.Type() == nil {
 				t.Fatalf(
-					"package state initializer is %T, want new expression",
+					"package state initializer is %T, want typed live binding",
 					declaration.Initializer(),
 				)
 			}
-			result.stateConstructors++
 		}
+	case tsgo.FunctionDeclaration:
+		if statement.Name().Text() != "$initializeState" {
+			return
+		}
+		body := statement.Body().(tsgo.Block).Statements()
+		if len(body) != 1 {
+			t.Fatal("state publication must contain one construction")
+		}
+		assignment := body[0].(tsgo.ExpressionStatement).Expression().(tsgo.BinaryExpression)
+		if _, ok := assignment.Right().(tsgo.NewExpression); !ok {
+			t.Fatal("state publication does not construct its exact class")
+		}
+		result.stateConstructors++
 	}
 }
 

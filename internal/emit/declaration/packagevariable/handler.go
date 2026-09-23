@@ -9,19 +9,20 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
-	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 const (
-	StateClassName = "$PackageState"
-	StateValueName = "$state"
+	StateClassName       = "$PackageState"
+	StateValueName       = "$state"
+	StateInitializerName = "$initializeState"
 )
 
 type StorageEmission struct {
 	field                    tsgo.PropertyDeclaration
 	initializationStatements []tsgo.Statement
+	initialValue             tsgo.Expression
 	stateRequests            []api.RootRequest
 	assemblyRequests         []api.RootRequest
 }
@@ -67,6 +68,12 @@ func EmitStorage(
 	if err != nil {
 		return StorageEmission{}, err
 	}
+	assemblyType, err := assemblyContext.Values().StorageType(
+		assemblyContext.WithRole(api.RolePackageVariableType), source, variable.Type(),
+	)
+	if err != nil {
+		return StorageEmission{}, err
+	}
 	initial, err := emitInitialStorage(
 		assemblyContext,
 		source,
@@ -76,33 +83,40 @@ func EmitStorage(
 	if err != nil {
 		return StorageEmission{}, err
 	}
+	initialName, err := assemblyContext.Names().Temporary(api.TemporaryAssignmentValue)
+	if err != nil {
+		return StorageEmission{}, err
+	}
 	initializationStatements := initial.Before()
 	initializationStatements = append(
 		initializationStatements,
-		assemblyContext.Factory().ExpressionStatement(
-			assemblyContext.Factory().BinaryExpression(
-				nil,
-				assemblyReference.Expression(assemblyContext.Factory()),
-				nil,
-				assemblyContext.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsToken,
-				),
-				initial.Value(),
+		assemblyContext.Factory().VariableStatement(
+			nil,
+			assemblyContext.Factory().VariableDeclarationList(
+				[]tsgo.VariableDeclaration{assemblyContext.Factory().VariableDeclaration(
+					assemblyContext.Factory().Identifier(initialName),
+					nil,
+					assemblyType.Value(),
+					initial.Value(),
+				)},
+				tsgo.NodeFlagsConst,
 			),
 		),
 	)
 	return StorageEmission{
 		field: stateContext.Factory().PropertyDeclaration(
-			[]tsgo.ModifierLike{stateContext.Factory().DeclareKeyword()},
+			nil,
 			stateContext.Factory().Identifier(stateReference.FieldName()),
 			nil,
 			targetType.Value(),
 			nil,
 		),
 		initializationStatements: initializationStatements,
+		initialValue:             assemblyContext.Factory().Identifier(initialName),
 		stateRequests:            targetType.Requests(),
 		assemblyRequests: api.CombineRequests(
 			assemblyReference.Requests(),
+			assemblyType.Requests(),
 			initial.Requests(),
 		),
 	}, nil
@@ -391,60 +405,16 @@ func emitMultipleInitializer(
 	return api.NewStatementEmission(statements, requests)
 }
 
-func StateDeclarations(
-	factory tsgo.Factory,
-	fields []tsgo.PropertyDeclaration,
-) ([]tsgo.Statement, error) {
-	if len(fields) == 0 {
-		return nil, &api.InvariantError{
-			Role:   api.RoleFileDeclaration,
-			Reason: "package state has no fields",
-		}
-	}
-	members := make([]tsgo.ClassElement, 0, len(fields))
-	for _, field := range fields {
-		if field == nil {
-			return nil, &api.InvariantError{
-				Role:   api.RolePackageVariableType,
-				Reason: "package state has a nil field",
-			}
-		}
-		members = append(members, field)
-	}
-	class := typescriptclass.Declaration(factory,
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.Identifier(StateClassName),
-		nil,
-		nil,
-		members,
-	)
-	state := factory.VariableStatement(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.VariableDeclarationList(
-			[]tsgo.VariableDeclaration{
-				factory.VariableDeclaration(
-					factory.Identifier(StateValueName),
-					nil,
-					nil,
-					factory.NewExpression(
-						factory.Identifier(StateClassName),
-						nil,
-						[]tsgo.Expression{},
-					),
-				),
-			},
-			tsgo.NodeFlagsConst,
-		),
-	)
-	return []tsgo.Statement{class, state}, nil
-}
-
 func (e StorageEmission) Field() tsgo.PropertyDeclaration {
 	return e.field
 }
 
 func (e StorageEmission) InitializationStatements() []tsgo.Statement {
 	return slices.Clone(e.initializationStatements)
+}
+
+func (e StorageEmission) InitialValue() tsgo.Expression {
+	return e.initialValue
 }
 
 func (e StorageEmission) StateRequests() []api.RootRequest {

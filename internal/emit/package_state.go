@@ -33,6 +33,7 @@ type packageStorage struct {
 	source                   ast.Node
 	field                    tsgo.PropertyDeclaration
 	initializationStatements []tsgo.Statement
+	initialValue             tsgo.Expression
 	statePlacement           *targetplacement.Owner
 	assemblyPlacement        *targetplacement.Owner
 	reconstructions          uint64
@@ -41,6 +42,7 @@ type packageStorage struct {
 type packageStorageRevision struct {
 	field                    tsgo.PropertyDeclaration
 	initializationStatements []tsgo.Statement
+	initialValue             tsgo.Expression
 	statePlacement           *targetplacement.Owner
 	assemblyPlacement        *targetplacement.Owner
 	dependencies             []api.ArtifactDependency
@@ -285,6 +287,7 @@ func (s *programSession) emitPackageStorage(
 		source:                   source,
 		field:                    revision.field,
 		initializationStatements: revision.initializationStatements,
+		initialValue:             revision.initialValue,
 		statePlacement:           revision.statePlacement,
 		assemblyPlacement:        revision.assemblyPlacement,
 	})
@@ -373,6 +376,7 @@ func (s *programSession) buildPackageStorageRevision(
 	return packageStorageRevision{
 		field:                    emission.Field(),
 		initializationStatements: emission.InitializationStatements(),
+		initialValue:             emission.InitialValue(),
 		statePlacement:           statePlacement,
 		assemblyPlacement:        assemblyPlacement,
 		dependencies: append(
@@ -451,6 +455,7 @@ func (s *programSession) reconstructPackageStorage(
 	s.artifacts.DiscardDirty(owner)
 	storage.field = revision.field
 	storage.initializationStatements = revision.initializationStatements
+	storage.initialValue = revision.initialValue
 	storage.statePlacement = revision.statePlacement
 	storage.assemblyPlacement = revision.assemblyPlacement
 	storage.reconstructions++

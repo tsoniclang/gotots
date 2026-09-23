@@ -2211,8 +2211,15 @@ Each state field carries the value's storage representation, not its public
 value wrapper. Reads, writes, initialization, and addresses use the same
 storage projection owner, so a later-demanded struct storage facet revises the
 state declaration and every dependent artifact together.
+State fields are ordinary typed fields, initialized together by their class
+constructor. The state module has only type dependencies and exports a live
+state binding plus its initialization function. The package assembly evaluates
+the exact storage-zero values in their established order and publishes the
+fully constructed state before any source initializer runs. There is no empty
+state object with erased `declare` fields, target-invented default value, or
+per-field late-initialization wrapper.
 Compiler-supplied `//go:embed` values initialize their owning package storage
-before source initializers through the same package-state assignment path.
+before source initializers through the same package-state construction path.
 String payload materialization preserves every Go byte, including NUL and
 invalid UTF-8, rather than interpreting payload text as Unicode source.
 

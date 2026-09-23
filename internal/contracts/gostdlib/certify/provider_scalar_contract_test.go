@@ -8,6 +8,7 @@ import (
 
 	runtimecontract "github.com/tsoniclang/gotots/internal/contracts/runtime"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestProviderScalarContractRejectsMissingCertifiedAlias(t *testing.T) {
@@ -40,7 +41,7 @@ func TestProviderScalarContractRejectsMissingCertifiedAlias(t *testing.T) {
 	}
 	mutated := strings.Replace(
 		string(scalarSource),
-		"export type int64 = bigint;\n",
+		"export type int64 = TsonicInt64;\n",
 		"",
 		1,
 	)
@@ -48,6 +49,9 @@ func TestProviderScalarContractRejectsMissingCertifiedAlias(t *testing.T) {
 		t.Fatal("provider scalar mutation did not remove int64")
 	}
 	providerRoot := t.TempDir()
+	if err := corefixture.InstallResolutionOnly(providerRoot); err != nil {
+		t.Fatal(err)
+	}
 	scalarPath := filepath.Join(providerRoot, "src", "internal", "scalars.ts")
 	if err := os.MkdirAll(filepath.Dir(scalarPath), 0o755); err != nil {
 		t.Fatal(err)

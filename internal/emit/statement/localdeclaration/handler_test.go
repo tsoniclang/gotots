@@ -11,7 +11,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestInitializedLocalDeclarationBuildsInferredVariableList(t *testing.T) {
+func TestInitializedLocalDeclarationRetainsExactScalarTypes(t *testing.T) {
 	projectDirectory, err := filepath.Abs(
 		filepath.Join("..", "..", "..", "..", "testdata", "projects", "local-variables"),
 	)
@@ -58,9 +58,15 @@ func TestInitializedLocalDeclarationBuildsInferredVariableList(t *testing.T) {
 		declarations[1].Name().(tsgo.Identifier).Text() != "right" {
 		t.Fatal("ValueSpec declaration order was not preserved")
 	}
-	if declarations[0].Type() != nil || declarations[1].Type() != nil ||
+	if declarations[0].Type() == nil || declarations[1].Type() == nil ||
 		declarations[0].Initializer() == nil || declarations[1].Initializer() == nil {
-		t.Fatal("initialized declarations were not left to exact target inference")
+		t.Fatal("initialized declarations lost their exact source scalar type")
+	}
+	for _, declaration := range declarations {
+		selected, ok := declaration.Type().(tsgo.TypeReferenceNode)
+		if !ok || selected.TypeName().(tsgo.Identifier).Text() != "int32" {
+			t.Fatal("integer binding widened from its exact int32 source type")
+		}
 	}
 }
 
