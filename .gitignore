@@ -2,7 +2,7 @@
 /.claude/
 
 # Project-local analysis, scratch, and generated test work
-/.analysis/
+.analysis/
 /.temp/
 **/.temp/
 /.tests/
